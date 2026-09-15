@@ -3,6 +3,7 @@ package hu.laca.weighttracker
 import android.content.Context
 import hu.laca.weighttracker.data.local.WeightDatabase
 import hu.laca.weighttracker.data.preferences.ThemePreferences
+import hu.laca.weighttracker.data.repository.ExerciseRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.domain.SystemDateProvider
@@ -17,9 +18,14 @@ class AppContainer(context: Context) {
         dao = database.weightMeasurementDao(),
         clock = clock
     )
+    val exerciseRepository = ExerciseRepository(
+        dao = database.exerciseDao(),
+        clock = clock
+    )
     val themePreferences = ThemePreferences(appContext)
     val viewModelFactory = WeightViewModelFactory(
         weightRepository = weightRepository,
+        exerciseRepository = exerciseRepository,
         dateProvider = dateProvider,
         themePreferences = themePreferences
     )

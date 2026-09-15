@@ -2,11 +2,14 @@ package hu.laca.weighttracker.ui.dashboard
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -20,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -39,6 +43,7 @@ import hu.laca.weighttracker.ui.components.MeasurementEditorSheet
 import hu.laca.weighttracker.ui.components.MonthCalendar
 import hu.laca.weighttracker.ui.components.SectionHeader
 import hu.laca.weighttracker.ui.components.SegmentedControl
+import hu.laca.weighttracker.ui.components.SettingsAction
 import hu.laca.weighttracker.ui.components.UiFormatters
 import hu.laca.weighttracker.ui.components.UserMessageEffect
 import hu.laca.weighttracker.ui.components.WeightChart
@@ -67,18 +72,21 @@ fun DashboardScreen(
     onDeleteRequest: () -> Unit,
     onDeleteDismiss: () -> Unit,
     onDeleteConfirm: () -> Unit,
-    onMessageConsumed: () -> Unit
+    onMessageConsumed: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedPoint by remember { mutableStateOf<ChartPoint?>(null) }
     UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
+                .statusBarsPadding()
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = AppDimens.screenPadding)
@@ -86,7 +94,8 @@ fun DashboardScreen(
         ) {
             OverviewHeader(
                 greeting = state.greeting,
-                today = state.today
+                today = state.today,
+                onOpenSettings = onOpenSettings
             )
             Spacer(Modifier.height(AppDimens.sectionGap))
             CurrentWeightHero(
@@ -187,19 +196,26 @@ fun DashboardScreen(
 @Composable
 private fun OverviewHeader(
     greeting: Greeting,
-    today: LocalDate
+    today: LocalDate,
+    onOpenSettings: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(greeting.stringRes()),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = UiFormatters.longDate(today),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(greeting.stringRes()),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = UiFormatters.longDate(today),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        SettingsAction(onOpenSettings = onOpenSettings)
     }
 }
 
@@ -347,7 +363,8 @@ private fun DashboardPreview() {
             onDeleteRequest = {},
             onDeleteDismiss = {},
             onDeleteConfirm = {},
-            onMessageConsumed = {}
+            onMessageConsumed = {},
+            onOpenSettings = {}
         )
     }
 }
@@ -382,7 +399,8 @@ private fun EmptyDashboardPreview() {
             onDeleteRequest = {},
             onDeleteDismiss = {},
             onDeleteConfirm = {},
-            onMessageConsumed = {}
+            onMessageConsumed = {},
+            onOpenSettings = {}
         )
     }
 }

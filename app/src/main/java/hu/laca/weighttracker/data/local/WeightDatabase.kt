@@ -1,17 +1,22 @@
 package hu.laca.weighttracker.data.local
 
+import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import android.content.Context
 
 @Database(
-    entities = [WeightMeasurementEntity::class],
-    version = 1,
+    entities = [
+        WeightMeasurementEntity::class,
+        ExerciseEntity::class,
+        ExerciseMuscleEntity::class
+    ],
+    version = 2,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
     abstract fun weightMeasurementDao(): WeightMeasurementDao
+    abstract fun exerciseDao(): ExerciseDao
 
     companion object {
         fun create(context: Context): WeightDatabase {
@@ -19,7 +24,9 @@ abstract class WeightDatabase : RoomDatabase() {
                 context.applicationContext,
                 WeightDatabase::class.java,
                 "weight_tracker.db"
-            ).build()
+            )
+                .addMigrations(MIGRATION_1_2)
+                .build()
         }
     }
 }

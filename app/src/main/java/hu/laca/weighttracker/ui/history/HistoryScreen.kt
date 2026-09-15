@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +32,7 @@ import hu.laca.weighttracker.domain.model.MeasurementListItem
 import hu.laca.weighttracker.domain.model.WeightMeasurement
 import hu.laca.weighttracker.ui.components.MeasurementEditorSheet
 import hu.laca.weighttracker.ui.components.MeasurementRow
+import hu.laca.weighttracker.ui.components.SettingsAction
 import hu.laca.weighttracker.ui.components.UserMessageEffect
 import hu.laca.weighttracker.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
@@ -50,14 +52,21 @@ fun HistoryScreen(
     onDeleteRequest: () -> Unit,
     onDeleteDismiss: () -> Unit,
     onDeleteConfirm: () -> Unit,
-    onMessageConsumed: () -> Unit
+    onMessageConsumed: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.history_title)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.history_title)) },
+                actions = { SettingsAction(onOpenSettings) }
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(onClick = onAdd) {
                 Icon(
@@ -146,7 +155,8 @@ private fun HistoryPreview() {
             onDeleteRequest = {},
             onDeleteDismiss = {},
             onDeleteConfirm = {},
-            onMessageConsumed = {}
+            onMessageConsumed = {},
+            onOpenSettings = {}
         )
     }
 }
