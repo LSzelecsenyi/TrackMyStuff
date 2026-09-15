@@ -7,17 +7,24 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import hu.laca.weighttracker.data.preferences.ThemePreferences
 import hu.laca.weighttracker.data.repository.ExerciseRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
+import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
+import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.ui.dashboard.DashboardViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseEditorViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseListViewModel
 import hu.laca.weighttracker.ui.history.HistoryViewModel
 import hu.laca.weighttracker.ui.settings.SettingsViewModel
+import hu.laca.weighttracker.ui.templates.TemplateEditorViewModel
+import hu.laca.weighttracker.ui.templates.TemplateListViewModel
+import hu.laca.weighttracker.ui.workout.ActiveWorkoutViewModel
 import hu.laca.weighttracker.ui.workout.WorkoutHubViewModel
 
 class WeightViewModelFactory(
     private val weightRepository: WeightRepository,
     private val exerciseRepository: ExerciseRepository,
+    private val workoutTemplateRepository: WorkoutTemplateRepository,
+    private val workoutSessionRepository: WorkoutSessionRepository,
     private val dateProvider: DateProvider,
     private val themePreferences: ThemePreferences
 ) : ViewModelProvider.Factory {
@@ -31,7 +38,12 @@ class WeightViewModelFactory(
                 HistoryViewModel(weightRepository, dateProvider)
             }
             modelClass.isAssignableFrom(WorkoutHubViewModel::class.java) -> {
-                WorkoutHubViewModel(exerciseRepository)
+                WorkoutHubViewModel(
+                    exerciseRepository,
+                    workoutTemplateRepository,
+                    workoutSessionRepository,
+                    dateProvider
+                )
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
                 SettingsViewModel(weightRepository, themePreferences, dateProvider)
@@ -41,6 +53,22 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(ExerciseEditorViewModel::class.java) -> {
                 ExerciseEditorViewModel(extras.createSavedStateHandle(), exerciseRepository)
+            }
+            modelClass.isAssignableFrom(TemplateListViewModel::class.java) -> {
+                TemplateListViewModel(workoutTemplateRepository)
+            }
+            modelClass.isAssignableFrom(TemplateEditorViewModel::class.java) -> {
+                TemplateEditorViewModel(
+                    extras.createSavedStateHandle(),
+                    workoutTemplateRepository,
+                    exerciseRepository
+                )
+            }
+            modelClass.isAssignableFrom(ActiveWorkoutViewModel::class.java) -> {
+                ActiveWorkoutViewModel(
+                    extras.createSavedStateHandle(),
+                    workoutSessionRepository
+                )
             }
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         } as T

@@ -10,6 +10,11 @@ object AppRoutes {
     const val EXERCISES = "exercises"
     const val EXERCISE_EDITOR = "exercise_editor"
     const val EXERCISE_EDITOR_PATTERN = "exercise_editor?exerciseId={exerciseId}"
+    const val TEMPLATES = "templates"
+    const val TEMPLATE_EDITOR = "template_editor"
+    const val TEMPLATE_EDITOR_PATTERN = "template_editor?templateId={templateId}"
+    const val ACTIVE_WORKOUT = "active_workout"
+    const val ACTIVE_WORKOUT_PATTERN = "active_workout?sessionId={sessionId}"
 }
 
 data class RootTab(
@@ -69,6 +74,22 @@ object AppNavigation {
             targetRoute = AppRoutes.EXERCISES,
             backTarget = AppRoutes.WORKOUT,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.EXERCISES)
+        )
+    }
+
+    fun openActiveWorkout(currentRoute: String?): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.ACTIVE_WORKOUT,
+            backTarget = AppRoutes.WORKOUT,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.ACTIVE_WORKOUT)
+        )
+    }
+
+    fun openTemplates(currentRoute: String?): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.TEMPLATES,
+            backTarget = AppRoutes.WORKOUT,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.TEMPLATES)
         )
     }
 

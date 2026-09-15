@@ -100,6 +100,11 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.EXERCISES))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.EXERCISE_EDITOR_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("exercise_editor?exerciseId=12"))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.TEMPLATES))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.TEMPLATE_EDITOR_PATTERN))
+        assertFalse(AppNavigation.showsBottomBar("template_editor?templateId=4"))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.ACTIVE_WORKOUT_PATTERN))
+        assertFalse(AppNavigation.showsBottomBar("active_workout?sessionId=9"))
     }
 
     @Test

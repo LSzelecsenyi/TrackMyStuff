@@ -26,7 +26,9 @@ data class ExerciseListUiState(
     val filtersActive: Boolean = false,
     val emptyKind: CatalogEmptyKind? = CatalogEmptyKind.Loading,
     val message: CatalogMessage? = null,
-    val pendingDelete: Exercise? = null
+    val pendingDelete: Exercise? = null,
+    val pendingBlocked: Exercise? = null,
+    val referencedIds: Set<Long> = emptySet()
 )
 
 enum class CatalogEmptyKind {
@@ -53,6 +55,14 @@ private data class ListQuery(
     val archiveFilter: ArchiveFilter
 )
 
+private data class ListCore(
+    val exercises: List<Exercise>,
+    val current: ListQuery,
+    val currentMessage: CatalogMessage?,
+    val delete: Exercise?,
+    val blocked: Exercise?
+)
+
 class ExerciseListViewModel(
     private val repository: ExerciseRepository
 ) : ViewModel() {
@@ -62,46 +72,50 @@ class ExerciseListViewModel(
     private val archiveFilter = MutableStateFlow(ArchiveFilter.ACTIVE)
     private val message = MutableStateFlow<CatalogMessage?>(null)
     private val pendingDelete = MutableStateFlow<Exercise?>(null)
+    private val pendingBlocked = MutableStateFlow<Exercise?>(null)
 
     private val filters = combine(query, category, muscle, archiveFilter) { text, cat, mus, archive ->
         ListQuery(text, cat, mus, archive)
     }
 
     val uiState: StateFlow<ExerciseListUiState> = combine(
-        repository.observeAll(),
-        filters,
-        message,
-        pendingDelete
-    ) { exercises, current, currentMessage, delete ->
+        combine(repository.observeAll(), filters, message, pendingDelete, pendingBlocked) {
+                exercises, current, currentMessage, delete, blocked ->
+            ListCore(exercises, current, currentMessage, delete, blocked)
+        },
+        repository.observeReferencedExerciseIds()
+    ) { core, referenced ->
         val visible = ExerciseCatalogLogic.filter(
-            exercises = exercises,
-            query = current.query,
-            category = current.category,
-            muscle = current.muscle,
-            archiveFilter = current.archiveFilter
+            exercises = core.exercises,
+            query = core.current.query,
+            category = core.current.category,
+            muscle = core.current.muscle,
+            archiveFilter = core.current.archiveFilter
         )
         val filtersActive = ExerciseCatalogLogic.hasActiveFilters(
-            current.query,
-            current.category,
-            current.muscle,
-            current.archiveFilter
+            core.current.query,
+            core.current.category,
+            core.current.muscle,
+            core.current.archiveFilter
         )
         ExerciseListUiState(
             loading = false,
             visibleExercises = visible,
-            query = current.query,
-            category = current.category,
-            muscle = current.muscle,
-            archiveFilter = current.archiveFilter,
+            query = core.current.query,
+            category = core.current.category,
+            muscle = core.current.muscle,
+            archiveFilter = core.current.archiveFilter,
             filtersActive = filtersActive,
             emptyKind = when {
                 visible.isNotEmpty() -> null
                 filtersActive -> CatalogEmptyKind.Search
-                current.archiveFilter == ArchiveFilter.ARCHIVED -> CatalogEmptyKind.Archived
+                core.current.archiveFilter == ArchiveFilter.ARCHIVED -> CatalogEmptyKind.Archived
                 else -> CatalogEmptyKind.Active
             },
-            message = currentMessage,
-            pendingDelete = delete
+            message = core.currentMessage,
+            pendingDelete = core.delete,
+            pendingBlocked = core.blocked,
+            referencedIds = referenced
         )
     }.stateIn(
         scope = viewModelScope,
@@ -149,11 +163,16 @@ class ExerciseListViewModel(
     }
 
     fun requestDelete(exercise: Exercise) {
-        pendingDelete.value = exercise
+        if (exercise.id in uiState.value.referencedIds) {
+            pendingBlocked.value = exercise
+        } else {
+            pendingDelete.value = exercise
+        }
     }
 
     fun dismissDelete() {
         pendingDelete.value = null
+        pendingBlocked.value = null
     }
 
     fun confirmDelete() {

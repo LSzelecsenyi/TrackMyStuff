@@ -26,6 +26,10 @@ class WeightRepository(
         return dao.getByDate(date.toString())?.toModel()
     }
 
+    suspend fun getLatestBefore(date: LocalDate): WeightMeasurement? {
+        return dao.getLatestBefore(date.toString())?.toModel()
+    }
+
     suspend fun save(date: LocalDate, weightKg: Double): SaveOutcome {
         val now = clock.millis()
         val existing = dao.getByDate(date.toString())

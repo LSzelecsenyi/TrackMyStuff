@@ -1,9 +1,10 @@
-﻿package hu.laca.weighttracker.ui.exercises
+package hu.laca.weighttracker.ui.templates
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,27 +47,23 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.exercise.ArchiveFilter
-import hu.laca.weighttracker.domain.exercise.Exercise
-import hu.laca.weighttracker.domain.exercise.ExerciseCategory
-import hu.laca.weighttracker.domain.exercise.MuscleGroup
+import hu.laca.weighttracker.domain.workout.TemplateListItem
 import hu.laca.weighttracker.ui.components.SegmentedControl
+import hu.laca.weighttracker.ui.exercises.labelRes
 import hu.laca.weighttracker.ui.theme.AppDimens
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ExerciseListScreen(
-    state: ExerciseListUiState,
+fun TemplateListScreen(
+    state: TemplateListUiState,
     onBack: () -> Unit,
     onAdd: () -> Unit,
     onEdit: (Long) -> Unit,
     onQueryChange: (String) -> Unit,
-    onCategoryFilter: (ExerciseCategory?) -> Unit,
-    onMuscleFilter: (MuscleGroup?) -> Unit,
     onArchiveFilter: (ArchiveFilter) -> Unit,
-    onClearFilters: () -> Unit,
     onArchive: (Long) -> Unit,
     onRestore: (Long) -> Unit,
-    onRequestDelete: (Exercise) -> Unit,
+    onRequestDelete: (TemplateListItem) -> Unit,
     onDismissDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
     onMessageConsumed: () -> Unit
@@ -82,7 +79,7 @@ fun ExerciseListScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.exercises_title)) },
+                title = { Text(stringResource(R.string.templates_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -98,7 +95,7 @@ fun ExerciseListScreen(
             FloatingActionButton(onClick = onAdd) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.action_add_exercise)
+                    contentDescription = stringResource(R.string.action_add_template)
                 )
             }
         },
@@ -115,7 +112,7 @@ fun ExerciseListScreen(
                 onValueChange = onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text(stringResource(R.string.exercise_search)) }
+                label = { Text(stringResource(R.string.template_search)) }
             )
             Spacer(Modifier.height(12.dp))
             SegmentedControl(
@@ -129,63 +126,37 @@ fun ExerciseListScreen(
                 }
             )
             Spacer(Modifier.height(8.dp))
-            CatalogDropdown(
-                label = stringResource(R.string.exercise_filter_category),
-                selected = state.category,
-                options = ExerciseCategory.entries,
-                optionLabel = { stringResource(it.labelRes()) },
-                noneLabel = stringResource(R.string.exercise_filter_all_categories),
-                onSelected = onCategoryFilter
-            )
-            Spacer(Modifier.height(8.dp))
-            CatalogDropdown(
-                label = stringResource(R.string.exercise_filter_muscle),
-                selected = state.muscle,
-                options = MuscleGroup.entries,
-                optionLabel = { stringResource(it.labelRes()) },
-                noneLabel = stringResource(R.string.exercise_filter_all_muscles),
-                onSelected = onMuscleFilter
-            )
-            if (state.filtersActive) {
-                TextButton(onClick = onClearFilters) {
-                    Text(stringResource(R.string.action_clear_filters))
-                }
-            } else {
-                Spacer(Modifier.height(8.dp))
-            }
             when {
-                state.loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+                state.loading -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+                state.visibleItems.isEmpty() -> EmptyTemplates(state.emptyKind)
+                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(state.visibleItems, key = { it.template.id }) { item ->
+                        TemplateRow(
+                            item = item,
+                            onEdit = { onEdit(item.template.id) },
+                            onArchive = { onArchive(item.template.id) },
+                            onRestore = { onRestore(item.template.id) },
+                            onDelete = { onRequestDelete(item) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
-                state.visibleExercises.isEmpty() -> EmptyCatalog(state.emptyKind)
-                else -> ExerciseList(
-                    exercises = state.visibleExercises,
-                    onEdit = onEdit,
-                    onArchive = onArchive,
-                    onRestore = onRestore,
-                    onRequestDelete = onRequestDelete
-                )
             }
         }
     }
-    state.pendingDelete?.let { exercise ->
+    state.pendingDelete?.let { item ->
         AlertDialog(
             onDismissRequest = onDismissDelete,
-            title = { Text(stringResource(R.string.exercise_delete_title)) },
-            text = {
-                Text(stringResource(R.string.exercise_delete_message, exercise.name))
-            },
+            title = { Text(stringResource(R.string.template_delete_title)) },
+            text = { Text(stringResource(R.string.template_delete_message, item.template.name)) },
             confirmButton = {
                 TextButton(onClick = onConfirmDelete) {
-                    Text(
-                        text = stringResource(R.string.action_delete_permanently),
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Text(stringResource(R.string.action_delete_permanently))
                 }
             },
             dismissButton = {
@@ -198,8 +169,8 @@ fun ExerciseListScreen(
     state.pendingBlocked?.let {
         AlertDialog(
             onDismissRequest = onDismissDelete,
-            title = { Text(stringResource(R.string.exercise_delete_title)) },
-            text = { Text(stringResource(R.string.exercise_delete_blocked_body)) },
+            title = { Text(stringResource(R.string.template_delete_title)) },
+            text = { Text(stringResource(R.string.template_delete_blocked_body)) },
             confirmButton = {
                 TextButton(onClick = onDismissDelete) {
                     Text(stringResource(R.string.action_ok))
@@ -210,16 +181,16 @@ fun ExerciseListScreen(
 }
 
 @Composable
-private fun EmptyCatalog(kind: CatalogEmptyKind?) {
+private fun EmptyTemplates(kind: TemplateEmptyKind?) {
     val title = when (kind) {
-        CatalogEmptyKind.Archived -> stringResource(R.string.exercise_empty_archived_title)
-        CatalogEmptyKind.Search -> stringResource(R.string.exercise_empty_search_title)
-        else -> stringResource(R.string.exercise_empty_active_title)
+        TemplateEmptyKind.Archived -> R.string.template_empty_archived_title
+        TemplateEmptyKind.Search -> R.string.template_empty_search_title
+        else -> R.string.template_empty_active_title
     }
     val body = when (kind) {
-        CatalogEmptyKind.Archived -> stringResource(R.string.exercise_empty_archived_body)
-        CatalogEmptyKind.Search -> stringResource(R.string.exercise_empty_search_body)
-        else -> stringResource(R.string.exercise_empty_active_body)
+        TemplateEmptyKind.Archived -> R.string.template_empty_archived_body
+        TemplateEmptyKind.Search -> R.string.template_empty_search_body
+        else -> R.string.template_empty_active_body
     }
     Column(
         modifier = Modifier
@@ -228,45 +199,20 @@ private fun EmptyCatalog(kind: CatalogEmptyKind?) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = title, style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(title), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(8.dp))
         Text(
-            text = body,
+            stringResource(body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ExerciseList(
-    exercises: List<Exercise>,
-    onEdit: (Long) -> Unit,
-    onArchive: (Long) -> Unit,
-    onRestore: (Long) -> Unit,
-    onRequestDelete: (Exercise) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = AppDimens.scrollEndPadding),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        items(exercises, key = { it.id }) { exercise ->
-            ExerciseRow(
-                exercise = exercise,
-                onEdit = { onEdit(exercise.id) },
-                onArchive = { onArchive(exercise.id) },
-                onRestore = { onRestore(exercise.id) },
-                onDelete = { onRequestDelete(exercise) }
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        }
-    }
-}
-
-@Composable
-private fun ExerciseRow(
-    exercise: Exercise,
+private fun TemplateRow(
+    item: TemplateListItem,
     onEdit: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
@@ -280,28 +226,34 @@ private fun ExerciseRow(
         verticalAlignment = Alignment.Top
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = exercise.name, style = MaterialTheme.typography.titleMedium)
+            Text(item.template.name, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = stringResource(
-                    R.string.exercise_row_meta,
-                    stringResource(exercise.category.labelRes()),
-                    stringResource(exercise.primaryMuscle.labelRes())
+                    R.string.template_row_meta,
+                    item.exerciseCount,
+                    item.setCount
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = stringResource(
-                    R.string.exercise_row_summary,
-                    stringResource(exercise.movementPattern.labelRes()),
-                    stringResource(exercise.measurementType.labelRes())
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (exercise.archived) {
+            if (item.primaryMuscles.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    item.primaryMuscles.forEach { muscle ->
+                        Text(
+                            text = stringResource(muscle.labelRes()),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+            if (item.template.archived) {
                 Text(
-                    text = stringResource(R.string.exercise_archived_badge),
+                    text = stringResource(R.string.template_archived_badge),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.tertiary
                 )
@@ -314,23 +266,26 @@ private fun ExerciseRow(
             IconButton(onClick = { menuOpen = true }) {
                 Icon(
                     imageVector = Icons.Filled.MoreVert,
-                    contentDescription = stringResource(R.string.exercise_more_actions, exercise.name)
+                    contentDescription = stringResource(
+                        R.string.template_more_actions,
+                        item.template.name
+                    )
                 )
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
                     text = {
                         Text(
-                            if (exercise.archived) {
-                                stringResource(R.string.action_restore_exercise)
+                            if (item.template.archived) {
+                                stringResource(R.string.action_restore_template)
                             } else {
-                                stringResource(R.string.action_archive_exercise)
+                                stringResource(R.string.action_archive_template)
                             }
                         )
                     },
                     onClick = {
                         menuOpen = false
-                        if (exercise.archived) onRestore() else onArchive()
+                        if (item.template.archived) onRestore() else onArchive()
                     }
                 )
                 DropdownMenuItem(

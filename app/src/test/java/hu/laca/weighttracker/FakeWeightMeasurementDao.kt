@@ -16,6 +16,10 @@ class FakeWeightMeasurementDao : WeightMeasurementDao {
         return items.values.firstOrNull { it.date == date }
     }
 
+    override suspend fun getLatestBefore(date: String): WeightMeasurementEntity? {
+        return items.values.filter { it.date < date }.maxByOrNull { it.date }
+    }
+
     override suspend fun insert(entity: WeightMeasurementEntity): Long {
         if (items.values.any { it.date == entity.date }) {
             throw IllegalStateException("UNIQUE constraint failed: date")

@@ -1,0 +1,472 @@
+package hu.laca.weighttracker.data.repository
+
+import android.database.sqlite.SQLiteConstraintException
+import hu.laca.weighttracker.data.local.WorkoutSessionDao
+import hu.laca.weighttracker.data.local.WorkoutSessionEntity
+import hu.laca.weighttracker.data.local.WorkoutSessionExerciseEntity
+import hu.laca.weighttracker.data.local.WorkoutSessionExerciseMuscleEntity
+import hu.laca.weighttracker.data.local.WorkoutSessionSetEntity
+import hu.laca.weighttracker.data.local.WorkoutTemplateDao
+import hu.laca.weighttracker.data.local.activeLock
+import hu.laca.weighttracker.data.local.toModel
+import hu.laca.weighttracker.domain.DateProvider
+import hu.laca.weighttracker.domain.WeightParseResult
+import hu.laca.weighttracker.domain.WeightParser
+import hu.laca.weighttracker.domain.exercise.ExerciseEnumCodec
+import hu.laca.weighttracker.domain.exercise.MuscleRole
+import hu.laca.weighttracker.domain.workout.AbandonWorkoutResult
+import hu.laca.weighttracker.domain.workout.ActiveSessionSummary
+import hu.laca.weighttracker.domain.workout.ActualSetDraft
+import hu.laca.weighttracker.domain.workout.ActualSetLogic
+import hu.laca.weighttracker.domain.workout.BodyWeightProposal
+import hu.laca.weighttracker.domain.workout.BodyWeightSnapshotLogic
+import hu.laca.weighttracker.domain.workout.BodyWeightSource
+import hu.laca.weighttracker.domain.workout.FinishWorkoutResult
+import hu.laca.weighttracker.domain.workout.SessionExerciseItem
+import hu.laca.weighttracker.domain.workout.SessionMutationResult
+import hu.laca.weighttracker.domain.workout.SessionProgressLogic
+import hu.laca.weighttracker.domain.workout.SessionSetStatus
+import hu.laca.weighttracker.domain.workout.SessionStatus
+import hu.laca.weighttracker.domain.workout.StartWorkoutResult
+import hu.laca.weighttracker.domain.workout.WorkoutSessionAggregate
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.time.Clock
+import java.time.LocalDate
+
+class WorkoutSessionRepository(
+    private val sessionDao: WorkoutSessionDao,
+    private val templateDao: WorkoutTemplateDao,
+    private val exerciseDao: hu.laca.weighttracker.data.local.ExerciseDao,
+    private val weightRepository: WeightRepository,
+    private val clock: Clock,
+    private val dateProvider: DateProvider
+) {
+    private val mutex = Mutex()
+
+    fun observeInProgress(): Flow<ActiveSessionSummary?> {
+        return combine(
+            sessionDao.observeInProgress(),
+            sessionDao.observeAllExercises(),
+            sessionDao.observeAllSets()
+        ) { sessions, exercises, sets ->
+            val session = sessions.firstOrNull() ?: return@combine null
+            val items = exercises.filter { it.sessionId == session.id }.sortedBy { it.position }
+            val setsByExercise = sets.groupBy { it.sessionExerciseId }
+            val allSets = items.flatMap { setsByExercise[it.id].orEmpty() }
+            val progress = SessionProgressLogic.from(allSets.map { it.toModel() })
+            val current = items.firstOrNull { exercise ->
+                setsByExercise[exercise.id].orEmpty().any { it.status == SessionSetStatus.PENDING.name }
+            } ?: items.firstOrNull()
+            ActiveSessionSummary(
+                session = session.toModel(),
+                completedSets = progress.completed,
+                skippedSets = progress.skipped,
+                pendingSets = progress.pending,
+                totalSets = progress.total,
+                currentExerciseName = current?.name,
+                currentExercisePosition = current?.position?.plus(1),
+                exerciseCount = items.size
+            )
+        }
+    }
+
+    fun observeAggregate(sessionId: Long): Flow<WorkoutSessionAggregate?> {
+        return combine(
+            sessionDao.observeById(sessionId),
+            sessionDao.observeAllExercises(),
+            sessionDao.observeAllSets(),
+            sessionDao.observeAllMuscles()
+        ) { session, exercises, sets, muscles ->
+            session ?: return@combine null
+            toAggregate(session, exercises, sets, muscles)
+        }
+    }
+
+    suspend fun getAggregate(sessionId: Long): WorkoutSessionAggregate? {
+        val session = sessionDao.getById(sessionId) ?: return null
+        return toAggregate(
+            session,
+            sessionDao.getExercises(sessionId),
+            sessionDao.getExercises(sessionId).flatMap { sessionDao.getSets(it.id) },
+            sessionDao.getExercises(sessionId).flatMap { sessionDao.getMuscles(it.id) }
+        )
+    }
+
+    suspend fun proposeBodyWeight(workoutDate: LocalDate = dateProvider.today()): BodyWeightProposal {
+        val sameDay = weightRepository.getByDate(workoutDate)
+        val previous = weightRepository.getLatestBefore(workoutDate)
+        return BodyWeightSnapshotLogic.propose(workoutDate, sameDay, previous)
+    }
+
+    suspend fun start(
+        templateId: Long,
+        bodyWeightText: String,
+        proposal: BodyWeightProposal,
+        editedManually: Boolean
+    ): StartWorkoutResult = mutex.withLock {
+        if (sessionDao.getInProgress() != null) {
+            return StartWorkoutResult.AlreadyActive
+        }
+        val template = templateDao.getById(templateId) ?: return StartWorkoutResult.TemplateNotFound
+        if (template.archived) {
+            return StartWorkoutResult.TemplateArchived
+        }
+        val relations = templateDao.getExercises(templateId)
+        if (relations.isEmpty() || relations.all { templateDao.getSets(it.id).isEmpty() }) {
+            return StartWorkoutResult.TemplateEmpty
+        }
+        val trimmedWeight = bodyWeightText.trim()
+        val resolvedProposal = if (!editedManually && trimmedWeight.isEmpty() && proposal.kilograms == null) {
+            proposal
+        } else if (trimmedWeight.isEmpty()) {
+            BodyWeightSnapshotLogic.afterManualEdit(null)
+        } else {
+            when (val parsed = WeightParser.parseUserInput(trimmedWeight)) {
+                is WeightParseResult.Invalid -> return StartWorkoutResult.InvalidBodyWeight(parsed.error)
+                is WeightParseResult.Valid -> {
+                    if (editedManually) {
+                        BodyWeightSnapshotLogic.afterManualEdit(parsed.kilograms)
+                    } else {
+                        proposal.copy(kilograms = parsed.kilograms)
+                    }
+                }
+            }
+        }
+        val now = clock.millis()
+        val workoutDate = dateProvider.today()
+        val session = WorkoutSessionEntity(
+            templateId = template.id,
+            templateName = template.name,
+            status = SessionStatus.IN_PROGRESS.name,
+            workoutDate = workoutDate.toString(),
+            startedAt = now,
+            finishedAt = null,
+            abandonedAt = null,
+            notes = null,
+            bodyWeightKg = resolvedProposal.kilograms,
+            bodyWeightSource = resolvedProposal.source.name,
+            bodyWeightSourceDate = resolvedProposal.sourceDate?.toString(),
+            createdAt = now,
+            updatedAt = now,
+            activeLock = SessionStatus.IN_PROGRESS.activeLock()
+        )
+        val children = relations.sortedBy { it.position }.mapNotNull { relation ->
+            val exercise = exerciseDao.getById(relation.exerciseId) ?: return@mapNotNull null
+            val catalogMuscles = exerciseDao.getMuscles(relation.exerciseId)
+            val sets = templateDao.getSets(relation.id).sortedBy { it.position }
+            if (sets.isEmpty()) {
+                return@mapNotNull null
+            }
+            val snapshot = WorkoutSessionExerciseEntity(
+                sessionId = 0L,
+                exerciseId = exercise.id,
+                position = 0,
+                name = exercise.name,
+                category = exercise.category,
+                movementPattern = exercise.movementPattern,
+                measurementType = exercise.measurementType,
+                resistanceBasis = exercise.resistanceBasis,
+                weightInterpretation = exercise.weightInterpretation,
+                primaryMuscle = catalogMuscles.firstOrNull { it.role == MuscleRole.PRIMARY.name }?.muscleGroup
+                    ?: catalogMuscles.firstOrNull()?.muscleGroup
+                    ?: "FULL_BODY",
+                notes = relation.notes
+            )
+            val muscleSnapshots = catalogMuscles.map { muscle ->
+                WorkoutSessionExerciseMuscleEntity(
+                    sessionExerciseId = 0L,
+                    muscleGroup = muscle.muscleGroup,
+                    role = muscle.role
+                )
+            }
+            val setSnapshots = sets.map { planned ->
+                WorkoutSessionSetEntity(
+                    sessionExerciseId = 0L,
+                    position = 0,
+                    plannedMinReps = planned.minReps,
+                    plannedMaxReps = planned.maxReps,
+                    plannedLoadKind = planned.loadKind,
+                    plannedWeightKg = planned.weightKg,
+                    plannedDurationSeconds = planned.durationSeconds,
+                    plannedDistanceMeters = planned.distanceMeters,
+                    actualReps = planned.minReps,
+                    actualLoadKind = planned.loadKind,
+                    actualWeightKg = planned.weightKg,
+                    actualDurationSeconds = planned.durationSeconds,
+                    actualDistanceMeters = planned.distanceMeters,
+                    status = SessionSetStatus.PENDING.name,
+                    completedAt = null,
+                    addedDuringWorkout = false
+                )
+            }
+            Triple(snapshot, muscleSnapshots, setSnapshots)
+        }
+        if (children.isEmpty()) {
+            return StartWorkoutResult.TemplateEmpty
+        }
+        return try {
+            val id = sessionDao.insertAggregate(session, children)
+            StartWorkoutResult.Started(id)
+        } catch (error: Exception) {
+            if (isUniqueConstraint(error)) {
+                StartWorkoutResult.AlreadyActive
+            } else {
+                throw error
+            }
+        }
+    }
+
+    suspend fun completeSet(setId: Long, draft: ActualSetDraft): SessionMutationResult = mutex.withLock {
+        mutateActiveSet(setId) { set, exercise, now ->
+            val (values, errors) = ActualSetLogic.parse(
+                draft,
+                ExerciseEnumCodec.measurement(exercise.measurementType),
+                ExerciseEnumCodec.resistance(exercise.resistanceBasis)
+            )
+            if (values == null) {
+                return@mutateActiveSet SessionMutationResult.Invalid(errors)
+            }
+            val completedAt = set.completedAt ?: now
+            sessionDao.updateSet(
+                set.copy(
+                    actualReps = values.reps,
+                    actualLoadKind = values.loadKind.name,
+                    actualWeightKg = values.weightKg,
+                    actualDurationSeconds = values.durationSeconds,
+                    actualDistanceMeters = values.distanceMeters,
+                    status = SessionSetStatus.COMPLETED.name,
+                    completedAt = completedAt
+                )
+            )
+            SessionMutationResult.Updated
+        }
+    }
+
+    suspend fun skipSet(setId: Long): SessionMutationResult = mutex.withLock {
+        mutateActiveSet(setId) { set, _, _ ->
+            sessionDao.updateSet(
+                set.copy(
+                    actualReps = null,
+                    actualLoadKind = null,
+                    actualWeightKg = null,
+                    actualDurationSeconds = null,
+                    actualDistanceMeters = null,
+                    status = SessionSetStatus.SKIPPED.name,
+                    completedAt = null
+                )
+            )
+            SessionMutationResult.Updated
+        }
+    }
+
+    suspend fun undoSkip(setId: Long): SessionMutationResult = mutex.withLock {
+        mutateActiveSet(setId) { set, _, _ ->
+            if (set.status != SessionSetStatus.SKIPPED.name) {
+                return@mutateActiveSet SessionMutationResult.Updated
+            }
+            sessionDao.updateSet(
+                set.copy(
+                    actualReps = set.plannedMinReps,
+                    actualLoadKind = set.plannedLoadKind,
+                    actualWeightKg = set.plannedWeightKg,
+                    actualDurationSeconds = set.plannedDurationSeconds,
+                    actualDistanceMeters = set.plannedDistanceMeters,
+                    status = SessionSetStatus.PENDING.name,
+                    completedAt = null
+                )
+            )
+            SessionMutationResult.Updated
+        }
+    }
+
+    suspend fun addExtraSet(sessionExerciseId: Long): SessionMutationResult = mutex.withLock {
+        val exercise = sessionDao.getExercise(sessionExerciseId) ?: return SessionMutationResult.NotFound
+        val session = sessionDao.getById(exercise.sessionId) ?: return SessionMutationResult.NotFound
+        if (session.status != SessionStatus.IN_PROGRESS.name) {
+            return SessionMutationResult.NotActive
+        }
+        val existing = sessionDao.getSets(sessionExerciseId)
+        val measurement = ExerciseEnumCodec.measurement(exercise.measurementType)
+        val resistance = ExerciseEnumCodec.resistance(exercise.resistanceBasis)
+        val previous = existing.maxByOrNull { it.position }?.toModel()
+        val (planned, actual) = if (previous != null) {
+            ActualSetLogic.extraSetFromPrevious(previous)
+        } else {
+            ActualSetLogic.extraSetDefaults(measurement, resistance)
+        }
+        val parsed = ActualSetLogic.parse(actual, measurement, resistance).first
+        sessionDao.insertSet(
+            WorkoutSessionSetEntity(
+                sessionExerciseId = sessionExerciseId,
+                position = existing.size,
+                plannedMinReps = planned.minReps,
+                plannedMaxReps = planned.maxReps,
+                plannedLoadKind = planned.loadKind.name,
+                plannedWeightKg = planned.weightKg,
+                plannedDurationSeconds = planned.durationSeconds,
+                plannedDistanceMeters = planned.distanceMeters,
+                actualReps = parsed?.reps ?: planned.minReps,
+                actualLoadKind = (parsed?.loadKind ?: planned.loadKind).name,
+                actualWeightKg = parsed?.weightKg ?: planned.weightKg,
+                actualDurationSeconds = parsed?.durationSeconds ?: planned.durationSeconds,
+                actualDistanceMeters = parsed?.distanceMeters ?: planned.distanceMeters,
+                status = SessionSetStatus.PENDING.name,
+                completedAt = null,
+                addedDuringWorkout = true
+            )
+        )
+        touchSession(session)
+        SessionMutationResult.Updated
+    }
+
+    suspend fun removeExtraSet(setId: Long): SessionMutationResult = mutex.withLock {
+        val set = sessionDao.getSet(setId) ?: return SessionMutationResult.NotFound
+        if (!set.addedDuringWorkout) {
+            return SessionMutationResult.OriginalSetProtected
+        }
+        if (set.status != SessionSetStatus.PENDING.name) {
+            return SessionMutationResult.OriginalSetProtected
+        }
+        val exercise = sessionDao.getExercise(set.sessionExerciseId) ?: return SessionMutationResult.NotFound
+        val session = sessionDao.getById(exercise.sessionId) ?: return SessionMutationResult.NotFound
+        if (session.status != SessionStatus.IN_PROGRESS.name) {
+            return SessionMutationResult.NotActive
+        }
+        sessionDao.deleteSet(setId)
+        sessionDao.getSets(exercise.id).sortedBy { it.position }.forEachIndexed { index, remaining ->
+            if (remaining.position != index) {
+                sessionDao.updateSetPosition(remaining.id, index)
+            }
+        }
+        touchSession(session)
+        SessionMutationResult.Updated
+    }
+
+    suspend fun finish(sessionId: Long, skipRemaining: Boolean): FinishWorkoutResult = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return FinishWorkoutResult.NotFound
+        if (session.status != SessionStatus.IN_PROGRESS.name) {
+            return FinishWorkoutResult.AlreadyTerminal
+        }
+        val pending = sessionDao.getExercises(sessionId).flatMap { sessionDao.getSets(it.id) }
+            .filter { it.status == SessionSetStatus.PENDING.name }
+        if (pending.isNotEmpty() && !skipRemaining) {
+            return FinishWorkoutResult.PendingRemaining(pending.size)
+        }
+        val now = clock.millis()
+        pending.forEach { set ->
+            sessionDao.updateSet(
+                set.copy(
+                    actualReps = null,
+                    actualLoadKind = null,
+                    actualWeightKg = null,
+                    actualDurationSeconds = null,
+                    actualDistanceMeters = null,
+                    status = SessionSetStatus.SKIPPED.name,
+                    completedAt = null
+                )
+            )
+        }
+        sessionDao.updateSession(
+            session.copy(
+                status = SessionStatus.COMPLETED.name,
+                finishedAt = now,
+                updatedAt = now,
+                activeLock = SessionStatus.COMPLETED.activeLock()
+            )
+        )
+        FinishWorkoutResult.Finished
+    }
+
+    suspend fun abandon(sessionId: Long): AbandonWorkoutResult = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return AbandonWorkoutResult.NotFound
+        if (session.status != SessionStatus.IN_PROGRESS.name) {
+            return AbandonWorkoutResult.AlreadyTerminal
+        }
+        val now = clock.millis()
+        sessionDao.updateSession(
+            session.copy(
+                status = SessionStatus.ABANDONED.name,
+                abandonedAt = now,
+                updatedAt = now,
+                activeLock = SessionStatus.ABANDONED.activeLock()
+            )
+        )
+        AbandonWorkoutResult.Abandoned
+    }
+
+    fun observeReferencedTemplateIds(): Flow<Set<Long>> {
+        return sessionDao.observeReferencedTemplateIds().map { it.toSet() }
+    }
+
+    fun observeReferencedExerciseIds(): Flow<Set<Long>> {
+        return sessionDao.observeReferencedExerciseIds().map { it.toSet() }
+    }
+
+    suspend fun hasTemplateReferences(templateId: Long): Boolean {
+        return sessionDao.countTemplateReferences(templateId) > 0
+    }
+
+    suspend fun hasExerciseReferences(exerciseId: Long): Boolean {
+        return sessionDao.countExerciseReferences(exerciseId) > 0
+    }
+
+    private suspend fun mutateActiveSet(
+        setId: Long,
+        block: suspend (WorkoutSessionSetEntity, WorkoutSessionExerciseEntity, Long) -> SessionMutationResult
+    ): SessionMutationResult {
+        val set = sessionDao.getSet(setId) ?: return SessionMutationResult.NotFound
+        val exercise = sessionDao.getExercise(set.sessionExerciseId) ?: return SessionMutationResult.NotFound
+        val session = sessionDao.getById(exercise.sessionId) ?: return SessionMutationResult.NotFound
+        if (session.status != SessionStatus.IN_PROGRESS.name) {
+            return SessionMutationResult.NotActive
+        }
+        val now = clock.millis()
+        val result = block(set, exercise, now)
+        if (result == SessionMutationResult.Updated) {
+            touchSession(session, now)
+        }
+        return result
+    }
+
+    private suspend fun touchSession(session: WorkoutSessionEntity, now: Long = clock.millis()) {
+        sessionDao.updateSession(session.copy(updatedAt = now))
+    }
+
+    private fun toAggregate(
+        session: WorkoutSessionEntity,
+        exercises: List<WorkoutSessionExerciseEntity>,
+        sets: List<WorkoutSessionSetEntity>,
+        muscles: List<WorkoutSessionExerciseMuscleEntity>
+    ): WorkoutSessionAggregate {
+        val sessionExercises = exercises.filter { it.sessionId == session.id }.sortedBy { it.position }
+        val setsByExercise = sets.groupBy { it.sessionExerciseId }
+        val musclesByExercise = muscles.groupBy { it.sessionExerciseId }
+        return WorkoutSessionAggregate(
+            session = session.toModel(),
+            exercises = sessionExercises.map { exercise ->
+                SessionExerciseItem(
+                    exercise = exercise.toModel(musclesByExercise[exercise.id].orEmpty()),
+                    sets = setsByExercise[exercise.id].orEmpty().sortedBy { it.position }.map { it.toModel() }
+                )
+            }
+        )
+    }
+
+    private fun isUniqueConstraint(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is SQLiteConstraintException) {
+                return true
+            }
+            if (current.message.orEmpty().contains("UNIQUE", ignoreCase = true)) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
+    }
+}

@@ -4,6 +4,8 @@ import android.database.sqlite.SQLiteConstraintException
 import hu.laca.weighttracker.data.local.ExerciseDao
 import hu.laca.weighttracker.data.local.ExerciseEntity
 import hu.laca.weighttracker.data.local.ExerciseMuscleEntity
+import hu.laca.weighttracker.data.local.WorkoutSessionDao
+import hu.laca.weighttracker.data.local.WorkoutTemplateDao
 import hu.laca.weighttracker.data.local.toModel
 import hu.laca.weighttracker.domain.exercise.Exercise
 import hu.laca.weighttracker.domain.exercise.ExerciseDeleteResult
@@ -13,12 +15,15 @@ import hu.laca.weighttracker.domain.exercise.ExerciseNaming
 import hu.laca.weighttracker.domain.exercise.ExerciseSaveResult
 import hu.laca.weighttracker.domain.exercise.MuscleRole
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import java.time.Clock
 
 class ExerciseRepository(
     private val dao: ExerciseDao,
-    private val clock: Clock
+    private val clock: Clock,
+    private val templateDao: WorkoutTemplateDao? = null,
+    private val sessionDao: WorkoutSessionDao? = null
 ) {
     fun observeAll(): Flow<List<Exercise>> {
         return combine(dao.observeAll(), dao.observeMuscles()) { exercises, muscles ->
@@ -166,7 +171,17 @@ class ExerciseRepository(
         return ExerciseDeleteResult.Deleted
     }
 
-    private fun hasWorkoutReferences(@Suppress("UNUSED_PARAMETER") exerciseId: Long): Boolean {
-        return false
+    fun observeReferencedExerciseIds(): Flow<Set<Long>> {
+        val templates = templateDao?.observeReferencedExerciseIds() ?: MutableStateFlow(emptyList())
+        val sessions = sessionDao?.observeReferencedExerciseIds() ?: MutableStateFlow(emptyList())
+        return combine(templates, sessions) { templateIds, sessionIds ->
+            (templateIds + sessionIds).toSet()
+        }
+    }
+
+    private suspend fun hasWorkoutReferences(exerciseId: Long): Boolean {
+        val templateRefs = templateDao?.countReferences(exerciseId) ?: 0
+        val sessionRefs = sessionDao?.countExerciseReferences(exerciseId) ?: 0
+        return templateRefs + sessionRefs > 0
     }
 }

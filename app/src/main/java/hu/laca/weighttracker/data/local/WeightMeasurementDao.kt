@@ -15,6 +15,9 @@ interface WeightMeasurementDao {
     @Query("SELECT * FROM weight_measurements WHERE date = :date LIMIT 1")
     suspend fun getByDate(date: String): WeightMeasurementEntity?
 
+    @Query("SELECT * FROM weight_measurements WHERE date < :date ORDER BY date DESC LIMIT 1")
+    suspend fun getLatestBefore(date: String): WeightMeasurementEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(entity: WeightMeasurementEntity): Long
 

@@ -49,6 +49,12 @@ import hu.laca.weighttracker.ui.history.HistoryScreen
 import hu.laca.weighttracker.ui.history.HistoryViewModel
 import hu.laca.weighttracker.ui.settings.SettingsScreen
 import hu.laca.weighttracker.ui.settings.SettingsViewModel
+import hu.laca.weighttracker.ui.templates.TemplateEditorScreen
+import hu.laca.weighttracker.ui.templates.TemplateEditorViewModel
+import hu.laca.weighttracker.ui.templates.TemplateListScreen
+import hu.laca.weighttracker.ui.templates.TemplateListViewModel
+import hu.laca.weighttracker.ui.workout.ActiveWorkoutScreen
+import hu.laca.weighttracker.ui.workout.ActiveWorkoutViewModel
 import hu.laca.weighttracker.ui.workout.WorkoutHubScreen
 import hu.laca.weighttracker.ui.workout.WorkoutHubViewModel
 import kotlinx.coroutines.Dispatchers
@@ -58,10 +64,22 @@ import java.nio.charset.StandardCharsets
 import java.time.LocalDate
 
 private const val ARG_EXERCISE_ID = "exerciseId"
+private const val ARG_TEMPLATE_ID = "templateId"
+private const val ARG_SESSION_ID = "sessionId"
 private const val KEY_CATALOG_SAVED = "catalog_saved"
+private const val KEY_TEMPLATE_SAVED = "template_saved"
+private const val KEY_WORKOUT_RESULT = "workout_result"
 
 private fun editorRoute(exerciseId: Long?): String {
     return "${AppRoutes.EXERCISE_EDITOR}?$ARG_EXERCISE_ID=${exerciseId ?: -1L}"
+}
+
+private fun templateEditorRoute(templateId: Long?): String {
+    return "${AppRoutes.TEMPLATE_EDITOR}?$ARG_TEMPLATE_ID=${templateId ?: -1L}"
+}
+
+private fun activeWorkoutRoute(sessionId: Long): String {
+    return "${AppRoutes.ACTIVE_WORKOUT}?$ARG_SESSION_ID=$sessionId"
 }
 
 private fun RootTab.icon(): ImageVector {
@@ -146,13 +164,34 @@ fun WeightTrackerNavHost(
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) }
                 )
             }
-            composable(AppRoutes.WORKOUT) {
+            composable(AppRoutes.WORKOUT) { entry ->
                 val viewModel: WorkoutHubViewModel = viewModel(factory = factory)
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
+                val result by entry.savedStateHandle
+                    .getStateFlow(KEY_WORKOUT_RESULT, "")
+                    .collectAsStateWithLifecycle()
+                LaunchedEffect(result) {
+                    when (result) {
+                        "finished" -> viewModel.showFinished()
+                        "abandoned" -> viewModel.showAbandoned()
+                    }
+                    if (result.isNotEmpty()) {
+                        entry.savedStateHandle[KEY_WORKOUT_RESULT] = ""
+                    }
+                }
                 WorkoutHubScreen(
                     state = state,
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
-                    onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) }
+                    onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
+                    onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
+                    onStartTemplate = viewModel::requestStart,
+                    onResume = { id -> navController.navigate(activeWorkoutRoute(id)) },
+                    onDismissStart = viewModel::dismissStart,
+                    onStartWeightChange = viewModel::onStartWeightChange,
+                    onConfirmStart = viewModel::confirmStart,
+                    onStartedConsumed = viewModel::consumeStartedSession,
+                    onOpenStarted = { id -> navController.navigate(activeWorkoutRoute(id)) },
+                    onMessageConsumed = viewModel::consumeMessage
                 )
             }
             composable(AppRoutes.JOURNAL) {
@@ -252,6 +291,139 @@ fun WeightTrackerNavHost(
                         }
                         navController.popBackStack()
                     }
+                )
+            }
+            composable(AppRoutes.TEMPLATES) { entry ->
+                val viewModel: TemplateListViewModel = viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                val saved by entry.savedStateHandle
+                    .getStateFlow(KEY_TEMPLATE_SAVED, "")
+                    .collectAsStateWithLifecycle()
+                LaunchedEffect(saved) {
+                    when (saved) {
+                        "created" -> viewModel.showSaved(true)
+                        "updated" -> viewModel.showSaved(false)
+                    }
+                    if (saved.isNotEmpty()) {
+                        entry.savedStateHandle[KEY_TEMPLATE_SAVED] = ""
+                    }
+                }
+                TemplateListScreen(
+                    state = state,
+                    onBack = { navController.popBackStack() },
+                    onAdd = { navController.navigate(templateEditorRoute(null)) },
+                    onEdit = { id -> navController.navigate(templateEditorRoute(id)) },
+                    onQueryChange = viewModel::onQueryChange,
+                    onArchiveFilter = viewModel::onArchiveFilter,
+                    onArchive = viewModel::archive,
+                    onRestore = viewModel::restore,
+                    onRequestDelete = viewModel::requestDelete,
+                    onDismissDelete = viewModel::dismissDelete,
+                    onConfirmDelete = viewModel::confirmDelete,
+                    onMessageConsumed = viewModel::consumeMessage
+                )
+            }
+            composable(
+                route = AppRoutes.TEMPLATE_EDITOR_PATTERN,
+                arguments = listOf(
+                    navArgument(ARG_TEMPLATE_ID) {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    }
+                )
+            ) {
+                val viewModel: TemplateEditorViewModel = viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                TemplateEditorScreen(
+                    state = state,
+                    onBack = viewModel::requestLeave,
+                    onNameChange = viewModel::onNameChange,
+                    onNotesChange = viewModel::onNotesChange,
+                    onOpenPicker = viewModel::openPicker,
+                    onClosePicker = viewModel::closePicker,
+                    onPickerQuery = viewModel::onPickerQuery,
+                    onPickerCategory = viewModel::onPickerCategory,
+                    onPickerMuscle = viewModel::onPickerMuscle,
+                    onSelectExercise = viewModel::selectExercise,
+                    onConfirmDuplicate = viewModel::confirmDuplicate,
+                    onDismissDuplicate = viewModel::dismissDuplicate,
+                    onRemoveExercise = viewModel::removeExercise,
+                    onMoveExercise = viewModel::moveExercise,
+                    onToggleExpanded = viewModel::toggleExpanded,
+                    onSetCount = viewModel::setSetCount,
+                    onAddSet = viewModel::addSet,
+                    onRemoveSet = viewModel::removeSet,
+                    onMoveSet = viewModel::moveSet,
+                    onApplyRemaining = viewModel::applyToRemaining,
+                    onApplyAll = viewModel::applyToAll,
+                    onMinReps = viewModel::onMinReps,
+                    onMaxReps = viewModel::onMaxReps,
+                    onLoadKind = viewModel::onLoadKind,
+                    onWeight = viewModel::onWeight,
+                    onMinutes = viewModel::onMinutes,
+                    onSeconds = viewModel::onSeconds,
+                    onDistance = viewModel::onDistance,
+                    onDistanceUnit = viewModel::onDistanceUnit,
+                    onSave = viewModel::save,
+                    onDismissDiscard = viewModel::dismissDiscard,
+                    onConfirmDiscard = viewModel::confirmDiscard,
+                    onFinished = { saved, created ->
+                        if (saved) {
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set(KEY_TEMPLATE_SAVED, if (created) "created" else "updated")
+                        }
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable(
+                route = AppRoutes.ACTIVE_WORKOUT_PATTERN,
+                arguments = listOf(
+                    navArgument(ARG_SESSION_ID) {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    }
+                )
+            ) {
+                val viewModel: ActiveWorkoutViewModel = viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                ActiveWorkoutScreen(
+                    state = state,
+                    onBack = { navController.popBackStack() },
+                    onPrevious = viewModel::previousExercise,
+                    onNext = viewModel::nextExercise,
+                    onReps = viewModel::onReps,
+                    onLoadKind = viewModel::onLoadKind,
+                    onWeight = viewModel::onWeight,
+                    onMinutes = viewModel::onMinutes,
+                    onSeconds = viewModel::onSeconds,
+                    onDistance = viewModel::onDistance,
+                    onDistanceUnit = viewModel::onDistanceUnit,
+                    onComplete = viewModel::completeSet,
+                    onSkip = viewModel::skipSet,
+                    onUndoSkip = viewModel::undoSkip,
+                    onAddExtra = viewModel::addExtraSet,
+                    onRemoveExtra = viewModel::removeExtraSet,
+                    onRequestFinish = viewModel::requestFinish,
+                    onDismissFinish = viewModel::dismissFinish,
+                    onConfirmFinish = viewModel::confirmFinish,
+                    onRequestAbandon = viewModel::requestAbandon,
+                    onDismissAbandon = viewModel::dismissAbandon,
+                    onConfirmAbandon = viewModel::confirmAbandon,
+                    onFinished = {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set(KEY_WORKOUT_RESULT, "finished")
+                        navController.popBackStack()
+                    },
+                    onAbandoned = {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set(KEY_WORKOUT_RESULT, "abandoned")
+                        navController.popBackStack()
+                    },
+                    onMessageConsumed = viewModel::consumeMessage
                 )
             }
         }
