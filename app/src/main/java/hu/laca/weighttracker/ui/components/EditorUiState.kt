@@ -30,4 +30,5 @@ sealed interface UserMessage {
     data object ExportSucceeded : UserMessage
     data object ExportFailed : UserMessage
     data object ImportReadFailed : UserMessage
+    data object PaletteSaved : UserMessage
 }

@@ -1,9 +1,7 @@
 package hu.laca.weighttracker.ui.dashboard
 
 import android.content.res.Configuration
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,52 +10,56 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.DashboardSnapshot
+import hu.laca.weighttracker.domain.Greeting
+import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
 import hu.laca.weighttracker.domain.model.ChartPoint
 import hu.laca.weighttracker.domain.model.ChartRange
-import hu.laca.weighttracker.domain.model.MeasurementListItem
 import hu.laca.weighttracker.domain.model.WeeklyAverage
 import hu.laca.weighttracker.domain.model.WeightMeasurement
+import hu.laca.weighttracker.ui.components.DayDetailsSheet
+import hu.laca.weighttracker.ui.components.DeleteMeasurementDialog
+import hu.laca.weighttracker.ui.components.HeroSurface
 import hu.laca.weighttracker.ui.components.MeasurementEditorSheet
-import hu.laca.weighttracker.ui.components.MeasurementRow
+import hu.laca.weighttracker.ui.components.MonthCalendar
+import hu.laca.weighttracker.ui.components.SectionHeader
+import hu.laca.weighttracker.ui.components.SegmentedControl
 import hu.laca.weighttracker.ui.components.UiFormatters
 import hu.laca.weighttracker.ui.components.UserMessageEffect
-import hu.laca.weighttracker.ui.components.WeeklyAveragesRow
 import hu.laca.weighttracker.ui.components.WeightChart
+import hu.laca.weighttracker.ui.theme.AppDimens
 import hu.laca.weighttracker.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
+import java.time.YearMonth
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     state: DashboardUiState,
-    today: LocalDate,
     onAddToday: () -> Unit,
     onChartRangeSelected: (ChartRange) -> Unit,
-    onOpenHistory: () -> Unit,
-    onEditMeasurement: (LocalDate) -> Unit,
-    onDeleteMeasurement: (LocalDate) -> Unit,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onDaySelected: (LocalDate) -> Unit,
+    onDismissDaySheet: () -> Unit,
+    onRecordSelectedDay: () -> Unit,
+    onRequestDayDelete: () -> Unit,
+    onDismissDayDelete: () -> Unit,
+    onConfirmDayDelete: () -> Unit,
     onEditorDateChange: (LocalDate) -> Unit,
     onEditorWeightChange: (String) -> Unit,
     onSave: () -> Unit,
@@ -71,117 +73,106 @@ fun DashboardScreen(
     var selectedPoint by remember { mutableStateOf<ChartPoint?>(null) }
     UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.app_name)) })
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        if (state.snapshot.isEmpty) {
-            EmptyDashboard(
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .fillMaxSize(),
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = AppDimens.screenPadding)
+                .padding(top = 8.dp, bottom = 24.dp)
+        ) {
+            OverviewHeader(
+                greeting = state.greeting,
+                today = state.today
+            )
+            Spacer(Modifier.height(AppDimens.sectionGap))
+            CurrentWeightHero(
+                snapshot = state.snapshot,
                 onAddToday = onAddToday
             )
-        } else {
-            Column(
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 24.dp)
-            ) {
-                LatestWeightCard(
-                    snapshot = state.snapshot,
-                    onAddToday = onAddToday
+            Spacer(Modifier.height(AppDimens.sectionGap))
+            SectionHeader(title = stringResource(R.string.calendar_title))
+            MonthCalendar(
+                grid = state.monthGrid,
+                selectedDate = state.daySheet?.date,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+                onDayClick = onDaySelected
+            )
+            Spacer(Modifier.height(AppDimens.sectionGap))
+            SectionHeader(title = stringResource(R.string.chart_title))
+            val ranges = ChartRange.entries
+            SegmentedControl(
+                options = ranges.map { stringResource(it.labelRes()) },
+                selectedIndex = ranges.indexOf(state.chartRange).coerceAtLeast(0),
+                onSelected = { onChartRangeSelected(ranges[it]) }
+            )
+            Spacer(Modifier.height(AppDimens.itemGap))
+            if (state.snapshot.chartPoints.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.chart_empty_range),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = AppDimens.itemGap)
                 )
-                Spacer(Modifier.height(16.dp))
-                WeekSummaryRow(snapshot = state.snapshot)
-                if (state.snapshot.recentWeeks.isNotEmpty()) {
-                    Spacer(Modifier.height(20.dp))
+            } else {
+                state.snapshot.chartRangeAverageKg?.let { average ->
                     Text(
-                        text = stringResource(R.string.weekly_averages_title),
-                        style = MaterialTheme.typography.titleMedium
+                        text = stringResource(R.string.chart_range_average, UiFormatters.weightKg(average)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(8.dp))
-                    WeeklyAveragesRow(weeks = state.snapshot.recentWeeks)
                 }
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    text = stringResource(R.string.chart_title),
-                    style = MaterialTheme.typography.titleMedium
+                WeightChart(
+                    points = state.snapshot.chartPoints,
+                    contentDescription = stringResource(
+                        R.string.chart_content_description,
+                        state.snapshot.chartPoints.size,
+                        UiFormatters.weightKg(state.snapshot.chartPoints.minOf { it.weightKg }),
+                        UiFormatters.weightKg(state.snapshot.chartPoints.maxOf { it.weightKg })
+                    ),
+                    onPointSelected = { selectedPoint = it }
                 )
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ChartRange.entries.forEach { range ->
-                        FilterChip(
-                            selected = state.chartRange == range,
-                            onClick = { onChartRangeSelected(range) },
-                            label = { Text(stringResource(range.labelRes())) }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                if (state.snapshot.chartPoints.isEmpty()) {
+                selectedPoint?.let { point ->
                     Text(
-                        text = stringResource(R.string.chart_empty_range),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 24.dp)
-                    )
-                } else {
-                    WeightChart(
-                        points = state.snapshot.chartPoints,
-                        contentDescription = stringResource(
-                            R.string.chart_content_description,
-                            state.snapshot.chartPoints.size,
-                            UiFormatters.weightKg(state.snapshot.chartPoints.minOf { it.weightKg }),
-                            UiFormatters.weightKg(state.snapshot.chartPoints.maxOf { it.weightKg })
+                        text = stringResource(
+                            R.string.chart_selected_point,
+                            UiFormatters.longDate(point.date),
+                            UiFormatters.weightKg(point.weightKg)
                         ),
-                        onPointSelected = { selectedPoint = it }
-                    )
-                    selectedPoint?.let { point ->
-                        Text(
-                            text = stringResource(
-                                R.string.chart_selected_point,
-                                UiFormatters.longDate(point.date),
-                                UiFormatters.weightKg(point.weightKg)
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Spacer(Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.recent_measurements_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = onOpenHistory) {
-                        Text(stringResource(R.string.action_open_history))
-                    }
-                }
-                state.snapshot.recentItems.forEach { item ->
-                    MeasurementRow(
-                        item = item,
-                        showActions = true,
-                        onEdit = { onEditMeasurement(item.measurement.date) },
-                        onDelete = { onDeleteMeasurement(item.measurement.date) }
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
     }
+    state.daySheet?.let { sheet ->
+        DayDetailsSheet(
+            state = sheet,
+            onRecordWeight = onRecordSelectedDay,
+            onEditWeight = onRecordSelectedDay,
+            onDeleteWeight = onRequestDayDelete,
+            onDismiss = onDismissDaySheet
+        )
+    }
+    if (state.showDayDeleteConfirm) {
+        state.daySheet?.measurement?.let { measurement ->
+            DeleteMeasurementDialog(
+                measurement = measurement,
+                onConfirm = onConfirmDayDelete,
+                onDismiss = onDismissDayDelete
+            )
+        }
+    }
     state.editor?.let { editor ->
         MeasurementEditorSheet(
             state = editor,
-            today = today,
+            today = state.today,
             onDateChange = onEditorDateChange,
             onWeightChange = onEditorWeightChange,
             onSave = onSave,
@@ -194,142 +185,100 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun EmptyDashboard(
-    modifier: Modifier,
-    onAddToday: () -> Unit
+private fun OverviewHeader(
+    greeting: Greeting,
+    today: LocalDate
 ) {
-    Column(
-        modifier = modifier.padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = stringResource(R.string.empty_title),
-            style = MaterialTheme.typography.headlineMedium
+            text = stringResource(greeting.stringRes()),
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground
         )
-        Spacer(Modifier.height(12.dp))
         Text(
-            text = stringResource(R.string.empty_body),
+            text = UiFormatters.longDate(today),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(24.dp))
-        Button(onClick = onAddToday) {
-            Text(stringResource(R.string.action_add_today))
-        }
     }
 }
 
 @Composable
-private fun LatestWeightCard(
+private fun CurrentWeightHero(
     snapshot: DashboardSnapshot,
     onAddToday: () -> Unit
 ) {
-    val latest = snapshot.latest ?: return
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+    HeroSurface {
+        if (snapshot.latest == null) {
+            Text(
+                text = stringResource(R.string.empty_title),
+                style = MaterialTheme.typography.titleLarge
+            )
+            Text(
+                text = stringResource(R.string.empty_body_short),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        } else {
             Text(
                 text = stringResource(R.string.latest_weight_label),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = UiFormatters.weightKg(latest.weightKg),
+                text = UiFormatters.weightKg(snapshot.latest.weightKg),
                 style = MaterialTheme.typography.displaySmall,
                 modifier = Modifier.padding(top = 4.dp)
             )
             Text(
-                text = UiFormatters.longDate(latest.date),
+                text = UiFormatters.longDate(snapshot.latest.date),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = snapshot.changeFromPreviousKg?.let {
-                    stringResource(R.string.change_from_previous_value, UiFormatters.signedWeightKg(it))
-                } ?: stringResource(R.string.no_previous_measurement),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = onAddToday,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            snapshot.currentWeek?.let { week ->
                 Text(
                     text = stringResource(
-                        if (snapshot.todayHasMeasurement) {
-                            R.string.action_edit_today
-                        } else {
-                            R.string.action_add_today
-                        }
-                    )
+                        R.string.hero_weekly_average,
+                        UiFormatters.weightKg(week.averageKg)
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp)
                 )
             }
+            Text(
+                text = snapshot.previousWeekChangeKg?.let {
+                    stringResource(R.string.change_from_previous_week_value, UiFormatters.signedWeightKg(it))
+                } ?: stringResource(R.string.no_previous_week_average),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onAddToday,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = stringResource(
+                    if (snapshot.todayHasMeasurement) {
+                        R.string.action_edit_today
+                    } else {
+                        R.string.action_add_today
+                    }
+                )
+            )
         }
     }
 }
 
-@Composable
-private fun WeekSummaryRow(snapshot: DashboardSnapshot) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = Modifier.weight(1f)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.weekly_average_title),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                val week = snapshot.currentWeek
-                Text(
-                    text = week?.let { UiFormatters.weightKg(it.averageKg) }
-                        ?: stringResource(R.string.no_current_week_average),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-                if (week != null) {
-                    Text(
-                        text = stringResource(
-                            R.string.week_interval,
-                            UiFormatters.compactDate(week.weekStart),
-                            UiFormatters.compactDate(week.coveredEnd)
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = Modifier.weight(1f)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.change_from_previous_week),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = snapshot.previousWeekChangeKg?.let { UiFormatters.signedWeightKg(it) }
-                        ?: stringResource(R.string.no_previous_week_average),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-        }
+private fun Greeting.stringRes(): Int {
+    return when (this) {
+        Greeting.Morning -> R.string.greeting_morning
+        Greeting.Day -> R.string.greeting_day
+        Greeting.Evening -> R.string.greeting_evening
     }
 }
 
@@ -346,6 +295,7 @@ private fun ChartRange.labelRes(): Int {
 @Composable
 private fun DashboardPreview() {
     val date = LocalDate.of(2026, 3, 11)
+    val month = YearMonth.from(date)
     val measurement = WeightMeasurement(1, date, 82.4, 0, 0)
     WeightTrackerTheme {
         DashboardScreen(
@@ -370,18 +320,26 @@ private fun DashboardPreview() {
                         ChartPoint(date.minusDays(2), 81.8),
                         ChartPoint(date, 82.4)
                     ),
-                    recentItems = listOf(
-                        MeasurementListItem(measurement, 0.4)
-                    ),
-                    todayHasMeasurement = true
-                )
+                    recentItems = emptyList(),
+                    todayHasMeasurement = true,
+                    measurementDates = setOf(date),
+                    chartRangeAverageKg = 82.1
+                ),
+                today = date,
+                greeting = Greeting.Morning,
+                displayedMonth = month,
+                monthGrid = MonthGridCalculator.grid(month, date, setOf(date))
             ),
-            today = date,
             onAddToday = {},
             onChartRangeSelected = {},
-            onOpenHistory = {},
-            onEditMeasurement = {},
-            onDeleteMeasurement = {},
+            onPreviousMonth = {},
+            onNextMonth = {},
+            onDaySelected = {},
+            onDismissDaySheet = {},
+            onRecordSelectedDay = {},
+            onRequestDayDelete = {},
+            onDismissDayDelete = {},
+            onConfirmDayDelete = {},
             onEditorDateChange = {},
             onEditorWeightChange = {},
             onSave = {},
@@ -395,18 +353,28 @@ private fun DashboardPreview() {
 }
 
 @Preview(showBackground = true, name = "Empty light")
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "Empty dark")
 @Composable
 private fun EmptyDashboardPreview() {
+    val date = LocalDate.of(2026, 3, 11)
+    val month = YearMonth.from(date)
     WeightTrackerTheme {
         DashboardScreen(
-            state = DashboardUiState(),
-            today = LocalDate.of(2026, 3, 11),
+            state = DashboardUiState(
+                today = date,
+                greeting = Greeting.Day,
+                displayedMonth = month,
+                monthGrid = MonthGridCalculator.grid(month, date, emptySet())
+            ),
             onAddToday = {},
             onChartRangeSelected = {},
-            onOpenHistory = {},
-            onEditMeasurement = {},
-            onDeleteMeasurement = {},
+            onPreviousMonth = {},
+            onNextMonth = {},
+            onDaySelected = {},
+            onDismissDaySheet = {},
+            onRecordSelectedDay = {},
+            onRequestDayDelete = {},
+            onDismissDayDelete = {},
+            onConfirmDayDelete = {},
             onEditorDateChange = {},
             onEditorWeightChange = {},
             onSave = {},

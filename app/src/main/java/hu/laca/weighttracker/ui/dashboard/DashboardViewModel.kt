@@ -6,8 +6,14 @@ import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.domain.DashboardAssembler
 import hu.laca.weighttracker.domain.DashboardSnapshot
 import hu.laca.weighttracker.domain.DateProvider
-import hu.laca.weighttracker.domain.MeasurementValidator
+import hu.laca.weighttracker.domain.DaySheetFactory
+import hu.laca.weighttracker.domain.DaySheetState
+import hu.laca.weighttracker.domain.Greeting
+import hu.laca.weighttracker.domain.GreetingSelector
 import hu.laca.weighttracker.domain.MeasurementValidationResult
+import hu.laca.weighttracker.domain.MeasurementValidator
+import hu.laca.weighttracker.domain.calendar.MonthGrid
+import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
 import hu.laca.weighttracker.domain.model.ChartRange
 import hu.laca.weighttracker.domain.model.SaveOutcome
 import hu.laca.weighttracker.domain.model.WeightMeasurement
@@ -21,6 +27,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.YearMonth
 
 data class DashboardUiState(
     val snapshot: DashboardSnapshot = DashboardSnapshot(
@@ -36,7 +43,25 @@ data class DashboardUiState(
     ),
     val chartRange: ChartRange = ChartRange.Days30,
     val editor: EditorUiState? = null,
-    val userMessage: UserMessage? = null
+    val userMessage: UserMessage? = null,
+    val today: LocalDate = LocalDate.of(1970, 1, 1),
+    val greeting: Greeting = Greeting.Day,
+    val displayedMonth: YearMonth = YearMonth.of(1970, 1),
+    val monthGrid: MonthGrid = MonthGridCalculator.grid(
+        month = YearMonth.of(1970, 1),
+        today = LocalDate.of(1970, 1, 1),
+        measuredDates = emptySet()
+    ),
+    val daySheet: DaySheetState? = null,
+    val showDayDeleteConfirm: Boolean = false
+)
+
+private data class DashboardChrome(
+    val range: ChartRange,
+    val editor: EditorUiState?,
+    val message: UserMessage?,
+    val month: YearMonth,
+    val selectedDay: LocalDate?
 )
 
 class DashboardViewModel(
@@ -47,23 +72,58 @@ class DashboardViewModel(
     private val editor = MutableStateFlow<EditorUiState?>(null)
     private val userMessage = MutableStateFlow<UserMessage?>(null)
     private val measurements = MutableStateFlow<List<WeightMeasurement>>(emptyList())
+    private val displayedMonth = MutableStateFlow(YearMonth.from(dateProvider.today()))
+    private val selectedDay = MutableStateFlow<LocalDate?>(null)
+    private val showDayDeleteConfirm = MutableStateFlow(false)
+
+    private val chrome = combine(
+        chartRange,
+        editor,
+        userMessage,
+        displayedMonth,
+        selectedDay
+    ) { range, editorState, message, month, day ->
+        DashboardChrome(range, editorState, message, month, day)
+    }
 
     val uiState: StateFlow<DashboardUiState> = combine(
         measurements,
-        chartRange,
-        editor,
-        userMessage
-    ) { items, range, editorState, message ->
+        chrome,
+        showDayDeleteConfirm
+    ) { items, chromeState, deleteConfirm ->
+        val today = dateProvider.today()
+        val snapshot = DashboardAssembler.assemble(items, today, chromeState.range)
         DashboardUiState(
-            snapshot = DashboardAssembler.assemble(items, dateProvider.today(), range),
-            chartRange = range,
-            editor = editorState,
-            userMessage = message
+            snapshot = snapshot,
+            chartRange = chromeState.range,
+            editor = chromeState.editor,
+            userMessage = chromeState.message,
+            today = today,
+            greeting = GreetingSelector.from(dateProvider.now().toLocalTime()),
+            displayedMonth = chromeState.month,
+            monthGrid = MonthGridCalculator.grid(
+                month = chromeState.month,
+                today = today,
+                measuredDates = snapshot.measurementDates
+            ),
+            daySheet = chromeState.selectedDay?.let { date ->
+                DaySheetFactory.create(date, items, today)
+            },
+            showDayDeleteConfirm = deleteConfirm
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = DashboardUiState()
+        initialValue = DashboardUiState(
+            today = dateProvider.today(),
+            greeting = GreetingSelector.from(dateProvider.now().toLocalTime()),
+            displayedMonth = YearMonth.from(dateProvider.today()),
+            monthGrid = MonthGridCalculator.grid(
+                month = YearMonth.from(dateProvider.today()),
+                today = dateProvider.today(),
+                measuredDates = emptySet()
+            )
+        )
     )
 
     init {
@@ -74,6 +134,54 @@ class DashboardViewModel(
 
     fun onChartRangeSelected(range: ChartRange) {
         chartRange.value = range
+    }
+
+    fun onPreviousMonth() {
+        displayedMonth.value = displayedMonth.value.minusMonths(1)
+    }
+
+    fun onNextMonth() {
+        displayedMonth.value = displayedMonth.value.plusMonths(1)
+    }
+
+    fun selectDay(date: LocalDate) {
+        if (!MonthGridCalculator.canOpenDay(date, dateProvider.today())) {
+            return
+        }
+        selectedDay.value = date
+        showDayDeleteConfirm.value = false
+    }
+
+    fun dismissDaySheet() {
+        selectedDay.value = null
+        showDayDeleteConfirm.value = false
+    }
+
+    fun recordSelectedDay() {
+        val date = selectedDay.value ?: return
+        selectedDay.value = null
+        showDayDeleteConfirm.value = false
+        openEditor(date)
+    }
+
+    fun requestDayDelete() {
+        if (uiState.value.daySheet?.measurement != null) {
+            showDayDeleteConfirm.value = true
+        }
+    }
+
+    fun dismissDayDelete() {
+        showDayDeleteConfirm.value = false
+    }
+
+    fun confirmDayDelete() {
+        val existing = uiState.value.daySheet?.measurement ?: return
+        viewModelScope.launch {
+            repository.delete(existing.id)
+            selectedDay.value = null
+            showDayDeleteConfirm.value = false
+            userMessage.value = UserMessage.Deleted
+        }
     }
 
     fun openDelete(date: LocalDate) {

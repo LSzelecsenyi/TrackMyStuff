@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,7 +23,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -179,28 +178,10 @@ fun MeasurementEditorSheet(
         }
     }
     if (state.showDeleteConfirm && state.existing != null) {
-        AlertDialog(
-            onDismissRequest = onDeleteDismiss,
-            title = { Text(stringResource(R.string.delete_title)) },
-            text = {
-                Text(
-                    stringResource(
-                        R.string.delete_message,
-                        UiFormatters.longDate(state.existing.date),
-                        UiFormatters.weightKg(state.existing.weightKg)
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = onDeleteConfirm) {
-                    Text(stringResource(R.string.action_delete))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDeleteDismiss) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
+        DeleteMeasurementDialog(
+            measurement = state.existing,
+            onConfirm = onDeleteConfirm,
+            onDismiss = onDeleteDismiss
         )
     }
 }

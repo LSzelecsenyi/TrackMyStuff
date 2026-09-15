@@ -30,6 +30,7 @@ private fun UserMessage.toStringRes(): Int {
         UserMessage.ExportSucceeded -> hu.laca.weighttracker.R.string.message_export_success
         UserMessage.ExportFailed -> hu.laca.weighttracker.R.string.message_export_failed
         UserMessage.ImportReadFailed -> hu.laca.weighttracker.R.string.message_import_read_failed
+        UserMessage.PaletteSaved -> hu.laca.weighttracker.R.string.message_palette_saved
     }
 }
 

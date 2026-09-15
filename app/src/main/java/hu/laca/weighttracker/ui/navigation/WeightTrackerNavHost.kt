@@ -3,14 +3,18 @@ package hu.laca.weighttracker.ui.navigation
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,26 +57,52 @@ fun WeightTrackerNavHost(
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+    val colors = NavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    )
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 NavigationBarItem(
                     selected = currentRoute == ROUTE_DASHBOARD,
                     onClick = { navController.navigateSingleTop(ROUTE_DASHBOARD) },
-                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
-                    label = { Text(stringResource(R.string.nav_dashboard)) }
+                    icon = {
+                        Icon(
+                            Icons.Outlined.Home,
+                            contentDescription = stringResource(R.string.nav_dashboard)
+                        )
+                    },
+                    label = { Text(stringResource(R.string.nav_dashboard)) },
+                    colors = colors
                 )
                 NavigationBarItem(
                     selected = currentRoute == ROUTE_HISTORY,
                     onClick = { navController.navigateSingleTop(ROUTE_HISTORY) },
-                    icon = { Icon(Icons.Outlined.History, contentDescription = null) },
-                    label = { Text(stringResource(R.string.nav_history)) }
+                    icon = {
+                        Icon(
+                            Icons.Outlined.History,
+                            contentDescription = stringResource(R.string.nav_history)
+                        )
+                    },
+                    label = { Text(stringResource(R.string.nav_history)) },
+                    colors = colors
                 )
                 NavigationBarItem(
                     selected = currentRoute == ROUTE_SETTINGS,
                     onClick = { navController.navigateSingleTop(ROUTE_SETTINGS) },
-                    icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
-                    label = { Text(stringResource(R.string.nav_settings)) }
+                    icon = {
+                        Icon(
+                            Icons.Outlined.Settings,
+                            contentDescription = stringResource(R.string.nav_settings)
+                        )
+                    },
+                    label = { Text(stringResource(R.string.nav_settings)) },
+                    colors = colors
                 )
             }
         }
@@ -80,19 +110,26 @@ fun WeightTrackerNavHost(
         NavHost(
             navController = navController,
             startDestination = ROUTE_DASHBOARD,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .fillMaxSize()
         ) {
             composable(ROUTE_DASHBOARD) {
                 val viewModel: DashboardViewModel = viewModel(factory = factory)
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
                 DashboardScreen(
                     state = state,
-                    today = dateProvider.today(),
                     onAddToday = { viewModel.openEditor() },
                     onChartRangeSelected = viewModel::onChartRangeSelected,
-                    onOpenHistory = { navController.navigateSingleTop(ROUTE_HISTORY) },
-                    onEditMeasurement = viewModel::openEditor,
-                    onDeleteMeasurement = viewModel::openDelete,
+                    onPreviousMonth = viewModel::onPreviousMonth,
+                    onNextMonth = viewModel::onNextMonth,
+                    onDaySelected = viewModel::selectDay,
+                    onDismissDaySheet = viewModel::dismissDaySheet,
+                    onRecordSelectedDay = viewModel::recordSelectedDay,
+                    onRequestDayDelete = viewModel::requestDayDelete,
+                    onDismissDayDelete = viewModel::dismissDayDelete,
+                    onConfirmDayDelete = viewModel::confirmDayDelete,
                     onEditorDateChange = viewModel::onEditorDateChange,
                     onEditorWeightChange = viewModel::onEditorWeightChange,
                     onSave = viewModel::saveEditor,
@@ -176,7 +213,16 @@ private fun SettingsRoute(
     }
     SettingsScreen(
         state = state,
-        onThemeSelected = viewModel::setTheme,
+        onThemeSelected = viewModel::setThemeMode,
+        onSelectDefaultPalette = viewModel::selectDefaultPalette,
+        onSelectCustomPalette = viewModel::selectCustomPalette,
+        onEditingDarkChange = viewModel::setEditingDark,
+        onDraftFieldChange = viewModel::onDraftFieldChange,
+        onDraftColorPicked = viewModel::onDraftColorPicked,
+        onGenerateDark = viewModel::generateDarkFromLight,
+        onSaveDraft = viewModel::saveDraft,
+        onCancelDraft = viewModel::cancelDraft,
+        onResetCustomDraft = viewModel::resetCustomDraft,
         onExportClick = {
             exportLauncher.launch("testsuly_mentes_${today}.csv")
         },

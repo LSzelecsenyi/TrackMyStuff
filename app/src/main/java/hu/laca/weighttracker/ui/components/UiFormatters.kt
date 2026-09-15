@@ -1,6 +1,7 @@
 package hu.laca.weighttracker.ui.components
 
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -14,6 +15,8 @@ object UiFormatters {
         DateTimeFormatter.ofPattern("MMM d.", locale)
     private val compactDate: DateTimeFormatter =
         DateTimeFormatter.ofPattern("MM.dd.", locale)
+    private val monthTitle: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("yyyy. MMMM", locale)
 
     fun weightKg(value: Double): String {
         return String.format(locale, "%.1f kg", value)
@@ -37,4 +40,6 @@ object UiFormatters {
     fun chartDate(date: LocalDate): String = date.format(chartDate)
 
     fun compactDate(date: LocalDate): String = date.format(compactDate)
+
+    fun monthTitle(month: YearMonth): String = month.format(monthTitle)
 }

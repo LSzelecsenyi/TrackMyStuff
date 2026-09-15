@@ -10,12 +10,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -29,9 +27,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hu.laca.weighttracker.domain.model.ChartPoint
-import kotlin.math.hypot
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import kotlin.math.hypot
 
 @Composable
 fun WeightChart(
@@ -41,10 +39,12 @@ fun WeightChart(
     onPointSelected: (ChartPoint?) -> Unit = {}
 ) {
     val lineColor = MaterialTheme.colorScheme.primary
+    val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
     val markerColor = MaterialTheme.colorScheme.onSurface
-    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+    val markerInner = MaterialTheme.colorScheme.surface
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val selectedColor = MaterialTheme.colorScheme.primary
+    val selectedColor = MaterialTheme.colorScheme.tertiary
     val textMeasurer = rememberTextMeasurer()
     var selectedDate by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -60,14 +60,30 @@ fun WeightChart(
                 .fillMaxSize()
                 .pointerInput(points) {
                     detectTapGestures { tap ->
-                        val layout = ChartLayout.from(size.width.toFloat(), size.height.toFloat(), points)
+                        val layout = ChartLayout.from(
+                            width = size.width.toFloat(),
+                            height = size.height.toFloat(),
+                            points = points,
+                            left = 52.dp.toPx(),
+                            rightInset = 16.dp.toPx(),
+                            top = 12.dp.toPx(),
+                            bottomInset = 40.dp.toPx()
+                        )
                         val hit = layout.hitTest(tap)
                         selectedDate = hit?.date?.toString()
                         onPointSelected(hit)
                     }
                 }
         ) {
-            val layout = ChartLayout.from(size.width, size.height, points)
+            val layout = ChartLayout.from(
+                width = size.width,
+                height = size.height,
+                points = points,
+                left = 52.dp.toPx(),
+                rightInset = 16.dp.toPx(),
+                top = 12.dp.toPx(),
+                bottomInset = 40.dp.toPx()
+            )
             layout.yLabels.forEach { label ->
                 drawLine(
                     color = gridColor,
@@ -81,7 +97,7 @@ fun WeightChart(
                 )
                 drawText(
                     textLayoutResult = measured,
-                    topLeft = Offset(0f, label.y - measured.size.height / 2f)
+                    topLeft = Offset(4.dp.toPx(), label.y - measured.size.height / 2f)
                 )
             }
             layout.xLabels.forEach { label ->
@@ -89,13 +105,26 @@ fun WeightChart(
                     text = label.text,
                     style = TextStyle(color = labelColor, fontSize = 11.sp)
                 )
+                val x = (label.x - measured.size.width / 2f)
+                    .coerceIn(layout.plotLeft, layout.plotRight - measured.size.width)
                 drawText(
                     textLayoutResult = measured,
-                    topLeft = Offset(
-                        label.x - measured.size.width / 2f,
-                        layout.plotBottom + 8.dp.toPx()
-                    )
+                    topLeft = Offset(x, layout.plotBottom + 8.dp.toPx())
                 )
+            }
+            if (layout.mapped.isNotEmpty()) {
+                val area = Path().apply {
+                    val first = layout.mapped.first()
+                    moveTo(first.offset.x, layout.plotBottom)
+                    lineTo(first.offset.x, first.offset.y)
+                    layout.mapped.drop(1).forEach { point ->
+                        lineTo(point.offset.x, point.offset.y)
+                    }
+                    val last = layout.mapped.last()
+                    lineTo(last.offset.x, layout.plotBottom)
+                    close()
+                }
+                drawPath(path = area, color = fillColor)
             }
             if (layout.mapped.size > 1) {
                 val path = Path().apply {
@@ -123,7 +152,7 @@ fun WeightChart(
                     center = point.offset
                 )
                 drawCircle(
-                    color = Color.White.copy(alpha = 0.9f),
+                    color = markerInner,
                     radius = if (selected) 3.dp.toPx() else 2.dp.toPx(),
                     center = point.offset
                 )
@@ -159,11 +188,17 @@ private data class ChartLayout(
     }
 
     companion object {
-        fun from(width: Float, height: Float, points: List<ChartPoint>): ChartLayout {
-            val left = 48f
-            val right = width - 12f
-            val top = 16f
-            val bottom = height - 36f
+        fun from(
+            width: Float,
+            height: Float,
+            points: List<ChartPoint>,
+            left: Float,
+            rightInset: Float,
+            top: Float,
+            bottomInset: Float
+        ): ChartLayout {
+            val right = width - rightInset
+            val bottom = height - bottomInset
             val weights = points.map { it.weightKg }
             val minWeight = weights.minOrNull() ?: 0.0
             val maxWeight = weights.maxOrNull() ?: 0.0

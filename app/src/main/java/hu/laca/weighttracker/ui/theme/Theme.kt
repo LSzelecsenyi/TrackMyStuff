@@ -1,57 +1,62 @@
 package hu.laca.weighttracker.ui.theme
 
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import hu.laca.weighttracker.data.preferences.ThemePreference
-
-private val LightColorScheme = lightColorScheme(
-    primary = TealPrimaryLight,
-    onPrimary = TealOnPrimaryLight,
-    primaryContainer = TealPrimaryContainerLight,
-    onPrimaryContainer = TealOnPrimaryContainerLight,
-    background = BackgroundLight,
-    onBackground = OnBackgroundLight,
-    surface = SurfaceLight,
-    onSurface = OnSurfaceLight,
-    surfaceContainer = SurfaceContainerLight,
-    surfaceContainerHigh = SurfaceContainerHighLight,
-    onSurfaceVariant = OnSurfaceVariantLight,
-    outline = OutlineLight,
-    error = ErrorLight
-)
-
-private val DarkColorScheme = darkColorScheme(
-    primary = TealPrimaryDark,
-    onPrimary = TealOnPrimaryDark,
-    primaryContainer = TealPrimaryContainerDark,
-    onPrimaryContainer = TealOnPrimaryContainerDark,
-    background = BackgroundDark,
-    onBackground = OnBackgroundDark,
-    surface = SurfaceDark,
-    onSurface = OnSurfaceDark,
-    surfaceContainer = SurfaceContainerDark,
-    surfaceContainerHigh = SurfaceContainerHighDark,
-    onSurfaceVariant = OnSurfaceVariantDark,
-    outline = OutlineDark,
-    error = ErrorDark
-)
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import hu.laca.weighttracker.domain.theme.AppearanceSettings
+import hu.laca.weighttracker.domain.theme.ColorSchemeFactory
+import hu.laca.weighttracker.domain.theme.ThemeMode
+import hu.laca.weighttracker.domain.theme.ThemeSeeds
 
 @Composable
 fun WeightTrackerTheme(
-    themePreference: ThemePreference = ThemePreference.System,
+    appearance: AppearanceSettings = AppearanceSettings.Default,
     content: @Composable () -> Unit
 ) {
-    val darkTheme = when (themePreference) {
-        ThemePreference.System -> isSystemInDarkTheme()
-        ThemePreference.Light -> false
-        ThemePreference.Dark -> true
+    val darkTheme = when (appearance.mode) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    val seeds = appearance.activeSeeds(darkTheme)
+    val colorScheme = remember(seeds, darkTheme) {
+        ColorSchemeFactory.derive(seeds, darkTheme).toComposeColorScheme(darkTheme)
+    }
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !darkTheme
+            controller.isAppearanceLightNavigationBars = !darkTheme
+        }
     }
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        colorScheme = colorScheme,
         typography = AppTypography,
+        shapes = AppShapes,
+        content = content
+    )
+}
+
+@Composable
+fun WeightTrackerThemeForPreview(
+    seeds: ThemeSeeds = ThemeSeeds.DefaultLight,
+    darkTheme: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val colorScheme = remember(seeds, darkTheme) {
+        ColorSchemeFactory.derive(seeds, darkTheme).toComposeColorScheme(darkTheme)
+    }
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = AppTypography,
+        shapes = AppShapes,
         content = content
     )
 }

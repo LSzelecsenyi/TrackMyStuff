@@ -57,6 +57,7 @@ fun HistoryScreen(
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.history_title)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             FloatingActionButton(onClick = onAdd) {
                 Icon(

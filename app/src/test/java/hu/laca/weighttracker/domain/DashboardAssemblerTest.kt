@@ -20,6 +20,8 @@ class DashboardAssemblerTest {
         assertNull(snapshot.currentWeek)
         assertNull(snapshot.previousWeekChangeKg)
         assertTrue(snapshot.chartPoints.isEmpty())
+        assertTrue(snapshot.measurementDates.isEmpty())
+        assertNull(snapshot.chartRangeAverageKg)
     }
 
     @Test

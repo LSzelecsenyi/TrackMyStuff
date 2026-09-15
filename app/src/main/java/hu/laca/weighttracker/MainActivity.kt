@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import hu.laca.weighttracker.data.preferences.ThemePreference
+import hu.laca.weighttracker.domain.theme.AppearanceSettings
 import hu.laca.weighttracker.ui.navigation.WeightTrackerNavHost
 import hu.laca.weighttracker.ui.theme.WeightTrackerTheme
 
@@ -16,10 +16,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = (application as WeightTrackerApplication).container
         setContent {
-            val theme by container.themePreferences.theme.collectAsStateWithLifecycle(
-                initialValue = ThemePreference.System
+            val appearance by container.themePreferences.appearance.collectAsStateWithLifecycle(
+                initialValue = AppearanceSettings.Default
             )
-            WeightTrackerTheme(themePreference = theme) {
+            WeightTrackerTheme(appearance = appearance) {
                 WeightTrackerNavHost(
                     factory = container.viewModelFactory,
                     dateProvider = container.dateProvider
