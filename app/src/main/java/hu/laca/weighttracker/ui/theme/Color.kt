@@ -1,0 +1,31 @@
+package hu.laca.weighttracker.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val TealPrimaryLight = Color(0xFF2C6E63)
+val TealOnPrimaryLight = Color(0xFFFFFFFF)
+val TealPrimaryContainerLight = Color(0xFFCDE8E1)
+val TealOnPrimaryContainerLight = Color(0xFF073730)
+val BackgroundLight = Color(0xFFF6F7F6)
+val OnBackgroundLight = Color(0xFF1A1C1B)
+val SurfaceLight = Color(0xFFF6F7F6)
+val SurfaceContainerLight = Color(0xFFEAEDEC)
+val SurfaceContainerHighLight = Color(0xFFE4E8E6)
+val OnSurfaceLight = Color(0xFF1A1C1B)
+val OnSurfaceVariantLight = Color(0xFF3F4946)
+val OutlineLight = Color(0xFF6F7976)
+val ErrorLight = Color(0xFFBA1A1A)
+
+val TealPrimaryDark = Color(0xFF8BD4C6)
+val TealOnPrimaryDark = Color(0xFF00382F)
+val TealPrimaryContainerDark = Color(0xFF10554B)
+val TealOnPrimaryContainerDark = Color(0xFFCDE8E1)
+val BackgroundDark = Color(0xFF121414)
+val OnBackgroundDark = Color(0xFFE2E3E1)
+val SurfaceDark = Color(0xFF121414)
+val SurfaceContainerDark = Color(0xFF1E2120)
+val SurfaceContainerHighDark = Color(0xFF282B2A)
+val OnSurfaceDark = Color(0xFFE2E3E1)
+val OnSurfaceVariantDark = Color(0xFFBEC9C5)
+val OutlineDark = Color(0xFF899390)
+val ErrorDark = Color(0xFFFFB4AB)
