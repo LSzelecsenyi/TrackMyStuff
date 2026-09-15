@@ -1,13 +1,17 @@
 package hu.laca.weighttracker.ui.history
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import hu.laca.weighttracker.data.repository.WeightRepository
+import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.domain.DateProvider
-import hu.laca.weighttracker.domain.MeasurementDiffs
 import hu.laca.weighttracker.domain.MeasurementValidationResult
 import hu.laca.weighttracker.domain.MeasurementValidator
-import hu.laca.weighttracker.domain.model.MeasurementListItem
+import hu.laca.weighttracker.domain.journal.JournalAssembler
+import hu.laca.weighttracker.domain.journal.JournalEmptyKind
+import hu.laca.weighttracker.domain.journal.JournalFilter
+import hu.laca.weighttracker.domain.journal.JournalTimeline
 import hu.laca.weighttracker.domain.model.SaveOutcome
 import hu.laca.weighttracker.domain.model.WeightMeasurement
 import hu.laca.weighttracker.ui.components.EditorUiState
@@ -22,31 +26,52 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 data class HistoryUiState(
-    val items: List<MeasurementListItem> = emptyList(),
-    val isEmpty: Boolean = true,
+    val timeline: JournalTimeline = JournalTimeline(
+        groups = emptyList(),
+        filter = JournalFilter.ALL,
+        includeAbandoned = false,
+        emptyKind = JournalEmptyKind.NoEntries
+    ),
+    val loading: Boolean = true,
     val editor: EditorUiState? = null,
     val userMessage: UserMessage? = null
-)
+) {
+    val filter: JournalFilter get() = timeline.filter
+    val includeAbandoned: Boolean get() = timeline.includeAbandoned
+    val isEmpty: Boolean get() = !loading && timeline.emptyKind != null
+    val emptyKind: JournalEmptyKind? get() = if (loading) null else timeline.emptyKind
+}
 
 class HistoryViewModel(
     private val repository: WeightRepository,
-    private val dateProvider: DateProvider
+    private val sessionRepository: WorkoutSessionRepository,
+    private val dateProvider: DateProvider,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+    private val filter = savedStateHandle.getStateFlow(FILTER, JournalFilter.ALL.name)
+    private val includeAbandoned = savedStateHandle.getStateFlow(INCLUDE_ABANDONED, false)
     private val editor = MutableStateFlow<EditorUiState?>(null)
     private val userMessage = MutableStateFlow<UserMessage?>(null)
     private val measurements = MutableStateFlow<List<WeightMeasurement>>(emptyList())
 
     val uiState: StateFlow<HistoryUiState> = combine(
         measurements,
-        editor,
-        userMessage
-    ) { items, editorState, message ->
-        val listItems = MeasurementDiffs.withChronologicalDifferences(items)
+        sessionRepository.observeSummaries(),
+        filter,
+        includeAbandoned,
+        combine(editor, userMessage) { editorState, message -> editorState to message }
+    ) { items, summaries, currentFilter, abandoned, extras ->
+        val timeline = JournalAssembler.assemble(
+            measurements = items,
+            summaries = summaries,
+            filter = runCatching { JournalFilter.valueOf(currentFilter) }.getOrDefault(JournalFilter.ALL),
+            includeAbandoned = abandoned
+        )
         HistoryUiState(
-            items = listItems,
-            isEmpty = listItems.isEmpty(),
-            editor = editorState,
-            userMessage = message
+            timeline = timeline,
+            loading = false,
+            editor = extras.first,
+            userMessage = extras.second
         )
     }.stateIn(
         scope = viewModelScope,
@@ -58,6 +83,14 @@ class HistoryViewModel(
         viewModelScope.launch {
             repository.observeAll().collect { measurements.value = it }
         }
+    }
+
+    fun onFilterSelected(value: JournalFilter) {
+        savedStateHandle[FILTER] = value.name
+    }
+
+    fun onIncludeAbandoned(value: Boolean) {
+        savedStateHandle[INCLUDE_ABANDONED] = value
     }
 
     fun openDelete(date: LocalDate) {
@@ -146,5 +179,10 @@ class HistoryViewModel(
 
     fun consumeMessage() {
         userMessage.value = null
+    }
+
+    companion object {
+        const val FILTER = "journalFilter"
+        const val INCLUDE_ABANDONED = "journalIncludeAbandoned"
     }
 }

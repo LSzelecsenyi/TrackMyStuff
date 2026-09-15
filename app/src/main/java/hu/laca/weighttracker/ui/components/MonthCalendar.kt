@@ -102,6 +102,42 @@ fun MonthCalendar(
                 }
             }
         }
+        Spacer(Modifier.height(8.dp))
+        CalendarLegend()
+    }
+}
+
+@Composable
+private fun CalendarLegend() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .border(1.5.dp, MaterialTheme.colorScheme.tertiary, CircleShape)
+            )
+            Text(
+                text = stringResource(R.string.calendar_legend_weight),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+            )
+            Text(
+                text = stringResource(R.string.calendar_legend_workout),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -112,15 +148,13 @@ private fun CalendarDayCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val todayLabel = stringResource(R.string.calendar_today_label)
-    val hasWeightLabel = stringResource(R.string.calendar_has_weight)
-    val futureLabel = stringResource(R.string.calendar_future_label)
-    val label = buildString {
-        append(UiFormatters.longDate(cell.date))
-        if (cell.isToday) append(", ").append(todayLabel)
-        if (cell.hasMeasurement) append(", ").append(hasWeightLabel)
-        if (cell.isFuture) append(", ").append(futureLabel)
-    }
+    val label = hu.laca.weighttracker.domain.calendar.CalendarDayCopy.description(
+        date = cell.date,
+        hasMeasurement = cell.hasMeasurement,
+        completedWorkoutCount = cell.completedWorkoutCount,
+        isToday = cell.isToday,
+        isFuture = cell.isFuture
+    )
     val textColor = when {
         !cell.inDisplayedMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
         cell.isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
@@ -158,21 +192,41 @@ private fun CalendarDayCell(
                 fontWeight = if (cell.isToday || selected) FontWeight.SemiBold else FontWeight.Normal,
                 color = textColor
             )
-            if (cell.hasMeasurement) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 2.dp)
-                        .size(6.dp)
-                        .border(
-                            width = 1.5.dp,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.tertiary
-                            },
-                            shape = CircleShape
+            if (cell.hasMeasurement || cell.hasCompletedWorkout) {
+                Row(
+                    modifier = Modifier.padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    if (cell.hasMeasurement) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .border(
+                                    width = 1.5.dp,
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.tertiary
+                                    },
+                                    shape = CircleShape
+                                )
                         )
-                )
+                    }
+                    if (cell.hasCompletedWorkout) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                    shape = CircleShape
+                                )
+                        )
+                    }
+                }
             } else {
                 Spacer(Modifier.height(8.dp))
             }

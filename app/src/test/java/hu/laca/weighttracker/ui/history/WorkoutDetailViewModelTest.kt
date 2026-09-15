@@ -1,0 +1,270 @@
+package hu.laca.weighttracker.ui.history
+
+import android.content.Context
+import androidx.lifecycle.SavedStateHandle
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import hu.laca.weighttracker.MainDispatcherRule
+import hu.laca.weighttracker.data.local.WeightDatabase
+import hu.laca.weighttracker.data.repository.ExerciseRepository
+import hu.laca.weighttracker.data.repository.WeightRepository
+import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
+import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
+import hu.laca.weighttracker.domain.FixedDateProvider
+import hu.laca.weighttracker.domain.exercise.ExerciseCategory
+import hu.laca.weighttracker.domain.exercise.ExerciseDraft
+import hu.laca.weighttracker.domain.exercise.ExerciseSaveResult
+import hu.laca.weighttracker.domain.exercise.MeasurementType
+import hu.laca.weighttracker.domain.exercise.MovementPattern
+import hu.laca.weighttracker.domain.exercise.MuscleGroup
+import hu.laca.weighttracker.domain.exercise.ResistanceBasis
+import hu.laca.weighttracker.domain.exercise.WeightInterpretation
+import hu.laca.weighttracker.domain.journal.WorkoutSetCopy
+import hu.laca.weighttracker.domain.workout.ActualSetDraft
+import hu.laca.weighttracker.domain.workout.BodyWeightSource
+import hu.laca.weighttracker.domain.workout.FinishWorkoutResult
+import hu.laca.weighttracker.domain.workout.PlannedLoadKind
+import hu.laca.weighttracker.domain.workout.PlannedSetDraft
+import hu.laca.weighttracker.domain.workout.SessionSetStatus
+import hu.laca.weighttracker.domain.workout.SessionStatus
+import hu.laca.weighttracker.domain.workout.StartWorkoutResult
+import hu.laca.weighttracker.domain.workout.TemplateDraft
+import hu.laca.weighttracker.domain.workout.TemplateExerciseDraft
+import hu.laca.weighttracker.domain.workout.TemplateSaveResult
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+
+@RunWith(RobolectricTestRunner::class)
+class WorkoutDetailViewModelTest {
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
+    private lateinit var database: WeightDatabase
+    private lateinit var exercises: ExerciseRepository
+    private lateinit var templates: WorkoutTemplateRepository
+    private lateinit var sessions: WorkoutSessionRepository
+    private val today = LocalDate.parse("2026-09-15")
+
+    @Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        database = Room.inMemoryDatabaseBuilder(context, WeightDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
+        exercises = ExerciseRepository(
+            database.exerciseDao(),
+            clock,
+            database.workoutTemplateDao(),
+            database.workoutSessionDao()
+        )
+        templates = WorkoutTemplateRepository(
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            clock,
+            database.workoutSessionDao()
+        )
+        sessions = WorkoutSessionRepository(
+            database.workoutSessionDao(),
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            WeightRepository(database.weightMeasurementDao(), clock),
+            clock,
+            FixedDateProvider(today)
+        )
+    }
+
+    @After
+    fun tearDown() {
+        database.close()
+    }
+
+    @Test
+    fun invalidSessionIdProducesMissingState() = runTest {
+        val missing = detail(-1L).uiState.first { !it.loading }
+        assertTrue(missing.missing)
+        assertNull(missing.aggregate)
+        val unknown = detail(99L).uiState.first { !it.loading }
+        assertTrue(unknown.missing)
+    }
+
+    @Test
+    fun inProgressSessionIsNotShownAsHistoryDetail() = runTest {
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+            as StartWorkoutResult.Started
+        val state = detail(started.sessionId).uiState.first { !it.loading }
+        assertEquals(started.sessionId, state.activeSessionId)
+        assertNull(state.aggregate)
+        assertFalse(state.missing)
+    }
+
+    @Test
+    fun completedDetailUsesSnapshotsAndSetOrder() = runTest {
+        WeightRepository(database.weightMeasurementDao(), Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC))
+            .save(today, 88.3)
+        val pull = savePull()
+        val dip = saveDip()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets(), dip to fourSets()))
+        val started = sessions.start(templateId, "88,3", sessions.proposeBodyWeight(), false)
+            as StartWorkoutResult.Started
+        val aggregate = sessions.getAggregate(started.sessionId)!!
+        val first = aggregate.exercises[0].sets
+        sessions.completeSet(
+            first[0].id,
+            ActualSetDraft(repsText = "7", loadKind = PlannedLoadKind.ADDED_WEIGHT, weightText = "15")
+        )
+        sessions.skipSet(first[1].id)
+        sessions.addExtraSet(aggregate.exercises[0].exercise.id)
+        val extra = sessions.getAggregate(started.sessionId)!!.exercises[0].sets.last()
+        sessions.completeSet(
+            extra.id,
+            ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+        )
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(started.sessionId, skipRemaining = true))
+        templates.save(
+            TemplateDraft(
+                id = templateId,
+                name = "Push B",
+                exercises = listOf(
+                    TemplateExerciseDraft(
+                        localId = -1,
+                        exerciseId = pull,
+                        sets = listOf(PlannedSetDraft(-1, "6", loadKind = PlannedLoadKind.ADDED_WEIGHT, weightText = "10"))
+                    )
+                )
+            )
+        )
+        exercises.save(
+            ExerciseDraft(
+                id = pull,
+                name = "Húzódzkodás plusz",
+                category = ExerciseCategory.STRENGTH,
+                movementPattern = MovementPattern.VERTICAL_PULL,
+                measurementType = MeasurementType.REPETITIONS,
+                resistanceBasis = ResistanceBasis.BODYWEIGHT,
+                weightInterpretation = WeightInterpretation.NOT_APPLICABLE,
+                primaryMuscle = MuscleGroup.CHEST,
+                secondaryMuscles = listOf(MuscleGroup.TRICEPS)
+            )
+        )
+        val state = detail(started.sessionId).uiState.first { !it.loading && it.aggregate != null }
+        val session = state.aggregate!!.session
+        assertEquals("Push A", session.templateName)
+        assertEquals(SessionStatus.COMPLETED, session.status)
+        assertEquals(88.3, session.bodyWeightKg!!, 0.0)
+        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, session.bodyWeightSource)
+        assertEquals(today, session.bodyWeightSourceDate)
+        assertEquals(listOf("Húzódzkodás", "Tolódzkodás"), state.aggregate.exercises.map { it.exercise.name })
+        assertEquals(listOf(0, 1), state.aggregate.exercises.map { it.exercise.position })
+        assertEquals(MuscleGroup.LATS, state.aggregate.exercises[0].exercise.primaryMuscle)
+        val sets = state.aggregate.exercises[0].sets
+        assertEquals(listOf(0, 1, 2, 3, 4), sets.map { it.position })
+        assertEquals(SessionSetStatus.COMPLETED, sets[0].status)
+        assertEquals(7, sets[0].actualReps)
+        assertEquals(SessionSetStatus.SKIPPED, sets[1].status)
+        assertTrue(sets.last().addedDuringWorkout)
+        assertEquals(2, state.progress.completed)
+        assertTrue(state.progress.skipped > 0)
+        val firstDisplay = state.setDisplays[sets[0].id]!!
+        assertEquals("7 ism. · +15 kg", firstDisplay.performed)
+        assertTrue(firstDisplay.valuesDiffer)
+        assertEquals("8 ism. · saját testsúly", WorkoutSetCopy.display(sets.last(), state.aggregate.exercises[0].exercise).performed)
+        assertFalse(WorkoutDetailViewModel::class.java.declaredMethods.map { it.name }.any { name ->
+            name.contains("complete", ignoreCase = true) ||
+                name.contains("finish", ignoreCase = true) ||
+                name.contains("edit", ignoreCase = true) ||
+                name.contains("reopen", ignoreCase = true)
+        })
+    }
+
+    @Test
+    fun missingBodyWeightSnapshotStaysAbsent() = runTest {
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+            as StartWorkoutResult.Started
+        sessions.finish(started.sessionId, skipRemaining = true)
+        val state = detail(started.sessionId).uiState.first { !it.loading && it.aggregate != null }
+        assertNull(state.aggregate!!.session.bodyWeightKg)
+        assertEquals(BodyWeightSource.UNKNOWN, state.aggregate.session.bodyWeightSource)
+    }
+
+    private fun detail(sessionId: Long): WorkoutDetailViewModel {
+        return WorkoutDetailViewModel(
+            SavedStateHandle(mapOf(WorkoutDetailViewModel.SESSION_ID to sessionId)),
+            sessions
+        )
+    }
+
+    private suspend fun savePull(): Long {
+        return (exercises.save(
+            ExerciseDraft(
+                name = "Húzódzkodás",
+                category = ExerciseCategory.STRENGTH,
+                movementPattern = MovementPattern.VERTICAL_PULL,
+                measurementType = MeasurementType.REPETITIONS,
+                resistanceBasis = ResistanceBasis.BODYWEIGHT,
+                weightInterpretation = WeightInterpretation.NOT_APPLICABLE,
+                primaryMuscle = MuscleGroup.LATS,
+                secondaryMuscles = listOf(MuscleGroup.BICEPS)
+            )
+        ) as ExerciseSaveResult.Created).id
+    }
+
+    private suspend fun saveDip(): Long {
+        return (exercises.save(
+            ExerciseDraft(
+                name = "Tolódzkodás",
+                category = ExerciseCategory.STRENGTH,
+                movementPattern = MovementPattern.VERTICAL_PUSH,
+                measurementType = MeasurementType.REPETITIONS,
+                resistanceBasis = ResistanceBasis.BODYWEIGHT,
+                weightInterpretation = WeightInterpretation.NOT_APPLICABLE,
+                primaryMuscle = MuscleGroup.TRICEPS
+            )
+        ) as ExerciseSaveResult.Created).id
+    }
+
+    private fun fourSets(): List<PlannedSetDraft> {
+        return List(4) { index ->
+            PlannedSetDraft(
+                localId = -(index + 1L),
+                minRepsText = "8",
+                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
+            )
+        }
+    }
+
+    private suspend fun saveTemplate(
+        name: String,
+        items: List<Pair<Long, List<PlannedSetDraft>>>
+    ): Long {
+        val draft = TemplateDraft(
+            name = name,
+            exercises = items.mapIndexed { index, item ->
+                TemplateExerciseDraft(
+                    localId = -(index + 1L),
+                    exerciseId = item.first,
+                    sets = item.second
+                )
+            }
+        )
+        return (templates.save(draft) as TemplateSaveResult.Created).id
+    }
+}

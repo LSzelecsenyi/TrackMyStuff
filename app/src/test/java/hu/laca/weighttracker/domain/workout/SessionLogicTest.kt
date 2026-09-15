@@ -82,6 +82,32 @@ class SessionLogicTest {
         assertEquals("0:00", ElapsedTime.format(startedAt = 5_000L, now = 1_000L))
         assertEquals("0:42", ElapsedTime.format(startedAt = 0L, now = 42_000L))
         assertEquals("1:02:05", ElapsedTime.format(startedAt = 0L, now = 3_725_000L))
+        assertEquals("0:00", ElapsedTime.formatMillis(-5_000L))
+    }
+
+    @Test
+    fun completedDurationUsesFinishedMinusStarted() {
+        val session = session(SessionStatus.COMPLETED, startedAt = 1_000L, finishedAt = 2_538_000L)
+        assertEquals(2_537_000L, ElapsedTime.forSession(session))
+        assertEquals("42:17", ElapsedTime.formatSession(session))
+    }
+
+    @Test
+    fun abandonedDurationUsesAbandonedTimestamp() {
+        val session = session(
+            status = SessionStatus.ABANDONED,
+            startedAt = 1_000L,
+            abandonedAt = 4_326_000L
+        )
+        assertEquals("1:12:05", ElapsedTime.formatSession(session))
+    }
+
+    @Test
+    fun malformedSessionDurationDoesNotGoNegative() {
+        val completed = session(SessionStatus.COMPLETED, startedAt = 9_000L, finishedAt = 1_000L)
+        val abandoned = session(SessionStatus.ABANDONED, startedAt = 9_000L, abandonedAt = 1_000L)
+        assertEquals(0L, ElapsedTime.forSession(completed))
+        assertEquals("0:00", ElapsedTime.formatSession(abandoned))
     }
 
     @Test
@@ -159,6 +185,30 @@ class SessionLogicTest {
 
     private fun measurement(date: LocalDate, kg: Double): WeightMeasurement {
         return WeightMeasurement(1L, date, kg, 1L, 1L)
+    }
+
+    private fun session(
+        status: SessionStatus,
+        startedAt: Long,
+        finishedAt: Long? = null,
+        abandonedAt: Long? = null
+    ): WorkoutSession {
+        return WorkoutSession(
+            id = 1L,
+            templateId = 1L,
+            templateName = "Push A",
+            status = status,
+            workoutDate = LocalDate.parse("2026-09-15"),
+            startedAt = startedAt,
+            finishedAt = finishedAt,
+            abandonedAt = abandonedAt,
+            notes = null,
+            bodyWeightKg = 88.3,
+            bodyWeightSource = BodyWeightSource.MEASURED_SAME_DAY,
+            bodyWeightSourceDate = LocalDate.parse("2026-09-15"),
+            createdAt = startedAt,
+            updatedAt = startedAt
+        )
     }
 
     private fun set(status: SessionSetStatus, extra: Boolean = false): SessionSet {

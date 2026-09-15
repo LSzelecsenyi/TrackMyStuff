@@ -68,7 +68,11 @@ object ElapsedTime {
     }
 
     fun format(startedAt: Long, now: Long): String {
-        val totalSeconds = millis(startedAt, now) / 1000L
+        return formatMillis(millis(startedAt, now))
+    }
+
+    fun formatMillis(durationMillis: Long): String {
+        val totalSeconds = durationMillis.coerceAtLeast(0L) / 1000L
         val hours = totalSeconds / 3600L
         val minutes = (totalSeconds % 3600L) / 60L
         val seconds = totalSeconds % 60L
@@ -77,6 +81,22 @@ object ElapsedTime {
         } else {
             "$minutes:${seconds.toString().padStart(2, '0')}"
         }
+    }
+
+    fun forSession(session: WorkoutSession): Long {
+        val end = when (session.status) {
+            SessionStatus.COMPLETED -> session.finishedAt
+            SessionStatus.ABANDONED -> session.abandonedAt
+            SessionStatus.IN_PROGRESS -> null
+        }
+        if (end == null) {
+            return 0L
+        }
+        return millis(session.startedAt, end)
+    }
+
+    fun formatSession(session: WorkoutSession): String {
+        return formatMillis(forSession(session))
     }
 }
 

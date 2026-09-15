@@ -14,6 +14,7 @@ import hu.laca.weighttracker.ui.dashboard.DashboardViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseEditorViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseListViewModel
 import hu.laca.weighttracker.ui.history.HistoryViewModel
+import hu.laca.weighttracker.ui.history.WorkoutDetailViewModel
 import hu.laca.weighttracker.ui.settings.SettingsViewModel
 import hu.laca.weighttracker.ui.templates.TemplateEditorViewModel
 import hu.laca.weighttracker.ui.templates.TemplateListViewModel
@@ -32,10 +33,15 @@ class WeightViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
         return when {
             modelClass.isAssignableFrom(DashboardViewModel::class.java) -> {
-                DashboardViewModel(weightRepository, dateProvider)
+                DashboardViewModel(weightRepository, workoutSessionRepository, dateProvider)
             }
             modelClass.isAssignableFrom(HistoryViewModel::class.java) -> {
-                HistoryViewModel(weightRepository, dateProvider)
+                HistoryViewModel(
+                    weightRepository,
+                    workoutSessionRepository,
+                    dateProvider,
+                    extras.createSavedStateHandle()
+                )
             }
             modelClass.isAssignableFrom(WorkoutHubViewModel::class.java) -> {
                 WorkoutHubViewModel(
@@ -66,6 +72,12 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(ActiveWorkoutViewModel::class.java) -> {
                 ActiveWorkoutViewModel(
+                    extras.createSavedStateHandle(),
+                    workoutSessionRepository
+                )
+            }
+            modelClass.isAssignableFrom(WorkoutDetailViewModel::class.java) -> {
+                WorkoutDetailViewModel(
                     extras.createSavedStateHandle(),
                     workoutSessionRepository
                 )

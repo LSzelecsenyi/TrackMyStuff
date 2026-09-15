@@ -270,6 +270,61 @@ class WorkoutSessionRepositoryRoomTest {
         assertFalse(columns.any { it.contains("rir") || it.contains("rpe") })
     }
 
+    @Test
+    fun monthRangeQueryUsesLocalWorkoutDateAndExcludesAbandonedFromCompletedCounts() = runTest {
+        val pull = savePull()
+        val firstTemplate = saveTemplate("Push A", listOf(pull to fourSets()))
+        val secondTemplate = saveTemplate("Push B", listOf(pull to fourSets()))
+        val completed = sessions.start(firstTemplate, "88,3", sessions.proposeBodyWeight(), false)
+            as StartWorkoutResult.Started
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(completed.sessionId, skipRemaining = true))
+        val abandoned = sessions.start(secondTemplate, "", sessions.proposeBodyWeight(), false)
+            as StartWorkoutResult.Started
+        assertEquals(AbandonWorkoutResult.Abandoned, sessions.abandon(abandoned.sessionId))
+        database.workoutSessionDao().insertSession(
+            WorkoutSessionEntity(
+                templateId = firstTemplate,
+                templateName = "Night",
+                status = SessionStatus.COMPLETED.name,
+                workoutDate = "2026-09-14",
+                startedAt = Instant.parse("2026-09-15T00:30:00Z").toEpochMilli(),
+                finishedAt = Instant.parse("2026-09-15T01:00:00Z").toEpochMilli(),
+                abandonedAt = null,
+                notes = null,
+                bodyWeightKg = null,
+                bodyWeightSource = BodyWeightSource.UNKNOWN.name,
+                bodyWeightSourceDate = null,
+                createdAt = 2L,
+                updatedAt = 2L,
+                activeLock = null
+            )
+        )
+        val september = sessions.observeCompletedCounts(
+            LocalDate.parse("2026-09-01"),
+            LocalDate.parse("2026-09-30")
+        ).first()
+        assertEquals(1, september[today])
+        assertEquals(1, september[LocalDate.parse("2026-09-14")])
+        assertFalse(september.containsKey(today.plusDays(1)))
+        val august = sessions.observeCompletedCounts(
+            LocalDate.parse("2026-08-01"),
+            LocalDate.parse("2026-08-31")
+        ).first()
+        assertTrue(august.isEmpty())
+        val between = sessions.observeSummariesBetween(
+            LocalDate.parse("2026-09-15"),
+            LocalDate.parse("2026-09-15")
+        ).first()
+        assertEquals(setOf(completed.sessionId, abandoned.sessionId), between.map { it.session.id }.toSet())
+        assertTrue(between.none { it.session.workoutDate != today })
+        val onDate = sessions.observeSummariesOnDate(today).first()
+            .filter { it.session.status == SessionStatus.COMPLETED }
+        assertEquals(listOf(completed.sessionId), onDate.map { it.session.id })
+        val latest = sessions.observeLatestCompleted().first()
+        assertEquals("Night", latest?.session?.templateName)
+        assertEquals(SessionMutationResult.NotActive, sessions.completeSet(1L, ActualSetDraft(loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
+    }
+
     private suspend fun savePull(): Long {
         return (exercises.save(
             ExerciseDraft(

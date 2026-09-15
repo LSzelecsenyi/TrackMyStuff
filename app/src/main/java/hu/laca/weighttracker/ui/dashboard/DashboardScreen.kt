@@ -73,7 +73,8 @@ fun DashboardScreen(
     onDeleteDismiss: () -> Unit,
     onDeleteConfirm: () -> Unit,
     onMessageConsumed: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenWorkout: (Long) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedPoint by remember { mutableStateOf<ChartPoint?>(null) }
@@ -166,6 +167,7 @@ fun DashboardScreen(
             onRecordWeight = onRecordSelectedDay,
             onEditWeight = onRecordSelectedDay,
             onDeleteWeight = onRequestDayDelete,
+            onOpenWorkout = onOpenWorkout,
             onDismiss = onDismissDaySheet
         )
     }
@@ -364,7 +366,8 @@ private fun DashboardPreview() {
             onDeleteDismiss = {},
             onDeleteConfirm = {},
             onMessageConsumed = {},
-            onOpenSettings = {}
+            onOpenSettings = {},
+            onOpenWorkout = {}
         )
     }
 }
@@ -400,7 +403,8 @@ private fun EmptyDashboardPreview() {
             onDeleteDismiss = {},
             onDeleteConfirm = {},
             onMessageConsumed = {},
-            onOpenSettings = {}
+            onOpenSettings = {},
+            onOpenWorkout = {}
         )
     }
 }

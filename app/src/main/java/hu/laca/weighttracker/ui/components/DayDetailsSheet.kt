@@ -4,9 +4,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +25,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.DaySheetState
+import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
+import hu.laca.weighttracker.ui.theme.AppDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +35,7 @@ fun DayDetailsSheet(
     onRecordWeight: () -> Unit,
     onEditWeight: () -> Unit,
     onDeleteWeight: () -> Unit,
+    onOpenWorkout: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -39,6 +46,8 @@ fun DayDetailsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp)
         ) {
@@ -60,17 +69,21 @@ fun DayDetailsSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = onEditWeight,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = AppDimens.minTouch)
                 ) {
                     Text(stringResource(R.string.action_edit_weight))
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = onDeleteWeight,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = AppDimens.minTouch)
                 ) {
                     Text(stringResource(R.string.action_delete))
                 }
@@ -80,12 +93,24 @@ fun DayDetailsSheet(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = onRecordWeight,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = AppDimens.minTouch)
                 ) {
                     Text(stringResource(R.string.action_record_weight))
+                }
+            }
+            if (state.workouts.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = stringResource(R.string.day_sheet_workouts),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                state.workouts.forEach { workout ->
+                    DayWorkoutRow(summary = workout, onOpen = { onOpenWorkout(workout.session.id) })
                 }
             }
             Row(
@@ -96,6 +121,36 @@ fun DayDetailsSheet(
                     Text(stringResource(R.string.action_cancel))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DayWorkoutRow(
+    summary: WorkoutSessionSummary,
+    onOpen: () -> Unit
+) {
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Text(summary.session.templateName, style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = stringResource(R.string.journal_duration, summary.durationLabel),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = stringResource(
+                R.string.journal_workout_summary,
+                summary.exerciseCount,
+                summary.progress.completed,
+                summary.progress.total
+            ),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        TextButton(
+            onClick = onOpen,
+            modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
+        ) {
+            Text(stringResource(R.string.action_open_details))
         }
     }
 }

@@ -79,3 +79,8 @@ fun WorkoutSessionSetEntity.toModel(): SessionSet {
 }
 
 fun SessionStatus.activeLock(): Int? = if (this == SessionStatus.IN_PROGRESS) 1 else null
+
+data class WorkoutDateCount(
+    val date: String,
+    val completedCount: Int
+)

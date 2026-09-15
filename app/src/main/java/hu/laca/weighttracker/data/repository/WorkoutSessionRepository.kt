@@ -29,6 +29,8 @@ import hu.laca.weighttracker.domain.workout.SessionSetStatus
 import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
 import hu.laca.weighttracker.domain.workout.WorkoutSessionAggregate
+import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
+import hu.laca.weighttracker.domain.workout.ElapsedTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -71,6 +73,62 @@ class WorkoutSessionRepository(
                 currentExercisePosition = current?.position?.plus(1),
                 exerciseCount = items.size
             )
+        }
+    }
+
+    fun observeSummaries(): Flow<List<WorkoutSessionSummary>> {
+        return combine(
+            sessionDao.observeAll(),
+            sessionDao.observeAllExercises(),
+            sessionDao.observeAllSets(),
+            sessionDao.observeAllMuscles()
+        ) { sessions, exercises, sets, muscles ->
+            sessions
+                .filter { it.status != SessionStatus.IN_PROGRESS.name }
+                .map { toSummary(it, exercises, sets, muscles) }
+        }
+    }
+
+    fun observeCompletedCounts(start: LocalDate, end: LocalDate): Flow<Map<LocalDate, Int>> {
+        return sessionDao.observeCompletedCountsBetween(start.toString(), end.toString()).map { rows ->
+            rows.associate { LocalDate.parse(it.date) to it.completedCount }
+        }
+    }
+
+    fun observeSummariesBetween(start: LocalDate, end: LocalDate): Flow<List<WorkoutSessionSummary>> {
+        return combine(
+            sessionDao.observeBetween(start.toString(), end.toString()),
+            sessionDao.observeAllExercises(),
+            sessionDao.observeAllSets(),
+            sessionDao.observeAllMuscles()
+        ) { sessions, exercises, sets, muscles ->
+            sessions
+                .filter { it.status != SessionStatus.IN_PROGRESS.name }
+                .map { toSummary(it, exercises, sets, muscles) }
+        }
+    }
+
+    fun observeSummariesOnDate(date: LocalDate): Flow<List<WorkoutSessionSummary>> {
+        return combine(
+            sessionDao.observeByWorkoutDate(date.toString()),
+            sessionDao.observeAllExercises(),
+            sessionDao.observeAllSets(),
+            sessionDao.observeAllMuscles()
+        ) { sessions, exercises, sets, muscles ->
+            sessions
+                .filter { it.status != SessionStatus.IN_PROGRESS.name }
+                .map { toSummary(it, exercises, sets, muscles) }
+        }
+    }
+
+    fun observeLatestCompleted(): Flow<WorkoutSessionSummary?> {
+        return combine(
+            sessionDao.observeLatestCompleted(),
+            sessionDao.observeAllExercises(),
+            sessionDao.observeAllSets(),
+            sessionDao.observeAllMuscles()
+        ) { session, exercises, sets, muscles ->
+            session?.let { toSummary(it, exercises, sets, muscles) }
         }
     }
 
@@ -434,6 +492,24 @@ class WorkoutSessionRepository(
 
     private suspend fun touchSession(session: WorkoutSessionEntity, now: Long = clock.millis()) {
         sessionDao.updateSession(session.copy(updatedAt = now))
+    }
+
+    private fun toSummary(
+        session: WorkoutSessionEntity,
+        exercises: List<WorkoutSessionExerciseEntity>,
+        sets: List<WorkoutSessionSetEntity>,
+        muscles: List<WorkoutSessionExerciseMuscleEntity>
+    ): WorkoutSessionSummary {
+        val aggregate = toAggregate(session, exercises, sets, muscles)
+        val progress = SessionProgressLogic.fromAggregate(aggregate)
+        val primaries = aggregate.exercises.map { it.exercise.primaryMuscle }.distinct()
+        return WorkoutSessionSummary(
+            session = aggregate.session,
+            progress = progress,
+            exerciseCount = aggregate.exercises.size,
+            primaryMuscles = primaries,
+            durationMillis = ElapsedTime.forSession(aggregate.session)
+        )
     }
 
     private fun toAggregate(

@@ -82,6 +82,16 @@ data class ActiveSessionSummary(
     val exerciseCount: Int
 )
 
+data class WorkoutSessionSummary(
+    val session: WorkoutSession,
+    val progress: SessionProgress,
+    val exerciseCount: Int,
+    val primaryMuscles: List<MuscleGroup>,
+    val durationMillis: Long
+) {
+    val durationLabel: String get() = ElapsedTime.formatMillis(durationMillis)
+}
+
 data class BodyWeightProposal(
     val kilograms: Double?,
     val source: BodyWeightSource,

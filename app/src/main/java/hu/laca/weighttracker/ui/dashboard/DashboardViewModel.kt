@@ -3,6 +3,7 @@ package hu.laca.weighttracker.ui.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import hu.laca.weighttracker.data.repository.WeightRepository
+import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.domain.DashboardAssembler
 import hu.laca.weighttracker.domain.DashboardSnapshot
 import hu.laca.weighttracker.domain.DateProvider
@@ -20,10 +21,13 @@ import hu.laca.weighttracker.domain.model.WeightMeasurement
 import hu.laca.weighttracker.ui.components.EditorUiState
 import hu.laca.weighttracker.ui.components.UserMessage
 import hu.laca.weighttracker.ui.components.formatWeightInput
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -66,6 +70,7 @@ private data class DashboardChrome(
 
 class DashboardViewModel(
     private val repository: WeightRepository,
+    private val sessionRepository: WorkoutSessionRepository,
     private val dateProvider: DateProvider
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
@@ -86,11 +91,30 @@ class DashboardViewModel(
         DashboardChrome(range, editorState, message, month, day)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val completedCounts = displayedMonth.flatMapLatest { month ->
+        sessionRepository.observeCompletedCounts(
+            MonthGridCalculator.gridStart(month),
+            MonthGridCalculator.gridEnd(month)
+        )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val dayWorkouts = selectedDay.flatMapLatest { date ->
+        if (date == null) {
+            flowOf(emptyList())
+        } else {
+            sessionRepository.observeSummariesOnDate(date)
+        }
+    }
+
     val uiState: StateFlow<DashboardUiState> = combine(
         measurements,
         chrome,
-        showDayDeleteConfirm
-    ) { items, chromeState, deleteConfirm ->
+        showDayDeleteConfirm,
+        completedCounts,
+        dayWorkouts
+    ) { items, chromeState, deleteConfirm, counts, workouts ->
         val today = dateProvider.today()
         val snapshot = DashboardAssembler.assemble(items, today, chromeState.range)
         DashboardUiState(
@@ -104,10 +128,11 @@ class DashboardViewModel(
             monthGrid = MonthGridCalculator.grid(
                 month = chromeState.month,
                 today = today,
-                measuredDates = snapshot.measurementDates
+                measuredDates = snapshot.measurementDates,
+                completedWorkoutCounts = counts
             ),
             daySheet = chromeState.selectedDay?.let { date ->
-                DaySheetFactory.create(date, items, today)
+                DaySheetFactory.create(date, items, today, workouts)
             },
             showDayDeleteConfirm = deleteConfirm
         )

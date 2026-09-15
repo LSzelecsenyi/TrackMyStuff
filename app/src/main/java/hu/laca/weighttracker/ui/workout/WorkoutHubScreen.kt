@@ -40,6 +40,7 @@ import hu.laca.weighttracker.domain.WeightParseError
 import hu.laca.weighttracker.domain.workout.ActiveSessionSummary
 import hu.laca.weighttracker.domain.workout.BodyWeightSource
 import hu.laca.weighttracker.domain.workout.TemplateListItem
+import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
 import hu.laca.weighttracker.ui.components.SettingsAction
 import hu.laca.weighttracker.ui.components.UiFormatters
 import hu.laca.weighttracker.ui.theme.AppDimens
@@ -62,7 +63,8 @@ fun WorkoutHubScreen(
     onConfirmStart: () -> Unit,
     onStartedConsumed: () -> Unit,
     onOpenStarted: (Long) -> Unit,
-    onMessageConsumed: () -> Unit
+    onMessageConsumed: () -> Unit,
+    onOpenRecent: (Long) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -110,6 +112,19 @@ fun WorkoutHubScreen(
                     onStart = onStartTemplate,
                     onOpenTemplates = onOpenTemplates
                 )
+            }
+            state.recentCompleted?.let { recent ->
+                Spacer(Modifier.height(AppDimens.sectionGap))
+                RecentWorkoutCard(summary = recent, onOpen = { onOpenRecent(recent.session.id) })
+            } ?: run {
+                if (!state.loading) {
+                    Spacer(Modifier.height(AppDimens.sectionGap))
+                    Text(
+                        text = stringResource(R.string.hub_recent_empty),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Spacer(Modifier.height(AppDimens.sectionGap))
             HubCard(
@@ -225,6 +240,56 @@ private fun ActiveSessionCard(
             Spacer(Modifier.height(16.dp))
             Button(onClick = onResume, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_resume_workout))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentWorkoutCard(
+    summary: WorkoutSessionSummary,
+    onOpen: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.secondaryContainer
+    ) {
+        Column(modifier = Modifier.padding(AppDimens.heroPadding)) {
+            Text(
+                text = stringResource(R.string.hub_recent_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = summary.session.templateName,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                text = UiFormatters.longDate(summary.session.workoutDate),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                text = stringResource(R.string.journal_duration, summary.durationLabel),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                text = stringResource(
+                    R.string.journal_workout_summary,
+                    summary.exerciseCount,
+                    summary.progress.completed,
+                    summary.progress.total
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.action_open_details))
             }
         }
     }

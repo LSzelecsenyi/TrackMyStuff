@@ -12,6 +12,7 @@ import hu.laca.weighttracker.domain.workout.ActiveSessionSummary
 import hu.laca.weighttracker.domain.workout.BodyWeightProposal
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
 import hu.laca.weighttracker.domain.workout.TemplateListItem
+import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +39,8 @@ data class WorkoutHubUiState(
     val activeSession: ActiveSessionSummary? = null,
     val startDraft: StartWorkoutDraft? = null,
     val message: WorkoutHubMessage? = null,
-    val startedSessionId: Long? = null
+    val startedSessionId: Long? = null,
+    val recentCompleted: WorkoutSessionSummary? = null
 ) {
     val isEmpty: Boolean
         get() = !loading &&
@@ -87,8 +89,9 @@ class WorkoutHubViewModel(
         sessionRepository.observeInProgress(),
         combine(startDraft, message, startedSessionId) { draft, currentMessage, started ->
             Triple(draft, currentMessage, started)
-        }
-    ) { counts, templates, active, extras ->
+        },
+        sessionRepository.observeLatestCompleted()
+    ) { counts, templates, active, extras, recent ->
         WorkoutHubUiState(
             loading = false,
             activeCount = counts.exercises,
@@ -99,7 +102,8 @@ class WorkoutHubViewModel(
             activeSession = active,
             startDraft = extras.first,
             message = extras.second,
-            startedSessionId = extras.third
+            startedSessionId = extras.third,
+            recentCompleted = recent
         )
     }.stateIn(
         scope = viewModelScope,

@@ -105,6 +105,22 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar("template_editor?templateId=4"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.ACTIVE_WORKOUT_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("active_workout?sessionId=9"))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_DETAIL_PATTERN))
+        assertFalse(AppNavigation.showsBottomBar("workout_detail?sessionId=3"))
+    }
+
+    @Test
+    fun workoutDetailReturnsToSourceAndDoesNotDuplicate() {
+        val fromJournal = AppNavigation.openWorkoutDetail(AppRoutes.JOURNAL)
+        assertEquals(AppRoutes.WORKOUT_DETAIL, fromJournal.targetRoute)
+        assertEquals(AppRoutes.JOURNAL, fromJournal.backTarget)
+        assertTrue(fromJournal.shouldPush)
+        val fromOverview = AppNavigation.openWorkoutDetail(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.OVERVIEW, fromOverview.backTarget)
+        val fromHub = AppNavigation.openWorkoutDetail(AppRoutes.WORKOUT)
+        assertEquals(AppRoutes.WORKOUT, fromHub.backTarget)
+        assertFalse(AppNavigation.openWorkoutDetail(AppRoutes.WORKOUT_DETAIL).shouldPush)
+        assertFalse(AppNavigation.openWorkoutDetail("workout_detail?sessionId=3").shouldPush)
     }
 
     @Test

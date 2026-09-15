@@ -13,6 +13,47 @@ abstract class WorkoutSessionDao {
     @Query("SELECT * FROM workout_sessions ORDER BY startedAt DESC, id DESC")
     abstract fun observeAll(): Flow<List<WorkoutSessionEntity>>
 
+    @Query(
+        """
+        SELECT * FROM workout_sessions
+        WHERE workoutDate BETWEEN :startInclusive AND :endInclusive
+        ORDER BY workoutDate DESC, startedAt DESC, id DESC
+        """
+    )
+    abstract fun observeBetween(startInclusive: String, endInclusive: String): Flow<List<WorkoutSessionEntity>>
+
+    @Query(
+        """
+        SELECT workoutDate AS date, COUNT(*) AS completedCount
+        FROM workout_sessions
+        WHERE status = 'COMPLETED' AND workoutDate BETWEEN :startInclusive AND :endInclusive
+        GROUP BY workoutDate
+        """
+    )
+    abstract fun observeCompletedCountsBetween(
+        startInclusive: String,
+        endInclusive: String
+    ): Flow<List<WorkoutDateCount>>
+
+    @Query(
+        """
+        SELECT * FROM workout_sessions
+        WHERE workoutDate = :date
+        ORDER BY startedAt DESC, id DESC
+        """
+    )
+    abstract fun observeByWorkoutDate(date: String): Flow<List<WorkoutSessionEntity>>
+
+    @Query(
+        """
+        SELECT * FROM workout_sessions
+        WHERE status = 'COMPLETED'
+        ORDER BY finishedAt DESC, startedAt DESC, id DESC
+        LIMIT 1
+        """
+    )
+    abstract fun observeLatestCompleted(): Flow<WorkoutSessionEntity?>
+
     @Query("SELECT * FROM workout_sessions WHERE status = 'IN_PROGRESS'")
     abstract fun observeInProgress(): Flow<List<WorkoutSessionEntity>>
 

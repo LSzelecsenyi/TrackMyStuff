@@ -47,6 +47,8 @@ import hu.laca.weighttracker.ui.exercises.ExerciseListScreen
 import hu.laca.weighttracker.ui.exercises.ExerciseListViewModel
 import hu.laca.weighttracker.ui.history.HistoryScreen
 import hu.laca.weighttracker.ui.history.HistoryViewModel
+import hu.laca.weighttracker.ui.history.WorkoutDetailScreen
+import hu.laca.weighttracker.ui.history.WorkoutDetailViewModel
 import hu.laca.weighttracker.ui.settings.SettingsScreen
 import hu.laca.weighttracker.ui.settings.SettingsViewModel
 import hu.laca.weighttracker.ui.templates.TemplateEditorScreen
@@ -80,6 +82,10 @@ private fun templateEditorRoute(templateId: Long?): String {
 
 private fun activeWorkoutRoute(sessionId: Long): String {
     return "${AppRoutes.ACTIVE_WORKOUT}?$ARG_SESSION_ID=$sessionId"
+}
+
+private fun workoutDetailRoute(sessionId: Long): String {
+    return "${AppRoutes.WORKOUT_DETAIL}?$ARG_SESSION_ID=$sessionId"
 }
 
 private fun RootTab.icon(): ImageVector {
@@ -161,7 +167,13 @@ fun WeightTrackerNavHost(
                     onDeleteDismiss = viewModel::dismissDelete,
                     onDeleteConfirm = viewModel::confirmDelete,
                     onMessageConsumed = viewModel::consumeMessage,
-                    onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) }
+                    onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
+                    onOpenWorkout = { id ->
+                        viewModel.dismissDaySheet()
+                        navController.navigate(workoutDetailRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable(AppRoutes.WORKOUT) { entry ->
@@ -191,7 +203,12 @@ fun WeightTrackerNavHost(
                     onConfirmStart = viewModel::confirmStart,
                     onStartedConsumed = viewModel::consumeStartedSession,
                     onOpenStarted = { id -> navController.navigate(activeWorkoutRoute(id)) },
-                    onMessageConsumed = viewModel::consumeMessage
+                    onMessageConsumed = viewModel::consumeMessage,
+                    onOpenRecent = { id ->
+                        navController.navigate(workoutDetailRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable(AppRoutes.JOURNAL) {
@@ -211,7 +228,14 @@ fun WeightTrackerNavHost(
                     onDeleteDismiss = viewModel::dismissDelete,
                     onDeleteConfirm = viewModel::confirmDelete,
                     onMessageConsumed = viewModel::consumeMessage,
-                    onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) }
+                    onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
+                    onFilterSelected = viewModel::onFilterSelected,
+                    onIncludeAbandoned = viewModel::onIncludeAbandoned,
+                    onOpenWorkout = { id ->
+                        navController.navigate(workoutDetailRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable(AppRoutes.SETTINGS) {
@@ -424,6 +448,28 @@ fun WeightTrackerNavHost(
                         navController.popBackStack()
                     },
                     onMessageConsumed = viewModel::consumeMessage
+                )
+            }
+            composable(
+                route = AppRoutes.WORKOUT_DETAIL_PATTERN,
+                arguments = listOf(
+                    navArgument(ARG_SESSION_ID) {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    }
+                )
+            ) {
+                val viewModel: WorkoutDetailViewModel = viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                WorkoutDetailScreen(
+                    state = state,
+                    onBack = { navController.popBackStack() },
+                    onOpenActive = { id ->
+                        navController.popBackStack()
+                        navController.navigate(activeWorkoutRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
         }

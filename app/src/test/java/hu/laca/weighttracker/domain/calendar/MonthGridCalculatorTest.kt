@@ -81,6 +81,51 @@ class MonthGridCalculatorTest {
         assertTrue(MonthGridCalculator.canOpenDay(today, today))
         assertTrue(MonthGridCalculator.canOpenDay(today.minusDays(1), today))
     }
+
+    @Test
+    fun weightOnlyMarkerDoesNotCreateWorkoutDot() {
+        val today = LocalDate.of(2026, 9, 15)
+        val grid = MonthGridCalculator.grid(
+            month = YearMonth.of(2026, 9),
+            today = today,
+            measuredDates = setOf(today),
+            completedWorkoutCounts = emptyMap()
+        )
+        val cell = grid.cells.first { it.date == today }
+        assertTrue(cell.hasMeasurement)
+        assertFalse(cell.hasCompletedWorkout)
+        assertEquals(0, cell.completedWorkoutCount)
+    }
+
+    @Test
+    fun workoutOnlyMarkerDoesNotCreateWeightDot() {
+        val today = LocalDate.of(2026, 9, 15)
+        val grid = MonthGridCalculator.grid(
+            month = YearMonth.of(2026, 9),
+            today = today,
+            measuredDates = emptySet(),
+            completedWorkoutCounts = mapOf(today to 1)
+        )
+        val cell = grid.cells.first { it.date == today }
+        assertFalse(cell.hasMeasurement)
+        assertTrue(cell.hasCompletedWorkout)
+        assertEquals(1, cell.completedWorkoutCount)
+    }
+
+    @Test
+    fun bothMarkersRemainVisibleAndMultipleWorkoutsStayOneCount() {
+        val today = LocalDate.of(2026, 9, 15)
+        val grid = MonthGridCalculator.grid(
+            month = YearMonth.of(2026, 9),
+            today = today,
+            measuredDates = setOf(today),
+            completedWorkoutCounts = mapOf(today to 3)
+        )
+        val cell = grid.cells.first { it.date == today }
+        assertTrue(cell.hasMeasurement)
+        assertTrue(cell.hasCompletedWorkout)
+        assertEquals(3, cell.completedWorkoutCount)
+    }
 }
 
 class DaySheetFactoryTest {
@@ -122,6 +167,52 @@ class DaySheetFactoryTest {
                 measurements = listOf(measurement("2026-03-11", 80.0)),
                 today = today
             )
+        )
+    }
+
+    @Test
+    fun selectedDayIncludesWeightAndCompletedWorkouts() {
+        val workout = summary(1, today, hu.laca.weighttracker.domain.workout.SessionStatus.COMPLETED)
+        val abandoned = summary(2, today, hu.laca.weighttracker.domain.workout.SessionStatus.ABANDONED)
+        val otherDay = summary(3, today.minusDays(1), hu.laca.weighttracker.domain.workout.SessionStatus.COMPLETED)
+        val state = hu.laca.weighttracker.domain.DaySheetFactory.create(
+            date = today,
+            measurements = listOf(measurement("2026-03-08", 81.0), measurement("2026-03-11", 81.4)),
+            today = today,
+            workouts = listOf(workout, abandoned, otherDay)
+        )
+        assertTrue(state!!.hasMeasurement)
+        assertEquals(0.4, state.differenceFromPreviousKg!!, 0.0001)
+        assertEquals(listOf(1L), state.workouts.map { it.session.id })
+        assertTrue(state.hasWorkouts)
+    }
+
+    private fun summary(
+        id: Long,
+        date: LocalDate,
+        status: hu.laca.weighttracker.domain.workout.SessionStatus
+    ): hu.laca.weighttracker.domain.workout.WorkoutSessionSummary {
+        return hu.laca.weighttracker.domain.workout.WorkoutSessionSummary(
+            session = hu.laca.weighttracker.domain.workout.WorkoutSession(
+                id = id,
+                templateId = 1L,
+                templateName = "Push A",
+                status = status,
+                workoutDate = date,
+                startedAt = id * 1_000L,
+                finishedAt = if (status == hu.laca.weighttracker.domain.workout.SessionStatus.COMPLETED) id * 1_000L + 1 else null,
+                abandonedAt = if (status == hu.laca.weighttracker.domain.workout.SessionStatus.ABANDONED) id * 1_000L + 1 else null,
+                notes = null,
+                bodyWeightKg = 81.4,
+                bodyWeightSource = hu.laca.weighttracker.domain.workout.BodyWeightSource.MEASURED_SAME_DAY,
+                bodyWeightSourceDate = date,
+                createdAt = id,
+                updatedAt = id
+            ),
+            progress = hu.laca.weighttracker.domain.workout.SessionProgress(3, 0, 0, 3),
+            exerciseCount = 1,
+            primaryMuscles = emptyList(),
+            durationMillis = 1_000L
         )
     }
 }
