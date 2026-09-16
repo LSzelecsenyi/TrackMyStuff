@@ -11,7 +11,9 @@
  * Licensed under the Apache License, Version 2.0
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * This file was converted for native Android / Jetpack Compose rendering.
+ * This file was converted for native Android / Jetpack Compose rendering
+ * and later adapted by extracting compound abdominal subpaths into
+ * independent region records. Contour vertices were not redrawn.
  * We did not create the original anatomical artwork.
  *
  * TODO: Revalidate artwork provenance or replace this data before any public distribution.
@@ -141,61 +143,147 @@ internal object BodyMusclesArtwork {
             muscleGroup = MuscleGroup.CHEST,
             pathData = "m 15.03,19.72 -6.8,2.1 0.65,0.5 0.90586,2.63773 2.0996699,0.86537 3.34636,-1.655 -0.2,-3.8 z"
         ),
+        // Extracted from serratus-anterior-left subpath 1 (central abs).
+        MuscleArtworkRegion(
+            id = "abs-block-left-1",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.LEFT,
+            muscleGroup = MuscleGroup.ABS,
+            pathData = "M 19.289,26.152 l -3.11202 -1.40604 0.0937 2.27965 2.80119 1.43603 z"
+        ),
+        // Extracted from obliques-left subpath 1 (central abs).
+        MuscleArtworkRegion(
+            id = "abs-block-left-2",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.LEFT,
+            muscleGroup = MuscleGroup.ABS,
+            pathData = "M 18.791,29.025 l -0.0622 1.62387 -2.30308 -0.49961 -0.12448 -2.21722 z"
+        ),
+        // Extracted from obliques-left subpath 2 (central abs).
+        MuscleArtworkRegion(
+            id = "abs-block-left-3",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.LEFT,
+            muscleGroup = MuscleGroup.ABS,
+            pathData = "M 18.635,31.429 l 0.0311 1.99844 -2.20953 0.59391 -0.0311 -3.1227 z"
+        ),
+        // Extracted from serratus-anterior-left subpath 2 (side obliques).
+        MuscleArtworkRegion(
+            id = "obliques-block-left-1",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.LEFT,
+            muscleGroup = MuscleGroup.OBLIQUES,
+            pathData = "M 21.224,27.820 l -1.29355 0.7212 0.14997 -1.70898 z"
+        ),
+        // Extracted from serratus-anterior-left subpath 3 (side obliques).
+        MuscleArtworkRegion(
+            id = "obliques-block-left-2",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.LEFT,
+            muscleGroup = MuscleGroup.OBLIQUES,
+            pathData = "M 20.171,26.183 l 2.47968 -1.03241 -0.9336 2.52093 z"
+        ),
+        // Extracted from serratus-anterior-left subpath 4 (side obliques).
+        MuscleArtworkRegion(
+            id = "obliques-block-left-3",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.LEFT,
+            muscleGroup = MuscleGroup.OBLIQUES,
+            pathData = "M 21.702,27.921 l -1.69005 1.03372 -0.28871 2.0678 1.64975 -1.07533 z"
+        ),
+        // Extracted from obliques-left subpath 3 (side obliques).
+        MuscleArtworkRegion(
+            id = "obliques-block-left-4",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.LEFT,
+            muscleGroup = MuscleGroup.OBLIQUES,
+            pathData = "M 21.290,30.444 l -1.48383 1.03372 -0.20622 2.10905 1.64862 -1.32355 z"
+        ),
+        // Extracted from serratus-anterior-right subpath 1 (central abs).
+        MuscleArtworkRegion(
+            id = "abs-block-right-1",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.RIGHT,
+            muscleGroup = MuscleGroup.ABS,
+            pathData = "m 12.399365,26.152365 3.11202,-1.40603 -0.0937,2.27965 -2.80138,1.4364 z"
+        ),
+        // Extracted from obliques-right subpath 1 (central abs).
+        MuscleArtworkRegion(
+            id = "abs-block-right-2",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.RIGHT,
+            muscleGroup = MuscleGroup.ABS,
+            pathData = "M 12.897,29.025 l 0.0623 1.62387 2.30327 -0.49961 0.12448 -2.21703 z"
+        ),
+        // Extracted from obliques-right subpath 2 (central abs).
+        MuscleArtworkRegion(
+            id = "abs-block-right-3",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.RIGHT,
+            muscleGroup = MuscleGroup.ABS,
+            pathData = "M 13.053,31.430 l -0.0309 1.99844 2.20973 0.59353 0.0311 -3.1227 z"
+        ),
+        // Extracted from serratus-anterior-right subpath 2 (side obliques).
+        // Leading relative m was converted to absolute M so the isolated
+        // contour keeps the original world coordinates.
+        MuscleArtworkRegion(
+            id = "obliques-block-right-1",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.RIGHT,
+            muscleGroup = MuscleGroup.OBLIQUES,
+            pathData = "M 10.464285,27.820865 l 1.29355,0.72139 -0.14997,-1.70899 z"
+        ),
+        // Extracted from serratus-anterior-right subpath 3 (side obliques).
+        MuscleArtworkRegion(
+            id = "obliques-block-right-2",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.RIGHT,
+            muscleGroup = MuscleGroup.OBLIQUES,
+            pathData = "M 11.517315,26.183865 l -2.4793099,-1.03259 0.93361,2.52148 z"
+        ),
+        // Extracted from serratus-anterior-right subpath 4 (side obliques).
+        MuscleArtworkRegion(
+            id = "obliques-block-right-3",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.RIGHT,
+            muscleGroup = MuscleGroup.OBLIQUES,
+            pathData = "M 9.9856751,27.921155 l 1.6900499,1.03372 0.28871,2.06743 -1.64881,-1.07515 z"
+        ),
+        // Extracted from obliques-right subpath 3 (side obliques).
+        MuscleArtworkRegion(
+            id = "obliques-block-right-4",
+            view = MuscleMapView.FRONT,
+            side = AnatomicalSide.RIGHT,
+            muscleGroup = MuscleGroup.OBLIQUES,
+            pathData = "M 10.398,30.445 l 1.48384 1.0339 0.20622 2.10905 -1.64975 -1.32355 z"
+        ),
         MuscleArtworkRegion(
             id = "abs-upper-left",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.LEFT,
-            muscleGroup = MuscleGroup.ABS,
-            pathData = "m 19.641935,34.707615 1.81341,-1.36479 0.15748,1.83347 1.28642,2.37338 -1.98044,2.73652 -1.03109,0.16554 -0.37026,-3.88816 z"
-        ),
-        MuscleArtworkRegion(
-            id = "serratus-anterior-left",
-            view = MuscleMapView.FRONT,
-            side = AnatomicalSide.LEFT,
             muscleGroup = null,
-            pathData = "M 19.289,26.152 l -3.11202 -1.40604 0.0937 2.27965 2.80119 1.43603 z M 21.224,27.820 l -1.29355 0.7212 0.14997 -1.70898 z M 20.171,26.183 l 2.47968 -1.03241 -0.9336 2.52093 z M 21.702,27.921 l -1.69005 1.03372 -0.28871 2.0678 1.64975 -1.07533 z"
-        ),
-        MuscleArtworkRegion(
-            id = "obliques-left",
-            view = MuscleMapView.FRONT,
-            side = AnatomicalSide.LEFT,
-            muscleGroup = MuscleGroup.OBLIQUES,
-            pathData = "M 18.791,29.025 l -0.0622 1.62387 -2.30308 -0.49961 -0.12448 -2.21722 z M 18.635,31.429 l 0.0311 1.99844 -2.20953 0.59391 -0.0311 -3.1227 z M 21.290,30.444 l -1.48383 1.03372 -0.20622 2.10905 1.64862 -1.32355 z"
+            pathData = "m 19.641935,34.707615 1.81341,-1.36479 0.15748,1.83347 1.28642,2.37338 -1.98044,2.73652 -1.03109,0.16554 -0.37026,-3.88816 z"
         ),
         MuscleArtworkRegion(
             id = "abs-upper-right",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.RIGHT,
-            muscleGroup = MuscleGroup.ABS,
+            muscleGroup = null,
             pathData = "m 12.045985,34.707615 -1.81341,-1.36479 -0.15748,1.83347 -1.2856799,2.37432 1.9804499,2.73595 1.03109,0.16554 0.37119,-3.88721 z"
-        ),
-        MuscleArtworkRegion(
-            id = "abs-lower-right",
-            view = MuscleMapView.FRONT,
-            side = AnatomicalSide.RIGHT,
-            muscleGroup = MuscleGroup.ABS,
-            pathData = "m 15.636055,44.919735 -0.60647,-5.91209 -0.015,-3.84879 -2.18479,-1.07533 -0.24746,7.03017 z"
         ),
         MuscleArtworkRegion(
             id = "abs-lower-left",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.LEFT,
-            muscleGroup = MuscleGroup.ABS,
+            muscleGroup = null,
             pathData = "m 16.051865,44.919165 0.60628,-5.91209 0.0154,-3.84915 2.18404,-1.07515 0.24746,7.03017 z"
         ),
         MuscleArtworkRegion(
-            id = "serratus-anterior-right",
+            id = "abs-lower-right",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.RIGHT,
             muscleGroup = null,
-            pathData = "m 12.399365,26.152365 3.11202,-1.40603 -0.0937,2.27965 -2.80138,1.4364 z m -1.93508,1.6685 1.29355,0.72139 -0.14997,-1.70899 z m 1.05303,-1.637 -2.4793099,-1.03259 0.93361,2.52148 z m -1.5316399,1.73729 1.6900499,1.03372 0.28871,2.06743 -1.64881,-1.07515 z"
-        ),
-        MuscleArtworkRegion(
-            id = "obliques-right",
-            view = MuscleMapView.FRONT,
-            side = AnatomicalSide.RIGHT,
-            muscleGroup = MuscleGroup.OBLIQUES,
-            pathData = "M 12.897,29.025 l 0.0623 1.62387 2.30327 -0.49961 0.12448 -2.21703 z M 13.053,31.430 l -0.0309 1.99844 2.20973 0.59353 0.0311 -3.1227 z M 10.398,30.445 l 1.48384 1.0339 0.20622 2.10905 -1.64975 -1.32355 z"
+            pathData = "m 15.636055,44.919735 -0.60647,-5.91209 -0.015,-3.84879 -2.18479,-1.07533 -0.24746,7.03017 z"
         ),
         MuscleArtworkRegion(
             id = "hip-flexor-right",

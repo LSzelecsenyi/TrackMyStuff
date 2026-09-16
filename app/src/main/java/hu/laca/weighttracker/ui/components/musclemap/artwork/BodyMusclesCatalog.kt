@@ -9,6 +9,8 @@
  * Licensed under the Apache License, Version 2.0
  *
  * This mapping was adapted for native Android. We did not create the artwork.
+ * Abdominal Has / Ferde hasizom IDs are extracted subpaths of the upstream
+ * serratus-anterior-* and obliques-* compound paths.
  *
  * TODO: Revalidate artwork provenance or replace this data before any public distribution.
  */

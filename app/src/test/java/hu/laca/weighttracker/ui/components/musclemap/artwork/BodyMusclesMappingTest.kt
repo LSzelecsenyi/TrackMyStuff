@@ -36,8 +36,14 @@ class BodyMusclesMappingTest {
             "forearm-left", "forearm-right", "forearm-flexors-left", "forearm-flexors-right",
             "forearm-extensors-left", "forearm-extensors-right"
         ),
-        MuscleGroup.ABS to setOf("abs-upper-left", "abs-upper-right", "abs-lower-left", "abs-lower-right"),
-        MuscleGroup.OBLIQUES to setOf("obliques-left", "obliques-right"),
+        MuscleGroup.ABS to setOf(
+            "abs-block-left-1", "abs-block-left-2", "abs-block-left-3",
+            "abs-block-right-1", "abs-block-right-2", "abs-block-right-3"
+        ),
+        MuscleGroup.OBLIQUES to setOf(
+            "obliques-block-left-1", "obliques-block-left-2", "obliques-block-left-3", "obliques-block-left-4",
+            "obliques-block-right-1", "obliques-block-right-2", "obliques-block-right-3", "obliques-block-right-4"
+        ),
         MuscleGroup.GLUTES to setOf(
             "gluteus-medius-left", "gluteus-medius-right", "gluteus-maximus-left", "gluteus-maximus-right"
         ),
@@ -68,6 +74,8 @@ class BodyMusclesMappingTest {
         assertFalse(BodyMusclesCatalog.hasAnatomicalPaths(MuscleGroup.CARDIOVASCULAR))
         assertNull(BodyMusclesCatalog.groupFor("head"))
         assertTrue("hip-flexor-left" in BodyMusclesCatalog.unmappedIds)
+        assertTrue("abs-upper-left" in BodyMusclesCatalog.unmappedIds)
+        assertTrue("abs-lower-left" in BodyMusclesCatalog.unmappedIds)
         assertTrue("tibialis-anterior-left" in BodyMusclesCatalog.unmappedIds)
     }
 
@@ -93,11 +101,29 @@ class BodyMusclesMappingTest {
     }
 
     @Test
-    fun hipFlexorsAndTibialisRemainUnmapped() {
+    fun hipFlexorsLowerAbsAndTibialisRemainUnmapped() {
         assertNull(BodyMusclesCatalog.groupFor("hip-flexor-left"))
         assertNull(BodyMusclesCatalog.groupFor("hip-flexor-right"))
+        assertNull(BodyMusclesCatalog.groupFor("abs-upper-left"))
+        assertNull(BodyMusclesCatalog.groupFor("abs-upper-right"))
+        assertNull(BodyMusclesCatalog.groupFor("abs-lower-left"))
+        assertNull(BodyMusclesCatalog.groupFor("abs-lower-right"))
         assertNull(BodyMusclesCatalog.groupFor("tibialis-anterior-left"))
         assertNull(BodyMusclesCatalog.groupFor("tibialis-anterior-right"))
+    }
+
+    @Test
+    fun absAndObliquesHaveThreeAndFourBlocksPerSide() {
+        val abs = BodyMusclesCatalog.regionsFor(MuscleGroup.ABS)
+        val obliques = BodyMusclesCatalog.regionsFor(MuscleGroup.OBLIQUES)
+        assertEquals(3, abs.count { it.side == AnatomicalSide.LEFT })
+        assertEquals(3, abs.count { it.side == AnatomicalSide.RIGHT })
+        assertEquals(4, obliques.count { it.side == AnatomicalSide.LEFT })
+        assertEquals(4, obliques.count { it.side == AnatomicalSide.RIGHT })
+        (abs + obliques).forEach { region ->
+            val closed = region.pathData.count { it == 'z' || it == 'Z' }
+            assertEquals(region.id, 1, closed)
+        }
     }
 
     @Test
