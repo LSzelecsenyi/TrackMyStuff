@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hu.laca.weighttracker.domain.model.ChartPoint
@@ -36,22 +37,26 @@ fun WeightChart(
     points: List<ChartPoint>,
     modifier: Modifier = Modifier,
     contentDescription: String,
-    onPointSelected: (ChartPoint?) -> Unit = {}
+    onPointSelected: (ChartPoint?) -> Unit = {},
+    subdued: Boolean = false,
+    chartHeight: Dp = 240.dp
 ) {
     val lineColor = MaterialTheme.colorScheme.primary
-    val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+    val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = if (subdued) 0.08f else 0.16f)
     val markerColor = MaterialTheme.colorScheme.onSurface
-    val markerInner = MaterialTheme.colorScheme.surface
-    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val markerInner = MaterialTheme.colorScheme.background
+    val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (subdued) 0.55f else 1f)
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val selectedColor = MaterialTheme.colorScheme.tertiary
     val textMeasurer = rememberTextMeasurer()
     var selectedDate by rememberSaveable { mutableStateOf<String?>(null) }
+    val lineWidth = if (subdued) 2.dp else 3.dp
+    val gridWidth = if (subdued) 0.5.dp else 1.dp
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(240.dp)
+            .height(chartHeight)
             .semantics { this.contentDescription = contentDescription }
     ) {
         if (points.isEmpty()) return@Box
@@ -89,7 +94,7 @@ fun WeightChart(
                     color = gridColor,
                     start = Offset(layout.plotLeft, label.y),
                     end = Offset(layout.plotRight, label.y),
-                    strokeWidth = 1.dp.toPx()
+                    strokeWidth = gridWidth.toPx()
                 )
                 val measured = textMeasurer.measure(
                     text = label.text,
@@ -138,7 +143,7 @@ fun WeightChart(
                     path = path,
                     color = lineColor,
                     style = Stroke(
-                        width = 3.dp.toPx(),
+                        width = lineWidth.toPx(),
                         cap = StrokeCap.Round,
                         join = StrokeJoin.Round
                     )

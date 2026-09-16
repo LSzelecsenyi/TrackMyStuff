@@ -26,14 +26,17 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.exercise.MuscleGroup
 import hu.laca.weighttracker.domain.musclemap.MuscleHeatmapEntry
 import hu.laca.weighttracker.domain.musclemap.MuscleHeatmapState
 import hu.laca.weighttracker.domain.musclemap.MuscleRecencyBand
-import hu.laca.weighttracker.ui.components.HeroSurface
 import hu.laca.weighttracker.ui.exercises.labelRes
+import hu.laca.weighttracker.ui.theme.AppDimens
+import hu.laca.weighttracker.ui.theme.AppShapeTokens
+import hu.laca.weighttracker.ui.theme.AppTypeTokens
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -45,26 +48,27 @@ fun MuscleHeatmapCard(
     val fills = remember(state) { MuscleMapColors.heatmapFills(state) }
     var selected by remember { mutableStateOf<MuscleGroup?>(null) }
     val selectedEntry = selected?.let { state.entries[it] }
-    HeroSurface(modifier = modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.heatmap_title),
-            style = MaterialTheme.typography.titleLarge
+            style = AppTypeTokens.sectionTitle,
+            color = MaterialTheme.colorScheme.onBackground
         )
+        Spacer(Modifier.height(AppDimens.statSecondaryGap))
         Text(
             text = stringResource(R.string.heatmap_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
+            style = AppTypeTokens.sectionSubtitle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (!state.hasCompletedWorkouts) {
             Text(
                 text = stringResource(R.string.heatmap_empty),
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTypeTokens.sectionSubtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                modifier = Modifier.padding(top = AppDimens.headerStackGap)
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(AppDimens.headerStackGap))
         MuscleMap(
             fills = fills,
             unmappedFill = MuscleMapColors.unmappedFill(scheme),
@@ -77,36 +81,57 @@ fun MuscleHeatmapCard(
             accessibilityActions = heatmapActions(state)
         )
         selectedEntry?.let { entry ->
-            Spacer(Modifier.height(12.dp))
-            val selection = stringResource(
-                R.string.heatmap_selection,
-                stringResource(entry.group.labelRes()),
-                recencyLabel(entry)
-            )
-            Text(
-                text = selection,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.semantics { contentDescription = selection }
-            )
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            HeatmapSelectionRow(entry = entry)
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(AppDimens.headerStackGap))
         HeatmapRecencyLegend()
         state.fullBody?.let { entry ->
             Text(
                 text = stringResource(R.string.heatmap_full_body_note, recencyLabel(entry)),
-                style = MaterialTheme.typography.bodySmall,
+                style = AppTypeTokens.statCaption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp)
+                modifier = Modifier.padding(top = AppDimens.headerStackGap)
             )
         }
         state.cardiovascular?.let { entry ->
             Text(
                 text = stringResource(R.string.heatmap_cardio_note, recencyLabel(entry)),
-                style = MaterialTheme.typography.bodySmall,
+                style = AppTypeTokens.statCaption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = AppDimens.statSecondaryGap)
             )
         }
+    }
+}
+
+@Composable
+private fun HeatmapSelectionRow(entry: MuscleHeatmapEntry) {
+    val name = stringResource(entry.group.labelRes())
+    val recency = recencyLabel(entry)
+    val selection = stringResource(R.string.heatmap_selection, name, recency)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = selection },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.headerStackGap)
+    ) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        Text(
+            text = recency,
+            style = AppTypeTokens.statCaption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -117,8 +142,8 @@ internal fun HeatmapRecencyLegend(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .testTag("heatmap_legend"),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         MuscleRecencyBand.entries.forEach { band ->
             RecencyLegendItem(band = band)
@@ -135,14 +160,17 @@ private fun RecencyLegendItem(band: MuscleRecencyBand) {
     ) {
         Box(
             modifier = Modifier
-                .size(12.dp)
-                .clip(MaterialTheme.shapes.extraSmall)
+                .size(8.dp)
+                .clip(AppShapeTokens.compact)
                 .background(MuscleMapColors.recencyFill(band))
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(start = 6.dp)
+            style = AppTypeTokens.statCaption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

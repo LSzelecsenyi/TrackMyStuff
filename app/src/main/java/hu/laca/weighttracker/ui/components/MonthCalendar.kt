@@ -8,13 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -25,7 +23,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -35,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.calendar.CalendarCell
 import hu.laca.weighttracker.domain.calendar.MonthGrid
+import hu.laca.weighttracker.ui.theme.AppDimens
+import hu.laca.weighttracker.ui.theme.AppShapeTokens
+import hu.laca.weighttracker.ui.theme.AppTypeTokens
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -55,7 +55,10 @@ fun MonthCalendar(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onPreviousMonth) {
+            IconButton(
+                onClick = onPreviousMonth,
+                modifier = Modifier.size(AppDimens.minTouch)
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
                     contentDescription = stringResource(R.string.calendar_previous_month)
@@ -63,30 +66,35 @@ fun MonthCalendar(
             }
             Text(
                 text = UiFormatters.monthTitle(grid.month),
-                style = MaterialTheme.typography.titleLarge,
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 1
             )
-            IconButton(onClick = onNextMonth) {
+            IconButton(
+                onClick = onNextMonth,
+                modifier = Modifier.size(AppDimens.minTouch)
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                     contentDescription = stringResource(R.string.calendar_next_month)
                 )
             }
         }
-        Spacer(Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             weekdayOrder().forEach { day ->
                 Text(
                     text = day.getDisplayName(TextStyle.SHORT, locale),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTypeTokens.statCaption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         grid.weeks.forEach { week ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -102,7 +110,7 @@ fun MonthCalendar(
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(AppDimens.headerStackGap))
         CalendarLegend()
     }
 }
@@ -111,30 +119,36 @@ fun MonthCalendar(
 private fun CalendarLegend() {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             Box(
                 modifier = Modifier
-                    .size(8.dp)
-                    .border(1.5.dp, MaterialTheme.colorScheme.tertiary, CircleShape)
+                    .size(6.dp)
+                    .border(AppDimens.strokeThin, MaterialTheme.colorScheme.tertiary, CircleShape)
             )
             Text(
                 text = stringResource(R.string.calendar_legend_weight),
-                style = MaterialTheme.typography.labelMedium,
+                style = AppTypeTokens.statCaption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             Box(
                 modifier = Modifier
-                    .size(8.dp)
+                    .size(6.dp)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
             )
             Text(
                 text = stringResource(R.string.calendar_legend_workout),
-                style = MaterialTheme.typography.labelMedium,
+                style = AppTypeTokens.statCaption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -158,25 +172,21 @@ private fun CalendarDayCell(
     val textColor = when {
         !cell.inDisplayedMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
         cell.isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
-        selected -> MaterialTheme.colorScheme.onPrimary
-        cell.isToday -> MaterialTheme.colorScheme.primary
+        selected || cell.isToday -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurface
+    }
+    val outline = when {
+        selected -> MaterialTheme.colorScheme.primary
+        cell.isToday -> MaterialTheme.colorScheme.outline
+        else -> null
     }
     Box(
         modifier = modifier
-            .aspectRatio(1f)
-            .padding(2.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .height(AppDimens.calendarCell)
+            .padding(1.dp)
             .then(
-                if (selected) {
-                    Modifier.background(MaterialTheme.colorScheme.primary)
-                } else {
-                    Modifier
-                }
-            )
-            .then(
-                if (!selected && cell.isToday) {
-                    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                if (outline != null) {
+                    Modifier.border(AppDimens.strokeThin, outline, AppShapeTokens.compact)
                 } else {
                     Modifier
                 }
@@ -194,20 +204,16 @@ private fun CalendarDayCell(
             )
             if (cell.hasMeasurement || cell.hasCompletedWorkout) {
                 Row(
-                    modifier = Modifier.padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    modifier = Modifier.padding(top = 1.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     if (cell.hasMeasurement) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(5.dp)
                                 .border(
-                                    width = 1.5.dp,
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.onPrimary
-                                    } else {
-                                        MaterialTheme.colorScheme.tertiary
-                                    },
+                                    width = AppDimens.strokeThin,
+                                    color = MaterialTheme.colorScheme.tertiary,
                                     shape = CircleShape
                                 )
                         )
@@ -215,20 +221,14 @@ private fun CalendarDayCell(
                     if (cell.hasCompletedWorkout) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(5.dp)
                                 .background(
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.onPrimary
-                                    } else {
-                                        MaterialTheme.colorScheme.primary
-                                    },
+                                    color = MaterialTheme.colorScheme.primary,
                                     shape = CircleShape
                                 )
                         )
                     }
                 }
-            } else {
-                Spacer(Modifier.height(8.dp))
             }
         }
     }

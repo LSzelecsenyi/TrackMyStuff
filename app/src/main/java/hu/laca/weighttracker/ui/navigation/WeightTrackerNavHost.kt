@@ -11,13 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,7 +20,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -109,34 +103,17 @@ fun WeightTrackerNavHost(
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showBottomBar = AppNavigation.showsBottomBar(currentRoute)
-    val colors = NavigationBarItemDefaults.colors(
-        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        selectedTextColor = MaterialTheme.colorScheme.onSurface,
-        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-    )
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                    AppNavigation.rootTabs.forEach { tab ->
-                        NavigationBarItem(
-                            selected = AppNavigation.canonicalRoute(currentRoute) == tab.route,
-                            onClick = { navController.navigateRoot(tab.route) },
-                            icon = {
-                                Icon(
-                                    imageVector = tab.icon(),
-                                    contentDescription = stringResource(tab.labelRes)
-                                )
-                            },
-                            label = { Text(stringResource(tab.labelRes)) },
-                            colors = colors
-                        )
-                    }
-                }
+                AppBottomBar(
+                    tabs = AppNavigation.rootTabs,
+                    selectedRoute = AppNavigation.canonicalRoute(currentRoute),
+                    onTabSelected = { navController.navigateRoot(it) },
+                    iconFor = { it.icon() }
+                )
             }
         }
     ) { innerPadding ->

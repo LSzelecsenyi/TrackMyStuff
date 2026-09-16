@@ -9,9 +9,9 @@ import hu.laca.weighttracker.domain.DashboardSnapshot
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.domain.DaySheetFactory
 import hu.laca.weighttracker.domain.DaySheetState
-import hu.laca.weighttracker.domain.Greeting
-import hu.laca.weighttracker.domain.GreetingSelector
 import hu.laca.weighttracker.domain.MeasurementValidationResult
+import hu.laca.weighttracker.domain.WeeklyOverview
+import hu.laca.weighttracker.domain.WeeklyOverviewLogic
 import hu.laca.weighttracker.domain.MeasurementValidator
 import hu.laca.weighttracker.domain.calendar.MonthGrid
 import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
@@ -20,6 +20,7 @@ import hu.laca.weighttracker.domain.musclemap.MuscleHeatmapState
 import hu.laca.weighttracker.domain.model.ChartRange
 import hu.laca.weighttracker.domain.model.SaveOutcome
 import hu.laca.weighttracker.domain.model.WeightMeasurement
+import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
 import hu.laca.weighttracker.ui.components.EditorUiState
 import hu.laca.weighttracker.ui.components.UserMessage
 import hu.laca.weighttracker.ui.components.formatWeightInput
@@ -51,7 +52,7 @@ data class DashboardUiState(
     val editor: EditorUiState? = null,
     val userMessage: UserMessage? = null,
     val today: LocalDate = LocalDate.of(1970, 1, 1),
-    val greeting: Greeting = Greeting.Day,
+    val weeklyOverview: WeeklyOverview = WeeklyOverview(),
     val displayedMonth: YearMonth = YearMonth.of(1970, 1),
     val monthGrid: MonthGrid = MonthGridCalculator.grid(
         month = YearMonth.of(1970, 1),
@@ -111,14 +112,26 @@ class DashboardViewModel(
         }
     }
 
+    private val weekSessions = sessionRepository.observeSummariesBetween(
+        WeeklyOverviewLogic.windowStart(dateProvider.today()),
+        dateProvider.today()
+    )
+
+    private data class SessionSignals(
+        val counts: Map<LocalDate, Int>,
+        val dayWorkouts: List<WorkoutSessionSummary>,
+        val weekSessions: List<WorkoutSessionSummary>
+    )
+
     val uiState: StateFlow<DashboardUiState> = combine(
         combine(
             measurements,
             chrome,
             showDayDeleteConfirm,
-            completedCounts,
-            dayWorkouts
-        ) { items, chromeState, deleteConfirm, counts, workouts ->
+            combine(completedCounts, dayWorkouts, weekSessions) { counts, workouts, week ->
+                SessionSignals(counts, workouts, week)
+            }
+        ) { items, chromeState, deleteConfirm, sessions ->
             val today = dateProvider.today()
             val snapshot = DashboardAssembler.assemble(items, today, chromeState.range)
             DashboardUiState(
@@ -127,16 +140,16 @@ class DashboardViewModel(
                 editor = chromeState.editor,
                 userMessage = chromeState.message,
                 today = today,
-                greeting = GreetingSelector.from(dateProvider.now().toLocalTime()),
+                weeklyOverview = WeeklyOverviewLogic.assemble(today, sessions.weekSessions, items),
                 displayedMonth = chromeState.month,
                 monthGrid = MonthGridCalculator.grid(
                     month = chromeState.month,
                     today = today,
                     measuredDates = snapshot.measurementDates,
-                    completedWorkoutCounts = counts
+                    completedWorkoutCounts = sessions.counts
                 ),
                 daySheet = chromeState.selectedDay?.let { date ->
-                    DaySheetFactory.create(date, items, today, workouts)
+                    DaySheetFactory.create(date, items, today, sessions.dayWorkouts)
                 },
                 showDayDeleteConfirm = deleteConfirm
             )
@@ -149,7 +162,6 @@ class DashboardViewModel(
         started = SharingStarted.Eagerly,
         initialValue = DashboardUiState(
             today = dateProvider.today(),
-            greeting = GreetingSelector.from(dateProvider.now().toLocalTime()),
             displayedMonth = YearMonth.from(dateProvider.today()),
             monthGrid = MonthGridCalculator.grid(
                 month = YearMonth.from(dateProvider.today()),

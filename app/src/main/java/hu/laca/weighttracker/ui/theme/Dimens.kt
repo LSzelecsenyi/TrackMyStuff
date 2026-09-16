@@ -13,12 +13,30 @@ object AppDimens {
     val calendarCell = 44.dp
     val swatchSize = 36.dp
     val scrollEndPadding = 96.dp
+
+    val cornerSurface = 16.dp
+    val cornerCompact = 12.dp
+    val cornerButton = 14.dp
+    val strokeThin = 1.dp
+    val headerStackGap = 6.dp
+    val statSecondaryGap = 2.dp
+    val sectionDividerSpace = 16.dp
+    val navBarHeight = 56.dp
+    val navIndicatorThickness = 2.dp
+    val navIndicatorWidth = 28.dp
+}
+
+object AppShapeTokens {
+    val surface = RoundedCornerShape(AppDimens.cornerSurface)
+    val compact = RoundedCornerShape(AppDimens.cornerCompact)
+    val button = RoundedCornerShape(AppDimens.cornerButton)
+    val chip = RoundedCornerShape(percent = 50)
 }
 
 val AppShapes = Shapes(
-    extraSmall = RoundedCornerShape(12.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(16.dp),
+    extraSmall = AppShapeTokens.compact,
+    small = AppShapeTokens.button,
+    medium = AppShapeTokens.surface,
     large = RoundedCornerShape(24.dp),
     extraLarge = RoundedCornerShape(28.dp)
 )

@@ -1,49 +1,61 @@
 package hu.laca.weighttracker.ui.dashboard
 
 import android.content.res.Configuration
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.DashboardSnapshot
-import hu.laca.weighttracker.domain.Greeting
+import hu.laca.weighttracker.domain.WeeklyOverview
+import hu.laca.weighttracker.domain.WeeklyOverviewLogic
 import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
 import hu.laca.weighttracker.domain.model.ChartPoint
 import hu.laca.weighttracker.domain.model.WeightMeasurement
 import hu.laca.weighttracker.ui.components.DayDetailsSheet
 import hu.laca.weighttracker.ui.components.DeleteMeasurementDialog
-import hu.laca.weighttracker.ui.components.HeroSurface
 import hu.laca.weighttracker.ui.components.MeasurementEditorSheet
 import hu.laca.weighttracker.ui.components.MonthCalendar
-import hu.laca.weighttracker.ui.components.SectionHeader
-import hu.laca.weighttracker.ui.components.SettingsAction
 import hu.laca.weighttracker.ui.components.UiFormatters
 import hu.laca.weighttracker.ui.components.UserMessageEffect
+import hu.laca.weighttracker.ui.components.WeightChart
 import hu.laca.weighttracker.ui.components.musclemap.MuscleHeatmapCard
 import hu.laca.weighttracker.ui.theme.AppDimens
+import hu.laca.weighttracker.ui.theme.AppTypeTokens
 import hu.laca.weighttracker.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
 import java.time.YearMonth
@@ -88,23 +100,32 @@ fun DashboardScreen(
                 .padding(top = 8.dp, bottom = 24.dp)
         ) {
             OverviewHeader(
-                greeting = state.greeting,
-                today = state.today,
+                overview = state.weeklyOverview,
                 onOpenSettings = onOpenSettings
             )
-            Spacer(Modifier.height(AppDimens.sectionGap))
-            MuscleHeatmapCard(state = state.heatmap)
-            Spacer(Modifier.height(AppDimens.sectionGap))
-            SectionHeader(title = stringResource(R.string.calendar_title))
+            Spacer(Modifier.height(AppDimens.sectionDividerSpace))
+            MuscleHeatmapCard(
+                state = state.heatmap,
+                modifier = Modifier.testTag("dashboard_heatmap")
+            )
+            OverviewSectionDivider()
+            Text(
+                text = stringResource(R.string.calendar_title),
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.testTag("dashboard_calendar_title")
+            )
+            Spacer(Modifier.height(AppDimens.statSecondaryGap))
             MonthCalendar(
                 grid = state.monthGrid,
                 selectedDate = state.daySheet?.date,
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
-                onDayClick = onDaySelected
+                onDayClick = onDaySelected,
+                modifier = Modifier.testTag("dashboard_calendar")
             )
-            Spacer(Modifier.height(AppDimens.sectionGap))
-            CompactWeightChartCard(
+            OverviewSectionDivider()
+            CompactWeightChartSection(
                 snapshot = state.snapshot,
                 onOpenDetails = onOpenWeightDetails
             )
@@ -145,12 +166,28 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun CompactWeightChartCard(
+private fun OverviewSectionDivider() {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(AppDimens.sectionDividerSpace))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(AppDimens.strokeThin)
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
+        Spacer(Modifier.height(AppDimens.sectionDividerSpace))
+    }
+}
+
+@Composable
+private fun CompactWeightChartSection(
     snapshot: DashboardSnapshot,
     onOpenDetails: () -> Unit
 ) {
-    HeroSurface(
-        modifier = Modifier.clickable(role = Role.Button, onClick = onOpenDetails)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("dashboard_weight_chart")
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -158,63 +195,147 @@ private fun CompactWeightChartCard(
         ) {
             Text(
                 text = stringResource(R.string.chart_title),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            TextButton(onClick = onOpenDetails) {
-                Text(stringResource(R.string.action_open_details))
+            Text(
+                text = stringResource(R.string.action_open_details),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = AppDimens.minTouch)
+                    .clickable(role = Role.Button, onClick = onOpenDetails)
+                    .padding(horizontal = 4.dp, vertical = 12.dp)
+                    .testTag("dashboard_weight_details")
+            )
+        }
+        if (snapshot.latest != null || snapshot.chartRangeAverageKg != null) {
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
+            ) {
+                snapshot.latest?.let { latest ->
+                    CompactStat(
+                        label = stringResource(R.string.weight_stat_latest_label),
+                        value = UiFormatters.weightKg(latest.weightKg),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                snapshot.chartRangeAverageKg?.let { average ->
+                    CompactStat(
+                        label = stringResource(R.string.weight_stat_average_label),
+                        value = UiFormatters.weightKg(average),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
-        snapshot.latest?.let { latest ->
+        Spacer(Modifier.height(AppDimens.headerStackGap))
+        if (snapshot.chartPoints.isEmpty()) {
             Text(
-                text = stringResource(
-                    R.string.weight_chart_latest_summary,
-                    UiFormatters.weightKg(latest.weightKg)
-                ),
-                style = MaterialTheme.typography.bodyMedium,
+                text = stringResource(R.string.chart_empty_range),
+                style = AppTypeTokens.sectionSubtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(8.dp))
+        } else {
+            WeightChart(
+                points = snapshot.chartPoints,
+                contentDescription = stringResource(
+                    R.string.chart_content_description,
+                    snapshot.chartPoints.size,
+                    UiFormatters.weightKg(snapshot.chartPoints.minOf { it.weightKg }),
+                    UiFormatters.weightKg(snapshot.chartPoints.maxOf { it.weightKg })
+                ),
+                onPointSelected = {},
+                subdued = true,
+                chartHeight = 200.dp
+            )
         }
-        WeightChartBlock(
-            snapshot = snapshot,
-            selectedPoint = null,
-            onPointSelected = {}
+    }
+}
+
+@Composable
+private fun CompactStat(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = AppTypeTokens.statCaption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = value,
+            style = AppTypeTokens.statValue,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
 
 @Composable
 private fun OverviewHeader(
-    greeting: Greeting,
-    today: LocalDate,
+    overview: WeeklyOverview,
     onOpenSettings: () -> Unit
 ) {
+    val activity = WeeklyOverviewLogic.activityLine(overview)
+    val weight = WeeklyOverviewLogic.weightChangeLabel(overview.weightChangeKg)
+    val description = stringResource(
+        R.string.weekly_overview_description,
+        activity,
+        weight
+    )
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        verticalAlignment = Alignment.Top
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(greeting.stringRes()),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground
+                text = stringResource(R.string.weekly_overview_kicker),
+                style = AppTypeTokens.sectionKicker,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+            Spacer(Modifier.height(AppDimens.headerStackGap))
             Text(
-                text = UiFormatters.longDate(today),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = WeeklyOverviewLogic.workoutLabel(overview.workoutCount),
+                style = AppTypeTokens.statHero,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(AppDimens.statSecondaryGap))
+            Text(
+                text = "${WeeklyOverviewLogic.setLabel(overview.completedSetCount)} · $weight",
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        SettingsAction(onOpenSettings = onOpenSettings)
-    }
-}
-
-private fun Greeting.stringRes(): Int {
-    return when (this) {
-        Greeting.Morning -> R.string.greeting_morning
-        Greeting.Day -> R.string.greeting_day
-        Greeting.Evening -> R.string.greeting_evening
+        IconButton(
+            onClick = onOpenSettings,
+            modifier = Modifier.size(AppDimens.minTouch)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Settings,
+                contentDescription = stringResource(R.string.action_open_settings),
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -245,7 +366,7 @@ private fun DashboardPreview() {
                     chartRangeAverageKg = 82.1
                 ),
                 today = date,
-                greeting = Greeting.Morning,
+                weeklyOverview = WeeklyOverview(workoutCount = 3, completedSetCount = 18, weightChangeKg = 0.4),
                 displayedMonth = month,
                 monthGrid = MonthGridCalculator.grid(month, date, setOf(date))
             ),
@@ -281,7 +402,7 @@ private fun EmptyDashboardPreview() {
         DashboardScreen(
             state = DashboardUiState(
                 today = date,
-                greeting = Greeting.Day,
+                weeklyOverview = WeeklyOverview(),
                 displayedMonth = month,
                 monthGrid = MonthGridCalculator.grid(month, date, emptySet())
             ),

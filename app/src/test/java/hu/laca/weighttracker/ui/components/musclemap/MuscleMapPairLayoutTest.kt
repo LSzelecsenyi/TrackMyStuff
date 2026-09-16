@@ -12,15 +12,15 @@ import androidx.compose.ui.unit.dp
 @RunWith(JUnit4::class)
 class MuscleMapPairLayoutTest {
     @Test
-    fun onePlusInnerCardWidthKeepsEqualSideBySideFigures() {
+    fun onePlusDashboardWidthKeepsEqualSideBySideFigures() {
         val screen = 360.dp
-        val available = screen - AppDimens.screenPadding * 2 - AppDimens.heroPadding * 2
-        assertEquals(280.dp, available)
+        val available = screen - AppDimens.screenPadding * 2
+        assertEquals(320.dp, available)
         val layout = muscleMapPairLayout(available)
         assertTrue(layout.placesSideBySide)
         assertEquals(2, layout.figureCount)
-        assertEquals(134.dp, layout.figureWidth)
-        assertEquals(134f * BodyMusclesArtwork.VIEW_HEIGHT / BodyMusclesArtwork.VIEW_WIDTH, layout.figureHeight.value, 0.01f)
+        assertEquals(154.dp, layout.figureWidth)
+        assertEquals(154f * BodyMusclesArtwork.VIEW_HEIGHT / BodyMusclesArtwork.VIEW_WIDTH, layout.figureHeight.value, 0.01f)
         assertEquals(available.value, layout.figureWidth.value * 2 + layout.gap.value, 0.01f)
         assertTrue(layout.figureWidth > 0.dp)
         assertTrue(layout.figureHeight > 0.dp)
@@ -28,7 +28,7 @@ class MuscleMapPairLayoutTest {
 
     @Test
     fun emulatorPhoneWidthAlsoStaysSideBySide() {
-        val available = 411.dp - AppDimens.screenPadding * 2 - AppDimens.heroPadding * 2
+        val available = 411.dp - AppDimens.screenPadding * 2
         val layout = muscleMapPairLayout(available)
         assertTrue(layout.placesSideBySide)
         assertEquals(layout.figureWidth, muscleMapPairLayout(available).figureWidth)

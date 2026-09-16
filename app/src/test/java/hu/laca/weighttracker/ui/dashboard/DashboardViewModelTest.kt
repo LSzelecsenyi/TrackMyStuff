@@ -9,7 +9,7 @@ import hu.laca.weighttracker.data.local.WeightDatabase
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.domain.FixedDateProvider
-import hu.laca.weighttracker.domain.Greeting
+import hu.laca.weighttracker.domain.WeeklyOverview
 import hu.laca.weighttracker.domain.model.ChartRange
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -64,7 +64,7 @@ class DashboardViewModelTest {
         assertTrue(state.snapshot.isEmpty)
         assertTrue(state.snapshot.chartPoints.isEmpty())
         assertTrue(state.snapshot.recentItems.isEmpty())
-        assertEquals(Greeting.Morning, state.greeting)
+        assertEquals(WeeklyOverview(), state.weeklyOverview)
     }
 
     @Test

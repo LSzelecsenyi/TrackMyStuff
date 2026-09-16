@@ -6,9 +6,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+private val TabularSans = TextStyle(
+    fontFamily = FontFamily.SansSerif,
+    fontFeatureSettings = "tnum"
+)
+
 val AppTypography = MaterialTypography(
-    displaySmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    displaySmall = TabularSans.copy(
         fontWeight = FontWeight.SemiBold,
         fontSize = 36.sp,
         lineHeight = 44.sp,
@@ -39,8 +43,7 @@ val AppTypography = MaterialTypography(
         fontSize = 16.sp,
         lineHeight = 24.sp
     ),
-    bodyMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    bodyMedium = TabularSans.copy(
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp
@@ -52,3 +55,47 @@ val AppTypography = MaterialTypography(
         lineHeight = 20.sp
     )
 )
+
+object AppTypeTokens {
+    val sectionKicker = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 1.4.sp
+    )
+    val statHero = TabularSans.copy(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 34.sp,
+        lineHeight = 40.sp,
+        letterSpacing = (-0.4).sp
+    )
+    val statSecondary = TabularSans.copy(
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 20.sp
+    )
+    val sectionTitle = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        lineHeight = 20.sp
+    )
+    val sectionSubtitle = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp
+    )
+    val statValue = TabularSans.copy(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp,
+        lineHeight = 22.sp
+    )
+    val statCaption = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        lineHeight = 14.sp
+    )
+}

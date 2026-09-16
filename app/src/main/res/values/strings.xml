@@ -90,6 +90,8 @@
     <string name="theme_preview_secondary">Másodlagos</string>
     <string name="theme_preview_description">Élő témaelőnézet a háttérrel, felülettel, gombbal, másodlagos színnel, harmadlagos kiemeléssel és egy rövid grafikonvonallal</string>
     <string name="message_palette_saved">Az egyéni paletta mentve.</string>
+    <string name="weekly_overview_kicker">ELMÚLT 7 NAP</string>
+    <string name="weekly_overview_description">Elmúlt 7 nap: %1$s, %2$s</string>
     <string name="greeting_morning">Jó reggelt</string>
     <string name="greeting_day">Szép napot</string>
     <string name="greeting_evening">Jó estét</string>
@@ -442,6 +444,8 @@
     <string name="template_map_cardio">Kardiovaszkuláris gyakorlat szerepel a tervben, ezért nincs anatómiai célterület.</string>
     <string name="weight_details_title">Testsúly</string>
     <string name="weight_chart_latest_summary">Legutóbbi: %1$s</string>
+    <string name="weight_stat_latest_label">Legutóbbi</string>
+    <string name="weight_stat_average_label">Időszak átlaga</string>
     <string name="workout_import_action">Edzések importálása</string>
     <string name="workout_import_title">Edzések importálása</string>
     <string name="workout_import_pick_file">CSV fájl kiválasztása</string>
