@@ -18,6 +18,7 @@ object AppRoutes {
     const val WORKOUT_DETAIL = "workout_detail"
     const val WORKOUT_DETAIL_PATTERN = "workout_detail?sessionId={sessionId}"
     const val WEIGHT_DETAILS = "weight_details"
+    const val WORKOUT_IMPORT = "workout_import"
 }
 
 data class RootTab(
@@ -93,6 +94,14 @@ object AppNavigation {
             targetRoute = AppRoutes.WEIGHT_DETAILS,
             backTarget = AppRoutes.OVERVIEW,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.WEIGHT_DETAILS)
+        )
+    }
+
+    fun openWorkoutImport(currentRoute: String?): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.WORKOUT_IMPORT,
+            backTarget = AppRoutes.JOURNAL,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.WORKOUT_IMPORT)
         )
     }
 

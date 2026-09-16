@@ -27,7 +27,8 @@ fun WorkoutSessionEntity.toModel(): WorkoutSession {
             .getOrDefault(BodyWeightSource.UNKNOWN),
         bodyWeightSourceDate = bodyWeightSourceDate?.let(LocalDate::parse),
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        importFingerprint = importFingerprint
     )
 }
 
@@ -83,4 +84,9 @@ fun SessionStatus.activeLock(): Int? = if (this == SessionStatus.IN_PROGRESS) 1 
 data class WorkoutDateCount(
     val date: String,
     val completedCount: Int
+)
+
+data class ImportedWorkoutName(
+    val date: String,
+    val name: String
 )

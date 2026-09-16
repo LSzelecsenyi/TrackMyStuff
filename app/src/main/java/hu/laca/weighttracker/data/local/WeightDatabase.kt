@@ -18,7 +18,7 @@ import androidx.room.RoomDatabase
         WorkoutSessionExerciseMuscleEntity::class,
         WorkoutSessionSetEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
@@ -34,7 +34,7 @@ abstract class WeightDatabase : RoomDatabase() {
                 WeightDatabase::class.java,
                 "weight_tracker.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
         }
     }

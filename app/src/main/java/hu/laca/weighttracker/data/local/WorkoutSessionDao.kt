@@ -63,6 +63,9 @@ abstract class WorkoutSessionDao {
     @Query("SELECT * FROM workout_sessions WHERE id = :id LIMIT 1")
     abstract suspend fun getById(id: Long): WorkoutSessionEntity?
 
+    @Query("SELECT workoutDate AS date, templateName AS name FROM workout_sessions WHERE status = 'COMPLETED'")
+    abstract suspend fun getCompletedDateNames(): List<ImportedWorkoutName>
+
     @Query("SELECT * FROM workout_sessions WHERE status = 'IN_PROGRESS' LIMIT 1")
     abstract suspend fun getInProgress(): WorkoutSessionEntity?
 
@@ -133,8 +136,19 @@ abstract class WorkoutSessionDao {
     @Query("SELECT COUNT(*) FROM workout_session_exercises WHERE exerciseId = :exerciseId")
     abstract suspend fun countExerciseReferences(exerciseId: Long): Int
 
-    @Query("SELECT DISTINCT templateId FROM workout_sessions")
+    @Query("SELECT DISTINCT templateId FROM workout_sessions WHERE templateId IS NOT NULL")
     abstract fun observeReferencedTemplateIds(): Flow<List<Long>>
+
+    @Query("SELECT importFingerprint FROM workout_sessions WHERE importFingerprint IS NOT NULL")
+    abstract suspend fun getImportFingerprints(): List<String>
+
+    @Query(
+        """
+        SELECT importFingerprint FROM workout_sessions
+        WHERE importFingerprint IN (:fingerprints)
+        """
+    )
+    abstract suspend fun findExistingImportFingerprints(fingerprints: List<String>): List<String>
 
     @Query("SELECT DISTINCT exerciseId FROM workout_session_exercises")
     abstract fun observeReferencedExerciseIds(): Flow<List<Long>>
@@ -181,5 +195,12 @@ abstract class WorkoutSessionDao {
             }
         }
         return sessionId
+    }
+
+    @Transaction
+    open suspend fun insertImportedAggregates(
+        sessions: List<Pair<WorkoutSessionEntity, List<Triple<WorkoutSessionExerciseEntity, List<WorkoutSessionExerciseMuscleEntity>, List<WorkoutSessionSetEntity>>>>>
+    ): List<Long> {
+        return sessions.map { (session, exercises) -> insertAggregate(session, exercises) }
     }
 }

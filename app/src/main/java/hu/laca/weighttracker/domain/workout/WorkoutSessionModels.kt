@@ -10,7 +10,7 @@ import java.time.LocalDate
 
 data class WorkoutSession(
     val id: Long,
-    val templateId: Long,
+    val templateId: Long?,
     val templateName: String,
     val status: SessionStatus,
     val workoutDate: LocalDate,
@@ -22,7 +22,8 @@ data class WorkoutSession(
     val bodyWeightSource: BodyWeightSource,
     val bodyWeightSourceDate: LocalDate?,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val importFingerprint: String? = null
 )
 
 data class SessionExercise(

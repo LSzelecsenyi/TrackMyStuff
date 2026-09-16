@@ -21,6 +21,8 @@ import hu.laca.weighttracker.ui.templates.TemplateEditorViewModel
 import hu.laca.weighttracker.ui.templates.TemplateListViewModel
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutViewModel
 import hu.laca.weighttracker.ui.workout.WorkoutHubViewModel
+import hu.laca.weighttracker.ui.workoutimport.WorkoutImportViewModel
+import hu.laca.weighttracker.data.workoutimport.WorkoutImportFileReader
 
 class WeightViewModelFactory(
     private val weightRepository: WeightRepository,
@@ -28,7 +30,8 @@ class WeightViewModelFactory(
     private val workoutTemplateRepository: WorkoutTemplateRepository,
     private val workoutSessionRepository: WorkoutSessionRepository,
     private val dateProvider: DateProvider,
-    private val themePreferences: ThemePreferences
+    private val themePreferences: ThemePreferences,
+    private val workoutImportFileReader: WorkoutImportFileReader
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -84,6 +87,15 @@ class WeightViewModelFactory(
                 WorkoutDetailViewModel(
                     extras.createSavedStateHandle(),
                     workoutSessionRepository
+                )
+            }
+            modelClass.isAssignableFrom(WorkoutImportViewModel::class.java) -> {
+                WorkoutImportViewModel(
+                    fileReader = workoutImportFileReader,
+                    exerciseRepository = exerciseRepository,
+                    weightRepository = weightRepository,
+                    sessionRepository = workoutSessionRepository,
+                    dateProvider = dateProvider
                 )
             }
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")

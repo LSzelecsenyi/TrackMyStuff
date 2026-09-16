@@ -20,12 +20,13 @@ import androidx.room.PrimaryKey
         Index(value = ["activeLock"], unique = true),
         Index(value = ["status"]),
         Index(value = ["templateId"]),
-        Index(value = ["workoutDate"])
+        Index(value = ["workoutDate"]),
+        Index(value = ["importFingerprint"], unique = true)
     ]
 )
 data class WorkoutSessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val templateId: Long,
+    val templateId: Long?,
     val templateName: String,
     val status: String,
     val workoutDate: String,
@@ -38,7 +39,8 @@ data class WorkoutSessionEntity(
     val bodyWeightSourceDate: String?,
     val createdAt: Long,
     val updatedAt: Long,
-    val activeLock: Int?
+    val activeLock: Int?,
+    val importFingerprint: String? = null
 )
 
 @Entity(

@@ -22,6 +22,10 @@ class WeightRepository(
         }
     }
 
+    suspend fun all(): List<WeightMeasurement> {
+        return dao.getAllAscending().map { it.toModel() }
+    }
+
     suspend fun getByDate(date: LocalDate): WeightMeasurement? {
         return dao.getByDate(date.toString())?.toModel()
     }

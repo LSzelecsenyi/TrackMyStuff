@@ -8,6 +8,8 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,7 +38,7 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
         try {
@@ -88,7 +90,7 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, V2_DB)
-            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
         try {
@@ -155,7 +157,7 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, V3_DB)
-            .addMigrations(MIGRATION_3_4)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
         try {
@@ -166,6 +168,176 @@ class WeightDatabaseMigrationTest {
             assertTrue(database.workoutSessionDao().observeAll().first().isEmpty())
         } finally {
             database.close()
+        }
+    }
+
+    @Test
+    fun migrationFromVersion4PreservesSessionsAndAddsNullableImportFingerprint() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(V4_DB)
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(V4_DB)
+                .callback(Version4Callback())
+                .build()
+        )
+        helper.writableDatabase.apply {
+            execSQL("INSERT INTO weight_measurements (date, weightKg, createdAt, updatedAt) VALUES ('2026-09-15', 88.3, 10, 20)")
+            execSQL(
+                """
+                INSERT INTO exercises (name, normalizedName, category, movementPattern, measurementType,
+                    resistanceBasis, weightInterpretation, notes, archived, createdAt, updatedAt)
+                VALUES ('Húzódzkodás', 'húzódzkodás', 'STRENGTH', 'VERTICAL_PULL', 'REPETITIONS',
+                    'BODYWEIGHT', 'NOT_APPLICABLE', NULL, 0, 10, 20)
+                """.trimIndent()
+            )
+            execSQL("INSERT INTO exercise_muscles (exerciseId, muscleGroup, role) VALUES (1, 'LATS', 'PRIMARY'), (1, 'BICEPS', 'SECONDARY')")
+            execSQL(
+                "INSERT INTO workout_templates (name, normalizedName, notes, archived, createdAt, updatedAt) VALUES ('Push A', 'push a', NULL, 0, 10, 20)"
+            )
+            execSQL(
+                "INSERT INTO workout_template_exercises (templateId, exerciseId, position, notes, createdAt) VALUES (1, 1, 0, NULL, 10)"
+            )
+            execSQL(
+                """
+                INSERT INTO workout_template_sets (templateExerciseId, position, minReps, maxReps, loadKind, weightKg, durationSeconds, distanceMeters)
+                VALUES (1, 0, 8, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL)
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                INSERT INTO workout_sessions (templateId, templateName, status, workoutDate, startedAt, finishedAt, abandonedAt,
+                    notes, bodyWeightKg, bodyWeightSource, bodyWeightSourceDate, createdAt, updatedAt, activeLock)
+                VALUES (1, 'Push A', 'COMPLETED', '2026-09-14', 1000, 2000, NULL, 'done', 88.3, 'MEASURED_SAME_DAY', '2026-09-14', 1000, 2000, NULL)
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                INSERT INTO workout_session_exercises (sessionId, exerciseId, position, name, category, movementPattern,
+                    measurementType, resistanceBasis, weightInterpretation, primaryMuscle, notes)
+                VALUES (1, 1, 0, 'Húzódzkodás', 'STRENGTH', 'VERTICAL_PULL', 'REPETITIONS', 'BODYWEIGHT', 'NOT_APPLICABLE', 'LATS', NULL)
+                """.trimIndent()
+            )
+            execSQL(
+                "INSERT INTO workout_session_exercise_muscles (sessionExerciseId, muscleGroup, role) VALUES (1, 'LATS', 'PRIMARY'), (1, 'BICEPS', 'SECONDARY')"
+            )
+            execSQL(
+                """
+                INSERT INTO workout_session_sets (sessionExerciseId, position, plannedMinReps, plannedMaxReps, plannedLoadKind,
+                    plannedWeightKg, plannedDurationSeconds, plannedDistanceMeters, actualReps, actualLoadKind, actualWeightKg,
+                    actualDurationSeconds, actualDistanceMeters, status, completedAt, addedDuringWorkout)
+                VALUES (1, 0, 8, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL, 'COMPLETED', 2000, 0)
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                INSERT INTO workout_sessions (templateId, templateName, status, workoutDate, startedAt, finishedAt, abandonedAt,
+                    notes, bodyWeightKg, bodyWeightSource, bodyWeightSourceDate, createdAt, updatedAt, activeLock)
+                VALUES (1, 'Push A', 'IN_PROGRESS', '2026-09-15', 3000, NULL, NULL, NULL, NULL, 'UNKNOWN', NULL, 3000, 3000, 1)
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                INSERT INTO workout_session_exercises (sessionId, exerciseId, position, name, category, movementPattern,
+                    measurementType, resistanceBasis, weightInterpretation, primaryMuscle, notes)
+                VALUES (2, 1, 0, 'Húzódzkodás', 'STRENGTH', 'VERTICAL_PULL', 'REPETITIONS', 'BODYWEIGHT', 'NOT_APPLICABLE', 'LATS', NULL)
+                """.trimIndent()
+            )
+            execSQL(
+                "INSERT INTO workout_session_exercise_muscles (sessionExerciseId, muscleGroup, role) VALUES (2, 'LATS', 'PRIMARY')"
+            )
+            execSQL(
+                """
+                INSERT INTO workout_session_sets (sessionExerciseId, position, plannedMinReps, plannedMaxReps, plannedLoadKind,
+                    plannedWeightKg, plannedDurationSeconds, plannedDistanceMeters, actualReps, actualLoadKind, actualWeightKg,
+                    actualDurationSeconds, actualDistanceMeters, status, completedAt, addedDuringWorkout)
+                VALUES (2, 0, 8, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL, 'PENDING', NULL, 0)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val database = Room.databaseBuilder(context, WeightDatabase::class.java, V4_DB)
+            .addMigrations(MIGRATION_4_5)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            assertEquals(88.3, database.weightMeasurementDao().getByDate("2026-09-15")!!.weightKg, 0.0)
+            val sessions = database.workoutSessionDao().observeAll().first()
+            assertEquals(2, sessions.size)
+            val completed = sessions.single { it.status == "COMPLETED" }
+            val active = sessions.single { it.status == "IN_PROGRESS" }
+            assertEquals(1L, completed.id)
+            assertEquals(2L, active.id)
+            assertEquals(1L, completed.templateId)
+            assertEquals(1L, active.templateId)
+            assertNull(completed.importFingerprint)
+            assertNull(active.importFingerprint)
+            assertEquals("done", completed.notes)
+            assertEquals(88.3, completed.bodyWeightKg)
+            assertEquals(1, database.workoutSessionDao().getExercises(1).size)
+            assertEquals(2, database.workoutSessionDao().getMuscles(1).size)
+            assertEquals("COMPLETED", database.workoutSessionDao().getSets(1).single().status)
+            assertEquals("PENDING", database.workoutSessionDao().getSets(2).single().status)
+            val fk = database.openHelper.readableDatabase.query("PRAGMA foreign_key_check")
+            assertFalse(fk.moveToFirst())
+            fk.close()
+            val indexes = mutableListOf<String>()
+            val indexCursor = database.openHelper.readableDatabase.query("PRAGMA index_list('workout_sessions')")
+            while (indexCursor.moveToNext()) {
+                indexes += indexCursor.getString(indexCursor.getColumnIndexOrThrow("name"))
+            }
+            indexCursor.close()
+            assertTrue(indexes.contains("index_workout_sessions_importFingerprint"))
+            assertTrue(indexes.contains("index_workout_sessions_activeLock"))
+            val uniqueCursor = database.openHelper.readableDatabase.query("PRAGMA index_list('workout_sessions')")
+            var fingerprintUnique = false
+            while (uniqueCursor.moveToNext()) {
+                if (uniqueCursor.getString(uniqueCursor.getColumnIndexOrThrow("name")) == "index_workout_sessions_importFingerprint") {
+                    fingerprintUnique = uniqueCursor.getInt(uniqueCursor.getColumnIndexOrThrow("unique")) == 1
+                }
+            }
+            uniqueCursor.close()
+            assertTrue(fingerprintUnique)
+            val info = database.openHelper.readableDatabase.query("PRAGMA table_info('workout_sessions')")
+            var templateNotNull = true
+            while (info.moveToNext()) {
+                if (info.getString(1) == "templateId") {
+                    templateNotNull = info.getInt(3) == 1
+                }
+            }
+            info.close()
+            assertFalse(templateNotNull)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun migratedSchemaMatchesFreshVersion5Install() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(FRESH_DB)
+        context.deleteDatabase(MIGRATED_DB)
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(MIGRATED_DB)
+                .callback(Version4Callback())
+                .build()
+        )
+        helper.writableDatabase.close()
+        val migrated = Room.databaseBuilder(context, WeightDatabase::class.java, MIGRATED_DB)
+            .addMigrations(MIGRATION_4_5)
+            .allowMainThreadQueries()
+            .build()
+        val fresh = Room.databaseBuilder(context, WeightDatabase::class.java, FRESH_DB)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            assertEquals(sessionColumns(fresh), sessionColumns(migrated))
+            assertEquals(sessionIndexes(fresh), sessionIndexes(migrated))
+        } finally {
+            migrated.close()
+            fresh.close()
         }
     }
 
@@ -220,9 +392,54 @@ class WeightDatabaseMigrationTest {
         ) = Unit
     }
 
+    private class Version4Callback : SupportSQLiteOpenHelper.Callback(4) {
+        override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+            Version3Callback().onCreate(db)
+            MIGRATION_3_4.migrate(db)
+        }
+
+        override fun onUpgrade(
+            db: androidx.sqlite.db.SupportSQLiteDatabase,
+            oldVersion: Int,
+            newVersion: Int
+        ) = Unit
+    }
+
     private companion object {
         const val TEST_DB = "weight-migration-test.db"
         const val V2_DB = "weight-migration-v2.db"
         const val V3_DB = "weight-migration-v3.db"
+        const val V4_DB = "weight-migration-v4.db"
+        const val FRESH_DB = "weight-fresh-v5.db"
+        const val MIGRATED_DB = "weight-migrated-v5.db"
+
+        fun sessionColumns(database: WeightDatabase): List<String> {
+            val cursor = database.openHelper.readableDatabase.query("PRAGMA table_info('workout_sessions')")
+            val columns = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                columns += listOf(
+                    cursor.getString(cursor.getColumnIndexOrThrow("name")),
+                    cursor.getString(cursor.getColumnIndexOrThrow("type")),
+                    cursor.getInt(cursor.getColumnIndexOrThrow("notnull")).toString(),
+                    cursor.getInt(cursor.getColumnIndexOrThrow("pk")).toString()
+                ).joinToString(":")
+            }
+            cursor.close()
+            return columns
+        }
+
+        fun sessionIndexes(database: WeightDatabase): List<String> {
+            val cursor = database.openHelper.readableDatabase.query("PRAGMA index_list('workout_sessions')")
+            val indexes = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (name.startsWith("sqlite_autoindex")) {
+                    continue
+                }
+                indexes += "$name:${cursor.getInt(cursor.getColumnIndexOrThrow("unique"))}"
+            }
+            cursor.close()
+            return indexes.sorted()
+        }
     }
 }

@@ -32,6 +32,11 @@ class ExerciseRepository(
         }
     }
 
+    suspend fun all(): List<Exercise> {
+        val grouped = dao.getAllMuscles().groupBy { it.exerciseId }
+        return dao.getAll().map { entity -> entity.toModel(grouped[entity.id].orEmpty()) }
+    }
+
     fun observeActive(): Flow<List<Exercise>> {
         return combine(dao.observeActive(), dao.observeMuscles()) { exercises, muscles ->
             val grouped = muscles.groupBy { it.exerciseId }

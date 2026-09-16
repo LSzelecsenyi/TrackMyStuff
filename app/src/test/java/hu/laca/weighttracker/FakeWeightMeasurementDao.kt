@@ -12,6 +12,10 @@ class FakeWeightMeasurementDao : WeightMeasurementDao {
 
     override fun observeAllAscending(): Flow<List<WeightMeasurementEntity>> = flow
 
+    override suspend fun getAllAscending(): List<WeightMeasurementEntity> {
+        return items.values.sortedWith(compareBy({ it.date }, { it.id }))
+    }
+
     override suspend fun getByDate(date: String): WeightMeasurementEntity? {
         return items.values.firstOrNull { it.date == date }
     }

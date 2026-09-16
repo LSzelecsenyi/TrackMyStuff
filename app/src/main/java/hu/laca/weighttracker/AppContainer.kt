@@ -7,6 +7,7 @@ import hu.laca.weighttracker.data.repository.ExerciseRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
+import hu.laca.weighttracker.data.workoutimport.ContentWorkoutImportFileReader
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.domain.SystemDateProvider
 import java.time.Clock
@@ -47,6 +48,7 @@ class AppContainer(context: Context) {
         workoutTemplateRepository = workoutTemplateRepository,
         workoutSessionRepository = workoutSessionRepository,
         dateProvider = dateProvider,
-        themePreferences = themePreferences
+        themePreferences = themePreferences,
+        workoutImportFileReader = ContentWorkoutImportFileReader(appContext)
     )
 }

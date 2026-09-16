@@ -32,6 +32,12 @@ import hu.laca.weighttracker.domain.musclemap.MuscleTrainingExercise
 import hu.laca.weighttracker.domain.workout.WorkoutSessionAggregate
 import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
 import hu.laca.weighttracker.domain.workout.ElapsedTime
+import hu.laca.weighttracker.domain.workoutimport.WorkoutImportDatabaseFailure
+import hu.laca.weighttracker.domain.workoutimport.WorkoutImportFingerprint
+import hu.laca.weighttracker.domain.workoutimport.WorkoutImportPersistenceResult
+import hu.laca.weighttracker.domain.workoutimport.WorkoutImportPlan
+import hu.laca.weighttracker.domain.workoutimport.WorkoutImportResolvedWorkout
+import hu.laca.weighttracker.domain.workout.PlannedLoadKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -39,6 +45,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 class WorkoutSessionRepository(
     private val sessionDao: WorkoutSessionDao,
@@ -182,6 +189,89 @@ class WorkoutSessionRepository(
         )
     }
 
+    /**
+     * Inserts already resolved historical workouts as completed session aggregates.
+     * Does not call [start], [completeSet], [finish], or [abandon].
+     *
+     * Timestamps: CSV start/finish are interpreted in [clock]'s zone. Session
+     * `createdAt`/`updatedAt` and completed-set `completedAt` use the historical
+     * finish instant so import time cannot become "latest workout". Skipped sets
+     * keep `completedAt = null`. These completion timestamps are persistence
+     * completeness, not known user events.
+     */
+    suspend fun importCompletedWorkouts(plan: WorkoutImportPlan): WorkoutImportPersistenceResult = mutex.withLock {
+        if (!plan.canConfirm) {
+            return WorkoutImportPersistenceResult.PlanNotConfirmable(
+                errorCount = plan.errorCount,
+                unresolvedNames = plan.unresolvedNames
+            )
+        }
+        if (plan.workouts.any { workout ->
+                workout.exercises.any { it.snapshot == null }
+            }
+        ) {
+            return WorkoutImportPersistenceResult.PlanNotConfirmable(
+                errorCount = plan.errorCount,
+                unresolvedNames = plan.unresolvedNames
+            )
+        }
+        val fingerprinted = plan.workouts.map { workout ->
+            workout.workoutId to WorkoutImportFingerprint.hash(workout)
+        }
+        val duplicatesInPlan = fingerprinted
+            .groupBy({ it.second }, { it.first })
+            .filter { it.value.size > 1 }
+            .values
+            .flatten()
+            .distinct()
+        if (duplicatesInPlan.isNotEmpty()) {
+            return WorkoutImportPersistenceResult.DuplicateWorkouts(duplicatesInPlan)
+        }
+        val fingerprints = fingerprinted.map { it.second }
+        if (fingerprints.isNotEmpty()) {
+            val existing = sessionDao.findExistingImportFingerprints(fingerprints).toSet()
+            if (existing.isNotEmpty()) {
+                val duplicateIds = fingerprinted
+                    .filter { it.second in existing }
+                    .map { it.first }
+                return WorkoutImportPersistenceResult.DuplicateWorkouts(duplicateIds)
+            }
+        }
+        val aggregates = plan.workouts.map { workout ->
+            val fingerprint = fingerprinted.first { it.first == workout.workoutId }.second
+            toImportedAggregate(workout, fingerprint)
+        }
+        return try {
+            val ids = sessionDao.insertImportedAggregates(aggregates)
+            WorkoutImportPersistenceResult.Imported(
+                sessionIds = ids,
+                workoutCount = ids.size,
+                exerciseCount = plan.resolvedExerciseCount,
+                completedSetCount = plan.completedSetCount,
+                skippedSetCount = plan.skippedSetCount
+            )
+        } catch (error: Exception) {
+            when {
+                isUniqueConstraint(error) -> {
+                    val existing = if (fingerprints.isEmpty()) {
+                        emptySet()
+                    } else {
+                        sessionDao.findExistingImportFingerprints(fingerprints).toSet()
+                    }
+                    val duplicateIds = fingerprinted
+                        .filter { it.second in existing }
+                        .map { it.first }
+                        .ifEmpty { plan.workouts.map { it.workoutId } }
+                    WorkoutImportPersistenceResult.DuplicateWorkouts(duplicateIds)
+                }
+                isForeignKeyConstraint(error) -> WorkoutImportPersistenceResult.DatabaseError(
+                    WorkoutImportDatabaseFailure.ForeignKey
+                )
+                else -> WorkoutImportPersistenceResult.DatabaseError(WorkoutImportDatabaseFailure.Unknown)
+            }
+        }
+    }
+
     suspend fun proposeBodyWeight(workoutDate: LocalDate = dateProvider.today()): BodyWeightProposal {
         val sameDay = weightRepository.getByDate(workoutDate)
         val previous = weightRepository.getLatestBefore(workoutDate)
@@ -238,7 +328,8 @@ class WorkoutSessionRepository(
             bodyWeightSourceDate = resolvedProposal.sourceDate?.toString(),
             createdAt = now,
             updatedAt = now,
-            activeLock = SessionStatus.IN_PROGRESS.activeLock()
+            activeLock = SessionStatus.IN_PROGRESS.activeLock(),
+            importFingerprint = null
         )
         val children = relations.sortedBy { it.position }.mapNotNull { relation ->
             val exercise = exerciseDao.getById(relation.exerciseId) ?: return@mapNotNull null
@@ -500,6 +591,16 @@ class WorkoutSessionRepository(
         return sessionDao.countExerciseReferences(exerciseId) > 0
     }
 
+    suspend fun existingImportFingerprints(): Set<String> {
+        return sessionDao.getImportFingerprints().toSet()
+    }
+
+    suspend fun completedWorkoutNames(): List<Pair<LocalDate, String>> {
+        return sessionDao.getCompletedDateNames().map { row ->
+            LocalDate.parse(row.date) to row.name
+        }
+    }
+
     private suspend fun mutateActiveSet(
         setId: Long,
         block: suspend (WorkoutSessionSetEntity, WorkoutSessionExerciseEntity, Long) -> SessionMutationResult
@@ -560,13 +661,107 @@ class WorkoutSessionRepository(
         )
     }
 
+    private fun toImportedAggregate(
+        workout: WorkoutImportResolvedWorkout,
+        fingerprint: String
+    ): Pair<WorkoutSessionEntity, List<Triple<WorkoutSessionExerciseEntity, List<WorkoutSessionExerciseMuscleEntity>, List<WorkoutSessionSetEntity>>>> {
+        val startedAt = toEpochMilli(workout.startedAt)
+        val finishedAt = toEpochMilli(workout.finishedAt)
+        val session = WorkoutSessionEntity(
+            templateId = null,
+            templateName = workout.name,
+            status = SessionStatus.COMPLETED.name,
+            workoutDate = workout.workoutDate.toString(),
+            startedAt = startedAt,
+            finishedAt = finishedAt,
+            abandonedAt = null,
+            notes = workout.notes,
+            bodyWeightKg = workout.bodyWeight.kilograms,
+            bodyWeightSource = workout.bodyWeight.source.name,
+            bodyWeightSourceDate = workout.bodyWeight.sourceDate?.toString(),
+            createdAt = finishedAt,
+            updatedAt = finishedAt,
+            activeLock = null,
+            importFingerprint = fingerprint
+        )
+        val children = workout.exercises.map { exercise ->
+            val snapshot = exercise.snapshot!!
+            val exerciseRow = WorkoutSessionExerciseEntity(
+                sessionId = 0L,
+                exerciseId = snapshot.exerciseId,
+                position = 0,
+                name = snapshot.catalogName,
+                category = snapshot.category.name,
+                movementPattern = snapshot.movementPattern.name,
+                measurementType = snapshot.measurementType.name,
+                resistanceBasis = snapshot.resistanceBasis.name,
+                weightInterpretation = snapshot.weightInterpretation.name,
+                primaryMuscle = snapshot.primaryMuscle.name,
+                notes = snapshot.notes
+            )
+            val muscles = snapshot.muscles.map { muscle ->
+                WorkoutSessionExerciseMuscleEntity(
+                    sessionExerciseId = 0L,
+                    muscleGroup = muscle.muscleGroup.name,
+                    role = muscle.role.name
+                )
+            }
+            val sets = exercise.sets.map { set ->
+                val plannedKind = (set.loadKind ?: PlannedLoadKind.NONE).name
+                val completed = set.status == SessionSetStatus.COMPLETED
+                WorkoutSessionSetEntity(
+                    sessionExerciseId = 0L,
+                    position = 0,
+                    plannedMinReps = set.reps,
+                    plannedMaxReps = set.reps,
+                    plannedLoadKind = plannedKind,
+                    plannedWeightKg = decimal(set.weightKg),
+                    plannedDurationSeconds = set.durationSeconds,
+                    plannedDistanceMeters = decimal(set.distanceMeters),
+                    actualReps = if (completed) set.reps else null,
+                    actualLoadKind = if (completed) plannedKind else null,
+                    actualWeightKg = if (completed) decimal(set.weightKg) else null,
+                    actualDurationSeconds = if (completed) set.durationSeconds else null,
+                    actualDistanceMeters = if (completed) decimal(set.distanceMeters) else null,
+                    status = set.status.name,
+                    completedAt = if (completed) finishedAt else null,
+                    addedDuringWorkout = false
+                )
+            }
+            Triple(exerciseRow, muscles, sets)
+        }
+        return session to children
+    }
+
+    private fun toEpochMilli(value: LocalDateTime): Long {
+        return value.atZone(clock.zone).toInstant().toEpochMilli()
+    }
+
+    private fun decimal(value: java.math.BigDecimal?): Double? {
+        return value?.toDouble()
+    }
+
+    private fun isForeignKeyConstraint(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is SQLiteConstraintException &&
+                current.message.orEmpty().contains("FOREIGN KEY", ignoreCase = true)
+            ) {
+                return true
+            }
+            if (current.message.orEmpty().contains("FOREIGN KEY", ignoreCase = true)) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
+    }
+
     private fun isUniqueConstraint(error: Throwable): Boolean {
         var current: Throwable? = error
         while (current != null) {
-            if (current is SQLiteConstraintException) {
-                return true
-            }
-            if (current.message.orEmpty().contains("UNIQUE", ignoreCase = true)) {
+            val message = current.message.orEmpty()
+            if (message.contains("UNIQUE", ignoreCase = true)) {
                 return true
             }
             current = current.cause

@@ -12,6 +12,9 @@ interface WeightMeasurementDao {
     @Query("SELECT * FROM weight_measurements ORDER BY date ASC, id ASC")
     fun observeAllAscending(): Flow<List<WeightMeasurementEntity>>
 
+    @Query("SELECT * FROM weight_measurements ORDER BY date ASC, id ASC")
+    suspend fun getAllAscending(): List<WeightMeasurementEntity>
+
     @Query("SELECT * FROM weight_measurements WHERE date = :date LIMIT 1")
     suspend fun getByDate(date: String): WeightMeasurementEntity?
 

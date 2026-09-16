@@ -267,8 +267,19 @@ internal fun paintOrderedRegions(regions: List<ParsedMuscleRegion>): List<Parsed
     val underlay = mapped.filter { it.region.muscleGroup !in DELTOID_OVERLAY_GROUPS }
         .sortedByDescending { regionArea(it) }
     val deltoids = mapped.filter { it.region.muscleGroup in DELTOID_OVERLAY_GROUPS }
-        .sortedByDescending { regionArea(it) }
+        .sortedWith(
+            compareBy<ParsedMuscleRegion> { deltoidPaintRank(it.region.muscleGroup) }
+                .thenByDescending { regionArea(it) }
+        )
     return unmapped + underlay + deltoids
+}
+
+private fun deltoidPaintRank(group: MuscleGroup?): Int {
+    return when (group) {
+        MuscleGroup.SIDE_DELTOID, MuscleGroup.REAR_DELTOID -> 0
+        MuscleGroup.FRONT_DELTOID -> 1
+        else -> 0
+    }
 }
 
 private val DELTOID_OVERLAY_GROUPS = setOf(
@@ -322,18 +333,26 @@ internal fun hitTest(
 }
 
 internal fun pathContains(path: Path, point: Offset): Boolean {
-    val androidPath = path.asAndroidPath()
+    val source = android.graphics.Path(path.asAndroidPath())
     val bounds = android.graphics.RectF()
-    androidPath.computeBounds(bounds, true)
-    val region = android.graphics.Region()
-    region.setPath(
-        androidPath,
-        android.graphics.Region(
-            bounds.left.toInt() - 1,
-            bounds.top.toInt() - 1,
-            bounds.right.toInt() + 1,
-            bounds.bottom.toInt() + 1
-        )
+    source.computeBounds(bounds, true)
+    val half = 0.02f
+    if (
+        point.x < bounds.left - half ||
+        point.x > bounds.right + half ||
+        point.y < bounds.top - half ||
+        point.y > bounds.bottom + half
+    ) {
+        return false
+    }
+    val probe = android.graphics.Path()
+    probe.addRect(
+        point.x - half,
+        point.y - half,
+        point.x + half,
+        point.y + half,
+        android.graphics.Path.Direction.CW
     )
-    return region.contains(point.x.toInt(), point.y.toInt())
+    val result = android.graphics.Path()
+    return result.op(source, probe, android.graphics.Path.Op.INTERSECT) && !result.isEmpty
 }

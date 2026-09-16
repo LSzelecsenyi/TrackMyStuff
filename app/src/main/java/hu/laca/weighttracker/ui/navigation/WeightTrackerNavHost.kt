@@ -61,6 +61,8 @@ import hu.laca.weighttracker.ui.workout.ActiveWorkoutScreen
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutViewModel
 import hu.laca.weighttracker.ui.workout.WorkoutHubScreen
 import hu.laca.weighttracker.ui.workout.WorkoutHubViewModel
+import hu.laca.weighttracker.ui.workoutimport.WorkoutImportScreen
+import hu.laca.weighttracker.ui.workoutimport.WorkoutImportViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -230,12 +232,45 @@ fun WeightTrackerNavHost(
                     onDeleteConfirm = viewModel::confirmDelete,
                     onMessageConsumed = viewModel::consumeMessage,
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
+                    onOpenImport = {
+                        val navigation = AppNavigation.openWorkoutImport(currentRoute)
+                        if (navigation.shouldPush) {
+                            navController.navigateInternal(AppRoutes.WORKOUT_IMPORT)
+                        }
+                    },
                     onFilterSelected = viewModel::onFilterSelected,
                     onIncludeAbandoned = viewModel::onIncludeAbandoned,
                     onOpenWorkout = { id ->
                         navController.navigate(workoutDetailRoute(id)) {
                             launchSingleTop = true
                         }
+                    }
+                )
+            }
+            composable(AppRoutes.WORKOUT_IMPORT) {
+                val viewModel: WorkoutImportViewModel = viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                WorkoutImportScreen(
+                    state = state,
+                    onBack = { navController.popBackStack() },
+                    onPickFile = viewModel::onPickFileRequested,
+                    onFilePicked = { uri ->
+                        if (uri == null) {
+                            viewModel.onFileSelectionCancelled()
+                        } else {
+                            viewModel.onFileSelected(uri.toString())
+                        }
+                    },
+                    onOpenMappingPicker = viewModel::onOpenMappingPicker,
+                    onDismissMappingPicker = viewModel::onDismissMappingPicker,
+                    onMappingQueryChange = viewModel::onMappingQueryChange,
+                    onMapExercise = viewModel::onMapExercise,
+                    onToggleWorkout = viewModel::onToggleWorkoutExpanded,
+                    onRequestConfirm = viewModel::onRequestConfirm,
+                    onDismissConfirm = viewModel::onDismissConfirm,
+                    onConfirmImport = viewModel::onConfirmImport,
+                    onViewJournal = {
+                        navController.popBackStack(AppRoutes.JOURNAL, false)
                     }
                 )
             }

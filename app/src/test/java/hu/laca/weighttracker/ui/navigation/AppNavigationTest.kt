@@ -108,6 +108,7 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_DETAIL_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("workout_detail?sessionId=3"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WEIGHT_DETAILS))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_IMPORT))
     }
 
     @Test
@@ -131,6 +132,19 @@ class AppNavigationTest {
         assertEquals(AppRoutes.WORKOUT, fromHub.backTarget)
         assertFalse(AppNavigation.openWorkoutDetail(AppRoutes.WORKOUT_DETAIL).shouldPush)
         assertFalse(AppNavigation.openWorkoutDetail("workout_detail?sessionId=3").shouldPush)
+    }
+
+    @Test
+    fun workoutImportOpensFromJournalHidesBottomBarAndDoesNotDuplicate() {
+        val navigation = AppNavigation.openWorkoutImport(AppRoutes.JOURNAL)
+        assertEquals(AppRoutes.WORKOUT_IMPORT, navigation.targetRoute)
+        assertEquals(AppRoutes.JOURNAL, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_IMPORT))
+        assertFalse(AppNavigation.openWorkoutImport(AppRoutes.WORKOUT_IMPORT).shouldPush)
+        assertEquals(AppRoutes.JOURNAL, AppNavigation.openWorkoutImport(AppRoutes.WORKOUT_IMPORT).backTarget)
+        assertEquals(AppRoutes.WORKOUT, AppNavigation.catalogEntryPoint())
+        assertTrue(AppNavigation.catalogEntryPoint() != AppRoutes.WORKOUT_IMPORT)
     }
 
     @Test
