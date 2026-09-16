@@ -28,21 +28,28 @@ class JournalFeatureAbsenceTest {
 
     @Test
     fun sourceDoesNotIntroduceRirRpeHeatmapOrStatisticsUi() {
-        val roots = listOf(
+        val journalRoots = listOf(
             File("src/main/java/hu/laca/weighttracker/ui/history"),
             File("src/main/java/hu/laca/weighttracker/domain/journal"),
-            File("src/main/res/values/strings.xml"),
             File("app/src/main/java/hu/laca/weighttracker/ui/history"),
-            File("app/src/main/java/hu/laca/weighttracker/domain/journal"),
+            File("app/src/main/java/hu/laca/weighttracker/domain/journal")
+        )
+        val stringRoots = listOf(
+            File("src/main/res/values/strings.xml"),
             File("app/src/main/res/values/strings.xml")
         )
-        val haystack = roots.filter { it.exists() }.flatMap { file ->
+        val journalHaystack = journalRoots.filter { it.exists() }.flatMap { file ->
             if (file.isDirectory) file.walkTopDown().filter { it.isFile }.toList() else listOf(file)
         }.joinToString("\n") { it.readText() }.lowercase()
-        assertFalse(haystack.contains("rir"))
-        assertFalse(haystack.contains("rpe"))
-        assertFalse(haystack.contains("heatmap"))
-        assertFalse(haystack.contains("testtérkép"))
-        assertFalse(haystack.contains("kalor"))
+        val stringsHaystack = stringRoots.filter { it.exists() }.joinToString("\n") { it.readText() }.lowercase()
+        assertFalse(journalHaystack.contains("rir"))
+        assertFalse(journalHaystack.contains("rpe"))
+        assertFalse(journalHaystack.contains("heatmap"))
+        assertFalse(journalHaystack.contains("testtérkép"))
+        assertFalse(journalHaystack.contains("kalor"))
+        assertFalse(stringsHaystack.contains("rir"))
+        assertFalse(stringsHaystack.contains("rpe"))
+        assertFalse(stringsHaystack.contains("kalor"))
+        assertFalse(stringsHaystack.contains("testtérkép"))
     }
 }

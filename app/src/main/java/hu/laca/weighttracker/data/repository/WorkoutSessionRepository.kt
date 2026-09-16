@@ -28,6 +28,7 @@ import hu.laca.weighttracker.domain.workout.SessionProgressLogic
 import hu.laca.weighttracker.domain.workout.SessionSetStatus
 import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
+import hu.laca.weighttracker.domain.musclemap.MuscleTrainingExercise
 import hu.laca.weighttracker.domain.workout.WorkoutSessionAggregate
 import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
 import hu.laca.weighttracker.domain.workout.ElapsedTime
@@ -118,6 +119,33 @@ class WorkoutSessionRepository(
             sessions
                 .filter { it.status != SessionStatus.IN_PROGRESS.name }
                 .map { toSummary(it, exercises, sets, muscles) }
+        }
+    }
+
+    fun observeHeatmapExercises(): Flow<List<MuscleTrainingExercise>> {
+        return combine(
+            sessionDao.observeCompletedSessions(),
+            sessionDao.observeCompletedExercises(),
+            sessionDao.observeCompletedSets(),
+            sessionDao.observeCompletedMuscles()
+        ) { sessions, exercises, sets, muscles ->
+            val sessionDates = sessions.associate { it.id to LocalDate.parse(it.workoutDate) }
+            val setsByExercise = sets.groupBy { it.sessionExerciseId }
+            val musclesByExercise = muscles.groupBy { it.sessionExerciseId }
+            exercises.mapNotNull { exercise ->
+                val date = sessionDates[exercise.sessionId] ?: return@mapNotNull null
+                val model = exercise.toModel(musclesByExercise[exercise.id].orEmpty())
+                val completedSets = setsByExercise[exercise.id].orEmpty().count { set ->
+                    set.status == SessionSetStatus.COMPLETED.name
+                }
+                MuscleTrainingExercise(
+                    status = SessionStatus.COMPLETED,
+                    workoutDate = date,
+                    primaryMuscle = model.primaryMuscle,
+                    secondaryMuscles = model.secondaryMuscles,
+                    completedSetCount = completedSets
+                )
+            }
         }
     }
 

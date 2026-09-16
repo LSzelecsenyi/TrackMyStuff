@@ -10,6 +10,8 @@ import hu.laca.weighttracker.domain.exercise.ExerciseCatalogLogic
 import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.MeasurementType
 import hu.laca.weighttracker.domain.exercise.MuscleGroup
+import hu.laca.weighttracker.domain.musclemap.TemplateMuscleMapAssembler
+import hu.laca.weighttracker.domain.musclemap.TemplateMuscleMapState
 import hu.laca.weighttracker.domain.workout.AddExerciseResult
 import hu.laca.weighttracker.domain.workout.DistanceUnit
 import hu.laca.weighttracker.domain.workout.PlannedLoadKind
@@ -53,7 +55,8 @@ data class TemplateEditorUiState(
     val showDiscardConfirm: Boolean = false,
     val finished: Boolean = false,
     val created: Boolean = false,
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    val musclePreview: TemplateMuscleMapState = TemplateMuscleMapAssembler.assemble(emptyList())
 ) {
     val canSave: Boolean
         get() = TemplateDraftLogic.validate(draft, catalog).isEmpty() && !duplicateName
@@ -125,7 +128,10 @@ class TemplateEditorViewModel(
             showDiscardConfirm = flags.showDiscard,
             finished = finish.finished,
             created = finish.created,
-            saved = finish.saved
+            saved = finish.saved,
+            musclePreview = TemplateMuscleMapAssembler.assemble(
+                core.draft.exercises.mapNotNull { catalog[it.exerciseId] }
+            )
         )
     }.stateIn(
         scope = viewModelScope,

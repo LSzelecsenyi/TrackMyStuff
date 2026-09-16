@@ -3,8 +3,10 @@ package hu.laca.weighttracker.ui.templates
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.exercise.Exercise
@@ -52,6 +55,7 @@ import hu.laca.weighttracker.domain.workout.TemplateFieldError
 import hu.laca.weighttracker.domain.workout.TemplateOrdering
 import hu.laca.weighttracker.domain.workout.TemplateValidationIssue
 import hu.laca.weighttracker.ui.components.SegmentedControl
+import hu.laca.weighttracker.ui.components.musclemap.TemplateMuscleMapCard
 import hu.laca.weighttracker.ui.exercises.CatalogDropdown
 import hu.laca.weighttracker.ui.exercises.labelRes
 import hu.laca.weighttracker.ui.theme.AppDimens
@@ -184,6 +188,10 @@ fun TemplateEditorScreen(
                         label = { Text(stringResource(R.string.template_field_notes)) },
                         minLines = 2
                     )
+                    if (state.draft.exercises.isNotEmpty()) {
+                        Spacer(Modifier.height(20.dp))
+                        TemplateMuscleMapCard(state = state.musclePreview)
+                    }
                     Spacer(Modifier.height(20.dp))
                     Text(
                         text = stringResource(R.string.template_exercises_heading),
@@ -244,7 +252,8 @@ fun TemplateEditorScreen(
                     onClick = onSave,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = AppDimens.screenPadding, vertical = 12.dp),
+                        .padding(horizontal = AppDimens.screenPadding, vertical = 12.dp)
+                        .defaultMinSize(minHeight = AppDimens.minTouch),
                     enabled = !state.duplicateName
                 ) {
                     Text(stringResource(R.string.action_save))
@@ -483,8 +492,17 @@ private fun ExerciseCard(
                     )
                 }
                 if (exercise.measurementType != MeasurementType.COMPLETION_ONLY) {
-                    TextButton(onClick = onAddSet) {
-                        Text(stringResource(R.string.action_copy_previous_set))
+                    TextButton(
+                        onClick = onAddSet,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = AppDimens.minTouch)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_copy_previous_set),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Start
+                        )
                     }
                 }
             }
@@ -637,14 +655,51 @@ private fun SetCard(
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            Row {
-                TextButton(onClick = onApplyRemaining) {
-                    Text(stringResource(R.string.action_apply_to_remaining))
-                }
-                TextButton(onClick = onApplyAll) {
-                    Text(stringResource(R.string.action_apply_to_all))
-                }
-            }
+            SetApplyActions(
+                onApplyRemaining = onApplyRemaining,
+                onApplyAll = onApplyAll
+            )
         }
+    }
+}
+
+@Composable
+internal fun SetApplyActions(
+    onApplyRemaining: () -> Unit,
+    onApplyAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        SetApplyActionButton(
+            label = stringResource(R.string.action_apply_to_remaining),
+            onClick = onApplyRemaining
+        )
+        SetApplyActionButton(
+            label = stringResource(R.string.action_apply_to_all),
+            onClick = onApplyAll
+        )
+    }
+}
+
+@Composable
+private fun SetApplyActionButton(
+    label: String,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Start
+        )
     }
 }

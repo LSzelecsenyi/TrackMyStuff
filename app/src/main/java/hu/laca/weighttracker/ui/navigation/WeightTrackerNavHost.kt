@@ -41,6 +41,8 @@ import hu.laca.weighttracker.WeightViewModelFactory
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.ui.dashboard.DashboardScreen
 import hu.laca.weighttracker.ui.dashboard.DashboardViewModel
+import hu.laca.weighttracker.ui.dashboard.WeightDetailsScreen
+import hu.laca.weighttracker.ui.dashboard.WeightDetailsViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseEditorScreen
 import hu.laca.weighttracker.ui.exercises.ExerciseEditorViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseListScreen
@@ -149,8 +151,6 @@ fun WeightTrackerNavHost(
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
                 DashboardScreen(
                     state = state,
-                    onAddToday = { viewModel.openEditor() },
-                    onChartRangeSelected = viewModel::onChartRangeSelected,
                     onPreviousMonth = viewModel::onPreviousMonth,
                     onNextMonth = viewModel::onNextMonth,
                     onDaySelected = viewModel::selectDay,
@@ -173,7 +173,8 @@ fun WeightTrackerNavHost(
                         navController.navigate(workoutDetailRoute(id)) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onOpenWeightDetails = { navController.navigateInternal(AppRoutes.WEIGHT_DETAILS) }
                 )
             }
             composable(AppRoutes.WORKOUT) { entry ->
@@ -246,6 +247,24 @@ fun WeightTrackerNavHost(
                     state = state,
                     today = dateProvider.today(),
                     onBack = { navController.popBackStack() }
+                )
+            }
+            composable(AppRoutes.WEIGHT_DETAILS) {
+                val viewModel: WeightDetailsViewModel = viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                WeightDetailsScreen(
+                    state = state,
+                    onBack = { navController.popBackStack() },
+                    onAddToday = { viewModel.openEditor() },
+                    onChartRangeSelected = viewModel::onChartRangeSelected,
+                    onEditorDateChange = viewModel::onEditorDateChange,
+                    onEditorWeightChange = viewModel::onEditorWeightChange,
+                    onSave = viewModel::saveEditor,
+                    onDismissEditor = viewModel::dismissEditor,
+                    onDeleteRequest = viewModel::requestDelete,
+                    onDeleteDismiss = viewModel::dismissDelete,
+                    onDeleteConfirm = viewModel::confirmDelete,
+                    onMessageConsumed = viewModel::consumeMessage
                 )
             }
             composable(AppRoutes.EXERCISES) { entry ->

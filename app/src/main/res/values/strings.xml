@@ -417,4 +417,27 @@
     <string name="hub_recent_empty">Még nincs befejezett edzésed.</string>
     <string name="set_status_completed_label">Teljesítve</string>
     <string name="set_status_skipped_label">Kihagyva</string>
+    <string name="heatmap_title">Izomterhelés</string>
+    <string name="heatmap_subtitle">Legutóbbi befejezett edzések alapján</string>
+    <string name="heatmap_empty">Még nincs befejezett edzés, ezért az izomterhelés üres.</string>
+    <string name="heatmap_empty_trained">A befejezett edzéseken még nincs teljesített sorozat izomcsoporthoz.</string>
+    <string name="heatmap_selection">%1$s: %2$s</string>
+    <string name="heatmap_days_ago">%1$d napja</string>
+    <string name="heatmap_band_today">Ma</string>
+    <string name="heatmap_band_recent">1–2 napja</string>
+    <string name="heatmap_band_days_3_4">3–4 napja</string>
+    <string name="heatmap_band_days_5_6">5–6 napja</string>
+    <string name="heatmap_band_old">7–13 napja</string>
+    <string name="heatmap_band_inactive">14+ napja</string>
+    <string name="heatmap_band_never">Még nem volt edzve</string>
+    <string name="heatmap_full_body_note">Teljes test: %1$s. Nincs külön anatómiai alakzat.</string>
+    <string name="heatmap_cardio_note">Kardiovaszkuláris: %1$s. Nincs külön anatómiai alakzat.</string>
+    <string name="template_map_title">Várható izomcsoportok</string>
+    <string name="template_map_subtitle">A tervben szereplő gyakorlatok alapján</string>
+    <string name="template_map_primary">Elsődleges</string>
+    <string name="template_map_secondary">Másodlagos</string>
+    <string name="template_map_full_body">Teljes test szerepel a tervben, ezért nem egyetlen izomrajzot színezünk.</string>
+    <string name="template_map_cardio">Kardiovaszkuláris gyakorlat szerepel a tervben, ezért nincs anatómiai célterület.</string>
+    <string name="weight_details_title">Testsúly</string>
+    <string name="weight_chart_latest_summary">Legutóbbi: %1$s</string>
 </resources>

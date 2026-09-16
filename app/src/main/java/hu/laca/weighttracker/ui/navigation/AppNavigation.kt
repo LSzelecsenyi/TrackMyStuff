@@ -17,6 +17,7 @@ object AppRoutes {
     const val ACTIVE_WORKOUT_PATTERN = "active_workout?sessionId={sessionId}"
     const val WORKOUT_DETAIL = "workout_detail"
     const val WORKOUT_DETAIL_PATTERN = "workout_detail?sessionId={sessionId}"
+    const val WEIGHT_DETAILS = "weight_details"
 }
 
 data class RootTab(
@@ -84,6 +85,14 @@ object AppNavigation {
             targetRoute = AppRoutes.ACTIVE_WORKOUT,
             backTarget = AppRoutes.WORKOUT,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.ACTIVE_WORKOUT)
+        )
+    }
+
+    fun openWeightDetails(currentRoute: String?): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.WEIGHT_DETAILS,
+            backTarget = AppRoutes.OVERVIEW,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.WEIGHT_DETAILS)
         )
     }
 

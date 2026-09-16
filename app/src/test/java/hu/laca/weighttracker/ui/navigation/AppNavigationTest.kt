@@ -107,6 +107,16 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar("active_workout?sessionId=9"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_DETAIL_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("workout_detail?sessionId=3"))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.WEIGHT_DETAILS))
+    }
+
+    @Test
+    fun weightDetailsOpensFromOverviewAndHidesBottomBar() {
+        val navigation = AppNavigation.openWeightDetails(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.WEIGHT_DETAILS, navigation.targetRoute)
+        assertEquals(AppRoutes.OVERVIEW, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.openWeightDetails(AppRoutes.WEIGHT_DETAILS).shouldPush)
     }
 
     @Test

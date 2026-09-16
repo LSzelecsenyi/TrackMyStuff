@@ -11,6 +11,7 @@ import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.ui.dashboard.DashboardViewModel
+import hu.laca.weighttracker.ui.dashboard.WeightDetailsViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseEditorViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseListViewModel
 import hu.laca.weighttracker.ui.history.HistoryViewModel
@@ -34,6 +35,9 @@ class WeightViewModelFactory(
         return when {
             modelClass.isAssignableFrom(DashboardViewModel::class.java) -> {
                 DashboardViewModel(weightRepository, workoutSessionRepository, dateProvider)
+            }
+            modelClass.isAssignableFrom(WeightDetailsViewModel::class.java) -> {
+                WeightDetailsViewModel(weightRepository, dateProvider)
             }
             modelClass.isAssignableFrom(HistoryViewModel::class.java) -> {
                 HistoryViewModel(

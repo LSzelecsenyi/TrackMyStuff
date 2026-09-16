@@ -15,6 +15,8 @@ import hu.laca.weighttracker.domain.MeasurementValidationResult
 import hu.laca.weighttracker.domain.MeasurementValidator
 import hu.laca.weighttracker.domain.calendar.MonthGrid
 import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
+import hu.laca.weighttracker.domain.musclemap.MuscleHeatmapAssembler
+import hu.laca.weighttracker.domain.musclemap.MuscleHeatmapState
 import hu.laca.weighttracker.domain.model.ChartRange
 import hu.laca.weighttracker.domain.model.SaveOutcome
 import hu.laca.weighttracker.domain.model.WeightMeasurement
@@ -57,7 +59,8 @@ data class DashboardUiState(
         measuredDates = emptySet()
     ),
     val daySheet: DaySheetState? = null,
-    val showDayDeleteConfirm: Boolean = false
+    val showDayDeleteConfirm: Boolean = false,
+    val heatmap: MuscleHeatmapState = MuscleHeatmapAssembler.assemble(emptyList(), LocalDate.of(1970, 1, 1))
 )
 
 private data class DashboardChrome(
@@ -109,33 +112,38 @@ class DashboardViewModel(
     }
 
     val uiState: StateFlow<DashboardUiState> = combine(
-        measurements,
-        chrome,
-        showDayDeleteConfirm,
-        completedCounts,
-        dayWorkouts
-    ) { items, chromeState, deleteConfirm, counts, workouts ->
-        val today = dateProvider.today()
-        val snapshot = DashboardAssembler.assemble(items, today, chromeState.range)
-        DashboardUiState(
-            snapshot = snapshot,
-            chartRange = chromeState.range,
-            editor = chromeState.editor,
-            userMessage = chromeState.message,
-            today = today,
-            greeting = GreetingSelector.from(dateProvider.now().toLocalTime()),
-            displayedMonth = chromeState.month,
-            monthGrid = MonthGridCalculator.grid(
-                month = chromeState.month,
+        combine(
+            measurements,
+            chrome,
+            showDayDeleteConfirm,
+            completedCounts,
+            dayWorkouts
+        ) { items, chromeState, deleteConfirm, counts, workouts ->
+            val today = dateProvider.today()
+            val snapshot = DashboardAssembler.assemble(items, today, chromeState.range)
+            DashboardUiState(
+                snapshot = snapshot,
+                chartRange = chromeState.range,
+                editor = chromeState.editor,
+                userMessage = chromeState.message,
                 today = today,
-                measuredDates = snapshot.measurementDates,
-                completedWorkoutCounts = counts
-            ),
-            daySheet = chromeState.selectedDay?.let { date ->
-                DaySheetFactory.create(date, items, today, workouts)
-            },
-            showDayDeleteConfirm = deleteConfirm
-        )
+                greeting = GreetingSelector.from(dateProvider.now().toLocalTime()),
+                displayedMonth = chromeState.month,
+                monthGrid = MonthGridCalculator.grid(
+                    month = chromeState.month,
+                    today = today,
+                    measuredDates = snapshot.measurementDates,
+                    completedWorkoutCounts = counts
+                ),
+                daySheet = chromeState.selectedDay?.let { date ->
+                    DaySheetFactory.create(date, items, today, workouts)
+                },
+                showDayDeleteConfirm = deleteConfirm
+            )
+        },
+        sessionRepository.observeHeatmapExercises()
+    ) { state, exercises ->
+        state.copy(heatmap = MuscleHeatmapAssembler.assemble(exercises, state.today))
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
