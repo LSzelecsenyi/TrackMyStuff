@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -59,6 +63,11 @@ import hu.laca.weighttracker.ui.components.musclemap.TemplateMuscleMapCard
 import hu.laca.weighttracker.ui.exercises.CatalogDropdown
 import hu.laca.weighttracker.ui.exercises.labelRes
 import hu.laca.weighttracker.ui.theme.AppDimens
+
+internal const val TEMPLATE_HEADER_KEY = "template-header"
+internal const val TEMPLATE_ADD_KEY = "template-add"
+
+internal fun templateExerciseKey(localId: Long): String = "template-exercise-$localId"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,7 +104,8 @@ fun TemplateEditorScreen(
     onSave: () -> Unit,
     onDismissDiscard: () -> Unit,
     onConfirmDiscard: () -> Unit,
-    onFinished: (Boolean, Boolean) -> Unit
+    onFinished: (Boolean, Boolean) -> Unit,
+    onScrollConsumed: () -> Unit
 ) {
     BackHandler {
         if (state.pane == TemplateEditorPane.Picker) onClosePicker() else onBack()
@@ -154,98 +164,122 @@ fun TemplateEditorScreen(
                     .fillMaxSize()
                     .imePadding()
             ) {
-                Column(
+                val listState = rememberLazyListState()
+                LaunchedEffect(state.scrollEvent?.generation, state.draft.exercises.map { it.localId }) {
+                    val event = state.scrollEvent ?: return@LaunchedEffect
+                    val index = state.draft.exercises.indexOfFirst { it.localId == event.exerciseLocalId }
+                    if (index < 0) {
+                        onScrollConsumed()
+                        return@LaunchedEffect
+                    }
+                    listState.animateScrollToItem(index + 1)
+                    onScrollConsumed()
+                }
+                LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = AppDimens.screenPadding)
-                        .padding(top = 8.dp, bottom = AppDimens.scrollEndPadding)
+                        .padding(top = 8.dp)
                 ) {
-                    val nameError = state.issues.firstOrNull {
-                        it.error == TemplateFieldError.NameBlank ||
-                            it.error == TemplateFieldError.NameTooLong
-                    }
-                    OutlinedTextField(
-                        value = state.draft.name,
-                        onValueChange = onNameChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.template_field_name)) },
-                        isError = nameError != null || state.duplicateName,
-                        supportingText = {
-                            val message = when {
-                                state.duplicateName -> stringResource(R.string.error_template_duplicate)
-                                nameError != null -> stringResource(nameError.error.labelRes())
-                                else -> null
+                    item(key = TEMPLATE_HEADER_KEY) {
+                        val nameError = state.issues.firstOrNull {
+                            it.error == TemplateFieldError.NameBlank ||
+                                it.error == TemplateFieldError.NameTooLong
+                        }
+                        Column {
+                            OutlinedTextField(
+                                value = state.draft.name,
+                                onValueChange = onNameChange,
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(stringResource(R.string.template_field_name)) },
+                                isError = nameError != null || state.duplicateName,
+                                supportingText = {
+                                    val message = when {
+                                        state.duplicateName -> stringResource(R.string.error_template_duplicate)
+                                        nameError != null -> stringResource(nameError.error.labelRes())
+                                        else -> null
+                                    }
+                                    if (message != null) Text(message)
+                                }
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = state.draft.notes,
+                                onValueChange = onNotesChange,
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(stringResource(R.string.template_field_notes)) },
+                                minLines = 2
+                            )
+                            if (state.draft.exercises.isNotEmpty()) {
+                                Spacer(Modifier.height(20.dp))
+                                TemplateMuscleMapCard(state = state.musclePreview)
                             }
-                            if (message != null) Text(message)
-                        }
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = state.draft.notes,
-                        onValueChange = onNotesChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.template_field_notes)) },
-                        minLines = 2
-                    )
-                    if (state.draft.exercises.isNotEmpty()) {
-                        Spacer(Modifier.height(20.dp))
-                        TemplateMuscleMapCard(state = state.musclePreview)
-                    }
-                    Spacer(Modifier.height(20.dp))
-                    Text(
-                        text = stringResource(R.string.template_exercises_heading),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    if (state.draft.exercises.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.template_no_exercises),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    state.draft.exercises.forEachIndexed { index, item ->
-                        val exercise = state.catalog[item.exerciseId]
-                        if (exercise != null) {
-                            Spacer(Modifier.height(12.dp))
-                            ExerciseCard(
-                                index = index,
-                                total = state.draft.exercises.size,
-                                item = item,
-                                exercise = exercise,
-                                issues = state.issues.filter { it.exerciseIndex == index },
-                                onMove = { up -> onMoveExercise(item.localId, up) },
-                                onRemove = { onRemoveExercise(item.localId) },
-                                onToggle = { onToggleExpanded(item.localId) },
-                                onSetCount = { onSetCount(item.localId, it) },
-                                onAddSet = { onAddSet(item.localId) },
-                                onRemoveSet = { onRemoveSet(item.localId, it) },
-                                onMoveSet = { setId, up -> onMoveSet(item.localId, setId, up) },
-                                onApplyRemaining = { onApplyRemaining(item.localId, it) },
-                                onApplyAll = { onApplyAll(item.localId, it) },
-                                onMinReps = { setId, value -> onMinReps(item.localId, setId, value) },
-                                onMaxReps = { setId, value -> onMaxReps(item.localId, setId, value) },
-                                onLoadKind = { setId, kind -> onLoadKind(item.localId, setId, kind) },
-                                onWeight = { setId, value -> onWeight(item.localId, setId, value) },
-                                onMinutes = { setId, value -> onMinutes(item.localId, setId, value) },
-                                onSeconds = { setId, value -> onSeconds(item.localId, setId, value) },
-                                onDistance = { setId, value -> onDistance(item.localId, setId, value) },
-                                onDistanceUnit = { setId, unit -> onDistanceUnit(item.localId, setId, unit) }
-                            )
-                        } else {
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(20.dp))
                             Text(
-                                text = stringResource(R.string.exercise_archived_badge),
-                                color = MaterialTheme.colorScheme.tertiary
+                                text = stringResource(R.string.template_exercises_heading),
+                                style = MaterialTheme.typography.titleMedium
                             )
+                            Spacer(Modifier.height(8.dp))
+                            if (state.draft.exercises.isEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.template_no_exercises),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedButton(
-                        onClick = onOpenPicker,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.template_add_exercise))
+                    itemsIndexed(
+                        items = state.draft.exercises,
+                        key = { _, item -> templateExerciseKey(item.localId) }
+                    ) { index, item ->
+                        val exercise = state.catalog[item.exerciseId]
+                        Column {
+                            Spacer(Modifier.height(12.dp))
+                            if (exercise != null) {
+                                ExerciseCard(
+                                    modifier = Modifier.testTag(templateExerciseKey(item.localId)),
+                                    index = index,
+                                    total = state.draft.exercises.size,
+                                    item = item,
+                                    exercise = exercise,
+                                    issues = state.issues.filter { it.exerciseIndex == index },
+                                    onMove = { up -> onMoveExercise(item.localId, up) },
+                                    onRemove = { onRemoveExercise(item.localId) },
+                                    onToggle = { onToggleExpanded(item.localId) },
+                                    onSetCount = { onSetCount(item.localId, it) },
+                                    onAddSet = { onAddSet(item.localId) },
+                                    onRemoveSet = { onRemoveSet(item.localId, it) },
+                                    onMoveSet = { setId, up -> onMoveSet(item.localId, setId, up) },
+                                    onApplyRemaining = { onApplyRemaining(item.localId, it) },
+                                    onApplyAll = { onApplyAll(item.localId, it) },
+                                    onMinReps = { setId, value -> onMinReps(item.localId, setId, value) },
+                                    onMaxReps = { setId, value -> onMaxReps(item.localId, setId, value) },
+                                    onLoadKind = { setId, kind -> onLoadKind(item.localId, setId, kind) },
+                                    onWeight = { setId, value -> onWeight(item.localId, setId, value) },
+                                    onMinutes = { setId, value -> onMinutes(item.localId, setId, value) },
+                                    onSeconds = { setId, value -> onSeconds(item.localId, setId, value) },
+                                    onDistance = { setId, value -> onDistance(item.localId, setId, value) },
+                                    onDistanceUnit = { setId, unit -> onDistanceUnit(item.localId, setId, unit) }
+                                )
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.exercise_archived_badge),
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                            }
+                        }
+                    }
+                    item(key = TEMPLATE_ADD_KEY) {
+                        Spacer(Modifier.height(16.dp))
+                        OutlinedButton(
+                            onClick = onOpenPicker,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = AppDimens.scrollEndPadding)
+                        ) {
+                            Text(stringResource(R.string.template_add_exercise))
+                        }
                     }
                 }
                 Button(
@@ -253,7 +287,8 @@ fun TemplateEditorScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = AppDimens.screenPadding, vertical = 12.dp)
-                        .defaultMinSize(minHeight = AppDimens.minTouch),
+                        .defaultMinSize(minHeight = AppDimens.minTouch)
+                        .testTag("template-save"),
                     enabled = !state.duplicateName
                 ) {
                     Text(stringResource(R.string.action_save))
@@ -376,6 +411,7 @@ private fun PickerPane(
 
 @Composable
 private fun ExerciseCard(
+    modifier: Modifier = Modifier,
     index: Int,
     total: Int,
     item: TemplateExerciseDraft,
@@ -400,7 +436,7 @@ private fun ExerciseCard(
     onDistanceUnit: (Long, DistanceUnit) -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {

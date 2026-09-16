@@ -368,6 +368,8 @@
     <string name="active_workout_title">Edzés</string>
     <string name="active_workout_position">%1$d / %2$d</string>
     <string name="active_workout_progress_label">Haladás: %1$d kész, %2$d kihagyva, %3$d hátra</string>
+    <string name="active_exercise_state">Aktuális gyakorlat</string>
+    <string name="active_workout_all_sets_done">Minden sorozat kész. Befejezheted az edzést.</string>
     <string name="active_set_planned">Terv: %1$s</string>
     <string name="active_set_actual">Tényleges</string>
     <string name="set_status_pending">Folyamatban</string>

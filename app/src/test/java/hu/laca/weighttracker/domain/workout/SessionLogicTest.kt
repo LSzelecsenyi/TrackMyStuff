@@ -177,6 +177,50 @@ class SessionLogicTest {
     }
 
     @Test
+    fun currentPendingExerciseIgnoresCompletedAndSkipped() {
+        val first = item(1L, "A", listOf(set(1L, SessionSetStatus.COMPLETED), set(2L, SessionSetStatus.SKIPPED)))
+        val second = item(2L, "B", listOf(set(3L, SessionSetStatus.PENDING)))
+        val aggregate = WorkoutSessionAggregate(session(), listOf(first, second))
+        assertEquals(2L, SessionFocusLogic.currentPendingExercise(aggregate)!!.exercise.id)
+        assertEquals(2L, SessionProgressLogic.currentExercise(aggregate)!!.exercise.id)
+    }
+
+    @Test
+    fun completedWorkoutHasNoPendingExercise() {
+        val only = item(1L, "A", listOf(set(1L, SessionSetStatus.COMPLETED), set(2L, SessionSetStatus.SKIPPED)))
+        val aggregate = WorkoutSessionAggregate(session(), listOf(only))
+        assertNull(SessionFocusLogic.currentPendingExercise(aggregate))
+    }
+
+    @Test
+    fun focusStaysOnSameExerciseWhenAnotherSetIsPending() {
+        val first = item(
+            1L,
+            "A",
+            listOf(set(1L, SessionSetStatus.COMPLETED), set(2L, SessionSetStatus.PENDING))
+        )
+        val second = item(2L, "B", listOf(set(3L, SessionSetStatus.PENDING)))
+        val target = SessionFocusLogic.focusAfterResolving(listOf(first, second), resolvedSetId = 1L)
+        assertEquals(WorkoutFocusTarget.Set(2L, 1L), target)
+    }
+
+    @Test
+    fun focusMovesToNextPendingExerciseAfterLastSet() {
+        val first = item(1L, "A", listOf(set(1L, SessionSetStatus.COMPLETED), set(2L, SessionSetStatus.COMPLETED)))
+        val skipped = item(2L, "B", listOf(set(3L, SessionSetStatus.SKIPPED)))
+        val third = item(3L, "C", listOf(set(4L, SessionSetStatus.PENDING)))
+        val target = SessionFocusLogic.focusAfterResolving(listOf(first, skipped, third), resolvedSetId = 2L)
+        assertEquals(WorkoutFocusTarget.Set(4L, 3L), target)
+    }
+
+    @Test
+    fun finalSetFocusesFinishSection() {
+        val only = item(1L, "A", listOf(set(1L, SessionSetStatus.COMPLETED)))
+        val target = SessionFocusLogic.focusAfterResolving(listOf(only), resolvedSetId = 1L)
+        assertEquals(WorkoutFocusTarget.Finish, target)
+    }
+
+    @Test
     fun schemaHasNoRirOrRpe() {
         val names = WorkoutSession::class.java.declaredFields.map { it.name.lowercase() } +
             SessionSet::class.java.declaredFields.map { it.name.lowercase() }
@@ -208,6 +252,51 @@ class SessionLogicTest {
             bodyWeightSourceDate = LocalDate.parse("2026-09-15"),
             createdAt = startedAt,
             updatedAt = startedAt
+        )
+    }
+
+    private fun session(): WorkoutSession = session(SessionStatus.IN_PROGRESS, 1_000L)
+
+    private fun item(id: Long, name: String, sets: List<SessionSet>): SessionExerciseItem {
+        return SessionExerciseItem(
+            exercise = SessionExercise(
+                id = id,
+                sessionId = 1L,
+                exerciseId = id,
+                position = id.toInt() - 1,
+                name = name,
+                category = hu.laca.weighttracker.domain.exercise.ExerciseCategory.STRENGTH,
+                movementPattern = hu.laca.weighttracker.domain.exercise.MovementPattern.VERTICAL_PULL,
+                measurementType = hu.laca.weighttracker.domain.exercise.MeasurementType.REPETITIONS,
+                resistanceBasis = hu.laca.weighttracker.domain.exercise.ResistanceBasis.BODYWEIGHT,
+                weightInterpretation = hu.laca.weighttracker.domain.exercise.WeightInterpretation.NOT_APPLICABLE,
+                primaryMuscle = hu.laca.weighttracker.domain.exercise.MuscleGroup.LATS,
+                secondaryMuscles = emptyList(),
+                notes = null
+            ),
+            sets = sets
+        )
+    }
+
+    private fun set(id: Long, status: SessionSetStatus): SessionSet {
+        return SessionSet(
+            id = id,
+            sessionExerciseId = 1L,
+            position = 0,
+            plannedMinReps = 8,
+            plannedMaxReps = 8,
+            plannedLoadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
+            plannedWeightKg = null,
+            plannedDurationSeconds = null,
+            plannedDistanceMeters = null,
+            actualReps = 8,
+            actualLoadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
+            actualWeightKg = null,
+            actualDurationSeconds = null,
+            actualDistanceMeters = null,
+            status = status,
+            completedAt = null,
+            addedDuringWorkout = false
         )
     }
 

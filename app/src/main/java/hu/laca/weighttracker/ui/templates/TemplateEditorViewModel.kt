@@ -39,6 +39,11 @@ enum class TemplateEditorPane {
     Picker
 }
 
+data class TemplateScrollEvent(
+    val generation: Long,
+    val exerciseLocalId: Long
+)
+
 data class TemplateEditorUiState(
     val draft: TemplateDraft = TemplateDraft(),
     val catalog: Map<Long, Exercise> = emptyMap(),
@@ -56,7 +61,8 @@ data class TemplateEditorUiState(
     val finished: Boolean = false,
     val created: Boolean = false,
     val saved: Boolean = false,
-    val musclePreview: TemplateMuscleMapState = TemplateMuscleMapAssembler.assemble(emptyList())
+    val musclePreview: TemplateMuscleMapState = TemplateMuscleMapAssembler.assemble(emptyList()),
+    val scrollEvent: TemplateScrollEvent? = null
 ) {
     val canSave: Boolean
         get() = TemplateDraftLogic.validate(draft, catalog).isEmpty() && !duplicateName
@@ -84,7 +90,9 @@ class TemplateEditorViewModel(
     private val created = MutableStateFlow(false)
     private val saved = MutableStateFlow(false)
     private val loading = MutableStateFlow(templateId != null)
+    private val scrollEvent = MutableStateFlow<TemplateScrollEvent?>(null)
     private var nextLocalId = -1L
+    private var scrollGeneration = 0L
 
     val uiState: StateFlow<TemplateEditorUiState> = combine(
         combine(draft, exerciseRepository.observeAll(), pane, pickerQuery, pickerCategory) {
@@ -100,8 +108,8 @@ class TemplateEditorViewModel(
         ) { muscle, currentIssues, duplicate, pending, discard ->
             EditorFlags(muscle, currentIssues, duplicate, pending, discard)
         },
-        combine(finished, created, saved, loading) { done, wasCreated, wasSaved, isLoading ->
-            EditorFinish(done, wasCreated, wasSaved, isLoading)
+        combine(finished, created, saved, loading, scrollEvent) { done, wasCreated, wasSaved, isLoading, scroll ->
+            EditorFinish(done, wasCreated, wasSaved, isLoading, scroll)
         }
     ) { core, flags, finish ->
         val catalog = core.exercises.associateBy { it.id }
@@ -131,7 +139,8 @@ class TemplateEditorViewModel(
             saved = finish.saved,
             musclePreview = TemplateMuscleMapAssembler.assemble(
                 core.draft.exercises.mapNotNull { catalog[it.exerciseId] }
-            )
+            ),
+            scrollEvent = finish.scroll
         )
     }.stateIn(
         scope = viewModelScope,
@@ -159,7 +168,8 @@ class TemplateEditorViewModel(
         val finished: Boolean,
         val created: Boolean,
         val saved: Boolean,
-        val loading: Boolean
+        val loading: Boolean,
+        val scroll: TemplateScrollEvent?
     )
 
     init {
@@ -250,6 +260,9 @@ class TemplateEditorViewModel(
                 pane.value = TemplateEditorPane.Form
                 issues.value = emptyList()
                 duplicateName.value = false
+                val addedId = result.draft.exercises.last().localId
+                scrollGeneration += 1L
+                scrollEvent.value = TemplateScrollEvent(scrollGeneration, addedId)
             }
         }
     }
@@ -439,6 +452,10 @@ class TemplateEditorViewModel(
                 TemplateSaveResult.NotFound -> finished.value = true
             }
         }
+    }
+
+    fun consumeScrollEvent() {
+        scrollEvent.value = null
     }
 
     fun requestLeave() {

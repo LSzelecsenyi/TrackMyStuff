@@ -445,6 +445,7 @@ fun WeightTrackerNavHost(
                     onSave = viewModel::save,
                     onDismissDiscard = viewModel::dismissDiscard,
                     onConfirmDiscard = viewModel::confirmDiscard,
+                    onScrollConsumed = viewModel::consumeScrollEvent,
                     onFinished = { saved, created ->
                         if (saved) {
                             navController.previousBackStackEntry
@@ -469,8 +470,6 @@ fun WeightTrackerNavHost(
                 ActiveWorkoutScreen(
                     state = state,
                     onBack = { navController.popBackStack() },
-                    onPrevious = viewModel::previousExercise,
-                    onNext = viewModel::nextExercise,
                     onReps = viewModel::onReps,
                     onLoadKind = viewModel::onLoadKind,
                     onWeight = viewModel::onWeight,
@@ -482,6 +481,7 @@ fun WeightTrackerNavHost(
                     onSkip = viewModel::skipSet,
                     onUndoSkip = viewModel::undoSkip,
                     onAddExtra = viewModel::addExtraSet,
+                    onFocusConsumed = viewModel::consumeFocusEvent,
                     onRemoveExtra = viewModel::removeExtraSet,
                     onRequestFinish = viewModel::requestFinish,
                     onDismissFinish = viewModel::dismissFinish,

@@ -1,5 +1,7 @@
 package hu.laca.weighttracker.ui.workout
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,13 +12,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -44,10 +47,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
@@ -64,18 +72,22 @@ import hu.laca.weighttracker.domain.workout.SessionExerciseItem
 import hu.laca.weighttracker.domain.workout.SessionSet
 import hu.laca.weighttracker.domain.workout.SessionSetStatus
 import hu.laca.weighttracker.domain.workout.TemplateFieldError
+import hu.laca.weighttracker.domain.workout.WorkoutFocusTarget
 import hu.laca.weighttracker.ui.components.SegmentedControl
 import hu.laca.weighttracker.ui.exercises.CatalogDropdown
 import hu.laca.weighttracker.ui.templates.labelRes
 import hu.laca.weighttracker.ui.theme.AppDimens
 
-@OptIn(ExperimentalMaterial3Api::class)
+internal const val WORKOUT_HEADER_KEY = "workout-header"
+internal const val WORKOUT_FINISH_KEY = "workout-finish"
+
+internal fun workoutExerciseKey(exerciseId: Long): String = "exercise-$exerciseId"
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ActiveWorkoutScreen(
     state: ActiveWorkoutUiState,
     onBack: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
     onReps: (Long, String) -> Unit,
     onLoadKind: (Long, PlannedLoadKind) -> Unit,
     onWeight: (Long, String) -> Unit,
@@ -86,7 +98,7 @@ fun ActiveWorkoutScreen(
     onComplete: (Long) -> Unit,
     onSkip: (Long) -> Unit,
     onUndoSkip: (Long) -> Unit,
-    onAddExtra: () -> Unit,
+    onAddExtra: (Long) -> Unit,
     onRemoveExtra: (Long) -> Unit,
     onRequestFinish: () -> Unit,
     onDismissFinish: () -> Unit,
@@ -96,10 +108,12 @@ fun ActiveWorkoutScreen(
     onConfirmAbandon: () -> Unit,
     onFinished: () -> Unit,
     onAbandoned: () -> Unit,
-    onMessageConsumed: () -> Unit
+    onMessageConsumed: () -> Unit,
+    onFocusConsumed: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
+    val listState = rememberLazyListState()
     LaunchedEffect(state.finished) {
         if (state.finished) onFinished()
     }
@@ -112,6 +126,22 @@ fun ActiveWorkoutScreen(
         onMessageConsumed()
     }
     val aggregate = state.aggregate
+    val exercises = aggregate?.exercises.orEmpty()
+    LaunchedEffect(state.focusEvent?.generation, exercises.map { it.exercise.id }) {
+        val event = state.focusEvent ?: return@LaunchedEffect
+        when (val target = event.target) {
+            is WorkoutFocusTarget.Set -> {
+                val index = exercises.indexOfFirst { it.exercise.id == target.exerciseId }
+                if (index < 0) return@LaunchedEffect
+                listState.animateScrollToItem(index + 1)
+            }
+            WorkoutFocusTarget.Finish -> {
+                if (state.aggregate == null) return@LaunchedEffect
+                listState.animateScrollToItem(exercises.size + 1)
+            }
+        }
+        onFocusConsumed()
+    }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -175,73 +205,95 @@ fun ActiveWorkoutScreen(
         if (aggregate == null) {
             return@Scaffold
         }
-        val exercise = aggregate.exercises.getOrNull(state.selectedIndex)
-        Column(
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = AppDimens.screenPadding)
-                .padding(bottom = 16.dp)
         ) {
-            Text(state.elapsedLabel, style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(8.dp))
-            LinearProgressIndicator(
-                progress = { state.progress.fraction },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(
-                    R.string.active_workout_progress_label,
-                    state.progress.completed,
-                    state.progress.skipped,
-                    state.progress.pending
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(16.dp))
-            if (exercise != null) {
-                ExerciseHeader(
-                    item = exercise,
-                    index = state.selectedIndex,
-                    total = aggregate.exercises.size,
-                    onPrevious = onPrevious,
-                    onNext = onNext,
-                    canPrevious = state.selectedIndex > 0,
-                    canNext = state.selectedIndex < aggregate.exercises.lastIndex
-                )
-                Spacer(Modifier.height(12.dp))
-                exercise.sets.forEach { set ->
-                    SetRow(
-                        exerciseName = exercise.exercise.name,
-                        item = exercise,
-                        set = set,
-                        draft = state.drafts[set.id] ?: ActualSetLogic.draftFromSet(set),
-                        errors = state.setErrors[set.id].orEmpty(),
-                        onReps = { onReps(set.id, it) },
-                        onLoadKind = { onLoadKind(set.id, it) },
-                        onWeight = { onWeight(set.id, it) },
-                        onMinutes = { onMinutes(set.id, it) },
-                        onSeconds = { onSeconds(set.id, it) },
-                        onDistance = { onDistance(set.id, it) },
-                        onDistanceUnit = { onDistanceUnit(set.id, it) },
-                        onComplete = { onComplete(set.id) },
-                        onSkip = { onSkip(set.id) },
-                        onUndoSkip = { onUndoSkip(set.id) },
-                        onRemoveExtra = { onRemoveExtra(set.id) }
+            item(key = WORKOUT_HEADER_KEY) {
+                Column {
+                    Spacer(Modifier.height(8.dp))
+                    Text(state.elapsedLabel, style = MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        progress = { state.progress.fraction },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.active_workout_progress_label,
+                            state.progress.completed,
+                            state.progress.skipped,
+                            state.progress.pending
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+            itemsIndexed(
+                items = exercises,
+                key = { _, item -> workoutExerciseKey(item.exercise.id) }
+            ) { index, item ->
+                val current = item.exercise.id == state.currentExerciseId
+                Column {
+                    ExerciseCard(
+                        item = item,
+                        index = index,
+                        total = exercises.size,
+                        current = current,
+                        state = state,
+                        focusedSetId = (state.focusEvent?.target as? WorkoutFocusTarget.Set)?.setId,
+                        focusGeneration = state.focusEvent?.generation,
+                        onReps = onReps,
+                        onLoadKind = onLoadKind,
+                        onWeight = onWeight,
+                        onMinutes = onMinutes,
+                        onSeconds = onSeconds,
+                        onDistance = onDistance,
+                        onDistanceUnit = onDistanceUnit,
+                        onComplete = onComplete,
+                        onSkip = onSkip,
+                        onUndoSkip = onUndoSkip,
+                        onAddExtra = { onAddExtra(item.exercise.id) },
+                        onRemoveExtra = onRemoveExtra
                     )
                     Spacer(Modifier.height(12.dp))
                 }
-                OutlinedButton(
-                    onClick = onAddExtra,
+            }
+            item(key = WORKOUT_FINISH_KEY) {
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = AppDimens.minTouch)
+                        .testTag(WORKOUT_FINISH_KEY)
+                        .padding(bottom = 16.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow
                 ) {
-                    Text(stringResource(R.string.action_add_extra_set))
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.action_finish_workout),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = if (state.progress.pending == 0) {
+                                stringResource(R.string.active_workout_all_sets_done)
+                            } else {
+                                stringResource(
+                                    R.string.finish_pending_body,
+                                    state.progress.pending
+                                )
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -303,40 +355,102 @@ fun ActiveWorkoutScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ExerciseHeader(
+private fun ExerciseCard(
     item: SessionExerciseItem,
     index: Int,
     total: Int,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    canPrevious: Boolean,
-    canNext: Boolean
+    current: Boolean,
+    state: ActiveWorkoutUiState,
+    focusedSetId: Long?,
+    focusGeneration: Long?,
+    onReps: (Long, String) -> Unit,
+    onLoadKind: (Long, PlannedLoadKind) -> Unit,
+    onWeight: (Long, String) -> Unit,
+    onMinutes: (Long, String) -> Unit,
+    onSeconds: (Long, String) -> Unit,
+    onDistance: (Long, String) -> Unit,
+    onDistanceUnit: (Long, DistanceUnit) -> Unit,
+    onComplete: (Long) -> Unit,
+    onSkip: (Long) -> Unit,
+    onUndoSkip: (Long) -> Unit,
+    onAddExtra: () -> Unit,
+    onRemoveExtra: (Long) -> Unit
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onPrevious, enabled = canPrevious) {
-            Icon(
-                Icons.Filled.KeyboardArrowUp,
-                contentDescription = stringResource(R.string.action_previous_exercise)
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
+    val currentLabel = stringResource(R.string.active_exercise_state)
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val border = if (current) {
+        if (dark) Color(0xFF81C784) else Color(0xFF2E7D32)
+    } else {
+        Color.Transparent
+    }
+    val glow = if (current) {
+        if (dark) Color(0x6681C784) else Color(0x332E7D32)
+    } else {
+        Color.Transparent
+    }
+    val shape = MaterialTheme.shapes.large
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(workoutExerciseKey(item.exercise.id))
+            .shadow(elevation = 6.dp, shape = shape, clip = false, ambientColor = glow, spotColor = glow)
+            .border(1.5.dp, border, shape)
+            .semantics {
+                if (current) {
+                    stateDescription = currentLabel
+                }
+            },
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(item.exercise.name, style = MaterialTheme.typography.titleLarge)
             Text(
                 text = stringResource(R.string.active_workout_position, index + 1, total),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-        IconButton(onClick = onNext, enabled = canNext) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.action_next_exercise)
-            )
+            Spacer(Modifier.height(12.dp))
+            item.sets.forEach { set ->
+                SetRow(
+                    exerciseName = item.exercise.name,
+                    item = item,
+                    set = set,
+                    draft = state.drafts[set.id] ?: ActualSetLogic.draftFromSet(set),
+                    errors = state.setErrors[set.id].orEmpty(),
+                    dirty = set.id in state.dirtySetIds,
+                    completing = set.id in state.completingSetIds,
+                    focused = focusedSetId == set.id,
+                    focusGeneration = focusGeneration,
+                    onReps = { onReps(set.id, it) },
+                    onLoadKind = { onLoadKind(set.id, it) },
+                    onWeight = { onWeight(set.id, it) },
+                    onMinutes = { onMinutes(set.id, it) },
+                    onSeconds = { onSeconds(set.id, it) },
+                    onDistance = { onDistance(set.id, it) },
+                    onDistanceUnit = { onDistanceUnit(set.id, it) },
+                    onComplete = { onComplete(set.id) },
+                    onSkip = { onSkip(set.id) },
+                    onUndoSkip = { onUndoSkip(set.id) },
+                    onRemoveExtra = { onRemoveExtra(set.id) }
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            OutlinedButton(
+                onClick = onAddExtra,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = AppDimens.minTouch)
+            ) {
+                Text(stringResource(R.string.action_add_extra_set))
+            }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SetRow(
     exerciseName: String,
@@ -344,6 +458,10 @@ private fun SetRow(
     set: SessionSet,
     draft: ActualSetDraft,
     errors: List<TemplateFieldError>,
+    dirty: Boolean,
+    completing: Boolean,
+    focused: Boolean,
+    focusGeneration: Long?,
     onReps: (String) -> Unit,
     onLoadKind: (PlannedLoadKind) -> Unit,
     onWeight: (String) -> Unit,
@@ -368,9 +486,17 @@ private fun SetRow(
         statusLabel
     )
     val highlighted = set.status == SessionSetStatus.PENDING
+    val requester = remember(set.id) { BringIntoViewRequester() }
+    LaunchedEffect(focusGeneration, focused) {
+        if (focused) {
+            requester.bringIntoView()
+        }
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .bringIntoViewRequester(requester)
+            .testTag("set-${set.id}")
             .semantics { contentDescription = description },
         shape = MaterialTheme.shapes.medium,
         color = if (highlighted) {
@@ -422,14 +548,20 @@ private fun SetRow(
                 SessionSetStatus.PENDING -> {
                     Button(
                         onClick = onComplete,
+                        enabled = !completing,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .testTag("complete-set")
                             .defaultMinSize(minHeight = 56.dp)
                     ) {
                         Text(stringResource(R.string.action_complete_set))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onSkip, modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)) {
+                        TextButton(
+                            onClick = onSkip,
+                            enabled = !completing,
+                            modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
+                        ) {
                             Text(stringResource(R.string.action_skip_set))
                         }
                         if (ActualSetLogic.canRemove(set)) {
@@ -446,13 +578,16 @@ private fun SetRow(
                     }
                 }
                 SessionSetStatus.COMPLETED -> {
-                    Button(
-                        onClick = onComplete,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .defaultMinSize(minHeight = AppDimens.minTouch)
-                    ) {
-                        Text(stringResource(R.string.action_save_set))
+                    if (dirty) {
+                        Button(
+                            onClick = onComplete,
+                            enabled = !completing,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = AppDimens.minTouch)
+                        ) {
+                            Text(stringResource(R.string.action_save_set))
+                        }
                     }
                 }
                 SessionSetStatus.SKIPPED -> {

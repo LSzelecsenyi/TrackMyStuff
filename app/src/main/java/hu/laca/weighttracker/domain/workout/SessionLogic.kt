@@ -62,6 +62,60 @@ object SessionProgressLogic {
     }
 }
 
+sealed interface WorkoutFocusTarget {
+    data class Set(val setId: Long, val exerciseId: Long) : WorkoutFocusTarget
+    data object Finish : WorkoutFocusTarget
+}
+
+object SessionFocusLogic {
+    fun currentPendingExercise(aggregate: WorkoutSessionAggregate): SessionExerciseItem? {
+        return aggregate.exercises.firstOrNull { item ->
+            item.sets.any { it.status == SessionSetStatus.PENDING }
+        }
+    }
+
+    fun focusAfterResolving(
+        exercises: List<SessionExerciseItem>,
+        resolvedSetId: Long
+    ): WorkoutFocusTarget {
+        val currentIndex = exercises.indexOfFirst { item ->
+            item.sets.any { it.id == resolvedSetId }
+        }
+        if (currentIndex < 0) {
+            return nextPending(exercises) ?: WorkoutFocusTarget.Finish
+        }
+        val remainingHere = exercises[currentIndex].sets.firstOrNull { set ->
+            set.id != resolvedSetId && set.status == SessionSetStatus.PENDING
+        }
+        if (remainingHere != null) {
+            return WorkoutFocusTarget.Set(remainingHere.id, exercises[currentIndex].exercise.id)
+        }
+        val later = exercises.drop(currentIndex + 1).firstOrNull { item ->
+            item.sets.any { it.status == SessionSetStatus.PENDING }
+        }
+        if (later != null) {
+            val pending = later.sets.first { it.status == SessionSetStatus.PENDING }
+            return WorkoutFocusTarget.Set(pending.id, later.exercise.id)
+        }
+        val earlier = exercises.take(currentIndex).firstOrNull { item ->
+            item.sets.any { it.status == SessionSetStatus.PENDING }
+        }
+        if (earlier != null) {
+            val pending = earlier.sets.first { it.status == SessionSetStatus.PENDING }
+            return WorkoutFocusTarget.Set(pending.id, earlier.exercise.id)
+        }
+        return WorkoutFocusTarget.Finish
+    }
+
+    private fun nextPending(exercises: List<SessionExerciseItem>): WorkoutFocusTarget.Set? {
+        val item = exercises.firstOrNull { exercise ->
+            exercise.sets.any { it.status == SessionSetStatus.PENDING }
+        } ?: return null
+        val pending = item.sets.first { it.status == SessionSetStatus.PENDING }
+        return WorkoutFocusTarget.Set(pending.id, item.exercise.id)
+    }
+}
+
 object ElapsedTime {
     fun millis(startedAt: Long, now: Long): Long {
         return (now - startedAt).coerceAtLeast(0L)
