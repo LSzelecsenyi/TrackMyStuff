@@ -344,7 +344,16 @@
     <string name="message_exercise_delete_blocked">A gyakorlat edzéstervben vagy edzésben szerepel, ezért nem törölhető véglegesen. Archiváld.</string>
     <string name="template_delete_blocked_body">Az edzésterv edzésben szerepel, ezért nem törölhető véglegesen. Archiváld.</string>
     <string name="action_start_workout">Edzés indítása</string>
+    <string name="action_start_template">%1$s edzés indítása</string>
     <string name="action_resume_workout">Edzés folytatása</string>
+    <string name="action_resume_named">%1$s folytatása</string>
+    <string name="action_create_template">Edzésterv létrehozása</string>
+    <string name="hub_in_progress_kicker">FOLYAMATBAN</string>
+    <string name="hub_start_section">Edzés indítása</string>
+    <string name="hub_manage_section">Kezelés</string>
+    <string name="hub_start_blocked">Előbb folytasd vagy zárd le a folyamatban lévő edzést.</string>
+    <string name="hub_active_progress">%1$d / %2$d sorozat</string>
+    <string name="hub_recent_open">%1$s részletei</string>
     <string name="action_finish_workout">Edzés befejezése</string>
     <string name="action_abandon_workout">Edzés elvetése</string>
     <string name="action_continue_workout">Folytatom az edzést</string>

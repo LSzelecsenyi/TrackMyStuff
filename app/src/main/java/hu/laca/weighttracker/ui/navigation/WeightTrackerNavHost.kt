@@ -178,12 +178,20 @@ fun WeightTrackerNavHost(
                     onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
                     onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
                     onStartTemplate = viewModel::requestStart,
-                    onResume = { id -> navController.navigate(activeWorkoutRoute(id)) },
+                    onResume = { id ->
+                        navController.navigate(activeWorkoutRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onDismissStart = viewModel::dismissStart,
                     onStartWeightChange = viewModel::onStartWeightChange,
                     onConfirmStart = viewModel::confirmStart,
                     onStartedConsumed = viewModel::consumeStartedSession,
-                    onOpenStarted = { id -> navController.navigate(activeWorkoutRoute(id)) },
+                    onOpenStarted = { id ->
+                        navController.navigate(activeWorkoutRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onMessageConsumed = viewModel::consumeMessage,
                     onOpenRecent = { id ->
                         navController.navigate(workoutDetailRoute(id)) {

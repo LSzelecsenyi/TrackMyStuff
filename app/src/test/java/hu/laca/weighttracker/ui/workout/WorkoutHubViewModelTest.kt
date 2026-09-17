@@ -12,16 +12,26 @@ import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.FixedDateProvider
 import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.ExerciseDraft
+import hu.laca.weighttracker.domain.exercise.ExerciseSaveResult
 import hu.laca.weighttracker.domain.exercise.MeasurementType
 import hu.laca.weighttracker.domain.exercise.MovementPattern
 import hu.laca.weighttracker.domain.exercise.MuscleGroup
 import hu.laca.weighttracker.domain.exercise.ResistanceBasis
 import hu.laca.weighttracker.domain.exercise.WeightInterpretation
+import hu.laca.weighttracker.domain.workout.BodyWeightSource
+import hu.laca.weighttracker.domain.workout.PlannedLoadKind
+import hu.laca.weighttracker.domain.workout.PlannedSetDraft
+import hu.laca.weighttracker.domain.workout.StartWorkoutResult
+import hu.laca.weighttracker.domain.workout.TemplateDraft
+import hu.laca.weighttracker.domain.workout.TemplateExerciseDraft
+import hu.laca.weighttracker.domain.workout.TemplateSaveResult
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -41,6 +51,8 @@ class WorkoutHubViewModelTest {
     private lateinit var database: WeightDatabase
     private lateinit var repository: ExerciseRepository
     private lateinit var templates: WorkoutTemplateRepository
+    private lateinit var weights: WeightRepository
+    private val today = LocalDate.parse("2026-09-15")
 
     @Before
     fun setUp() {
@@ -58,6 +70,7 @@ class WorkoutHubViewModelTest {
             exerciseDao = database.exerciseDao(),
             clock = clock
         )
+        weights = WeightRepository(database.weightMeasurementDao(), clock)
     }
 
     @After
@@ -67,12 +80,7 @@ class WorkoutHubViewModelTest {
 
     @Test
     fun emptyCatalogProducesEmptyHubState() = runTest {
-        val viewModel = WorkoutHubViewModel(
-            repository,
-            templates,
-            sessions(database),
-            FixedDateProvider(LocalDate.parse("2026-09-15"))
-        )
+        val viewModel = hubViewModel()
         val state = viewModel.uiState.first { !it.loading }
         assertTrue(state.isEmpty)
         assertEquals(0, state.activeCount)
@@ -85,12 +93,7 @@ class WorkoutHubViewModelTest {
         repository.save(draft("Kerékpározás"))
         val id = repository.observeAll().first().first { it.name == "Kerékpározás" }.id
         repository.archive(id)
-        val viewModel = WorkoutHubViewModel(
-            repository,
-            templates,
-            sessions(database),
-            FixedDateProvider(LocalDate.parse("2026-09-15"))
-        )
+        val viewModel = hubViewModel()
         val state = viewModel.uiState.first { !it.loading && it.activeCount == 1 }
         assertFalse(state.isEmpty)
         assertEquals(1, state.activeCount)
@@ -101,27 +104,157 @@ class WorkoutHubViewModelTest {
     @Test
     fun hubReportsRealTemplateAndExerciseCounts() = runTest {
         repository.save(draft("Plank"))
-        val viewModel = WorkoutHubViewModel(
-            repository,
-            templates,
-            sessions(database),
-            FixedDateProvider(LocalDate.parse("2026-09-15"))
-        )
+        val viewModel = hubViewModel()
         val emptyTemplates = viewModel.uiState.first { !it.loading && it.activeCount == 1 }
         assertEquals(0, emptyTemplates.activeTemplateCount)
         assertEquals(1, emptyTemplates.activeCount)
     }
 
-    private fun sessions(database: WeightDatabase): WorkoutSessionRepository {
+    @Test
+    fun givenNoActiveSessionWhenHubOpensThenActiveTemplatesAreListed() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        saveTemplate("Push – Kondipark", exerciseId)
+        saveTemplate("Záró", exerciseId)
+        val viewModel = hubViewModel()
+        val state = viewModel.uiState.first { !it.loading && it.templates.size == 2 }
+        assertNull(state.activeSession)
+        assertEquals(listOf("Push – Kondipark", "Záró"), state.templates.map { it.template.name })
+        assertTrue(state.templates.all { it.exerciseCount == 1 && it.setCount == 2 })
+    }
+
+    @Test
+    fun givenActiveSessionWhenHubOpensThenInProgressSummaryIsPresent() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val templateId = saveTemplate("Push – Kondipark", exerciseId)
+        val sessionRepository = sessions()
+        val started = sessionRepository.start(
+            templateId,
+            "",
+            sessionRepository.proposeBodyWeight(today),
+            false
+        )
+        assertTrue(started is StartWorkoutResult.Started)
+        val viewModel = hubViewModel(sessionRepository)
+        val state = viewModel.uiState.first { it.activeSession != null }
+        assertEquals("Push – Kondipark", state.activeSession!!.session.templateName)
+        assertEquals(0, state.activeSession!!.completedSets)
+        assertEquals(2, state.activeSession!!.totalSets)
+    }
+
+    @Test
+    fun givenSameDayWeightWhenStartSheetOpensThenValueIsPrefilled() = runTest {
+        weights.save(today, 82.4)
+        val exerciseId = saveExercise("Húzódzkodás")
+        saveTemplate("Push – Kondipark", exerciseId)
+        val viewModel = hubViewModel()
+        val item = viewModel.uiState.first { it.templates.size == 1 }.templates.single()
+        viewModel.requestStart(item)
+        val draft = viewModel.uiState.first { it.startDraft != null }.startDraft!!
+        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, draft.proposal.source)
+        assertEquals("82,4", draft.weightText)
+    }
+
+    @Test
+    fun givenStartAlreadyInProgressWhenConfirmedAgainThenOnlyOneSessionIsCreated() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        saveTemplate("Push – Kondipark", exerciseId)
+        val viewModel = hubViewModel()
+        val item = viewModel.uiState.first { it.templates.size == 1 }.templates.single()
+        viewModel.requestStart(item)
+        viewModel.uiState.first { it.startDraft != null }
+        viewModel.confirmStart()
+        viewModel.confirmStart()
+        val started = viewModel.uiState.first { it.startedSessionId != null }
+        assertNotNull(started.startedSessionId)
+        assertNull(started.startDraft)
+        assertFalse(started.isStarting)
+        val inProgress = sessions().observeInProgress().first()
+        assertEquals(started.startedSessionId, inProgress?.session?.id)
+    }
+
+    @Test
+    fun givenUserCancelsStartWhenSheetClosesThenNothingIsWritten() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        saveTemplate("Push – Kondipark", exerciseId)
+        val viewModel = hubViewModel()
+        val item = viewModel.uiState.first { it.templates.size == 1 }.templates.single()
+        viewModel.requestStart(item)
+        viewModel.uiState.first { it.startDraft != null }
+        viewModel.dismissStart()
+        val state = viewModel.uiState.first { it.startDraft == null && !it.loading }
+        assertNull(state.startDraft)
+        assertNull(state.startedSessionId)
+        assertNull(sessions().observeInProgress().first())
+    }
+
+    @Test
+    fun givenTwoStartRequestsWhenFirstSheetIsOpenThenSecondIsIgnored() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        saveTemplate("Push – Kondipark", exerciseId)
+        saveTemplate("Pull", exerciseId)
+        val viewModel = hubViewModel()
+        val items = viewModel.uiState.first { it.templates.size == 2 }.templates
+        viewModel.requestStart(items[0])
+        viewModel.requestStart(items[1])
+        val draft = viewModel.uiState.first { it.startDraft != null }.startDraft!!
+        assertEquals(items[0].template.id, draft.template.template.id)
+    }
+
+    private fun hubViewModel(
+        sessionRepository: WorkoutSessionRepository = sessions()
+    ): WorkoutHubViewModel {
+        return WorkoutHubViewModel(
+            repository,
+            templates,
+            sessionRepository,
+            FixedDateProvider(today)
+        )
+    }
+
+    private fun sessions(): WorkoutSessionRepository {
         val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
         return WorkoutSessionRepository(
             sessionDao = database.workoutSessionDao(),
             templateDao = database.workoutTemplateDao(),
             exerciseDao = database.exerciseDao(),
-            weightRepository = WeightRepository(database.weightMeasurementDao(), clock),
+            weightRepository = weights,
             clock = clock,
-            dateProvider = FixedDateProvider(LocalDate.parse("2026-09-15"))
+            dateProvider = FixedDateProvider(today)
         )
+    }
+
+    private suspend fun saveExercise(name: String): Long {
+        return (repository.save(
+            ExerciseDraft(
+                name = name,
+                category = ExerciseCategory.STRENGTH,
+                movementPattern = MovementPattern.VERTICAL_PULL,
+                measurementType = MeasurementType.REPETITIONS,
+                resistanceBasis = ResistanceBasis.BODYWEIGHT,
+                weightInterpretation = WeightInterpretation.NOT_APPLICABLE,
+                primaryMuscle = MuscleGroup.LATS
+            )
+        ) as ExerciseSaveResult.Created).id
+    }
+
+    private suspend fun saveTemplate(name: String, exerciseId: Long): Long {
+        val draft = TemplateDraft(
+            name = name,
+            exercises = listOf(
+                TemplateExerciseDraft(
+                    localId = -1L,
+                    exerciseId = exerciseId,
+                    sets = List(2) { index ->
+                        PlannedSetDraft(
+                            localId = -(index + 1L),
+                            minRepsText = "8",
+                            loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
+                        )
+                    }
+                )
+            )
+        )
+        return (templates.save(draft) as TemplateSaveResult.Created).id
     }
 
     private fun draft(name: String): ExerciseDraft {
