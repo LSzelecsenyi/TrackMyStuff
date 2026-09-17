@@ -10,6 +10,7 @@ import hu.laca.weighttracker.data.repository.ExerciseRepository
 import hu.laca.weighttracker.domain.exercise.ArchiveFilter
 import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.ExerciseDraft
+import hu.laca.weighttracker.domain.exercise.ExerciseFieldError
 import hu.laca.weighttracker.domain.exercise.ExerciseSaveResult
 import hu.laca.weighttracker.domain.exercise.MeasurementType
 import hu.laca.weighttracker.domain.exercise.MovementPattern
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -86,7 +88,7 @@ class ExerciseViewModelTest {
         repository.save(draft("Húzódzkodás"))
         val id = repository.observeAll().first().single().id
         repository.archive(id)
-        val viewModel = ExerciseEditorViewModel(SavedStateHandle(), repository)
+        val viewModel = editorViewModel()
         viewModel.onNameChange(" húzódzkodás ")
         viewModel.onCategoryChange(ExerciseCategory.STRENGTH)
         viewModel.onMovementChange(MovementPattern.VERTICAL_PULL)
@@ -97,6 +99,77 @@ class ExerciseViewModelTest {
         val state = viewModel.uiState.first { it.duplicateName }
         assertTrue(state.duplicateName)
         assertTrue(!state.finished)
+        assertEquals(" Húzódzkodás ", viewModel.uiState.value.draft.name)
+    }
+
+    @Test
+    fun editorCapitalizesFirstLetterOnly() {
+        val viewModel = editorViewModel()
+        viewModel.onNameChange("tolódzkodás")
+        assertEquals("Tolódzkodás", viewModel.uiState.value.draft.name)
+        viewModel.onNameChange("őrségi fekvőtámasz")
+        assertEquals("Őrségi fekvőtámasz", viewModel.uiState.value.draft.name)
+        viewModel.onNameChange("hammer curl")
+        assertEquals("Hammer curl", viewModel.uiState.value.draft.name)
+        viewModel.onNameChange("Biceps curl")
+        assertEquals("Biceps curl", viewModel.uiState.value.draft.name)
+    }
+
+    @Test
+    fun secondaryMusclesAreSortedByHungarianLabelAndPrimaryIsRemoved() = runTest {
+        val viewModel = editorViewModel()
+        viewModel.onNameChange("Evezés")
+        viewModel.onPrimaryMuscleChange(MuscleGroup.LATS)
+        viewModel.onToggleSecondary(MuscleGroup.TRICEPS)
+        viewModel.onToggleSecondary(MuscleGroup.FOREARMS)
+        viewModel.onToggleSecondary(MuscleGroup.BICEPS)
+        assertEquals(
+            listOf(MuscleGroup.FOREARMS, MuscleGroup.BICEPS, MuscleGroup.TRICEPS),
+            viewModel.uiState.value.draft.secondaryMuscles
+        )
+        viewModel.onPrimaryMuscleChange(MuscleGroup.BICEPS)
+        assertEquals(MuscleGroup.BICEPS, viewModel.uiState.value.draft.primaryMuscle)
+        assertFalse(MuscleGroup.BICEPS in viewModel.uiState.value.draft.secondaryMuscles)
+        assertEquals(
+            listOf(MuscleGroup.FOREARMS, MuscleGroup.TRICEPS),
+            viewModel.uiState.value.draft.secondaryMuscles
+        )
+        viewModel.save()
+        val created = viewModel.uiState.first { it.finished && it.saved }
+        assertTrue(created.created)
+        val stored = repository.observeAll().first().single()
+        assertEquals("Evezés", stored.name)
+        assertEquals(
+            listOf(MuscleGroup.FOREARMS, MuscleGroup.TRICEPS),
+            stored.secondaryMuscles
+        )
+    }
+
+    @Test
+    fun saveShowsFieldErrorAndIgnoresASecondSubmitAfterSuccess() = runTest {
+        val viewModel = editorViewModel()
+        viewModel.save()
+        assertTrue(ExerciseFieldError.NameBlank in viewModel.uiState.value.fieldErrors)
+        assertFalse(viewModel.uiState.value.finished)
+        viewModel.onNameChange("Tolódzkodás")
+        viewModel.onMeasurementChange(MeasurementType.REPETITIONS)
+        viewModel.onResistanceChange(ResistanceBasis.BODYWEIGHT)
+        viewModel.onPrimaryMuscleChange(MuscleGroup.LATS)
+        viewModel.save()
+        viewModel.uiState.first { it.finished && it.saved }
+        viewModel.save()
+        assertEquals(1, repository.observeAll().first().size)
+        assertTrue(viewModel.uiState.value.finished)
+        assertFalse(viewModel.uiState.value.saving)
+    }
+
+    private fun editorViewModel(
+        handle: SavedStateHandle = SavedStateHandle()
+    ): ExerciseEditorViewModel {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return ExerciseEditorViewModel(handle, repository) { group ->
+            context.getString(group.labelRes())
+        }
     }
 
     private fun draft(name: String): ExerciseDraft {

@@ -8,12 +8,14 @@ import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.ExerciseDraft
 import hu.laca.weighttracker.domain.exercise.ExerciseDraftLogic
 import hu.laca.weighttracker.domain.exercise.ExerciseFieldError
+import hu.laca.weighttracker.domain.exercise.ExerciseNaming
 import hu.laca.weighttracker.domain.exercise.ExerciseSaveResult
 import hu.laca.weighttracker.domain.exercise.MeasurementType
 import hu.laca.weighttracker.domain.exercise.MovementPattern
 import hu.laca.weighttracker.domain.exercise.MuscleGroup
 import hu.laca.weighttracker.domain.exercise.ResistanceBasis
 import hu.laca.weighttracker.domain.exercise.WeightInterpretation
+import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +26,7 @@ data class ExerciseEditorUiState(
     val draft: ExerciseDraft = ExerciseDraft(),
     val isEditing: Boolean = false,
     val loading: Boolean = false,
+    val saving: Boolean = false,
     val fieldErrors: List<ExerciseFieldError> = emptyList(),
     val duplicateName: Boolean = false,
     val showDiscardConfirm: Boolean = false,
@@ -44,7 +47,8 @@ data class ExerciseEditorUiState(
 
 class ExerciseEditorViewModel(
     savedStateHandle: SavedStateHandle,
-    private val repository: ExerciseRepository
+    private val repository: ExerciseRepository,
+    private val muscleLabel: (MuscleGroup) -> String = { it.name }
 ) : ViewModel() {
     private val exerciseId: Long? = savedStateHandle.get<Long>(EXERCISE_ID_KEY)
         ?.takeIf { it > 0L }
@@ -65,7 +69,7 @@ class ExerciseEditorViewModel(
                 if (exercise == null) {
                     _uiState.update { it.copy(loading = false, finished = true) }
                 } else {
-                    val draft = ExerciseDraftLogic.fromExercise(exercise)
+                    val draft = sortedSecondaries(ExerciseDraftLogic.fromExercise(exercise))
                     original.value = draft
                     _uiState.update {
                         it.copy(draft = draft, isEditing = true, loading = false)
@@ -75,7 +79,9 @@ class ExerciseEditorViewModel(
         }
     }
 
-    fun onNameChange(value: String) = updateDraft { it.copy(name = value) }
+    fun onNameChange(value: String) = updateDraft {
+        it.copy(name = ExerciseNaming.capitalizeFirstLetter(value))
+    }
 
     fun onCategoryChange(value: ExerciseCategory) = updateDraft { draft ->
         if (draft.id == null) {
@@ -100,48 +106,84 @@ class ExerciseEditorViewModel(
     }
 
     fun onPrimaryMuscleChange(value: MuscleGroup) = updateDraft {
-        ExerciseDraftLogic.applyPrimaryMuscle(it, value)
+        sortedSecondaries(ExerciseDraftLogic.applyPrimaryMuscle(it, value))
     }
 
     fun onToggleSecondary(value: MuscleGroup) = updateDraft {
-        ExerciseDraftLogic.toggleSecondary(it, value)
+        sortedSecondaries(ExerciseDraftLogic.toggleSecondary(it, value))
     }
 
     fun onNotesChange(value: String) = updateDraft { it.copy(notes = value) }
 
     fun save() {
-        val current = _uiState.value.draft
-        val errors = ExerciseDraftLogic.validate(current)
-        if (errors.isNotEmpty()) {
-            _uiState.update { it.copy(fieldErrors = errors, duplicateName = false) }
-            return
+        var draftToSave: ExerciseDraft? = null
+        _uiState.update { state ->
+            if (state.saving || state.finished || state.loading) {
+                return@update state
+            }
+            val prepared = sortedSecondaries(state.draft)
+            val errors = ExerciseDraftLogic.validate(prepared)
+            if (errors.isNotEmpty()) {
+                return@update state.copy(
+                    draft = prepared,
+                    fieldErrors = errors,
+                    duplicateName = false
+                )
+            }
+            draftToSave = prepared
+            state.copy(
+                draft = prepared,
+                saving = true,
+                fieldErrors = emptyList(),
+                duplicateName = false
+            )
         }
+        val current = draftToSave ?: return
         viewModelScope.launch {
             when (val result = repository.save(current)) {
                 is ExerciseSaveResult.Created -> {
                     _uiState.update {
-                        it.copy(finished = true, created = true, saved = true, duplicateName = false)
+                        it.copy(
+                            saving = false,
+                            finished = true,
+                            created = true,
+                            saved = true,
+                            duplicateName = false
+                        )
                     }
                 }
                 is ExerciseSaveResult.Updated -> {
                     _uiState.update {
-                        it.copy(finished = true, created = false, saved = true, duplicateName = false)
+                        it.copy(
+                            saving = false,
+                            finished = true,
+                            created = false,
+                            saved = true,
+                            duplicateName = false
+                        )
                     }
                 }
                 ExerciseSaveResult.DuplicateName -> {
-                    _uiState.update { it.copy(duplicateName = true, fieldErrors = emptyList()) }
+                    _uiState.update {
+                        it.copy(saving = false, duplicateName = true, fieldErrors = emptyList())
+                    }
                 }
                 is ExerciseSaveResult.Invalid -> {
-                    _uiState.update { it.copy(fieldErrors = result.errors, duplicateName = false) }
+                    _uiState.update {
+                        it.copy(saving = false, fieldErrors = result.errors, duplicateName = false)
+                    }
                 }
                 ExerciseSaveResult.NotFound -> {
-                    _uiState.update { it.copy(finished = true) }
+                    _uiState.update { it.copy(saving = false, finished = true) }
                 }
             }
         }
     }
 
     fun requestLeave() {
+        if (_uiState.value.saving) {
+            return
+        }
         if (isDirty()) {
             _uiState.update { it.copy(showDiscardConfirm = true) }
         } else {
@@ -163,6 +205,9 @@ class ExerciseEditorViewModel(
 
     private fun updateDraft(transform: (ExerciseDraft) -> ExerciseDraft) {
         _uiState.update { state ->
+            if (state.saving) {
+                return@update state
+            }
             val next = transform(state.draft)
             state.copy(
                 draft = next,
@@ -170,6 +215,19 @@ class ExerciseEditorViewModel(
                 duplicateName = false
             )
         }
+    }
+
+    private fun sortedSecondaries(draft: ExerciseDraft): ExerciseDraft {
+        return draft.copy(
+            secondaryMuscles = LocalizedLabelOrder.sorted(
+                items = ExerciseDraftLogic.normalizeSecondary(
+                    draft.primaryMuscle,
+                    draft.secondaryMuscles
+                ),
+                label = muscleLabel,
+                key = { it.name }
+            )
+        )
     }
 
     companion object {

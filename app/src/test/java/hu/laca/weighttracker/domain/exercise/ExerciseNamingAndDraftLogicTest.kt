@@ -51,6 +51,26 @@ class ExerciseNamingAndDraftLogicTest {
     }
 
     @Test
+    fun sentenceCapitalizesFirstLetterOnly() {
+        assertEquals("Tolódzkodás", ExerciseNaming.capitalizeFirstLetter("tolódzkodás"))
+        assertEquals("Őrségi fekvőtámasz", ExerciseNaming.capitalizeFirstLetter("őrségi fekvőtámasz"))
+        assertEquals("Hammer curl", ExerciseNaming.capitalizeFirstLetter("hammer curl"))
+        assertEquals("Biceps curl", ExerciseNaming.capitalizeFirstLetter("Biceps curl"))
+        assertEquals("  Tolódzkodás", ExerciseNaming.capitalizeFirstLetter("  tolódzkodás"))
+        assertEquals("Húzódzkodás", ExerciseNaming.displayName("  húzódzkodás  "))
+    }
+
+    @Test
+    fun sentenceCapitalizationPreservesCursorWhenOnlyTheFirstLetterChanges() {
+        val before = "tolódzkodás"
+        val after = ExerciseNaming.capitalizeFirstLetter(before)
+        assertEquals("Tolódzkodás", after)
+        assertEquals(1, ExerciseNaming.mapCursor(before, after, 1))
+        assertEquals(4, ExerciseNaming.mapCursor(before, after, 4))
+        assertEquals(before.length, ExerciseNaming.mapCursor(before, after, before.length))
+    }
+
+    @Test
     fun changingPrimaryRemovesItFromSecondary() {
         val draft = ExerciseDraft(
             name = "Evezés",

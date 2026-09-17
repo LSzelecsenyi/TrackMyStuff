@@ -58,13 +58,39 @@ sealed class ExerciseDeleteResult {
 object ExerciseNaming {
     const val NAME_MAX_LENGTH = 80
     const val NOTES_MAX_LENGTH = 500
+    private val HUNGARIAN = Locale.forLanguageTag("hu-HU")
 
     fun displayName(raw: String): String {
-        return raw.trim().replace(WHITESPACE, " ")
+        return capitalizeFirstLetter(raw.trim().replace(WHITESPACE, " "))
     }
 
     fun normalize(raw: String): String {
         return displayName(raw).lowercase(Locale.ROOT)
+    }
+
+    fun capitalizeFirstLetter(raw: String): String {
+        val index = raw.indexOfFirst { Character.isLetter(it) }
+        if (index < 0) {
+            return raw
+        }
+        val codePoint = raw.codePointAt(index)
+        val charCount = Character.charCount(codePoint)
+        val letter = String(intArrayOf(codePoint), 0, 1)
+        val upper = letter.uppercase(HUNGARIAN)
+        if (letter == upper) {
+            return raw
+        }
+        return raw.substring(0, index) + upper + raw.substring(index + charCount)
+    }
+
+    fun mapCursor(before: String, after: String, cursor: Int): Int {
+        if (before == after) {
+            return cursor.coerceIn(0, after.length)
+        }
+        val prefix = before.commonPrefixWith(after).length
+        val delta = after.length - before.length
+        val mapped = if (cursor <= prefix) cursor else cursor + delta
+        return mapped.coerceIn(0, after.length)
     }
 
     private val WHITESPACE = Regex("\\s+")

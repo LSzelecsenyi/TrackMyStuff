@@ -266,6 +266,12 @@
     <string name="exercise_field_primary_muscle">Elsődleges izomcsoport</string>
     <string name="exercise_field_secondary_muscles">Másodlagos izomcsoportok</string>
     <string name="exercise_field_notes">Megjegyzés</string>
+    <string name="exercise_section_basics">Alapadatok</string>
+    <string name="exercise_section_measurement">Mérés és terhelés</string>
+    <string name="exercise_section_muscles">Izomcsoportok</string>
+    <string name="exercise_section_notes">Megjegyzés</string>
+    <string name="exercise_add_secondary_muscle">Másodlagos izom hozzáadása</string>
+    <string name="exercise_remove_secondary_muscle">%1$s eltávolítása</string>
     <string name="exercise_bodyweight_helper">Az extra súly vagy rásegítés az edzés során, sorozatonként adható meg.</string>
     <string name="exercise_category_strength">Erőgyakorlat</string>
     <string name="exercise_category_cardio">Kardió</string>

@@ -2,6 +2,7 @@ package hu.laca.weighttracker
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import hu.laca.weighttracker.data.preferences.ThemePreferences
@@ -9,11 +10,14 @@ import hu.laca.weighttracker.data.repository.ExerciseRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
+import hu.laca.weighttracker.data.workoutimport.WorkoutImportFileReader
 import hu.laca.weighttracker.domain.DateProvider
+import hu.laca.weighttracker.domain.exercise.MuscleGroup
 import hu.laca.weighttracker.ui.dashboard.DashboardViewModel
 import hu.laca.weighttracker.ui.dashboard.WeightDetailsViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseEditorViewModel
 import hu.laca.weighttracker.ui.exercises.ExerciseListViewModel
+import hu.laca.weighttracker.ui.exercises.labelRes
 import hu.laca.weighttracker.ui.history.HistoryViewModel
 import hu.laca.weighttracker.ui.history.WorkoutDetailViewModel
 import hu.laca.weighttracker.ui.settings.SettingsViewModel
@@ -22,7 +26,6 @@ import hu.laca.weighttracker.ui.templates.TemplateListViewModel
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutViewModel
 import hu.laca.weighttracker.ui.workout.WorkoutHubViewModel
 import hu.laca.weighttracker.ui.workoutimport.WorkoutImportViewModel
-import hu.laca.weighttracker.data.workoutimport.WorkoutImportFileReader
 
 class WeightViewModelFactory(
     private val weightRepository: WeightRepository,
@@ -65,7 +68,13 @@ class WeightViewModelFactory(
                 ExerciseListViewModel(exerciseRepository)
             }
             modelClass.isAssignableFrom(ExerciseEditorViewModel::class.java) -> {
-                ExerciseEditorViewModel(extras.createSavedStateHandle(), exerciseRepository)
+                val application = extras[APPLICATION_KEY]
+                ExerciseEditorViewModel(
+                    extras.createSavedStateHandle(),
+                    exerciseRepository
+                ) { group: MuscleGroup ->
+                    application?.getString(group.labelRes()) ?: group.name
+                }
             }
             modelClass.isAssignableFrom(TemplateListViewModel::class.java) -> {
                 TemplateListViewModel(workoutTemplateRepository)
