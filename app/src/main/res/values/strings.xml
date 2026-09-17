@@ -91,7 +91,11 @@
     <string name="theme_preview_description">Élő témaelőnézet a háttérrel, felülettel, gombbal, másodlagos színnel, harmadlagos kiemeléssel és egy rövid grafikonvonallal</string>
     <string name="message_palette_saved">Az egyéni paletta mentve.</string>
     <string name="weekly_overview_kicker">ELMÚLT 7 NAP</string>
-    <string name="weekly_overview_description">Elmúlt 7 nap: %1$s, %2$s</string>
+    <string name="weekly_overview_description">Elmúlt 7 nap, %1$s: %2$d edzés, %3$d sorozat, testsúlyváltozás %4$s</string>
+    <string name="weekly_overview_column_workouts">EDZÉS</string>
+    <string name="weekly_overview_column_sets">SOROZAT</string>
+    <string name="weekly_overview_column_weight">TESTSÚLY</string>
+    <string name="weekly_overview_missing_weight">—</string>
     <string name="greeting_morning">Jó reggelt</string>
     <string name="greeting_day">Szép napot</string>
     <string name="greeting_evening">Jó estét</string>

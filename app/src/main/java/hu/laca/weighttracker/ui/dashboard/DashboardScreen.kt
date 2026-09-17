@@ -6,16 +6,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -101,9 +105,10 @@ fun DashboardScreen(
         ) {
             OverviewHeader(
                 overview = state.weeklyOverview,
+                today = state.today,
                 onOpenSettings = onOpenSettings
             )
-            Spacer(Modifier.height(AppDimens.sectionDividerSpace))
+            OverviewSectionDivider()
             MuscleHeatmapCard(
                 state = state.heatmap,
                 modifier = Modifier.testTag("dashboard_heatmap")
@@ -285,57 +290,144 @@ private fun CompactStat(
 @Composable
 private fun OverviewHeader(
     overview: WeeklyOverview,
+    today: LocalDate,
     onOpenSettings: () -> Unit
 ) {
-    val activity = WeeklyOverviewLogic.activityLine(overview)
-    val weight = WeeklyOverviewLogic.weightChangeLabel(overview.weightChangeKg)
+    val dateRange = UiFormatters.inclusiveDateRange(
+        WeeklyOverviewLogic.windowStart(today),
+        today
+    )
+    val weightValue = overview.weightChangeKg?.let(WeeklyOverviewLogic::weightChangeLabel)
+        ?: stringResource(R.string.weekly_overview_missing_weight)
     val description = stringResource(
         R.string.weekly_overview_description,
-        activity,
-        weight
+        dateRange,
+        overview.workoutCount,
+        overview.completedSetCount,
+        weightValue
     )
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics(mergeDescendants = true) { contentDescription = description },
-        verticalAlignment = Alignment.Top
+            .testTag("dashboard_weekly_overview")
+            .semantics { contentDescription = description }
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.weekly_overview_kicker),
-                style = AppTypeTokens.sectionKicker,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(AppDimens.headerStackGap))
-            Text(
-                text = WeeklyOverviewLogic.workoutLabel(overview.workoutCount),
-                style = AppTypeTokens.statHero,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(AppDimens.statSecondaryGap))
-            Text(
-                text = "${WeeklyOverviewLogic.setLabel(overview.completedSetCount)} · $weight",
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        IconButton(
-            onClick = onOpenSettings,
-            modifier = Modifier.size(AppDimens.minTouch)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("dashboard_weekly_header"),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Settings,
-                contentDescription = stringResource(R.string.action_open_settings),
-                modifier = Modifier.size(22.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.weekly_overview_kicker),
+                    style = AppTypeTokens.sectionKicker,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.testTag("dashboard_weekly_kicker")
+                )
+                Spacer(Modifier.height(AppDimens.statSecondaryGap))
+                Text(
+                    text = dateRange,
+                    style = AppTypeTokens.sectionSubtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.testTag("dashboard_weekly_range")
+                )
+            }
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier
+                    .size(AppDimens.minTouch)
+                    .testTag("dashboard_weekly_settings")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = stringResource(R.string.action_open_settings),
+                    modifier = Modifier.size(22.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(Modifier.height(AppDimens.itemGap))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .testTag("dashboard_weekly_stats"),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            WeeklyStatColumn(
+                label = stringResource(R.string.weekly_overview_column_workouts),
+                value = overview.workoutCount.toString(),
+                testTagPrefix = "dashboard_stat_workouts",
+                modifier = Modifier.weight(1f)
+            )
+            WeeklyStatDivider()
+            WeeklyStatColumn(
+                label = stringResource(R.string.weekly_overview_column_sets),
+                value = overview.completedSetCount.toString(),
+                testTagPrefix = "dashboard_stat_sets",
+                modifier = Modifier.weight(1f)
+            )
+            WeeklyStatDivider()
+            WeeklyStatColumn(
+                label = stringResource(R.string.weekly_overview_column_weight),
+                value = weightValue,
+                testTagPrefix = "dashboard_stat_weight",
+                modifier = Modifier.weight(1f)
             )
         }
+    }
+}
+
+@Composable
+private fun WeeklyStatDivider() {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 4.dp)
+            .width(AppDimens.strokeThin)
+            .fillMaxHeight()
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
+}
+
+@Composable
+private fun WeeklyStatColumn(
+    label: String,
+    value: String,
+    testTagPrefix: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.testTag(testTagPrefix),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            style = AppTypeTokens.columnHeader,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Clip,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("${testTagPrefix}_label")
+        )
+        Spacer(Modifier.height(AppDimens.statSecondaryGap))
+        Text(
+            text = value,
+            style = AppTypeTokens.statBand,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Clip,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("${testTagPrefix}_value")
+        )
     }
 }
 

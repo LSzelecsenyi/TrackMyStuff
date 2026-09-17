@@ -17,6 +17,8 @@ object UiFormatters {
         DateTimeFormatter.ofPattern("MM.dd.", locale)
     private val monthTitle: DateTimeFormatter =
         DateTimeFormatter.ofPattern("yyyy. MMMM", locale)
+    private val monthAbbrev: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("MMM", locale)
 
     fun weightKg(value: Double): String {
         return String.format(locale, "%.1f kg", value)
@@ -42,4 +44,12 @@ object UiFormatters {
     fun compactDate(date: LocalDate): String = date.format(compactDate)
 
     fun monthTitle(month: YearMonth): String = month.format(monthTitle)
+
+    fun inclusiveDateRange(start: LocalDate, end: LocalDate): String {
+        return if (start.month == end.month && start.year == end.year) {
+            "${start.format(monthAbbrev)} ${start.dayOfMonth}–${end.dayOfMonth}."
+        } else {
+            "${start.format(chartDate)}–${end.format(chartDate)}"
+        }
+    }
 }

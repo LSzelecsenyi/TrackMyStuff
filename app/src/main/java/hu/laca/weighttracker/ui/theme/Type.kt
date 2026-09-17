@@ -98,4 +98,17 @@ object AppTypeTokens {
         fontSize = 11.sp,
         lineHeight = 14.sp
     )
+    val columnHeader = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        letterSpacing = 0.8.sp
+    )
+    val statBand = TabularSans.copy(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 26.sp,
+        lineHeight = 32.sp,
+        letterSpacing = (-0.2).sp
+    )
 }
