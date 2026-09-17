@@ -26,6 +26,8 @@ private fun UserMessage.toStringRes(): Int {
         UserMessage.Created -> hu.laca.weighttracker.R.string.message_created
         UserMessage.Updated -> hu.laca.weighttracker.R.string.message_updated
         UserMessage.Deleted -> hu.laca.weighttracker.R.string.message_deleted
+        UserMessage.WorkoutDeleted -> hu.laca.weighttracker.R.string.message_workout_deleted
+        UserMessage.WorkoutDeleteFailed -> hu.laca.weighttracker.R.string.message_workout_delete_failed
         is UserMessage.ImportSucceeded -> hu.laca.weighttracker.R.string.message_import_success
         UserMessage.ExportSucceeded -> hu.laca.weighttracker.R.string.message_export_success
         UserMessage.ExportFailed -> hu.laca.weighttracker.R.string.message_export_failed

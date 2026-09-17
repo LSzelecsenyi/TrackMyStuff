@@ -69,6 +69,7 @@ private const val ARG_SESSION_ID = "sessionId"
 private const val KEY_CATALOG_SAVED = "catalog_saved"
 private const val KEY_TEMPLATE_SAVED = "template_saved"
 private const val KEY_WORKOUT_RESULT = "workout_result"
+private const val KEY_WORKOUT_DELETED = "workout_deleted"
 
 private fun editorRoute(exerciseId: Long?): String {
     return "${AppRoutes.EXERCISE_EDITOR}?$ARG_EXERCISE_ID=${exerciseId ?: -1L}"
@@ -191,9 +192,18 @@ fun WeightTrackerNavHost(
                     }
                 )
             }
-            composable(AppRoutes.JOURNAL) {
+            composable(AppRoutes.JOURNAL) { entry ->
                 val viewModel: HistoryViewModel = viewModel(factory = factory)
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
+                val deleted by entry.savedStateHandle
+                    .getStateFlow(KEY_WORKOUT_DELETED, false)
+                    .collectAsStateWithLifecycle()
+                LaunchedEffect(deleted) {
+                    if (deleted) {
+                        viewModel.showWorkoutDeleted()
+                        entry.savedStateHandle[KEY_WORKOUT_DELETED] = false
+                    }
+                }
                 HistoryScreen(
                     state = state,
                     today = dateProvider.today(),
@@ -221,7 +231,10 @@ fun WeightTrackerNavHost(
                         navController.navigate(workoutDetailRoute(id)) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onRequestDeleteWorkout = viewModel::requestDeleteWorkout,
+                    onDismissDeleteWorkout = viewModel::dismissDeleteWorkout,
+                    onConfirmDeleteWorkout = viewModel::confirmDeleteWorkout
                 )
             }
             composable(AppRoutes.WORKOUT_IMPORT) {
@@ -501,7 +514,20 @@ fun WeightTrackerNavHost(
                         navController.navigate(activeWorkoutRoute(id)) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onRequestDeleteWorkout = viewModel::requestDeleteWorkout,
+                    onDismissDeleteWorkout = viewModel::dismissDeleteWorkout,
+                    onConfirmDeleteWorkout = viewModel::confirmDeleteWorkout,
+                    onDeleted = {
+                        runCatching {
+                            navController.getBackStackEntry(AppRoutes.JOURNAL)
+                                .savedStateHandle[KEY_WORKOUT_DELETED] = true
+                        }
+                        if (!navController.popBackStack(AppRoutes.JOURNAL, false)) {
+                            navController.popBackStack()
+                        }
+                    },
+                    onMessageConsumed = viewModel::consumeMessage
                 )
             }
         }

@@ -24,6 +24,7 @@ import hu.laca.weighttracker.domain.workout.WorkoutFocusTarget
 import hu.laca.weighttracker.domain.workout.WorkoutSessionAggregate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Clock
 
 data class WorkoutFocusEvent(
@@ -56,6 +58,7 @@ data class ActiveWorkoutUiState(
     val confirmAbandon: Boolean = false,
     val finished: Boolean = false,
     val abandoned: Boolean = false,
+    val discarding: Boolean = false,
     val message: ActiveWorkoutMessage? = null,
     val focusEvent: WorkoutFocusEvent? = null,
     val focusedSetId: Long? = null,
@@ -77,6 +80,7 @@ sealed interface ActiveWorkoutMessage {
     data object ExtraRemoved : ActiveWorkoutMessage
     data object CannotRemoveOriginal : ActiveWorkoutMessage
     data object SaveFailed : ActiveWorkoutMessage
+    data object DiscardFailed : ActiveWorkoutMessage
 }
 
 class ActiveWorkoutViewModel(
@@ -95,6 +99,7 @@ class ActiveWorkoutViewModel(
     private val confirmAbandon = MutableStateFlow(false)
     private val finished = MutableStateFlow(false)
     private val abandoned = MutableStateFlow(false)
+    private val discarding = MutableStateFlow(false)
     private val message = MutableStateFlow<ActiveWorkoutMessage?>(null)
     private val focusEvent = MutableStateFlow<WorkoutFocusEvent?>(null)
     private val focusedSetId = MutableStateFlow<Long?>(null)
@@ -106,7 +111,8 @@ class ActiveWorkoutViewModel(
         val pendingFinish: Int?,
         val confirmAbandon: Boolean,
         val finished: Boolean,
-        val abandoned: Boolean
+        val abandoned: Boolean,
+        val discarding: Boolean
     )
 
     private data class EditorSignals(
@@ -130,9 +136,10 @@ class ActiveWorkoutViewModel(
                 currentDrafts, dirty, completing, errors, currentMessage ->
             EditorSignals(currentDrafts, dirty, completing, errors, currentMessage)
         },
-        combine(nowMillis, pendingFinishCount, confirmAbandon, finished, abandoned) {
-                now, pending, abandon, done, left ->
-            Dialogs(now, pending, abandon, done, left)
+        combine(nowMillis, pendingFinishCount, confirmAbandon, finished, combine(abandoned, discarding) { left, discardingNow ->
+            left to discardingNow
+        }) { now, pending, abandon, done, left ->
+            Dialogs(now, pending, abandon, done, left.first, left.second)
         },
         combine(focusEvent, focusedSetId, expandedIds) { focus, focused, expanded ->
             FocusChrome(focus, focused, expanded)
@@ -141,10 +148,14 @@ class ActiveWorkoutViewModel(
         if (aggregate == null) {
             return@combine ActiveWorkoutUiState(
                 loading = false,
-                missing = true,
+                missing = !dialogs.abandoned && !dialogs.finished && !dialogs.discarding,
                 nowMillis = dialogs.now,
+                pendingFinishCount = dialogs.pendingFinish,
+                confirmAbandon = dialogs.confirmAbandon,
                 finished = dialogs.finished,
                 abandoned = dialogs.abandoned,
+                discarding = dialogs.discarding,
+                message = signals.message,
                 focusEvent = chrome.focus,
                 focusedSetId = chrome.focusedSetId,
                 expandedExerciseIds = chrome.expanded
@@ -172,6 +183,7 @@ class ActiveWorkoutViewModel(
             confirmAbandon = dialogs.confirmAbandon,
             finished = dialogs.finished || aggregate.session.status == SessionStatus.COMPLETED,
             abandoned = dialogs.abandoned || aggregate.session.status == SessionStatus.ABANDONED,
+            discarding = dialogs.discarding,
             message = signals.message,
             focusEvent = chrome.focus,
             focusedSetId = chrome.focusedSetId,
@@ -250,7 +262,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun completeSet(setId: Long) {
-        if (setId in completingIds.value) {
+        if (discarding.value || setId in completingIds.value) {
             return
         }
         val snapshot = uiState.value
@@ -292,7 +304,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun skipSet(setId: Long) {
-        if (setId in completingIds.value) {
+        if (discarding.value || setId in completingIds.value) {
             return
         }
         completingIds.value = completingIds.value + setId
@@ -322,12 +334,18 @@ class ActiveWorkoutViewModel(
     }
 
     fun undoSkip(setId: Long) {
+        if (discarding.value) {
+            return
+        }
         viewModelScope.launch {
             sessionRepository.undoSkip(setId)
         }
     }
 
     fun addExtraSet(sessionExerciseId: Long) {
+        if (discarding.value) {
+            return
+        }
         viewModelScope.launch {
             if (sessionRepository.addExtraSet(sessionExerciseId) == SessionMutationResult.Updated) {
                 message.value = ActiveWorkoutMessage.ExtraAdded
@@ -336,6 +354,9 @@ class ActiveWorkoutViewModel(
     }
 
     fun removeExtraSet(setId: Long) {
+        if (discarding.value) {
+            return
+        }
         viewModelScope.launch {
             when (sessionRepository.removeExtraSet(setId)) {
                 SessionMutationResult.Updated -> message.value = ActiveWorkoutMessage.ExtraRemoved
@@ -347,6 +368,9 @@ class ActiveWorkoutViewModel(
     }
 
     fun requestFinish() {
+        if (discarding.value) {
+            return
+        }
         val pending = uiState.value.progress.pending
         if (pending > 0) {
             pendingFinishCount.value = pending
@@ -360,6 +384,9 @@ class ActiveWorkoutViewModel(
     }
 
     fun confirmFinish(skipRemaining: Boolean) {
+        if (discarding.value) {
+            return
+        }
         viewModelScope.launch {
             when (sessionRepository.finish(sessionId, skipRemaining)) {
                 FinishWorkoutResult.Finished, FinishWorkoutResult.AlreadyTerminal -> {
@@ -373,21 +400,48 @@ class ActiveWorkoutViewModel(
     }
 
     fun requestAbandon() {
+        if (discarding.value) {
+            return
+        }
         confirmAbandon.value = true
     }
 
     fun dismissAbandon() {
+        if (discarding.value) {
+            return
+        }
         confirmAbandon.value = false
     }
 
     fun confirmAbandon() {
+        if (discarding.value) {
+            return
+        }
+        discarding.value = true
         viewModelScope.launch {
-            when (sessionRepository.abandon(sessionId)) {
-                AbandonWorkoutResult.Abandoned, AbandonWorkoutResult.AlreadyTerminal -> {
+            val result = try {
+                withContext(NonCancellable) {
+                    sessionRepository.abandon(sessionId)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                AbandonWorkoutResult.Failed
+            }
+            when (result) {
+                AbandonWorkoutResult.Abandoned, AbandonWorkoutResult.NotFound -> {
                     confirmAbandon.value = false
                     abandoned.value = true
                 }
-                AbandonWorkoutResult.NotFound -> Unit
+                AbandonWorkoutResult.AlreadyTerminal -> {
+                    confirmAbandon.value = false
+                    discarding.value = false
+                    finished.value = true
+                }
+                AbandonWorkoutResult.Failed -> {
+                    discarding.value = false
+                    message.value = ActiveWorkoutMessage.DiscardFailed
+                }
             }
         }
     }

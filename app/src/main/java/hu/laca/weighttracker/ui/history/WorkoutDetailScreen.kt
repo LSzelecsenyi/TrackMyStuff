@@ -1,5 +1,7 @@
 package hu.laca.weighttracker.ui.history
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -11,17 +13,27 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
@@ -33,6 +45,7 @@ import hu.laca.weighttracker.domain.workout.SessionSetStatus
 import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.WorkoutSession
 import hu.laca.weighttracker.ui.components.UiFormatters
+import hu.laca.weighttracker.ui.components.UserMessageEffect
 import hu.laca.weighttracker.ui.exercises.labelRes
 import hu.laca.weighttracker.ui.theme.AppDimens
 import java.time.Instant
@@ -46,8 +59,19 @@ import java.util.Locale
 fun WorkoutDetailScreen(
     state: WorkoutDetailUiState,
     onBack: () -> Unit,
-    onOpenActive: (Long) -> Unit
+    onOpenActive: (Long) -> Unit,
+    onRequestDeleteWorkout: () -> Unit,
+    onDismissDeleteWorkout: () -> Unit,
+    onConfirmDeleteWorkout: () -> Unit,
+    onDeleted: () -> Unit,
+    onMessageConsumed: () -> Unit
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
+    BackHandler(enabled = state.deleting) { }
+    LaunchedEffect(state.deleted) {
+        if (state.deleted) onDeleted()
+    }
     LaunchedEffect(state.activeSessionId) {
         val id = state.activeSessionId ?: return@LaunchedEffect
         onOpenActive(id)
@@ -60,15 +84,53 @@ fun WorkoutDetailScreen(
                     Text(session?.templateName ?: stringResource(R.string.workout_detail_title))
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)) {
+                    IconButton(
+                        onClick = onBack,
+                        enabled = !state.deleting,
+                        modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back)
                         )
                     }
+                },
+                actions = {
+                    if (session != null) {
+                        Box {
+                            var menuOpen by remember { mutableStateOf(false) }
+                            IconButton(
+                                onClick = { menuOpen = true },
+                                enabled = !state.deleting,
+                                modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
+                            ) {
+                                Icon(
+                                    Icons.Filled.MoreVert,
+                                    contentDescription = stringResource(R.string.action_more_workout)
+                                )
+                            }
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = stringResource(R.string.action_delete_workout),
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        menuOpen = false
+                                        onRequestDeleteWorkout()
+                                    },
+                                    enabled = !state.deleting,
+                                    modifier = Modifier.testTag(WORKOUT_DELETE_ACTION)
+                                )
+                            }
+                        }
+                    }
                 }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         when {
@@ -155,6 +217,15 @@ fun WorkoutDetailScreen(
                 }
             }
         }
+    }
+    if (state.confirmDelete && session != null) {
+        DeleteWorkoutDialog(
+            name = session.templateName,
+            dateLabel = UiFormatters.longDate(session.workoutDate),
+            deleting = state.deleting,
+            onDismiss = onDismissDeleteWorkout,
+            onConfirm = onConfirmDeleteWorkout
+        )
     }
 }
 

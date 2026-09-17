@@ -155,4 +155,12 @@ sealed class AbandonWorkoutResult {
     data object Abandoned : AbandonWorkoutResult()
     data object AlreadyTerminal : AbandonWorkoutResult()
     data object NotFound : AbandonWorkoutResult()
+    data object Failed : AbandonWorkoutResult()
+}
+
+sealed class DeleteWorkoutResult {
+    data object Deleted : DeleteWorkoutResult()
+    data object NotFound : DeleteWorkoutResult()
+    data object ActiveSession : DeleteWorkoutResult()
+    data object Failed : DeleteWorkoutResult()
 }

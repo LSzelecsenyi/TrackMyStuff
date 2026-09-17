@@ -26,6 +26,8 @@ sealed interface UserMessage {
     data object Created : UserMessage
     data object Updated : UserMessage
     data object Deleted : UserMessage
+    data object WorkoutDeleted : UserMessage
+    data object WorkoutDeleteFailed : UserMessage
     data class ImportSucceeded(val created: Int, val updated: Int) : UserMessage
     data object ExportSucceeded : UserMessage
     data object ExportFailed : UserMessage

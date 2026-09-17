@@ -12,17 +12,23 @@ import hu.laca.weighttracker.domain.journal.JournalAssembler
 import hu.laca.weighttracker.domain.journal.JournalEmptyKind
 import hu.laca.weighttracker.domain.journal.JournalFilter
 import hu.laca.weighttracker.domain.journal.JournalTimeline
+import hu.laca.weighttracker.domain.journal.WorkoutJournalEntry
 import hu.laca.weighttracker.domain.model.SaveOutcome
 import hu.laca.weighttracker.domain.model.WeightMeasurement
+import hu.laca.weighttracker.domain.workout.DeleteWorkoutResult
+import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
 import hu.laca.weighttracker.ui.components.EditorUiState
 import hu.laca.weighttracker.ui.components.UserMessage
 import hu.laca.weighttracker.ui.components.formatWeightInput
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 data class HistoryUiState(
@@ -34,7 +40,9 @@ data class HistoryUiState(
     ),
     val loading: Boolean = true,
     val editor: EditorUiState? = null,
-    val userMessage: UserMessage? = null
+    val userMessage: UserMessage? = null,
+    val pendingWorkoutDelete: WorkoutSessionSummary? = null,
+    val deletingWorkout: Boolean = false
 ) {
     val filter: JournalFilter get() = timeline.filter
     val includeAbandoned: Boolean get() = timeline.includeAbandoned
@@ -53,14 +61,25 @@ class HistoryViewModel(
     private val editor = MutableStateFlow<EditorUiState?>(null)
     private val userMessage = MutableStateFlow<UserMessage?>(null)
     private val measurements = MutableStateFlow<List<WeightMeasurement>>(emptyList())
+    private val pendingWorkoutDelete = MutableStateFlow<WorkoutSessionSummary?>(null)
+    private val deletingWorkout = MutableStateFlow(false)
+
+    private data class HistoryChrome(
+        val editor: EditorUiState?,
+        val userMessage: UserMessage?,
+        val pendingWorkoutDelete: WorkoutSessionSummary?,
+        val deletingWorkout: Boolean
+    )
 
     val uiState: StateFlow<HistoryUiState> = combine(
         measurements,
         sessionRepository.observeSummaries(),
         filter,
         includeAbandoned,
-        combine(editor, userMessage) { editorState, message -> editorState to message }
-    ) { items, summaries, currentFilter, abandoned, extras ->
+        combine(editor, userMessage, pendingWorkoutDelete, deletingWorkout) { editorState, message, pending, deleting ->
+            HistoryChrome(editorState, message, pending, deleting)
+        }
+    ) { items, summaries, currentFilter, abandoned, chrome ->
         val timeline = JournalAssembler.assemble(
             measurements = items,
             summaries = summaries,
@@ -70,8 +89,10 @@ class HistoryViewModel(
         HistoryUiState(
             timeline = timeline,
             loading = false,
-            editor = extras.first,
-            userMessage = extras.second
+            editor = chrome.editor,
+            userMessage = chrome.userMessage,
+            pendingWorkoutDelete = chrome.pendingWorkoutDelete,
+            deletingWorkout = chrome.deletingWorkout
         )
     }.stateIn(
         scope = viewModelScope,
@@ -175,6 +196,60 @@ class HistoryViewModel(
             editor.value = null
             userMessage.value = UserMessage.Deleted
         }
+    }
+
+    fun requestDeleteWorkout(sessionId: Long) {
+        if (deletingWorkout.value) {
+            return
+        }
+        val summary = uiState.value.timeline.entries
+            .filterIsInstance<WorkoutJournalEntry>()
+            .firstOrNull { it.summary.session.id == sessionId }
+            ?.summary
+            ?: return
+        pendingWorkoutDelete.value = summary
+    }
+
+    fun dismissDeleteWorkout() {
+        if (deletingWorkout.value) {
+            return
+        }
+        pendingWorkoutDelete.value = null
+    }
+
+    fun confirmDeleteWorkout() {
+        if (deletingWorkout.value) {
+            return
+        }
+        val target = pendingWorkoutDelete.value ?: return
+        deletingWorkout.value = true
+        viewModelScope.launch {
+            val result = try {
+                withContext(NonCancellable) {
+                    sessionRepository.deleteWorkout(target.session.id)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                DeleteWorkoutResult.Failed
+            }
+            deletingWorkout.value = false
+            when (result) {
+                DeleteWorkoutResult.Deleted -> {
+                    pendingWorkoutDelete.value = null
+                    userMessage.value = UserMessage.WorkoutDeleted
+                }
+                DeleteWorkoutResult.NotFound,
+                DeleteWorkoutResult.ActiveSession,
+                DeleteWorkoutResult.Failed -> {
+                    userMessage.value = UserMessage.WorkoutDeleteFailed
+                }
+            }
+        }
+    }
+
+    fun showWorkoutDeleted() {
+        userMessage.value = UserMessage.WorkoutDeleted
     }
 
     fun consumeMessage() {

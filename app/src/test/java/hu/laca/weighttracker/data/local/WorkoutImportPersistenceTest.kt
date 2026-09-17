@@ -175,6 +175,26 @@ class WorkoutImportPersistenceTest {
     }
 
     @Test
+    fun deletedImportedWorkoutCanBeImportedAgain() = runTest {
+        seedCatalogAndWeights()
+        val plan = resolvedOneSet("Pullup")
+        val imported = sessions.importCompletedWorkouts(plan) as WorkoutImportPersistenceResult.Imported
+        val sessionId = imported.sessionIds.single()
+        val fingerprint = database.workoutSessionDao().getById(sessionId)!!.importFingerprint
+        assertNotNull(fingerprint)
+        assertEquals(
+            hu.laca.weighttracker.domain.workout.DeleteWorkoutResult.Deleted,
+            sessions.deleteWorkout(sessionId)
+        )
+        assertNull(database.workoutSessionDao().getById(sessionId))
+        assertTrue(sessions.existingImportFingerprints().isEmpty())
+        val second = sessions.importCompletedWorkouts(plan)
+        assertTrue(second.toString(), second is WorkoutImportPersistenceResult.Imported)
+        val reimported = (second as WorkoutImportPersistenceResult.Imported).sessionIds.single()
+        assertEquals(fingerprint, database.workoutSessionDao().getById(reimported)!!.importFingerprint)
+    }
+
+    @Test
     fun uniqueIndexRejectsARacedDuplicateFingerprint() = runTest {
         seedCatalogAndWeights()
         val plan = resolvedOneSet("Pullup")

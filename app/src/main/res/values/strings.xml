@@ -337,6 +337,8 @@
     <string name="action_resume_workout">Edzés folytatása</string>
     <string name="action_finish_workout">Edzés befejezése</string>
     <string name="action_abandon_workout">Edzés elvetése</string>
+    <string name="action_continue_workout">Folytatom az edzést</string>
+    <string name="action_delete_workout">Edzés törlése</string>
     <string name="action_complete_set">Kész</string>
     <string name="action_complete_set_a11y">Sorozat befejezése</string>
     <string name="action_save_set">Mentés</string>
@@ -354,6 +356,7 @@
     <string name="action_return_to_workout">Vissza az edzéshez</string>
     <string name="action_finish_skip_remaining">Befejezés, a maradék kihagyásával</string>
     <string name="action_more_workout">További edzésműveletek</string>
+    <string name="workout_card_more_actions">További műveletek: %1$s</string>
     <string name="start_workout_title">Edzés indítása</string>
     <string name="start_workout_body">%1$d gyakorlat · %2$d tervezett sorozat</string>
     <string name="start_weight_same_day">A mai mérésből: %1$s</string>
@@ -369,7 +372,7 @@
     <string name="message_workout_template_archived">Archivált edzéstervből nem indítható új edzés.</string>
     <string name="message_workout_template_empty">Az edzéstervben nincs gyakorlat vagy sorozat.</string>
     <string name="message_workout_finished">Az edzés befejezve.</string>
-    <string name="message_workout_abandoned">Az edzés elvetve. A feljegyzés megmaradt.</string>
+    <string name="message_workout_abandoned">Az edzés elvetve.</string>
     <string name="message_extra_set_added">Extra sorozat hozzáadva.</string>
     <string name="message_extra_set_removed">Extra sorozat törölve.</string>
     <string name="message_cannot_remove_original">A tervezett sorozat nem törölhető, csak kihagyható.</string>
@@ -394,8 +397,8 @@
     <string name="finish_pending_body">Még %1$d befejezetlen sorozat van.</string>
     <string name="finish_confirm_title">Edzés befejezése</string>
     <string name="finish_confirm_body">Befejezed az edzést? Ezután ebből a nézetből már nem szerkeszthető.</string>
-    <string name="abandon_title">Edzés elvetése</string>
-    <string name="abandon_body">Elveted az edzést? A feljegyzés elvetettként megmarad a későbbi naplóhoz, de nem folytatható.</string>
+    <string name="abandon_title">Elveted az edzést?</string>
+    <string name="abandon_body">Az eddig rögzített sorozatok véglegesen elvesznek, és az edzés nem kerül be a Naplóba.</string>
     <string name="field_actual_reps">Tényleges ismétlés</string>
     <string name="weight_interpretation_hint_total">Teljes súly</string>
     <string name="weight_interpretation_hint_per_side">Kézenként / oldalanként</string>
@@ -422,6 +425,12 @@
     <string name="workout_detail_finished">Befejezve: %1$s</string>
     <string name="workout_detail_abandoned_at">Elvetve: %1$s</string>
     <string name="workout_detail_counts">%1$d gyakorlat · %2$d kész, %3$d kihagyva, %4$d összesen</string>
+    <string name="delete_workout_title">Edzés törlése?</string>
+    <string name="delete_workout_name_date">%1$s · %2$s</string>
+    <string name="delete_workout_body">Az edzés, a gyakorlatok és a rögzített sorozatok véglegesen törlődnek. Ez nem vonható vissza.</string>
+    <string name="message_workout_deleted">Az edzés törölve.</string>
+    <string name="message_workout_delete_failed">Az edzést nem sikerült törölni. Az adatok megmaradtak.</string>
+    <string name="message_workout_discard_failed">Az edzést nem sikerült elvetni. Az edzés megmaradt.</string>
     <string name="workout_detail_planned">Terv: %1$s</string>
     <string name="workout_detail_performed">Teljesítve: %1$s</string>
     <string name="workout_detail_extra">Edzés közben hozzáadva</string>

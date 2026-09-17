@@ -31,6 +31,7 @@ import hu.laca.weighttracker.domain.workout.StartWorkoutResult
 import hu.laca.weighttracker.domain.workout.TemplateDraft
 import hu.laca.weighttracker.domain.workout.TemplateExerciseDraft
 import hu.laca.weighttracker.domain.workout.TemplateSaveResult
+import hu.laca.weighttracker.ui.components.UserMessage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -188,7 +189,7 @@ class WorkoutDetailViewModelTest {
         assertFalse(WorkoutDetailViewModel::class.java.declaredMethods.map { it.name }.any { name ->
             name.contains("complete", ignoreCase = true) ||
                 name.contains("finish", ignoreCase = true) ||
-                name.contains("edit", ignoreCase = true) ||
+                (name.contains("edit", ignoreCase = true) && !name.contains("delete", ignoreCase = true)) ||
                 name.contains("reopen", ignoreCase = true)
         })
     }
@@ -205,11 +206,75 @@ class WorkoutDetailViewModelTest {
         assertEquals(BodyWeightSource.UNKNOWN, state.aggregate.session.bodyWeightSource)
     }
 
+    @Test
+    fun dismissDeleteKeepsTheCompletedWorkout() = runTest {
+        val sessionId = completePushA()
+        val viewModel = detail(sessionId)
+        viewModel.uiState.first { !it.loading && it.aggregate != null }
+        viewModel.requestDeleteWorkout()
+        assertTrue(viewModel.uiState.value.confirmDelete)
+        viewModel.dismissDeleteWorkout()
+        assertFalse(viewModel.uiState.value.confirmDelete)
+        assertFalse(viewModel.uiState.value.deleting)
+        assertFalse(viewModel.uiState.value.deleted)
+        assertEquals(SessionStatus.COMPLETED, sessions.getAggregate(sessionId)!!.session.status)
+    }
+
+    @Test
+    fun confirmDeleteRemovesAggregateAndMarksDeleted() = runTest {
+        val sessionId = completePushA()
+        val viewModel = detail(sessionId)
+        viewModel.uiState.first { !it.loading && it.aggregate != null }
+        viewModel.requestDeleteWorkout()
+        viewModel.confirmDeleteWorkout()
+        val state = viewModel.uiState.first { it.deleted }
+        assertTrue(state.deleted)
+        assertNull(sessions.getAggregate(sessionId))
+    }
+
+    @Test
+    fun doubleConfirmDeleteStartsOnlyOneRepositoryDelete() = runTest {
+        val sessionId = completePushA()
+        val viewModel = detail(sessionId)
+        viewModel.uiState.first { !it.loading && it.aggregate != null }
+        viewModel.confirmDeleteWorkout()
+        viewModel.confirmDeleteWorkout()
+        viewModel.uiState.first { it.deleted }
+        assertNull(sessions.getAggregate(sessionId))
+        assertTrue(database.workoutSessionDao().observeAll().first().isEmpty())
+    }
+
+    @Test
+    fun repositoryFailureKeepsTheUserOnTheDetailScreen() = runTest {
+        val sessionId = completePushA()
+        val viewModel = detail(sessionId)
+        viewModel.uiState.first { !it.loading && it.aggregate != null }
+        viewModel.requestDeleteWorkout()
+        assertEquals(
+            hu.laca.weighttracker.domain.workout.DeleteWorkoutResult.Deleted,
+            sessions.deleteWorkout(sessionId)
+        )
+        viewModel.confirmDeleteWorkout()
+        val state = viewModel.uiState.first { it.userMessage == UserMessage.WorkoutDeleteFailed }
+        assertEquals(UserMessage.WorkoutDeleteFailed, state.userMessage)
+        assertFalse(state.deleted)
+        assertFalse(state.deleting)
+    }
+
     private fun detail(sessionId: Long): WorkoutDetailViewModel {
         return WorkoutDetailViewModel(
             SavedStateHandle(mapOf(WorkoutDetailViewModel.SESSION_ID to sessionId)),
             sessions
         )
+    }
+
+    private suspend fun completePushA(): Long {
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+            as StartWorkoutResult.Started
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(started.sessionId, skipRemaining = true))
+        return started.sessionId
     }
 
     private suspend fun savePull(): Long {

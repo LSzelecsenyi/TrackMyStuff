@@ -15,6 +15,7 @@ import hu.laca.weighttracker.domain.WeightParser
 import hu.laca.weighttracker.domain.exercise.ExerciseEnumCodec
 import hu.laca.weighttracker.domain.exercise.MuscleRole
 import hu.laca.weighttracker.domain.workout.AbandonWorkoutResult
+import hu.laca.weighttracker.domain.workout.DeleteWorkoutResult
 import hu.laca.weighttracker.domain.workout.ActiveSessionSummary
 import hu.laca.weighttracker.domain.workout.ActualSetDraft
 import hu.laca.weighttracker.domain.workout.ActualSetLogic
@@ -38,11 +39,14 @@ import hu.laca.weighttracker.domain.workoutimport.WorkoutImportPersistenceResult
 import hu.laca.weighttracker.domain.workoutimport.WorkoutImportPlan
 import hu.laca.weighttracker.domain.workoutimport.WorkoutImportResolvedWorkout
 import hu.laca.weighttracker.domain.workout.PlannedLoadKind
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -523,6 +527,27 @@ class WorkoutSessionRepository(
         SessionMutationResult.Updated
     }
 
+    suspend fun deleteWorkout(sessionId: Long): DeleteWorkoutResult = mutex.withLock {
+        withContext(NonCancellable) {
+            try {
+                val session = sessionDao.getById(sessionId) ?: return@withContext DeleteWorkoutResult.NotFound
+                if (session.status == SessionStatus.IN_PROGRESS.name) {
+                    return@withContext DeleteWorkoutResult.ActiveSession
+                }
+                val deleted = sessionDao.deleteSessionAggregate(sessionId)
+                if (deleted <= 0) {
+                    DeleteWorkoutResult.NotFound
+                } else {
+                    DeleteWorkoutResult.Deleted
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                DeleteWorkoutResult.Failed
+            }
+        }
+    }
+
     suspend fun finish(sessionId: Long, skipRemaining: Boolean): FinishWorkoutResult = mutex.withLock {
         val session = sessionDao.getById(sessionId) ?: return FinishWorkoutResult.NotFound
         if (session.status != SessionStatus.IN_PROGRESS.name) {
@@ -559,20 +584,24 @@ class WorkoutSessionRepository(
     }
 
     suspend fun abandon(sessionId: Long): AbandonWorkoutResult = mutex.withLock {
-        val session = sessionDao.getById(sessionId) ?: return AbandonWorkoutResult.NotFound
-        if (session.status != SessionStatus.IN_PROGRESS.name) {
-            return AbandonWorkoutResult.AlreadyTerminal
+        withContext(NonCancellable) {
+            try {
+                val session = sessionDao.getById(sessionId) ?: return@withContext AbandonWorkoutResult.NotFound
+                if (session.status != SessionStatus.IN_PROGRESS.name) {
+                    return@withContext AbandonWorkoutResult.AlreadyTerminal
+                }
+                val deleted = sessionDao.deleteSessionAggregate(sessionId)
+                if (deleted <= 0) {
+                    AbandonWorkoutResult.NotFound
+                } else {
+                    AbandonWorkoutResult.Abandoned
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                AbandonWorkoutResult.Failed
+            }
         }
-        val now = clock.millis()
-        sessionDao.updateSession(
-            session.copy(
-                status = SessionStatus.ABANDONED.name,
-                abandonedAt = now,
-                updatedAt = now,
-                activeLock = SessionStatus.ABANDONED.activeLock()
-            )
-        )
-        AbandonWorkoutResult.Abandoned
     }
 
     fun observeReferencedTemplateIds(): Flow<Set<Long>> {

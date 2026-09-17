@@ -2,6 +2,7 @@ package hu.laca.weighttracker.ui.history
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,8 +17,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -31,9 +35,13 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -86,7 +94,10 @@ fun HistoryScreen(
     onOpenImport: () -> Unit,
     onFilterSelected: (JournalFilter) -> Unit,
     onIncludeAbandoned: (Boolean) -> Unit,
-    onOpenWorkout: (Long) -> Unit
+    onOpenWorkout: (Long) -> Unit,
+    onRequestDeleteWorkout: (Long) -> Unit,
+    onDismissDeleteWorkout: () -> Unit,
+    onConfirmDeleteWorkout: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
@@ -190,9 +201,11 @@ fun HistoryScreen(
                         items(group.entries, key = { it.key }) { entry ->
                             JournalEntryRow(
                                 entry = entry,
+                                deleting = state.deletingWorkout,
                                 onEdit = onEdit,
                                 onDelete = onDelete,
-                                onOpenWorkout = onOpenWorkout
+                                onOpenWorkout = onOpenWorkout,
+                                onRequestDeleteWorkout = onRequestDeleteWorkout
                             )
                         }
                     }
@@ -214,14 +227,25 @@ fun HistoryScreen(
             onDeleteConfirm = onDeleteConfirm
         )
     }
+    state.pendingWorkoutDelete?.let { pending ->
+        DeleteWorkoutDialog(
+            name = pending.session.templateName,
+            dateLabel = UiFormatters.longDate(pending.session.workoutDate),
+            deleting = state.deletingWorkout,
+            onDismiss = onDismissDeleteWorkout,
+            onConfirm = onConfirmDeleteWorkout
+        )
+    }
 }
 
 @Composable
 private fun JournalEntryRow(
     entry: JournalEntry,
+    deleting: Boolean,
     onEdit: (LocalDate) -> Unit,
     onDelete: (LocalDate) -> Unit,
-    onOpenWorkout: (Long) -> Unit
+    onOpenWorkout: (Long) -> Unit,
+    onRequestDeleteWorkout: (Long) -> Unit
 ) {
     when (entry) {
         is WeightJournalEntry -> MeasurementRow(
@@ -231,7 +255,9 @@ private fun JournalEntryRow(
         )
         is WorkoutJournalEntry -> WorkoutJournalCard(
             entry = entry,
-            onOpen = { onOpenWorkout(entry.summary.session.id) }
+            deleting = deleting,
+            onOpen = { onOpenWorkout(entry.summary.session.id) },
+            onRequestDelete = { onRequestDeleteWorkout(entry.summary.session.id) }
         )
     }
 }
@@ -239,7 +265,9 @@ private fun JournalEntryRow(
 @Composable
 private fun WorkoutJournalCard(
     entry: WorkoutJournalEntry,
-    onOpen: () -> Unit
+    deleting: Boolean,
+    onOpen: () -> Unit,
+    onRequestDelete: () -> Unit
 ) {
     val summary = entry.summary
     val started = Instant.ofEpochMilli(summary.session.startedAt)
@@ -266,10 +294,45 @@ private fun WorkoutJournalCard(
         }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = summary.session.templateName,
-                style = MaterialTheme.typography.titleMedium
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = summary.session.templateName,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Box {
+                    var menuOpen by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        enabled = !deleting,
+                        modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = stringResource(
+                                R.string.workout_card_more_actions,
+                                summary.session.templateName
+                            )
+                        )
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.action_delete_workout),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onRequestDelete()
+                            },
+                            enabled = !deleting,
+                            modifier = Modifier.testTag(WORKOUT_DELETE_ACTION)
+                        )
+                    }
+                }
+            }
             Text(
                 text = stringResource(
                     if (entry.abandoned) R.string.workout_status_abandoned else R.string.workout_status_completed
@@ -379,7 +442,10 @@ private fun HistoryPreview() {
             onOpenImport = {},
             onFilterSelected = {},
             onIncludeAbandoned = {},
-            onOpenWorkout = {}
+            onOpenWorkout = {},
+            onRequestDeleteWorkout = {},
+            onDismissDeleteWorkout = {},
+            onConfirmDeleteWorkout = {}
         )
     }
 }

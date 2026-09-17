@@ -22,6 +22,7 @@ import hu.laca.weighttracker.domain.exercise.WeightInterpretation
 import hu.laca.weighttracker.domain.workout.PlannedLoadKind
 import hu.laca.weighttracker.domain.workout.PlannedSetDraft
 import hu.laca.weighttracker.domain.workout.SessionSetStatus
+import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
 import hu.laca.weighttracker.domain.workout.TemplateDraft
 import hu.laca.weighttracker.domain.workout.TemplateExerciseDraft
@@ -34,6 +35,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -308,8 +310,8 @@ class ActiveWorkoutViewModelTest {
     fun repositoryErrorKeepsCurrentSetActive() = runTest {
         val viewModel = startSingleSet()
         val set = viewModel.loaded().aggregate!!.exercises[0].sets.single()
-        viewModel.confirmAbandon()
-        awaitReal { viewModel.uiState.first { it.abandoned } }
+        viewModel.confirmFinish(true)
+        awaitReal { viewModel.uiState.first { it.finished } }
         viewModel.completeSet(set.id)
         val state = awaitReal {
             viewModel.uiState.first { snapshot ->
@@ -319,8 +321,43 @@ class ActiveWorkoutViewModelTest {
         }
         assertEquals(ActiveWorkoutMessage.SaveFailed, state.message)
         assertNull(state.focusEvent)
-        assertEquals(set.id, viewModel.uiState.value.currentSetId)
-        assertEquals(SessionSetStatus.PENDING, sessions.getAggregate(sessionId)!!.exercises[0].sets.single().status)
+        assertEquals(SessionSetStatus.SKIPPED, sessions.getAggregate(sessionId)!!.exercises[0].sets.single().status)
+    }
+
+    @Test
+    fun confirmAbandonDeletesSessionWithoutAbandonedJournalEntry() = runTest {
+        val viewModel = startSingleSet()
+        viewModel.loaded()
+        viewModel.confirmAbandon()
+        awaitReal { viewModel.uiState.first { it.abandoned } }
+        assertNull(sessions.getAggregate(sessionId))
+        assertNull(sessions.observeInProgress().first())
+        assertTrue(sessions.observeSummaries().first().isEmpty())
+        assertTrue(viewModel.uiState.value.discarding)
+    }
+
+    @Test
+    fun dismissAbandonLeavesActiveSessionUnchanged() = runTest {
+        val viewModel = startSingleSet()
+        viewModel.loaded()
+        viewModel.requestAbandon()
+        assertTrue(viewModel.uiState.value.confirmAbandon)
+        viewModel.dismissAbandon()
+        assertFalse(viewModel.uiState.value.confirmAbandon)
+        assertFalse(viewModel.uiState.value.discarding)
+        assertEquals(SessionStatus.IN_PROGRESS, sessions.getAggregate(sessionId)!!.session.status)
+        assertEquals(1, sessions.getAggregate(sessionId)!!.exercises.single().sets.size)
+    }
+
+    @Test
+    fun doubleConfirmAbandonDoesNotRestartDelete() = runTest {
+        val viewModel = startSingleSet()
+        viewModel.loaded()
+        viewModel.confirmAbandon()
+        viewModel.confirmAbandon()
+        awaitReal { viewModel.uiState.first { it.abandoned } }
+        assertNull(sessions.getAggregate(sessionId))
+        assertTrue(database.workoutSessionDao().observeAll().first().isEmpty())
     }
 
     @Test

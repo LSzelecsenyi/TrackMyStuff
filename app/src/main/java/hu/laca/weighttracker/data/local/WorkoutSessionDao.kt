@@ -174,6 +174,14 @@ abstract class WorkoutSessionDao {
     @Query("DELETE FROM workout_session_sets WHERE id = :id")
     abstract suspend fun deleteSet(id: Long)
 
+    @Query("DELETE FROM workout_sessions WHERE id = :id")
+    abstract suspend fun deleteSessionById(id: Long): Int
+
+    @Transaction
+    open suspend fun deleteSessionAggregate(id: Long): Int {
+        return deleteSessionById(id)
+    }
+
     @Query("UPDATE workout_session_sets SET position = :position WHERE id = :id")
     abstract suspend fun updateSetPosition(id: Long, position: Int)
 

@@ -6,14 +6,21 @@ import androidx.lifecycle.viewModelScope
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.domain.journal.WorkoutSetCopy
 import hu.laca.weighttracker.domain.journal.WorkoutSetDisplay
+import hu.laca.weighttracker.domain.workout.DeleteWorkoutResult
 import hu.laca.weighttracker.domain.workout.SessionProgress
 import hu.laca.weighttracker.domain.workout.SessionProgressLogic
 import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.WorkoutSessionAggregate
+import hu.laca.weighttracker.ui.components.UserMessage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class WorkoutDetailUiState(
     val loading: Boolean = true,
@@ -21,45 +28,133 @@ data class WorkoutDetailUiState(
     val activeSessionId: Long? = null,
     val aggregate: WorkoutSessionAggregate? = null,
     val progress: SessionProgress = SessionProgress(0, 0, 0, 0),
-    val setDisplays: Map<Long, WorkoutSetDisplay> = emptyMap()
+    val setDisplays: Map<Long, WorkoutSetDisplay> = emptyMap(),
+    val confirmDelete: Boolean = false,
+    val deleting: Boolean = false,
+    val deleted: Boolean = false,
+    val userMessage: UserMessage? = null
 )
 
 class WorkoutDetailViewModel(
     savedStateHandle: SavedStateHandle,
-    sessionRepository: WorkoutSessionRepository
+    private val sessionRepository: WorkoutSessionRepository
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(SESSION_ID) ?: -1L
+    private val confirmDelete = MutableStateFlow(false)
+    private val deleting = MutableStateFlow(false)
+    private val deleted = MutableStateFlow(false)
+    private val userMessage = MutableStateFlow<UserMessage?>(null)
 
-    val uiState: StateFlow<WorkoutDetailUiState> = sessionRepository.observeAggregate(sessionId)
-        .map { aggregate ->
-            when {
-                sessionId <= 0L || aggregate == null -> WorkoutDetailUiState(
-                    loading = false,
-                    missing = true
-                )
-                aggregate.session.status == SessionStatus.IN_PROGRESS -> WorkoutDetailUiState(
-                    loading = false,
-                    activeSessionId = aggregate.session.id
-                )
-                else -> WorkoutDetailUiState(
-                    loading = false,
-                    aggregate = aggregate,
-                    progress = SessionProgressLogic.fromAggregate(aggregate),
-                    setDisplays = buildMap {
-                        aggregate.exercises.forEach { item ->
-                            item.sets.forEach { set ->
-                                put(set.id, WorkoutSetCopy.display(set, item.exercise))
-                            }
+    private data class DetailChrome(
+        val confirmDelete: Boolean,
+        val deleting: Boolean,
+        val deleted: Boolean,
+        val userMessage: UserMessage?
+    )
+
+    val uiState: StateFlow<WorkoutDetailUiState> = combine(
+        sessionRepository.observeAggregate(sessionId),
+        combine(confirmDelete, deleting, deleted, userMessage) { confirm, inFlight, gone, message ->
+            DetailChrome(confirm, inFlight, gone, message)
+        }
+    ) { aggregate, chrome ->
+        if (chrome.deleted) {
+            return@combine WorkoutDetailUiState(
+                loading = false,
+                deleted = true,
+                deleting = chrome.deleting,
+                userMessage = chrome.userMessage
+            )
+        }
+        when {
+            sessionId <= 0L || (aggregate == null && !chrome.deleting) -> WorkoutDetailUiState(
+                loading = false,
+                missing = true,
+                confirmDelete = chrome.confirmDelete,
+                deleting = chrome.deleting,
+                userMessage = chrome.userMessage
+            )
+            aggregate == null -> WorkoutDetailUiState(
+                loading = false,
+                deleting = true,
+                userMessage = chrome.userMessage
+            )
+            aggregate.session.status == SessionStatus.IN_PROGRESS -> WorkoutDetailUiState(
+                loading = false,
+                activeSessionId = aggregate.session.id,
+                confirmDelete = chrome.confirmDelete,
+                deleting = chrome.deleting,
+                userMessage = chrome.userMessage
+            )
+            else -> WorkoutDetailUiState(
+                loading = false,
+                aggregate = aggregate,
+                progress = SessionProgressLogic.fromAggregate(aggregate),
+                setDisplays = buildMap {
+                    aggregate.exercises.forEach { item ->
+                        item.sets.forEach { set ->
+                            put(set.id, WorkoutSetCopy.display(set, item.exercise))
                         }
                     }
-                )
+                },
+                confirmDelete = chrome.confirmDelete,
+                deleting = chrome.deleting,
+                userMessage = chrome.userMessage
+            )
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = WorkoutDetailUiState()
+    )
+
+    fun requestDeleteWorkout() {
+        if (deleting.value || deleted.value) {
+            return
+        }
+        confirmDelete.value = true
+    }
+
+    fun dismissDeleteWorkout() {
+        if (deleting.value) {
+            return
+        }
+        confirmDelete.value = false
+    }
+
+    fun confirmDeleteWorkout() {
+        if (deleting.value || deleted.value || sessionId <= 0L) {
+            return
+        }
+        deleting.value = true
+        viewModelScope.launch {
+            val result = try {
+                withContext(NonCancellable) {
+                    sessionRepository.deleteWorkout(sessionId)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                DeleteWorkoutResult.Failed
+            }
+            when (result) {
+                DeleteWorkoutResult.Deleted -> {
+                    confirmDelete.value = false
+                    deleted.value = true
+                }
+                DeleteWorkoutResult.NotFound,
+                DeleteWorkoutResult.ActiveSession,
+                DeleteWorkoutResult.Failed -> {
+                    deleting.value = false
+                    userMessage.value = UserMessage.WorkoutDeleteFailed
+                }
             }
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = WorkoutDetailUiState()
-        )
+    }
+
+    fun consumeMessage() {
+        userMessage.value = null
+    }
 
     companion object {
         const val SESSION_ID = "sessionId"

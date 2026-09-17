@@ -1,5 +1,6 @@
 package hu.laca.weighttracker.ui.workout
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -107,6 +109,11 @@ internal const val WORKOUT_FINISH_CTA_STRONG = "workout-finish-cta-strong"
 internal const val SET_COMPLETE_ACTION = "complete-set"
 internal const val SET_SKIP_ACTION = "skip-set"
 internal const val SET_COMPLETE_PROGRESS = "complete-set-progress"
+internal const val SET_CURRENT_ACTIONS = "current-set-actions"
+internal const val WORKOUT_TOP_BAR = "workout-top-bar"
+internal const val WORKOUT_OVERFLOW_ANCHOR = "workout-overflow-anchor"
+internal const val WORKOUT_OVERFLOW_BUTTON = "workout-overflow-button"
+internal const val WORKOUT_OVERFLOW_MENU = "workout-overflow-menu"
 
 internal fun workoutExerciseKey(exerciseId: Long): String = "exercise-$exerciseId"
 
@@ -193,6 +200,7 @@ fun ActiveWorkoutScreen(
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
     }
+    BackHandler(enabled = state.discarding) { }
     LaunchedEffect(state.finished) {
         if (state.finished) onFinished()
     }
@@ -261,6 +269,7 @@ fun ActiveWorkoutScreen(
                 if (allResolved) {
                     Button(
                         onClick = onRequestFinish,
+                        enabled = !state.discarding,
                         shape = AppShapeTokens.button,
                         modifier = finishModifier
                     ) {
@@ -269,6 +278,7 @@ fun ActiveWorkoutScreen(
                 } else {
                     OutlinedButton(
                         onClick = onRequestFinish,
+                        enabled = !state.discarding,
                         shape = AppShapeTokens.button,
                         modifier = finishModifier
                     ) {
@@ -288,7 +298,8 @@ fun ActiveWorkoutScreen(
             ConsoleTopBar(
                 title = aggregate?.session?.templateName ?: stringResource(R.string.active_workout_title),
                 onBack = onBack,
-                onRequestAbandon = onRequestAbandon
+                onRequestAbandon = onRequestAbandon,
+                discarding = state.discarding
             )
             if (aggregate == null) {
                 return@Column
@@ -315,6 +326,7 @@ fun ActiveWorkoutScreen(
                         currentSetId = state.currentSetId,
                         focusGeneration = state.focusEvent?.generation,
                         listState = listState,
+                        discarding = state.discarding,
                         onToggle = { onToggleExercise(item.exercise.id) },
                         onReps = onReps,
                         onLoadKind = onLoadKind,
@@ -411,11 +423,14 @@ fun ActiveWorkoutScreen(
     }
     if (state.confirmAbandon) {
         AlertDialog(
-            onDismissRequest = onDismissAbandon,
+            onDismissRequest = { if (!state.discarding) onDismissAbandon() },
             title = { Text(stringResource(R.string.abandon_title)) },
             text = { Text(stringResource(R.string.abandon_body)) },
             confirmButton = {
-                TextButton(onClick = onConfirmAbandon) {
+                TextButton(
+                    onClick = onConfirmAbandon,
+                    enabled = !state.discarding
+                ) {
                     Text(
                         text = stringResource(R.string.action_abandon_workout),
                         color = MaterialTheme.colorScheme.error
@@ -423,8 +438,11 @@ fun ActiveWorkoutScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismissAbandon) {
-                    Text(stringResource(R.string.action_cancel))
+                TextButton(
+                    onClick = onDismissAbandon,
+                    enabled = !state.discarding
+                ) {
+                    Text(stringResource(R.string.action_continue_workout))
                 }
             }
         )
@@ -458,16 +476,18 @@ fun ActiveWorkoutScreen(
 private fun ConsoleTopBar(
     title: String,
     onBack: () -> Unit,
-    onRequestAbandon: () -> Unit
+    onRequestAbandon: () -> Unit,
+    discarding: Boolean
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp)
-            .defaultMinSize(minHeight = AppDimens.minTouch),
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag(WORKOUT_TOP_BAR),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, enabled = !discarding) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = stringResource(R.string.action_back)
@@ -481,25 +501,44 @@ private fun ConsoleTopBar(
             modifier = Modifier.weight(1f)
         )
         var menuOpen by remember { mutableStateOf(false) }
-        IconButton(onClick = { menuOpen = true }) {
-            Icon(
-                Icons.Filled.MoreVert,
-                contentDescription = stringResource(R.string.action_more_workout)
-            )
-        }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(R.string.action_abandon_workout),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                },
-                onClick = {
-                    menuOpen = false
-                    onRequestAbandon()
-                }
-            )
+        Box(
+            modifier = Modifier
+                .wrapContentSize(Alignment.TopEnd)
+                .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
+                .testTag(WORKOUT_OVERFLOW_ANCHOR),
+            contentAlignment = Alignment.TopEnd
+        ) {
+            IconButton(
+                onClick = { menuOpen = true },
+                enabled = !discarding,
+                modifier = Modifier
+                    .size(AppDimens.minTouch)
+                    .testTag(WORKOUT_OVERFLOW_BUTTON)
+            ) {
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = stringResource(R.string.action_more_workout)
+                )
+            }
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                modifier = Modifier.testTag(WORKOUT_OVERFLOW_MENU)
+            ) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(R.string.action_abandon_workout),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    onClick = {
+                        menuOpen = false
+                        onRequestAbandon()
+                    },
+                    enabled = !discarding
+                )
+            }
         }
     }
 }
@@ -571,6 +610,7 @@ private fun ExerciseBlock(
     currentSetId: Long?,
     focusGeneration: Long?,
     listState: LazyListState,
+    discarding: Boolean,
     onToggle: () -> Unit,
     onReps: (Long, String) -> Unit,
     onLoadKind: (Long, PlannedLoadKind) -> Unit,
@@ -665,7 +705,7 @@ private fun ExerciseBlock(
                     draft = state.drafts[set.id] ?: ActualSetLogic.draftFromSet(set),
                     errors = state.setErrors[set.id].orEmpty(),
                     dirty = set.id in state.dirtySetIds,
-                    completing = set.id in state.completingSetIds,
+                    completing = discarding || set.id in state.completingSetIds,
                     current = set.id == currentSetId,
                     editing = set.id in editingIds,
                     focusGeneration = focusGeneration,
@@ -863,15 +903,16 @@ private fun SetRow(
             SessionSetStatus.PENDING -> {
                 if (current) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(SET_CURRENT_ACTIONS),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         SkipSetAction(
                             enabled = !completing,
                             onClick = onSkip
                         )
-                        Spacer(Modifier.width(4.dp))
                         CompleteSetAction(
                             completing = completing,
                             accent = currentGreen,
@@ -1245,5 +1286,6 @@ private fun ActiveWorkoutMessage.labelRes(): Int {
         ActiveWorkoutMessage.ExtraRemoved -> R.string.message_extra_set_removed
         ActiveWorkoutMessage.CannotRemoveOriginal -> R.string.message_cannot_remove_original
         ActiveWorkoutMessage.SaveFailed -> R.string.message_set_save_failed
+        ActiveWorkoutMessage.DiscardFailed -> R.string.message_workout_discard_failed
     }
 }

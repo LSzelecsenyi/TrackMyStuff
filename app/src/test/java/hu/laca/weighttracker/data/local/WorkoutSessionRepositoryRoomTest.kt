@@ -238,7 +238,9 @@ class WorkoutSessionRepositoryRoomTest {
         val second = sessions.start(other, "", sessions.proposeBodyWeight(), false) as StartWorkoutResult.Started
         assertEquals(AbandonWorkoutResult.Abandoned, sessions.abandon(second.sessionId))
         assertNull(sessions.observeInProgress().first())
-        assertEquals(SessionStatus.ABANDONED, sessions.getAggregate(second.sessionId)!!.session.status)
+        assertNull(sessions.getAggregate(second.sessionId))
+        val restarted = sessions.start(other, "", sessions.proposeBodyWeight(), false)
+        assertTrue(restarted is StartWorkoutResult.Started)
     }
 
     @Test
@@ -278,9 +280,24 @@ class WorkoutSessionRepositoryRoomTest {
         val completed = sessions.start(firstTemplate, "88,3", sessions.proposeBodyWeight(), false)
             as StartWorkoutResult.Started
         assertEquals(FinishWorkoutResult.Finished, sessions.finish(completed.sessionId, skipRemaining = true))
-        val abandoned = sessions.start(secondTemplate, "", sessions.proposeBodyWeight(), false)
-            as StartWorkoutResult.Started
-        assertEquals(AbandonWorkoutResult.Abandoned, sessions.abandon(abandoned.sessionId))
+        val abandonedId = database.workoutSessionDao().insertSession(
+            WorkoutSessionEntity(
+                templateId = secondTemplate,
+                templateName = "Legacy abandoned",
+                status = SessionStatus.ABANDONED.name,
+                workoutDate = today.toString(),
+                startedAt = 3L,
+                finishedAt = null,
+                abandonedAt = 4L,
+                notes = null,
+                bodyWeightKg = null,
+                bodyWeightSource = BodyWeightSource.UNKNOWN.name,
+                bodyWeightSourceDate = null,
+                createdAt = 3L,
+                updatedAt = 4L,
+                activeLock = null
+            )
+        )
         database.workoutSessionDao().insertSession(
             WorkoutSessionEntity(
                 templateId = firstTemplate,
@@ -315,7 +332,7 @@ class WorkoutSessionRepositoryRoomTest {
             LocalDate.parse("2026-09-15"),
             LocalDate.parse("2026-09-15")
         ).first()
-        assertEquals(setOf(completed.sessionId, abandoned.sessionId), between.map { it.session.id }.toSet())
+        assertEquals(setOf(completed.sessionId, abandonedId), between.map { it.session.id }.toSet())
         assertTrue(between.none { it.session.workoutDate != today })
         val onDate = sessions.observeSummariesOnDate(today).first()
             .filter { it.session.status == SessionStatus.COMPLETED }

@@ -50,7 +50,10 @@ class HistoryImportActionTest {
                     onOpenImport = { opened += 1 },
                     onFilterSelected = {},
                     onIncludeAbandoned = {},
-                    onOpenWorkout = {}
+                    onOpenWorkout = {},
+                    onRequestDeleteWorkout = {},
+                    onDismissDeleteWorkout = {},
+                    onConfirmDeleteWorkout = {}
                 )
             }
         }
