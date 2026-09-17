@@ -18,10 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.ui.theme.AppDimens
 import hu.laca.weighttracker.ui.theme.AppShapeTokens
@@ -33,7 +36,8 @@ fun SegmentedControl(
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false
+    compact: Boolean = false,
+    optionTestTags: List<String> = emptyList()
 ) {
     val shape = if (compact) AppShapeTokens.compact else RoundedCornerShape(16.dp)
     val rowModifier = if (compact) {
@@ -56,11 +60,16 @@ fun SegmentedControl(
     ) {
         options.forEachIndexed { index, label ->
             val selected = index == selectedIndex
-            val itemModifier = if (compact) {
-                Modifier.defaultMinSize(minHeight = AppDimens.minTouch, minWidth = AppDimens.minTouch)
-            } else {
-                Modifier.weight(1f).defaultMinSize(minHeight = AppDimens.minTouch)
-            }
+            val itemModifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = AppDimens.minTouch, minWidth = AppDimens.minTouch)
+                .then(
+                    if (index < optionTestTags.size) {
+                        Modifier.testTag(optionTestTags[index])
+                    } else {
+                        Modifier
+                    }
+                )
             Box(
                 modifier = itemModifier
                     .clip(if (compact) AppShapeTokens.compact else RoundedCornerShape(12.dp))
@@ -77,7 +86,7 @@ fun SegmentedControl(
                         role = Role.Tab
                         this.selected = selected
                     }
-                    .padding(horizontal = if (compact) 10.dp else 8.dp, vertical = 8.dp),
+                    .padding(horizontal = if (compact) 8.dp else 8.dp, vertical = if (compact) 6.dp else 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -88,7 +97,10 @@ fun SegmentedControl(
                         compact -> MaterialTheme.colorScheme.onSurfaceVariant
                         selected -> MaterialTheme.colorScheme.onPrimary
                         else -> MaterialTheme.colorScheme.onSurface
-                    }
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
                 )
             }
         }

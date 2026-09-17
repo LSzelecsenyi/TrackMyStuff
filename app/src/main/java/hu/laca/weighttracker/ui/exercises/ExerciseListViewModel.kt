@@ -108,7 +108,9 @@ class ExerciseListViewModel(
             filtersActive = filtersActive,
             emptyKind = when {
                 visible.isNotEmpty() -> null
-                filtersActive -> CatalogEmptyKind.Search
+                ExerciseCatalogLogic.hasSearchQuery(core.current.query) ||
+                    core.current.category != null ||
+                    core.current.muscle != null -> CatalogEmptyKind.Search
                 core.current.archiveFilter == ArchiveFilter.ARCHIVED -> CatalogEmptyKind.Archived
                 else -> CatalogEmptyKind.Active
             },

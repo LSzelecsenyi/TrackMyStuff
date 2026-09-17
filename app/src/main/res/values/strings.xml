@@ -233,6 +233,10 @@
     <string name="exercises_title">Gyakorlatok</string>
     <string name="action_back">Vissza</string>
     <string name="action_add_exercise">Gyakorlat hozzáadása</string>
+    <string name="action_create_exercise">Új gyakorlat létrehozása</string>
+    <string name="action_clear_search">Keresés törlése</string>
+    <string name="exercise_filter_all">Összes</string>
+    <string name="exercise_empty_search_query">Nincs találat a(z) „%1$s” keresésre.</string>
     <string name="action_archive_exercise">Archiválás</string>
     <string name="action_restore_exercise">Visszaállítás</string>
     <string name="action_delete_permanently">Végleges törlés</string>
@@ -247,7 +251,7 @@
     <string name="exercise_filter_all_muscles">Minden izomcsoport</string>
     <string name="exercise_empty_active_title">Még nincs gyakorlat</string>
     <string name="exercise_empty_active_body">Add hozzá az első gyakorlatot. Egy mozgást elég egyszer felvenni, a terhelés változatai később, sorozatonként rögzíthetők.</string>
-    <string name="exercise_empty_archived_title">Nincs archivált gyakorlat</string>
+    <string name="exercise_empty_archived_title">Nincs archivált gyakorlat.</string>
     <string name="exercise_empty_archived_body">Az archivált gyakorlatok itt jelennek meg, és később visszaállíthatók.</string>
     <string name="exercise_empty_search_title">Nincs találat</string>
     <string name="exercise_empty_search_body">Módosítsd a keresést vagy a szűrőket.</string>

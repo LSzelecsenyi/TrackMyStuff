@@ -74,5 +74,6 @@ enum class MuscleRole {
 
 enum class ArchiveFilter {
     ACTIVE,
-    ARCHIVED
+    ARCHIVED,
+    ALL
 }

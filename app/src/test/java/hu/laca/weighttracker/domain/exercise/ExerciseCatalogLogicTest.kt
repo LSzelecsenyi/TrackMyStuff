@@ -1,6 +1,8 @@
 package hu.laca.weighttracker.domain.exercise
 
+import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -86,6 +88,126 @@ class ExerciseCatalogLogicTest {
                 archiveFilter = ArchiveFilter.ACTIVE
             )
         )
+    }
+
+    @Test
+    fun givenUnsortedActiveExercisesWhenFilteredThenHungarianDisplayedNamesAreAbcOrdered() {
+        val zaro = sample(id = 10, name = "Zárógyakorlat", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val allo = sample(id = 11, name = "Álló evezés", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.LATS)
+        val alma = sample(id = 12, name = "Alma", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.ABS)
+        val result = ExerciseCatalogLogic.filter(
+            exercises = listOf(zaro, allo, alma),
+            query = "",
+            category = null,
+            muscle = null,
+            archiveFilter = ArchiveFilter.ACTIVE
+        )
+        assertEquals(listOf("Alma", "Álló evezés", "Zárógyakorlat"), result.map { it.name })
+    }
+
+    @Test
+    fun givenAccentedHungarianNamesWhenSortedThenHuHuCollatorRulesApply() {
+        val oszi = sample(id = 1, name = "őszibarack", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val alma = sample(id = 2, name = "alma", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val aron = sample(id = 3, name = "Áron", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val beka = sample(id = 4, name = "béka", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val ekezet = sample(id = 5, name = "ékezet", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val result = ExerciseCatalogLogic.filter(
+            exercises = listOf(oszi, alma, aron, beka, ekezet),
+            query = "",
+            category = null,
+            muscle = null,
+            archiveFilter = ArchiveFilter.ACTIVE
+        )
+        assertEquals(
+            listOf("alma", "Áron", "béka", "ékezet", "őszibarack"),
+            result.map { it.name }
+        )
+        assertTrue(LocalizedLabelOrder.compareLabels("alma", "Áron") < 0)
+        assertTrue(LocalizedLabelOrder.compareLabels("béka", "ékezet") < 0)
+    }
+
+    @Test
+    fun identicalDisplayedNamesUseStableSecondaryKey() {
+        val later = sample(id = 20, name = "Mellnyomás", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val earlier = sample(id = 4, name = "Mellnyomás", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val result = ExerciseCatalogLogic.filter(
+            exercises = listOf(later, earlier),
+            query = "",
+            category = null,
+            muscle = null,
+            archiveFilter = ArchiveFilter.ACTIVE
+        )
+        assertEquals(listOf(4L, 20L), result.map { it.id })
+    }
+
+    @Test
+    fun givenActiveExercisesAndQueryWhenTypedThenListFiltersImmediatelyCaseInsensitively() {
+        val result = ExerciseCatalogLogic.filter(
+            exercises = listOf(pullUp, bike, archivedPlank),
+            query = "  húzó  ",
+            category = null,
+            muscle = null,
+            archiveFilter = ArchiveFilter.ACTIVE
+        )
+        assertEquals(listOf(pullUp), result)
+        val emptyNeedle = ExerciseCatalogLogic.filter(
+            exercises = listOf(pullUp, bike),
+            query = "   ",
+            category = null,
+            muscle = null,
+            archiveFilter = ArchiveFilter.ACTIVE
+        )
+        assertEquals(listOf(pullUp, bike), emptyNeedle)
+    }
+
+    @Test
+    fun searchDoesNotMatchNotesAndDoesNotMutateSource() {
+        val noted = pullUp.copy(notes = "Kerékpározás jegyzet")
+        val source = mutableListOf(bike, noted)
+        val snapshot = source.toList()
+        val result = ExerciseCatalogLogic.filter(
+            exercises = source,
+            query = "kerék",
+            category = null,
+            muscle = null,
+            archiveFilter = ArchiveFilter.ACTIVE
+        )
+        assertEquals(listOf(bike), result)
+        assertEquals(snapshot, source)
+        assertEquals(listOf(bike, noted), source)
+    }
+
+    @Test
+    fun givenArchiveFiltersWhenSwitchedThenOnlyMatchingExercisesAppearInAbcOrder() {
+        val zaro = sample(id = 8, name = "Záró", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.CHEST)
+        val almaArchived = sample(
+            id = 9,
+            name = "Alma",
+            category = ExerciseCategory.STRENGTH,
+            primary = MuscleGroup.ABS,
+            archived = true
+        )
+        val allo = sample(id = 7, name = "Álló evezés", category = ExerciseCategory.STRENGTH, primary = MuscleGroup.LATS)
+        val source = listOf(zaro, almaArchived, allo)
+        assertEquals(
+            listOf("Álló evezés", "Záró"),
+            ExerciseCatalogLogic.filter(source, "", null, null, ArchiveFilter.ACTIVE).map { it.name }
+        )
+        assertEquals(
+            listOf("Alma"),
+            ExerciseCatalogLogic.filter(source, "", null, null, ArchiveFilter.ARCHIVED).map { it.name }
+        )
+        assertEquals(
+            listOf("Alma", "Álló evezés", "Záró"),
+            ExerciseCatalogLogic.filter(source, "", null, null, ArchiveFilter.ALL).map { it.name }
+        )
+    }
+
+    @Test
+    fun hasSearchQueryIgnoresBlankText() {
+        assertFalse(ExerciseCatalogLogic.hasSearchQuery("  "))
+        assertTrue(ExerciseCatalogLogic.hasSearchQuery("húzó"))
     }
 
     private fun sample(

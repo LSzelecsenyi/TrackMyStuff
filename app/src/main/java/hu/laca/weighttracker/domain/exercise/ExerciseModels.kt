@@ -1,5 +1,6 @@
 package hu.laca.weighttracker.domain.exercise
 
+import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import java.util.Locale
 
 data class Exercise(
@@ -277,10 +278,11 @@ object ExerciseCatalogLogic {
         archiveFilter: ArchiveFilter
     ): List<Exercise> {
         val needle = ExerciseNaming.normalize(query)
-        return exercises.filter { exercise ->
+        val visible = exercises.filter { exercise ->
             val archiveMatch = when (archiveFilter) {
                 ArchiveFilter.ACTIVE -> !exercise.archived
                 ArchiveFilter.ARCHIVED -> exercise.archived
+                ArchiveFilter.ALL -> true
             }
             val categoryMatch = category == null || exercise.category == category
             val muscleMatch = muscle == null ||
@@ -288,9 +290,14 @@ object ExerciseCatalogLogic {
                 muscle in exercise.secondaryMuscles
             val searchMatch = needle.isEmpty() ||
                 exercise.normalizedName.contains(needle) ||
-                ExerciseNaming.normalize(exercise.notes.orEmpty()).contains(needle)
+                ExerciseNaming.normalize(exercise.name).contains(needle)
             archiveMatch && categoryMatch && muscleMatch && searchMatch
         }
+        return LocalizedLabelOrder.sorted(
+            items = visible,
+            label = { it.name },
+            key = { it.id.toString().padStart(20, '0') }
+        )
     }
 
     fun hasActiveFilters(
@@ -302,7 +309,11 @@ object ExerciseCatalogLogic {
         return query.isNotBlank() ||
             category != null ||
             muscle != null ||
-            archiveFilter == ArchiveFilter.ARCHIVED
+            archiveFilter != ArchiveFilter.ACTIVE
+    }
+
+    fun hasSearchQuery(query: String): Boolean {
+        return query.isNotBlank()
     }
 }
 

@@ -29,5 +29,6 @@ class LocalizedLabelOrderTest {
         assertTrue(LocalizedLabelOrder.compareLabels("e", "é") < 0)
         assertTrue(LocalizedLabelOrder.compareLabels("o", "ö") < 0)
         assertTrue(LocalizedLabelOrder.compareLabels("ö", "ő") < 0)
+        assertTrue(LocalizedLabelOrder.compareLabels("Alma", "Álló evezés") < 0)
     }
 }

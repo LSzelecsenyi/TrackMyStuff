@@ -73,7 +73,8 @@ class ExerciseViewModelTest {
         viewModel.uiState.first { it.visibleExercises.size == 1 }
         val stored = repository.getById(created.id)!!
         viewModel.requestDelete(stored)
-        assertEquals(stored.id, viewModel.uiState.value.pendingDelete?.id)
+        val pending = viewModel.uiState.first { it.pendingDelete != null || it.pendingBlocked != null }
+        assertEquals(stored.id, pending.pendingDelete?.id)
         viewModel.confirmDelete()
         val deleted = viewModel.uiState.first {
             it.message == CatalogMessage.Deleted && it.visibleExercises.isEmpty()
@@ -81,6 +82,75 @@ class ExerciseViewModelTest {
         assertTrue(deleted.visibleExercises.isEmpty())
         assertNull(deleted.pendingDelete)
         assertTrue(repository.observeAll().first().isEmpty())
+    }
+
+    @Test
+    fun givenUnsortedRepositoryWhenCatalogAppearsThenNamesFollowHungarianAbc() = runTest {
+        repository.save(draft("Zárógyakorlat"))
+        repository.save(draft("Álló evezés"))
+        repository.save(draft("Alma"))
+        val viewModel = ExerciseListViewModel(repository)
+        val state = viewModel.uiState.first { !it.loading && it.visibleExercises.size == 3 }
+        assertEquals(
+            listOf("Alma", "Álló evezés", "Zárógyakorlat"),
+            state.visibleExercises.map { it.name }
+        )
+    }
+
+    @Test
+    fun givenRenamedExerciseWhenReturningToListThenItMovesToNewAbcPlace() = runTest {
+        val first = repository.save(draft("Alma")) as ExerciseSaveResult.Created
+        repository.save(draft("Béka"))
+        val viewModel = ExerciseListViewModel(repository)
+        viewModel.uiState.first { it.visibleExercises.map { exercise -> exercise.name } == listOf("Alma", "Béka") }
+        val stored = repository.getById(first.id)!!
+        repository.save(
+            ExerciseDraft(
+                id = stored.id,
+                name = "őszibarack",
+                category = stored.category,
+                movementPattern = stored.movementPattern,
+                measurementType = stored.measurementType,
+                resistanceBasis = stored.resistanceBasis,
+                weightInterpretation = stored.weightInterpretation,
+                primaryMuscle = stored.primaryMuscle,
+                secondaryMuscles = stored.secondaryMuscles
+            )
+        )
+        val updated = viewModel.uiState.first { it.visibleExercises.any { exercise -> exercise.name == "Őszibarack" } }
+        assertEquals(listOf("Béka", "Őszibarack"), updated.visibleExercises.map { it.name })
+    }
+
+    @Test
+    fun givenArchiveFilterWhenUserSwitchesThenVisibleRowsStayAbcOrdered() = runTest {
+        val activeLate = repository.save(draft("Záró")) as ExerciseSaveResult.Created
+        val archived = repository.save(draft("Alma")) as ExerciseSaveResult.Created
+        repository.save(draft("Álló evezés"))
+        repository.archive(archived.id)
+        val viewModel = ExerciseListViewModel(repository)
+        val active = viewModel.uiState.first { !it.loading && it.visibleExercises.size == 2 }
+        assertEquals(listOf("Álló evezés", "Záró"), active.visibleExercises.map { it.name })
+        viewModel.onArchiveFilter(ArchiveFilter.ARCHIVED)
+        val archivedState = viewModel.uiState.first { it.archiveFilter == ArchiveFilter.ARCHIVED && it.visibleExercises.size == 1 }
+        assertEquals(listOf("Alma"), archivedState.visibleExercises.map { it.name })
+        viewModel.onArchiveFilter(ArchiveFilter.ALL)
+        val all = viewModel.uiState.first { it.archiveFilter == ArchiveFilter.ALL && it.visibleExercises.size == 3 }
+        assertEquals(listOf("Alma", "Álló evezés", "Záró"), all.visibleExercises.map { it.name })
+        viewModel.archive(activeLate.id)
+        val afterArchive = viewModel.uiState.first {
+            it.archiveFilter == ArchiveFilter.ALL &&
+                it.visibleExercises.any { exercise -> exercise.id == activeLate.id && exercise.archived }
+        }
+        assertEquals(listOf("Alma", "Álló evezés", "Záró"), afterArchive.visibleExercises.map { it.name })
+        viewModel.onArchiveFilter(ArchiveFilter.ACTIVE)
+        val remainingActive = viewModel.uiState.first {
+            it.archiveFilter == ArchiveFilter.ACTIVE && it.visibleExercises.size == 1
+        }
+        assertEquals(listOf("Álló evezés"), remainingActive.visibleExercises.map { it.name })
+        viewModel.onQueryChange("nincsilyen")
+        val miss = viewModel.uiState.first { it.emptyKind == CatalogEmptyKind.Search }
+        assertEquals("nincsilyen", miss.query)
+        assertTrue(miss.visibleExercises.isEmpty())
     }
 
     @Test

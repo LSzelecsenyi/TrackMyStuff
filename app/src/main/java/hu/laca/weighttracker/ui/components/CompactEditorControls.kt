@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -23,6 +24,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +46,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -180,6 +185,87 @@ fun CompactTextField(
 }
 
 @Composable
+fun CompactSearchBar(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onClear: () -> Unit,
+    label: String,
+    clearLabel: String,
+    modifier: Modifier = Modifier,
+    testTag: String? = null,
+    clearTestTag: String = "catalog-search-clear"
+) {
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var field by remember { mutableStateOf(TextFieldValue(value)) }
+    LaunchedEffect(value) {
+        if (value != field.text) {
+            val cursor = field.selection.start.coerceIn(0, value.length)
+            field = TextFieldValue(text = value, selection = TextRange(cursor))
+        }
+    }
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = AppTypeTokens.statCaption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(AppDimens.statSecondaryGap))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = AppDimens.minTouch),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BasicTextField(
+                value = field,
+                onValueChange = { incoming ->
+                    field = incoming
+                    onValueChange(incoming.text)
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = label }
+                    .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
+                textStyle = AppTypeTokens.statValue.copy(color = MaterialTheme.colorScheme.onSurface),
+                singleLine = true,
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        focusManager.clearFocus(force = true)
+                        keyboard?.hide()
+                    }
+                )
+            )
+            if (value.isNotEmpty()) {
+                IconButton(
+                    onClick = {
+                        field = TextFieldValue("")
+                        onClear()
+                    },
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
+                        .testTag(clearTestTag)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = clearLabel,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(AppDimens.strokeThin)
+                .background(MaterialTheme.colorScheme.outline)
+        )
+    }
+}
+
+@Composable
 fun <T> CompactDropdown(
     label: String,
     selected: T?,
@@ -191,6 +277,8 @@ fun <T> CompactDropdown(
     supportingText: String? = null,
     placeholder: String = "",
     enabled: Boolean = true,
+    noneLabel: String? = null,
+    onClear: (() -> Unit)? = null,
     testTag: String,
     menuTestTag: String = "$testTag-menu",
     anchorTestTag: String = "$testTag-anchor"
@@ -245,6 +333,19 @@ fun <T> CompactDropdown(
                     onDismissRequest = { expanded = false },
                     modifier = Modifier.testTag(menuTestTag)
                 ) {
+                    if (noneLabel != null) {
+                        DropdownMenuItem(
+                            text = { Text(noneLabel) },
+                            onClick = {
+                                onClear?.invoke()
+                                expanded = false
+                            },
+                            modifier = Modifier.semantics {
+                                this.selected = selected == null
+                                contentDescription = noneLabel
+                            }
+                        )
+                    }
                     options.forEach { option ->
                         val optionText = optionLabel(option)
                         val isSelected = option == selected
