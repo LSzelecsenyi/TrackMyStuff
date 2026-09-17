@@ -22,12 +22,14 @@ import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.TemplateFieldError
 import hu.laca.weighttracker.domain.workout.WorkoutFocusTarget
 import hu.laca.weighttracker.domain.workout.WorkoutSessionAggregate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -44,6 +46,7 @@ data class ActiveWorkoutUiState(
     val aggregate: WorkoutSessionAggregate? = null,
     val selectedIndex: Int = 0,
     val currentExerciseId: Long? = null,
+    val currentSetId: Long? = null,
     val drafts: Map<Long, ActualSetDraft> = emptyMap(),
     val dirtySetIds: Set<Long> = emptySet(),
     val completingSetIds: Set<Long> = emptySet(),
@@ -54,7 +57,9 @@ data class ActiveWorkoutUiState(
     val finished: Boolean = false,
     val abandoned: Boolean = false,
     val message: ActiveWorkoutMessage? = null,
-    val focusEvent: WorkoutFocusEvent? = null
+    val focusEvent: WorkoutFocusEvent? = null,
+    val focusedSetId: Long? = null,
+    val expandedExerciseIds: Set<Long> = emptySet()
 ) {
     val progress: SessionProgress
         get() = aggregate?.let(SessionProgressLogic::fromAggregate) ?: SessionProgress(0, 0, 0, 0)
@@ -71,6 +76,7 @@ sealed interface ActiveWorkoutMessage {
     data object ExtraAdded : ActiveWorkoutMessage
     data object ExtraRemoved : ActiveWorkoutMessage
     data object CannotRemoveOriginal : ActiveWorkoutMessage
+    data object SaveFailed : ActiveWorkoutMessage
 }
 
 class ActiveWorkoutViewModel(
@@ -91,6 +97,8 @@ class ActiveWorkoutViewModel(
     private val abandoned = MutableStateFlow(false)
     private val message = MutableStateFlow<ActiveWorkoutMessage?>(null)
     private val focusEvent = MutableStateFlow<WorkoutFocusEvent?>(null)
+    private val focusedSetId = MutableStateFlow<Long?>(null)
+    private val expandedIds = MutableStateFlow<Set<Long>>(emptySet())
     private var focusGeneration = 0L
 
     private data class Dialogs(
@@ -106,8 +114,13 @@ class ActiveWorkoutViewModel(
         val dirty: Set<Long>,
         val completing: Set<Long>,
         val errors: Map<Long, List<TemplateFieldError>>,
-        val message: ActiveWorkoutMessage?,
-        val focus: WorkoutFocusEvent?
+        val message: ActiveWorkoutMessage?
+    )
+
+    private data class FocusChrome(
+        val focus: WorkoutFocusEvent?,
+        val focusedSetId: Long?,
+        val expanded: Set<Long>
     )
 
     val uiState: StateFlow<ActiveWorkoutUiState> = combine(
@@ -115,14 +128,16 @@ class ActiveWorkoutViewModel(
         selectedIndex,
         combine(drafts, dirtyIds, completingIds, setErrors, message) {
                 currentDrafts, dirty, completing, errors, currentMessage ->
-            EditorSignals(currentDrafts, dirty, completing, errors, currentMessage, null)
+            EditorSignals(currentDrafts, dirty, completing, errors, currentMessage)
         },
         combine(nowMillis, pendingFinishCount, confirmAbandon, finished, abandoned) {
                 now, pending, abandon, done, left ->
             Dialogs(now, pending, abandon, done, left)
         },
-        focusEvent
-    ) { aggregate, index, signals, dialogs, focus ->
+        combine(focusEvent, focusedSetId, expandedIds) { focus, focused, expanded ->
+            FocusChrome(focus, focused, expanded)
+        }
+    ) { aggregate, index, signals, dialogs, chrome ->
         if (aggregate == null) {
             return@combine ActiveWorkoutUiState(
                 loading = false,
@@ -130,7 +145,9 @@ class ActiveWorkoutViewModel(
                 nowMillis = dialogs.now,
                 finished = dialogs.finished,
                 abandoned = dialogs.abandoned,
-                focusEvent = focus
+                focusEvent = chrome.focus,
+                focusedSetId = chrome.focusedSetId,
+                expandedExerciseIds = chrome.expanded
             )
         }
         val notActive = aggregate.session.status != SessionStatus.IN_PROGRESS
@@ -145,6 +162,7 @@ class ActiveWorkoutViewModel(
             aggregate = aggregate,
             selectedIndex = bounded,
             currentExerciseId = SessionFocusLogic.currentPendingExercise(aggregate)?.exercise?.id,
+            currentSetId = SessionFocusLogic.currentPendingSet(aggregate)?.id,
             drafts = mergeDrafts(aggregate, signals.drafts, signals.dirty),
             dirtySetIds = signals.dirty,
             completingSetIds = signals.completing,
@@ -155,7 +173,9 @@ class ActiveWorkoutViewModel(
             finished = dialogs.finished || aggregate.session.status == SessionStatus.COMPLETED,
             abandoned = dialogs.abandoned || aggregate.session.status == SessionStatus.ABANDONED,
             message = signals.message,
-            focusEvent = focus
+            focusEvent = chrome.focus,
+            focusedSetId = chrome.focusedSetId,
+            expandedExerciseIds = chrome.expanded
         )
     }.stateIn(
         scope = viewModelScope,
@@ -168,6 +188,13 @@ class ActiveWorkoutViewModel(
             while (isActive) {
                 nowMillis.value = clock.millis()
                 delay(1_000)
+            }
+        }
+        viewModelScope.launch {
+            val aggregate = sessionRepository.observeAggregate(sessionId).first { it != null }
+            val pendingId = aggregate?.let { SessionFocusLogic.currentPendingExercise(it)?.exercise?.id }
+            if (pendingId != null) {
+                expandedIds.value = expandedIds.value + pendingId
             }
         }
     }
@@ -248,8 +275,16 @@ class ActiveWorkoutViewModel(
                     is SessionMutationResult.Invalid -> {
                         setErrors.value = setErrors.value + (setId to result.errors)
                     }
-                    else -> Unit
+                    SessionMutationResult.NotFound,
+                    SessionMutationResult.NotActive,
+                    SessionMutationResult.OriginalSetProtected -> {
+                        message.value = ActiveWorkoutMessage.SaveFailed
+                    }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                message.value = ActiveWorkoutMessage.SaveFailed
             } finally {
                 completingIds.value = completingIds.value - setId
             }
@@ -263,11 +298,23 @@ class ActiveWorkoutViewModel(
         completingIds.value = completingIds.value + setId
         viewModelScope.launch {
             try {
-                if (sessionRepository.skipSet(setId) == SessionMutationResult.Updated) {
-                    dirtyIds.value = dirtyIds.value - setId
-                    setErrors.value = setErrors.value - setId
-                    advanceAfterResolved(setId)
+                when (sessionRepository.skipSet(setId)) {
+                    SessionMutationResult.Updated -> {
+                        dirtyIds.value = dirtyIds.value - setId
+                        setErrors.value = setErrors.value - setId
+                        advanceAfterResolved(setId)
+                    }
+                    SessionMutationResult.NotFound,
+                    SessionMutationResult.NotActive,
+                    SessionMutationResult.OriginalSetProtected -> {
+                        message.value = ActiveWorkoutMessage.SaveFailed
+                    }
+                    is SessionMutationResult.Invalid -> Unit
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                message.value = ActiveWorkoutMessage.SaveFailed
             } finally {
                 completingIds.value = completingIds.value - setId
             }
@@ -353,6 +400,15 @@ class ActiveWorkoutViewModel(
         focusEvent.value = null
     }
 
+    fun toggleExercise(exerciseId: Long) {
+        val current = expandedIds.value
+        expandedIds.value = if (exerciseId in current) {
+            current - exerciseId
+        } else {
+            current + exerciseId
+        }
+    }
+
     fun draftFor(set: SessionSet): ActualSetDraft {
         return uiState.value.drafts[set.id] ?: ActualSetLogic.draftFromSet(set)
     }
@@ -365,6 +421,10 @@ class ActiveWorkoutViewModel(
             if (index >= 0) {
                 savedStateHandle[SELECTED_INDEX] = index
             }
+            expandedIds.value = expandedIds.value + target.exerciseId
+            focusedSetId.value = target.setId
+        } else {
+            focusedSetId.value = null
         }
         emitFocus(target)
     }

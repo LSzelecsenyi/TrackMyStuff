@@ -459,6 +459,7 @@ fun WeightTrackerNavHost(
                     onUndoSkip = viewModel::undoSkip,
                     onAddExtra = viewModel::addExtraSet,
                     onFocusConsumed = viewModel::consumeFocusEvent,
+                    onToggleExercise = viewModel::toggleExercise,
                     onRemoveExtra = viewModel::removeExtraSet,
                     onRequestFinish = viewModel::requestFinish,
                     onDismissFinish = viewModel::dismissFinish,

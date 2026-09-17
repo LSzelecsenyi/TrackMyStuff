@@ -74,6 +74,12 @@ object SessionFocusLogic {
         }
     }
 
+    fun currentPendingSet(aggregate: WorkoutSessionAggregate): SessionSet? {
+        return currentPendingExercise(aggregate)?.sets?.firstOrNull { set ->
+            set.status == SessionSetStatus.PENDING
+        }
+    }
+
     fun focusAfterResolving(
         exercises: List<SessionExerciseItem>,
         resolvedSetId: Long

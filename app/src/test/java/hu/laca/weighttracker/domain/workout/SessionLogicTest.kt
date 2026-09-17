@@ -182,6 +182,7 @@ class SessionLogicTest {
         val second = item(2L, "B", listOf(set(3L, SessionSetStatus.PENDING)))
         val aggregate = WorkoutSessionAggregate(session(), listOf(first, second))
         assertEquals(2L, SessionFocusLogic.currentPendingExercise(aggregate)!!.exercise.id)
+        assertEquals(3L, SessionFocusLogic.currentPendingSet(aggregate)!!.id)
         assertEquals(2L, SessionProgressLogic.currentExercise(aggregate)!!.exercise.id)
     }
 
@@ -190,6 +191,7 @@ class SessionLogicTest {
         val only = item(1L, "A", listOf(set(1L, SessionSetStatus.COMPLETED), set(2L, SessionSetStatus.SKIPPED)))
         val aggregate = WorkoutSessionAggregate(session(), listOf(only))
         assertNull(SessionFocusLogic.currentPendingExercise(aggregate))
+        assertNull(SessionFocusLogic.currentPendingSet(aggregate))
     }
 
     @Test

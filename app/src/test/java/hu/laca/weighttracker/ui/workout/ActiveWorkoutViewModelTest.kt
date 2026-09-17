@@ -115,7 +115,46 @@ class ActiveWorkoutViewModelTest {
         assertEquals(remainingId, focus.setId)
         assertEquals(exerciseId, focus.exerciseId)
         assertEquals(exerciseId, viewModel.uiState.value.currentExerciseId)
+        assertEquals(remainingId, viewModel.uiState.value.currentSetId)
+        assertEquals(remainingId, viewModel.uiState.value.focusedSetId)
+        assertTrue(exerciseId in viewModel.uiState.value.expandedExerciseIds)
         assertTrue(viewModel.uiState.value.dirtySetIds.isEmpty())
+    }
+
+    @Test
+    fun completeSetSavesCompletedWithoutImeAction() = runTest {
+        val viewModel = startTwoExercises()
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        val next = viewModel.loaded().aggregate!!.exercises[0].sets[1]
+        viewModel.completeSet(first.id)
+        awaitReal {
+            viewModel.uiState.first { state ->
+                first.id !in state.completingSetIds &&
+                    state.currentSetId == next.id
+            }
+        }
+        val stored = sessions.getAggregate(sessionId)!!.exercises[0].sets[0]
+        assertEquals(SessionSetStatus.COMPLETED, stored.status)
+        assertEquals(8, stored.actualReps)
+        assertEquals(next.id, viewModel.uiState.value.currentSetId)
+        assertEquals(next.id, (viewModel.uiState.value.focusEvent!!.target as WorkoutFocusTarget.Set).setId)
+    }
+
+    @Test
+    fun skipDoesNotRequireImeAndAdvancesWithoutFinishingWorkout() = runTest {
+        val viewModel = startTwoExercises()
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        val next = viewModel.loaded().aggregate!!.exercises[0].sets[1]
+        viewModel.skipSet(first.id)
+        awaitReal {
+            viewModel.uiState.first { state ->
+                first.id !in state.completingSetIds &&
+                    state.currentSetId == next.id
+            }
+        }
+        assertEquals(SessionSetStatus.SKIPPED, sessions.getAggregate(sessionId)!!.exercises[0].sets[0].status)
+        assertEquals(next.id, viewModel.uiState.value.currentSetId)
+        assertEquals(false, viewModel.uiState.value.finished)
     }
 
     @Test
@@ -129,6 +168,8 @@ class ActiveWorkoutViewModelTest {
         }
         assertEquals(SessionSetStatus.PENDING, sessions.getAggregate(sessionId)!!.exercises[0].sets[0].status)
         assertNull(state.focusEvent)
+        assertEquals(first.id, state.currentSetId)
+        assertNull(state.focusedSetId)
     }
 
     @Test
@@ -175,6 +216,9 @@ class ActiveWorkoutViewModelTest {
         assertEquals(second.sets.first().id, focus.setId)
         assertEquals(second.exercise.id, focus.exerciseId)
         assertEquals(second.exercise.id, viewModel.uiState.value.currentExerciseId)
+        assertTrue(second.exercise.id in viewModel.uiState.value.expandedExerciseIds)
+        assertEquals(second.sets.first().id, viewModel.uiState.value.focusedSetId)
+        assertEquals(second.sets.first().id, viewModel.uiState.value.currentSetId)
         assertTrue(viewModel.uiState.value.currentExerciseId != firstExerciseId)
     }
 
@@ -208,6 +252,7 @@ class ActiveWorkoutViewModelTest {
         assertTrue(stored.exercises[0].sets.all { it.status == SessionSetStatus.COMPLETED })
         assertEquals(WorkoutFocusTarget.Finish, viewModel.uiState.value.focusEvent!!.target)
         assertNull(viewModel.uiState.value.currentExerciseId)
+        assertNull(viewModel.uiState.value.currentSetId)
     }
 
     @Test
@@ -225,6 +270,57 @@ class ActiveWorkoutViewModelTest {
         assertEquals(SessionSetStatus.COMPLETED, sessions.getAggregate(sessionId)!!.exercises[0].sets.single().status)
         assertEquals(WorkoutFocusTarget.Finish, viewModel.uiState.value.focusEvent!!.target)
         assertNull(viewModel.uiState.value.currentExerciseId)
+        assertNull(viewModel.uiState.value.currentSetId)
+        assertNull(viewModel.uiState.value.focusedSetId)
+        assertEquals(
+            hu.laca.weighttracker.domain.workout.SessionStatus.IN_PROGRESS,
+            sessions.getAggregate(sessionId)!!.session.status
+        )
+        assertEquals(false, viewModel.uiState.value.finished)
+    }
+
+    @Test
+    fun skipAdvancesToNextPendingSetInSameExercise() = runTest {
+        val viewModel = startTwoExercises()
+        val loaded = viewModel.loaded().aggregate!!
+        val first = loaded.exercises[0].sets[0]
+        val next = loaded.exercises[0].sets[1]
+        val exerciseId = loaded.exercises[0].exercise.id
+        viewModel.skipSet(first.id)
+        awaitReal {
+            viewModel.uiState.first { state ->
+                state.focusEvent != null && first.id !in state.completingSetIds
+            }
+        }
+        val stored = sessions.getAggregate(sessionId)!!
+        assertEquals(SessionSetStatus.SKIPPED, stored.exercises[0].sets[0].status)
+        assertEquals(SessionSetStatus.PENDING, stored.exercises[0].sets[1].status)
+        val focus = viewModel.uiState.value.focusEvent!!.target as WorkoutFocusTarget.Set
+        assertEquals(next.id, focus.setId)
+        assertEquals(exerciseId, focus.exerciseId)
+        assertEquals(exerciseId, viewModel.uiState.value.currentExerciseId)
+        assertTrue(exerciseId in viewModel.uiState.value.expandedExerciseIds)
+        assertEquals(next.id, viewModel.uiState.value.focusedSetId)
+        assertEquals(next.id, viewModel.uiState.value.currentSetId)
+    }
+
+    @Test
+    fun repositoryErrorKeepsCurrentSetActive() = runTest {
+        val viewModel = startSingleSet()
+        val set = viewModel.loaded().aggregate!!.exercises[0].sets.single()
+        viewModel.confirmAbandon()
+        awaitReal { viewModel.uiState.first { it.abandoned } }
+        viewModel.completeSet(set.id)
+        val state = awaitReal {
+            viewModel.uiState.first { snapshot ->
+                set.id !in snapshot.completingSetIds &&
+                    snapshot.message == ActiveWorkoutMessage.SaveFailed
+            }
+        }
+        assertEquals(ActiveWorkoutMessage.SaveFailed, state.message)
+        assertNull(state.focusEvent)
+        assertEquals(set.id, viewModel.uiState.value.currentSetId)
+        assertEquals(SessionSetStatus.PENDING, sessions.getAggregate(sessionId)!!.exercises[0].sets.single().status)
     }
 
     @Test
