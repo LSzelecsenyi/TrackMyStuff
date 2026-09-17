@@ -154,21 +154,27 @@ internal fun HeatmapRecencyLegend(modifier: Modifier = Modifier) {
 @Composable
 private fun RecencyLegendItem(band: MuscleRecencyBand) {
     val label = stringResource(band.labelRes())
+    val caption = AppTypeTokens.statCaption
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.semantics { contentDescription = label }
+        modifier = Modifier
+            .testTag("heatmap_legend_${band.name}")
+            .semantics { contentDescription = label }
     ) {
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(LegendDotSize)
                 .clip(AppShapeTokens.compact)
                 .background(MuscleMapColors.recencyFill(band))
         )
         Text(
             text = label,
-            style = AppTypeTokens.statCaption,
+            style = caption.copy(
+                fontSize = caption.fontSize * LegendScale,
+                lineHeight = caption.lineHeight * LegendScale
+            ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 4.dp),
+            modifier = Modifier.padding(start = LegendDotLabelGap),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -230,3 +236,7 @@ internal fun MuscleRecencyBand.labelRes(): Int {
         MuscleRecencyBand.NEVER -> R.string.heatmap_band_never
     }
 }
+
+private const val LegendScale = 1.2f
+private val LegendDotSize = 8.dp * LegendScale
+private val LegendDotLabelGap = 4.dp * LegendScale

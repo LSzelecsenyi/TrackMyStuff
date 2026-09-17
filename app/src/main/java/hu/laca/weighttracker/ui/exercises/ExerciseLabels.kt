@@ -83,6 +83,7 @@ fun MuscleGroup.labelRes(): Int {
         MuscleGroup.HAMSTRINGS -> R.string.muscle_hamstrings
         MuscleGroup.ADDUCTORS -> R.string.muscle_adductors
         MuscleGroup.CALVES -> R.string.muscle_calves
+        MuscleGroup.NECK -> R.string.muscle_neck
         MuscleGroup.FULL_BODY -> R.string.muscle_full_body
         MuscleGroup.CARDIOVASCULAR -> R.string.muscle_cardio
     }

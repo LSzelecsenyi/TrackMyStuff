@@ -73,6 +73,7 @@ class WorkoutImportFingerprintTest {
         assertNotEquals(baseline, hash(workout(duration = 30)))
         assertNotEquals(baseline, hash(workout(distance = BigDecimal("1000"))))
         assertNotEquals(baseline, hash(workout(secondary = listOf(MuscleGroup.BICEPS, MuscleGroup.CHEST))))
+        assertNotEquals(baseline, hash(workout(primary = MuscleGroup.NECK)))
         assertNotEquals(
             baseline,
             hash(
@@ -84,6 +85,18 @@ class WorkoutImportFingerprintTest {
                     )
                 )
             )
+        )
+    }
+
+    @Test
+    fun neckMuscleIsEncodedInTheImportFingerprint() {
+        val snapshot = WorkoutImportFingerprint.canonical(workout(primary = MuscleGroup.NECK))
+        assertTrue(snapshot.contains("primary=NECK"))
+        assertTrue(snapshot.contains("NECK"))
+        assertEquals(MuscleGroup.NECK, workout(primary = MuscleGroup.NECK).exercises.single().snapshot!!.primaryMuscle)
+        assertEquals(
+            MuscleGroup.NECK,
+            workout(primary = MuscleGroup.NECK).exercises.single().snapshot!!.muscles.single { it.role == MuscleRole.PRIMARY }.muscleGroup
         )
     }
 
@@ -115,6 +128,7 @@ class WorkoutImportFingerprintTest {
         loadKind: PlannedLoadKind? = PlannedLoadKind.BODYWEIGHT_ONLY,
         weight: BigDecimal? = null,
         secondary: List<MuscleGroup> = listOf(MuscleGroup.BICEPS, MuscleGroup.FOREARMS),
+        primary: MuscleGroup = MuscleGroup.LATS,
         bodyWeight: BodyWeightProposal = BodyWeightProposal(
             80.0,
             BodyWeightSource.MEASURED_SAME_DAY,
@@ -130,9 +144,9 @@ class WorkoutImportFingerprintTest {
             measurementType = MeasurementType.REPETITIONS_AND_WEIGHT,
             resistanceBasis = ResistanceBasis.BODYWEIGHT,
             weightInterpretation = WeightInterpretation.NOT_APPLICABLE,
-            primaryMuscle = MuscleGroup.LATS,
+            primaryMuscle = primary,
             secondaryMuscles = secondary,
-            muscles = listOf(WorkoutImportMuscleSnapshot(MuscleGroup.LATS, MuscleRole.PRIMARY)) +
+            muscles = listOf(WorkoutImportMuscleSnapshot(primary, MuscleRole.PRIMARY)) +
                 secondary.map { WorkoutImportMuscleSnapshot(it, MuscleRole.SECONDARY) },
             notes = null,
             archived = false

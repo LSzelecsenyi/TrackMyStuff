@@ -12,8 +12,8 @@ class ExerciseEnumCodecTest {
         assertEquals(MeasurementType.COMPLETION_ONLY, ExerciseEnumCodec.measurement(""))
         assertEquals(ResistanceBasis.NONE, ExerciseEnumCodec.resistance("BAND"))
         assertEquals(WeightInterpretation.NOT_APPLICABLE, ExerciseEnumCodec.weight("BODY"))
-        assertNull(ExerciseEnumCodec.muscle("NECK"))
-        assertEquals(MuscleGroup.FULL_BODY, ExerciseEnumCodec.muscleOrFallback("NECK"))
+        assertNull(ExerciseEnumCodec.muscle("NOT_A_MUSCLE"))
+        assertEquals(MuscleGroup.FULL_BODY, ExerciseEnumCodec.muscleOrFallback("NOT_A_MUSCLE"))
         assertEquals(MuscleRole.SECONDARY, ExerciseEnumCodec.role("ASSIST"))
     }
 
@@ -21,6 +21,9 @@ class ExerciseEnumCodecTest {
     fun knownCodesRoundTrip() {
         assertEquals(ExerciseCategory.MOBILITY, ExerciseEnumCodec.category("MOBILITY"))
         assertEquals(MuscleGroup.SIDE_DELTOID, ExerciseEnumCodec.muscle("SIDE_DELTOID"))
+        assertEquals(MuscleGroup.NECK, ExerciseEnumCodec.muscle("NECK"))
+        assertEquals(MuscleGroup.NECK, ExerciseEnumCodec.muscleOrFallback("NECK"))
+        assertEquals("NECK", MuscleGroup.NECK.name)
         assertEquals(WeightInterpretation.PER_SIDE, ExerciseEnumCodec.weight("PER_SIDE"))
     }
 }

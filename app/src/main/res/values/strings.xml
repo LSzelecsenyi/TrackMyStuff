@@ -328,6 +328,7 @@
     <string name="muscle_hamstrings">Combhajlító</string>
     <string name="muscle_adductors">Közelítő izmok</string>
     <string name="muscle_calves">Vádli</string>
+    <string name="muscle_neck">Nyak</string>
     <string name="muscle_full_body">Teljes test</string>
     <string name="muscle_cardio">Kardiovaszkuláris</string>
     <string name="error_exercise_name_blank">Add meg a gyakorlat nevét.</string>

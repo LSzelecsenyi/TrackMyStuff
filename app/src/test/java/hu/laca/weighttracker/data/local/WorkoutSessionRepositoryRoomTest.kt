@@ -7,6 +7,7 @@ import hu.laca.weighttracker.data.repository.ExerciseRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
+import hu.laca.weighttracker.domain.exercise.ExerciseEnumCodec
 import hu.laca.weighttracker.domain.FixedDateProvider
 import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.ExerciseDraft
@@ -106,6 +107,32 @@ class WorkoutSessionRepositoryRoomTest {
         assertEquals(PlannedLoadKind.BODYWEIGHT_ONLY, aggregate.exercises[0].sets[0].actualLoadKind)
         assertTrue(aggregate.exercises[0].sets.all { it.status == SessionSetStatus.PENDING })
         assertEquals(MuscleGroup.BICEPS, aggregate.exercises[0].exercise.secondaryMuscles.single())
+    }
+
+    @Test
+    fun neckMuscleIsCopiedIntoTheSessionSnapshotAsAString() = runTest {
+        val created = exercises.save(
+            ExerciseDraft(
+                name = "Nyakhajlítás",
+                category = ExerciseCategory.STRENGTH,
+                movementPattern = MovementPattern.OTHER,
+                measurementType = MeasurementType.REPETITIONS,
+                resistanceBasis = ResistanceBasis.BODYWEIGHT,
+                weightInterpretation = WeightInterpretation.NOT_APPLICABLE,
+                primaryMuscle = MuscleGroup.NECK,
+                secondaryMuscles = listOf(MuscleGroup.UPPER_BACK)
+            )
+        ) as ExerciseSaveResult.Created
+        val templateId = saveTemplate("Nyak", listOf(created.id to fourSets()))
+        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+            as StartWorkoutResult.Started
+        val aggregate = sessions.getAggregate(started.sessionId)!!
+        assertEquals(MuscleGroup.NECK, aggregate.exercises.single().exercise.primaryMuscle)
+        assertEquals(listOf(MuscleGroup.UPPER_BACK), aggregate.exercises.single().exercise.secondaryMuscles)
+        val stored = database.workoutSessionDao().getMuscles(aggregate.exercises.single().exercise.id)
+        assertEquals(setOf("NECK", "UPPER_BACK"), stored.map { it.muscleGroup }.toSet())
+        assertEquals("PRIMARY", stored.single { it.muscleGroup == "NECK" }.role)
+        assertEquals(MuscleGroup.NECK, ExerciseEnumCodec.muscle(stored.single { it.muscleGroup == "NECK" }.muscleGroup))
     }
 
     @Test

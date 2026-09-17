@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
+import hu.laca.weighttracker.domain.exercise.MuscleGroup
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -335,9 +336,72 @@ class WeightDatabaseMigrationTest {
         try {
             assertEquals(sessionColumns(fresh), sessionColumns(migrated))
             assertEquals(sessionIndexes(fresh), sessionIndexes(migrated))
-        } finally {
+        }         finally {
             migrated.close()
             fresh.close()
+        }
+    }
+
+    @Test
+    fun existingVersion5DatabaseOpensWithoutMigration() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(CURRENT_V5_REOPEN_DB)
+        val created = Room.databaseBuilder(context, WeightDatabase::class.java, CURRENT_V5_REOPEN_DB)
+            .allowMainThreadQueries()
+            .build()
+        val exerciseId = created.exerciseDao().insert(
+            ExerciseEntity(
+                name = "Nyomás",
+                normalizedName = "nyomás",
+                category = "STRENGTH",
+                movementPattern = "HORIZONTAL_PUSH",
+                measurementType = "REPETITIONS",
+                resistanceBasis = "BODYWEIGHT",
+                weightInterpretation = "NOT_APPLICABLE",
+                notes = null,
+                archived = false,
+                createdAt = 1L,
+                updatedAt = 1L
+            )
+        )
+        created.exerciseDao().insertMuscles(
+            listOf(ExerciseMuscleEntity(exerciseId, "CHEST", "PRIMARY"))
+        )
+        created.close()
+
+        val reopened = Room.databaseBuilder(context, WeightDatabase::class.java, CURRENT_V5_REOPEN_DB)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            assertEquals(5, reopened.openHelper.readableDatabase.version)
+            val stored = reopened.exerciseDao().getById(exerciseId)!!
+                .toModel(reopened.exerciseDao().getMuscles(exerciseId))
+            assertEquals(MuscleGroup.CHEST, stored.primaryMuscle)
+            val neckId = reopened.exerciseDao().insert(
+                ExerciseEntity(
+                    name = "Nyakhajlítás",
+                    normalizedName = "nyakhajlítás",
+                    category = "STRENGTH",
+                    movementPattern = "OTHER",
+                    measurementType = "REPETITIONS",
+                    resistanceBasis = "BODYWEIGHT",
+                    weightInterpretation = "NOT_APPLICABLE",
+                    notes = null,
+                    archived = false,
+                    createdAt = 2L,
+                    updatedAt = 2L
+                )
+            )
+            reopened.exerciseDao().insertMuscles(
+                listOf(ExerciseMuscleEntity(neckId, "NECK", "PRIMARY"))
+            )
+            assertEquals(5, reopened.openHelper.readableDatabase.version)
+            val neck = reopened.exerciseDao().getById(neckId)!!
+                .toModel(reopened.exerciseDao().getMuscles(neckId))
+            assertEquals(MuscleGroup.NECK, neck.primaryMuscle)
+            assertEquals("NECK", reopened.exerciseDao().getMuscles(neckId).single().muscleGroup)
+        } finally {
+            reopened.close()
         }
     }
 
@@ -412,6 +476,7 @@ class WeightDatabaseMigrationTest {
         const val V4_DB = "weight-migration-v4.db"
         const val FRESH_DB = "weight-fresh-v5.db"
         const val MIGRATED_DB = "weight-migrated-v5.db"
+        const val CURRENT_V5_REOPEN_DB = "weight-current-v5-reopen.db"
 
         fun sessionColumns(database: WeightDatabase): List<String> {
             val cursor = database.openHelper.readableDatabase.query("PRAGMA table_info('workout_sessions')")

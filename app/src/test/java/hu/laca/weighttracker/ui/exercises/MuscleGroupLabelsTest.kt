@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.exercise.ExerciseEnumCodec
 import hu.laca.weighttracker.domain.exercise.MuscleGroup
+import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import hu.laca.weighttracker.ui.components.musclemap.artwork.BodyMusclesCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,5 +66,40 @@ class MuscleGroupLabelsTest {
             val label = resources.getString(group.labelRes())
             assertTrue(group.name, label.isNotBlank())
         }
+    }
+
+    @Test
+    fun neckIsDisplayedAsNyakAndIsSelectable() {
+        assertEquals("NECK", MuscleGroup.NECK.name)
+        assertEquals(R.string.muscle_neck, MuscleGroup.NECK.labelRes())
+        assertEquals("Nyak", resources.getString(MuscleGroup.NECK.labelRes()))
+        assertTrue(MuscleGroup.NECK in MuscleGroup.entries)
+        assertEquals(MuscleGroup.NECK, ExerciseEnumCodec.muscle("NECK"))
+        assertEquals("NECK", MuscleGroup.NECK.name)
+        assertTrue(BodyMusclesCatalog.hasAnatomicalPaths(MuscleGroup.NECK))
+        val heatmapSelection = resources.getString(
+            R.string.heatmap_selection,
+            resources.getString(MuscleGroup.NECK.labelRes()),
+            "2 napja"
+        )
+        assertEquals("Nyak: 2 napja", heatmapSelection)
+    }
+
+    @Test
+    fun hungarianAbcPlacesNyakBetweenMellAndOldalsoVall() {
+        val sorted = LocalizedLabelOrder.sorted(
+            MuscleGroup.entries,
+            label = { resources.getString(it.labelRes()) },
+            key = { it.name }
+        )
+        val labels = sorted.map { resources.getString(it.labelRes()) }
+        val neckIndex = labels.indexOf("Nyak")
+        val chestIndex = labels.indexOf("Mell")
+        val sideDeltIndex = labels.indexOf("Oldalsó váll")
+        assertTrue(neckIndex >= 0)
+        assertEquals(chestIndex + 1, neckIndex)
+        assertEquals(neckIndex + 1, sideDeltIndex)
+        assertEquals(MuscleGroup.NECK, sorted[neckIndex])
+        assertTrue(sorted != MuscleGroup.entries)
     }
 }

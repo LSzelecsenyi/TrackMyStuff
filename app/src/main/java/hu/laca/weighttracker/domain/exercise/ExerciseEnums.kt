@@ -63,6 +63,7 @@ enum class MuscleGroup {
     HAMSTRINGS,
     ADDUCTORS,
     CALVES,
+    NECK,
     FULL_BODY,
     CARDIOVASCULAR
 }

@@ -114,6 +114,32 @@ class MuscleHeatmapAssemblerTest {
     }
 
     @Test
+    fun neckIsAnAnatomicalGroupAndAcceptsPrimaryOrSecondaryCompletedSets() {
+        assertTrue(MuscleGroup.NECK in MuscleHeatmapAssembler.anatomicalGroups)
+        val asPrimary = MuscleHeatmapAssembler.assemble(
+            listOf(exercise(SessionStatus.COMPLETED, today.minusDays(2), MuscleGroup.NECK, completedSets = 1)),
+            today
+        )
+        val asSecondary = MuscleHeatmapAssembler.assemble(
+            listOf(
+                exercise(
+                    status = SessionStatus.COMPLETED,
+                    date = today.minusDays(2),
+                    primary = MuscleGroup.UPPER_BACK,
+                    secondary = listOf(MuscleGroup.NECK),
+                    completedSets = 1
+                )
+            ),
+            today
+        )
+        assertEquals(2, asPrimary.entry(MuscleGroup.NECK).daysAgo)
+        assertEquals(MuscleRecencyBand.DAYS_1_2, asPrimary.entry(MuscleGroup.NECK).band)
+        assertEquals(2, asSecondary.entry(MuscleGroup.NECK).daysAgo)
+        assertEquals(MuscleRecencyBand.DAYS_1_2, asSecondary.entry(MuscleGroup.NECK).band)
+        assertEquals(MuscleRecencyBand.NEVER, asPrimary.entry(MuscleGroup.UPPER_BACK).band)
+    }
+
+    @Test
     fun duplicatedMuscleGroupsCollapseToLatestDate() {
         val state = MuscleHeatmapAssembler.assemble(
             listOf(

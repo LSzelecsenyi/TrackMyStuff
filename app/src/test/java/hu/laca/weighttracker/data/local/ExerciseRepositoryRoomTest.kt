@@ -156,7 +156,7 @@ class ExerciseRepositoryRoomTest {
         )
         dao.insertMuscles(
             listOf(
-                ExerciseMuscleEntity(id, "NECK", "PRIMARY"),
+                ExerciseMuscleEntity(id, "NOT_A_MUSCLE", "PRIMARY"),
                 ExerciseMuscleEntity(id, "BICEPS", "SECONDARY")
             )
         )
@@ -168,6 +168,25 @@ class ExerciseRepositoryRoomTest {
         assertEquals(WeightInterpretation.NOT_APPLICABLE, mapped.weightInterpretation)
         assertEquals(MuscleGroup.FULL_BODY, mapped.primaryMuscle)
         assertEquals(listOf(MuscleGroup.BICEPS), mapped.secondaryMuscles)
+    }
+
+    @Test
+    fun neckMusclePersistsAsRoomStringWithoutSchemaChange() = runTest {
+        val repository = repository(clock(1_000L))
+        val created = repository.save(
+            pullUpDraft(name = "Nyakhajlítás").copy(
+                primaryMuscle = MuscleGroup.NECK,
+                secondaryMuscles = listOf(MuscleGroup.UPPER_BACK)
+            )
+        ) as ExerciseSaveResult.Created
+        val storedMuscles = dao.getMuscles(created.id)
+        assertEquals(setOf("NECK", "UPPER_BACK"), storedMuscles.map { it.muscleGroup }.toSet())
+        assertEquals("PRIMARY", storedMuscles.single { it.muscleGroup == "NECK" }.role)
+        assertEquals("SECONDARY", storedMuscles.single { it.muscleGroup == "UPPER_BACK" }.role)
+        val mapped = repository.getById(created.id)!!
+        assertEquals(MuscleGroup.NECK, mapped.primaryMuscle)
+        assertEquals(listOf(MuscleGroup.UPPER_BACK), mapped.secondaryMuscles)
+        assertEquals(5, database.openHelper.readableDatabase.version)
     }
 
     @Test

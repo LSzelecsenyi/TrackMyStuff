@@ -49,14 +49,14 @@ internal object BodyMusclesArtwork {
             id = "neck-right",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.RIGHT,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.NECK,
             pathData = "m 13.304665,11.910505 1.64975,2.35202 0.74426,2.62159 -1.73486,-1.38354 -0.86649,-2.97104 z"
         ),
         MuscleArtworkRegion(
             id = "neck-left",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.LEFT,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.NECK,
             pathData = "m 18.385135,11.910505 -1.64975,2.35202 -0.74538,2.62234 1.73486,-1.38354 0.86649,-2.97104 z"
         ),
         MuscleArtworkRegion(
@@ -261,28 +261,28 @@ internal object BodyMusclesArtwork {
             id = "abs-upper-left",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.LEFT,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.OBLIQUES,
             pathData = "m 19.641935,34.707615 1.81341,-1.36479 0.15748,1.83347 1.28642,2.37338 -1.98044,2.73652 -1.03109,0.16554 -0.37026,-3.88816 z"
         ),
         MuscleArtworkRegion(
             id = "abs-upper-right",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.RIGHT,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.OBLIQUES,
             pathData = "m 12.045985,34.707615 -1.81341,-1.36479 -0.15748,1.83347 -1.2856799,2.37432 1.9804499,2.73595 1.03109,0.16554 0.37119,-3.88721 z"
         ),
         MuscleArtworkRegion(
             id = "abs-lower-left",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.LEFT,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.ABS,
             pathData = "m 16.051865,44.919165 0.60628,-5.91209 0.0154,-3.84915 2.18404,-1.07515 0.24746,7.03017 z"
         ),
         MuscleArtworkRegion(
             id = "abs-lower-right",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.RIGHT,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.ABS,
             pathData = "m 15.636055,44.919735 -0.60647,-5.91209 -0.015,-3.84879 -2.18479,-1.07533 -0.24746,7.03017 z"
         ),
         MuscleArtworkRegion(
@@ -324,7 +324,7 @@ internal object BodyMusclesArtwork {
             id = "tibialis-anterior-left",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.LEFT,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.CALVES,
             pathData = "m 18.251375,70.441125 0.29058,0.91486 0.6224,3.8681 0.0829,5.15733 -0.87136,5.03304 0.0412,-6.44714 -0.91242,-2.57848 -0.12561,-2.82837 z m 1.9915,2.32915 -0.20753,7.73637 -1.65949,6.23904 1.80478,-0.853 3.00816,-10.83583 -1.03727,-6.82095 z"
         ),
         MuscleArtworkRegion(
@@ -359,7 +359,7 @@ internal object BodyMusclesArtwork {
             id = "tibialis-anterior-right",
             view = MuscleMapView.FRONT,
             side = AnatomicalSide.RIGHT,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.CALVES,
             pathData = "m 13.437675,70.440945 -0.29058,0.91486 -0.62241,3.86828 -0.0829,5.15733 0.87174,5.03304 -0.0418,-6.44714 0.91298,-2.57848 0.1243,-2.82837 z m -1.99151,2.32914 0.20735,7.73637 1.65968,6.23904 -1.80497,-0.85299 -3.0079799,-10.83584 1.03728,-6.82095 z"
         ),
         MuscleArtworkRegion(
@@ -408,7 +408,7 @@ internal object BodyMusclesArtwork {
             id = "nape",
             view = MuscleMapView.BACK,
             side = AnatomicalSide.CENTRAL,
-            muscleGroup = null,
+            muscleGroup = MuscleGroup.NECK,
             pathData = "m 52.369695,12.105075 -2.35767,-1.55045 -1.47119,-3.9514301 -0.60741,0.0403 0.27409,1.82447 0.97635,0.33932 0.7613,2.2157201 0.33017,1.06849 0.0895,2.14894 1.16448,0.008 0.10563,-0.70833 0.54716,-0.0606 z m 1.01793,1.47595 0.23768,0.64982 1.38107,-0.004 0.01,-2.38784 0.25971,-0.79061 0.57215,-2.1698001 0.76359,-0.41018 0.25158,-1.78416 -0.62859,0.0193 -1.08488,3.8998101 -2.39725,1.46684 0.2768,1.48507 z"
         ),
         MuscleArtworkRegion(

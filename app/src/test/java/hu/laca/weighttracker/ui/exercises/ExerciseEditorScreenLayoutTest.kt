@@ -171,6 +171,41 @@ class ExerciseEditorScreenLayoutTest {
     }
 
     @Test
+    fun neckIsOfferedAsPrimaryAndSecondaryInHungarianAbcOrder() {
+        val resources = ApplicationProvider.getApplicationContext<android.content.Context>().resources
+        val muscles = LocalizedLabelOrder.sorted(
+            MuscleGroup.entries,
+            label = { resources.getString(it.labelRes()) },
+            key = { it.name }
+        )
+        val labels = muscles.map { resources.getString(it.labelRes()) }
+        assertTrue(MuscleGroup.NECK in MuscleGroup.entries)
+        assertEquals("Nyak", resources.getString(MuscleGroup.NECK.labelRes()))
+        assertEquals(labels.indexOf("Mell") + 1, labels.indexOf("Nyak"))
+        assertEquals(labels.indexOf("Nyak") + 1, labels.indexOf("Oldalsó váll"))
+        render()
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Nyak").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Mell").assertCountEquals(2)
+    }
+
+    @Test
+    fun neckIsOfferedAsASecondaryOptionWhenNotPrimary() {
+        render(
+            state = ExerciseEditorUiState(
+                draft = ExerciseDraft(
+                    name = "Nyakhajlítás",
+                    primaryMuscle = MuscleGroup.CHEST
+                )
+            )
+        )
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_ADD_SECONDARY).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Nyak").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
     fun saveShowsNameErrorAndStaysOnScreen() {
         var saved = 0
         render(

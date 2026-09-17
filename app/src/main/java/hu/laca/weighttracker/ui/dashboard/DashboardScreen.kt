@@ -322,7 +322,7 @@ private fun OverviewHeader(
                 Text(
                     text = stringResource(R.string.weekly_overview_kicker),
                     style = AppTypeTokens.sectionKicker,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 2,
                     overflow = TextOverflow.Clip,
                     modifier = Modifier.testTag("dashboard_weekly_kicker")
@@ -351,7 +351,6 @@ private fun OverviewHeader(
                 )
             }
         }
-        Spacer(Modifier.height(AppDimens.itemGap))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
