@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -54,6 +55,18 @@ class WorkoutStartPickerLayoutTest {
         assertTrue("row height ${alma.bottom - alma.top}", alma.bottom - alma.top >= 48.dp)
         assertTrue("row width ${alma.right - alma.left}", alma.right - alma.left >= 300.dp)
         composeRule.onNodeWithText("Edzéstervek kezelése").assertIsDisplayed()
+    }
+
+    @Test
+    fun givenATemplateWhenTheRowIsTappedThenNoBodyWeightFieldOrDialogAppears() {
+        render(templates = listOf(templateItem(4, "Push – Kondipark", 3, 8)))
+        composeRule.onNodeWithTag(startPickerRowTag(4)).performClick()
+        composeRule.onNodeWithTag(START_PICKER_SHEET).assertIsDisplayed()
+        composeRule.onNodeWithText("Testsúly").assertDoesNotExist()
+        composeRule.onNodeWithText("A testsúly nem kötelező. Üresen hagyva az edzés testsúly nélkül indul.")
+            .assertDoesNotExist()
+        composeRule.onAllNodesWithTag("workout-hub-start-weight").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("workout-hub-start-sheet").assertCountEquals(0)
     }
 
     @Test

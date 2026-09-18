@@ -376,7 +376,7 @@ class ActiveWorkoutViewModelTest {
         val pull = savePull()
         val dip = saveDip()
         val templateId = saveTemplate("Push A", listOf(pull to twoSets(), dip to twoSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         sessionId = started.sessionId
         return active(started.sessionId)
@@ -388,7 +388,7 @@ class ActiveWorkoutViewModelTest {
             "Push A",
             listOf(pull to listOf(PlannedSetDraft(-1, "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
         )
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         sessionId = started.sessionId
         return active(started.sessionId)

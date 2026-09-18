@@ -1,6 +1,8 @@
 package hu.laca.weighttracker.ui.workout
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -36,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.workout.TemplateListItem
 import hu.laca.weighttracker.ui.theme.AppDimens
+import hu.laca.weighttracker.ui.theme.AppShapeTokens
 import hu.laca.weighttracker.ui.theme.AppTypeTokens
 
 internal const val START_PICKER_SHEET = "workout-start-picker-sheet"
@@ -60,6 +65,11 @@ fun WorkoutStartPickerSheet(
     var selected by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         keyboard?.hide()
+    }
+    LaunchedEffect(starting) {
+        if (!starting) {
+            selected = false
+        }
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -185,4 +195,15 @@ private fun PickerTemplateRow(
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+@Composable
+internal fun CompactSheetHandle() {
+    Box(
+        modifier = Modifier
+            .padding(top = 8.dp, bottom = 4.dp)
+            .size(width = 32.dp, height = 3.dp)
+            .clip(AppShapeTokens.compact)
+            .background(MaterialTheme.colorScheme.outline)
+    )
 }

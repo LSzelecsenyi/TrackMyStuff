@@ -174,7 +174,7 @@ class HistoryWorkoutDeleteViewModelTest {
                 )
             )
         ) as TemplateSaveResult.Created).id
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         assertEquals(FinishWorkoutResult.Finished, sessions.finish(started.sessionId, skipRemaining = true))
         return started.sessionId

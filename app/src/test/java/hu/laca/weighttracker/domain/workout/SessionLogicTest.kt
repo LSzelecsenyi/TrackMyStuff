@@ -33,6 +33,16 @@ class SessionLogicTest {
     }
 
     @Test
+    fun futureMeasurementIsNotUsedAsPreviousSnapshot() {
+        val today = LocalDate.parse("2026-09-15")
+        val future = measurement(today.plusDays(1), 90.0)
+        val proposal = BodyWeightSnapshotLogic.propose(today, null, future)
+        assertNull(proposal.kilograms)
+        assertEquals(BodyWeightSource.UNKNOWN, proposal.source)
+        assertNull(proposal.sourceDate)
+    }
+
+    @Test
     fun missingWeightProducesUnknownSnapshot() {
         val proposal = BodyWeightSnapshotLogic.propose(LocalDate.parse("2026-09-15"), null, null)
         assertNull(proposal.kilograms)

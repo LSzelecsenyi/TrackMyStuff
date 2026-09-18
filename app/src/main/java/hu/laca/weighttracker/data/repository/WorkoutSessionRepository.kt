@@ -10,8 +10,6 @@ import hu.laca.weighttracker.data.local.WorkoutTemplateDao
 import hu.laca.weighttracker.data.local.activeLock
 import hu.laca.weighttracker.data.local.toModel
 import hu.laca.weighttracker.domain.DateProvider
-import hu.laca.weighttracker.domain.WeightParseResult
-import hu.laca.weighttracker.domain.WeightParser
 import hu.laca.weighttracker.domain.exercise.ExerciseEnumCodec
 import hu.laca.weighttracker.domain.exercise.MuscleRole
 import hu.laca.weighttracker.domain.workout.AbandonWorkoutResult
@@ -276,18 +274,13 @@ class WorkoutSessionRepository(
         }
     }
 
-    suspend fun proposeBodyWeight(workoutDate: LocalDate = dateProvider.today()): BodyWeightProposal {
+    suspend fun proposeBodyWeight(workoutDate: LocalDate = LocalDate.now(clock)): BodyWeightProposal {
         val sameDay = weightRepository.getByDate(workoutDate)
         val previous = weightRepository.getLatestBefore(workoutDate)
         return BodyWeightSnapshotLogic.propose(workoutDate, sameDay, previous)
     }
 
-    suspend fun start(
-        templateId: Long,
-        bodyWeightText: String,
-        proposal: BodyWeightProposal,
-        editedManually: Boolean
-    ): StartWorkoutResult = mutex.withLock {
+    suspend fun start(templateId: Long): StartWorkoutResult = mutex.withLock {
         if (sessionDao.getInProgress() != null) {
             return StartWorkoutResult.AlreadyActive
         }
@@ -299,30 +292,14 @@ class WorkoutSessionRepository(
         if (relations.isEmpty() || relations.all { templateDao.getSets(it.id).isEmpty() }) {
             return StartWorkoutResult.TemplateEmpty
         }
-        val trimmedWeight = bodyWeightText.trim()
-        val resolvedProposal = if (!editedManually && trimmedWeight.isEmpty() && proposal.kilograms == null) {
-            proposal
-        } else if (trimmedWeight.isEmpty()) {
-            BodyWeightSnapshotLogic.afterManualEdit(null)
-        } else {
-            when (val parsed = WeightParser.parseUserInput(trimmedWeight)) {
-                is WeightParseResult.Invalid -> return StartWorkoutResult.InvalidBodyWeight(parsed.error)
-                is WeightParseResult.Valid -> {
-                    if (editedManually) {
-                        BodyWeightSnapshotLogic.afterManualEdit(parsed.kilograms)
-                    } else {
-                        proposal.copy(kilograms = parsed.kilograms)
-                    }
-                }
-            }
-        }
+        val workoutDate = LocalDate.now(clock)
+        val resolvedProposal = proposeBodyWeight(workoutDate)
         val now = clock.millis()
-        val workoutDate = dateProvider.today()
         val session = WorkoutSessionEntity(
             templateId = template.id,
             templateName = template.name,
             status = SessionStatus.IN_PROGRESS.name,
-            workoutDate = workoutDate.toString(),
+            workoutDate = dateProvider.today().toString(),
             startedAt = now,
             finishedAt = null,
             abandonedAt = null,

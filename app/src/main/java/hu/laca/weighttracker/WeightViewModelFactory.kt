@@ -57,8 +57,7 @@ class WeightViewModelFactory(
                 WorkoutHubViewModel(
                     exerciseRepository,
                     workoutTemplateRepository,
-                    workoutSessionRepository,
-                    dateProvider
+                    workoutSessionRepository
                 )
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {

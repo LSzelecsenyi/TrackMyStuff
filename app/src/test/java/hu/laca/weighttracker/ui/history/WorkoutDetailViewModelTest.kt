@@ -67,6 +67,7 @@ class WorkoutDetailViewModelTest {
             .allowMainThreadQueries()
             .build()
         val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
+        val sessionClock = Clock.fixed(today.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
         exercises = ExerciseRepository(
             database.exerciseDao(),
             clock,
@@ -84,7 +85,7 @@ class WorkoutDetailViewModelTest {
             database.workoutTemplateDao(),
             database.exerciseDao(),
             WeightRepository(database.weightMeasurementDao(), clock),
-            clock,
+            sessionClock,
             FixedDateProvider(today)
         )
     }
@@ -107,7 +108,7 @@ class WorkoutDetailViewModelTest {
     fun inProgressSessionIsNotShownAsHistoryDetail() = runTest {
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         val state = detail(started.sessionId).uiState.first { !it.loading }
         assertEquals(started.sessionId, state.activeSessionId)
@@ -122,7 +123,7 @@ class WorkoutDetailViewModelTest {
         val pull = savePull()
         val dip = saveDip()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets(), dip to fourSets()))
-        val started = sessions.start(templateId, "88,3", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         val aggregate = sessions.getAggregate(started.sessionId)!!
         val first = aggregate.exercises[0].sets
@@ -198,7 +199,7 @@ class WorkoutDetailViewModelTest {
     fun missingBodyWeightSnapshotStaysAbsent() = runTest {
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         sessions.finish(started.sessionId, skipRemaining = true)
         val state = detail(started.sessionId).uiState.first { !it.loading && it.aggregate != null }
@@ -271,7 +272,7 @@ class WorkoutDetailViewModelTest {
     private suspend fun completePushA(): Long {
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         assertEquals(FinishWorkoutResult.Finished, sessions.finish(started.sessionId, skipRemaining = true))
         return started.sessionId

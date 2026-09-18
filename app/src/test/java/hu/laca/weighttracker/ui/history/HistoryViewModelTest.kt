@@ -60,7 +60,10 @@ class HistoryViewModelTest {
         repository.save(today.minusDays(1), 81.0)
         repository.save(today, 81.4)
         val viewModel = HistoryViewModel(repository, sessions(), dateProvider, SavedStateHandle())
-        val loaded = viewModel.uiState.first { !it.loading && it.timeline.entries.isNotEmpty() }
+        val initial = viewModel.uiState.first { !it.loading }
+        assertEquals(JournalFilter.WORKOUT, initial.filter)
+        viewModel.onFilterSelected(JournalFilter.WEIGHT)
+        val loaded = viewModel.uiState.first { !it.loading && it.filter == JournalFilter.WEIGHT && it.timeline.entries.isNotEmpty() }
         val weights = loaded.timeline.entries.filterIsInstance<WeightJournalEntry>()
         assertEquals(2, weights.size)
         assertEquals(0.4, weights.first().item.differenceFromPreviousKg!!, 0.001)
@@ -86,7 +89,9 @@ class HistoryViewModelTest {
         repository.save(today, 81.4)
         val handle = SavedStateHandle()
         val viewModel = HistoryViewModel(repository, sessions(), dateProvider, handle)
-        viewModel.uiState.first { !it.loading && it.timeline.entries.isNotEmpty() }
+        val initial = viewModel.uiState.first { !it.loading }
+        assertEquals(JournalFilter.WORKOUT, initial.filter)
+        assertEquals(JournalEmptyKind.FilterEmpty, initial.emptyKind)
         viewModel.onFilterSelected(JournalFilter.WORKOUT)
         val filtered = viewModel.uiState.first { it.filter == JournalFilter.WORKOUT }
         assertEquals(JournalEmptyKind.FilterEmpty, filtered.emptyKind)
@@ -95,6 +100,36 @@ class HistoryViewModelTest {
         val weightsOnly = viewModel.uiState.first { it.filter == JournalFilter.WEIGHT }
         assertEquals(1, weightsOnly.timeline.entries.size)
         assertTrue(weightsOnly.timeline.entries.single() is WeightJournalEntry)
+        viewModel.onFilterSelected(JournalFilter.ALL)
+        val all = viewModel.uiState.first { it.filter == JournalFilter.ALL }
+        assertEquals(1, all.timeline.entries.size)
+        assertTrue(all.timeline.entries.single() is WeightJournalEntry)
+    }
+
+    @Test
+    fun savedWeightFilterIsRestoredInsteadOfNewDefault() = runTest {
+        val repository = WeightRepository(FakeWeightMeasurementDao(), clock)
+        repository.save(today, 81.4)
+        val handle = SavedStateHandle(mapOf(HistoryViewModel.FILTER to JournalFilter.WEIGHT.name))
+        val viewModel = HistoryViewModel(repository, sessions(), dateProvider, handle)
+        val restored = viewModel.uiState.first { !it.loading && it.filter == JournalFilter.WEIGHT }
+        assertEquals(JournalFilter.WEIGHT, restored.filter)
+        assertEquals(1, restored.timeline.entries.size)
+        assertTrue(restored.timeline.entries.single() is WeightJournalEntry)
+        assertEquals(JournalFilter.WEIGHT.name, handle.get<String>(HistoryViewModel.FILTER))
+    }
+
+    @Test
+    fun savedAllFilterIsRestoredInsteadOfNewDefault() = runTest {
+        val repository = WeightRepository(FakeWeightMeasurementDao(), clock)
+        repository.save(today, 81.4)
+        val handle = SavedStateHandle(mapOf(HistoryViewModel.FILTER to JournalFilter.ALL.name))
+        val viewModel = HistoryViewModel(repository, sessions(), dateProvider, handle)
+        val restored = viewModel.uiState.first { !it.loading && it.filter == JournalFilter.ALL }
+        assertEquals(JournalFilter.ALL, restored.filter)
+        assertEquals(1, restored.timeline.entries.size)
+        assertTrue(restored.timeline.entries.single() is WeightJournalEntry)
+        assertEquals(JournalFilter.ALL.name, handle.get<String>(HistoryViewModel.FILTER))
     }
 
     private fun sessions(): WorkoutSessionRepository {

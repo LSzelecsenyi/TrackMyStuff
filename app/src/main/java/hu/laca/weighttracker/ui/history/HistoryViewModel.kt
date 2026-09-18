@@ -34,7 +34,7 @@ import java.time.LocalDate
 data class HistoryUiState(
     val timeline: JournalTimeline = JournalTimeline(
         groups = emptyList(),
-        filter = JournalFilter.ALL,
+        filter = JournalFilter.WORKOUT,
         includeAbandoned = false,
         emptyKind = JournalEmptyKind.NoEntries
     ),
@@ -56,7 +56,7 @@ class HistoryViewModel(
     private val dateProvider: DateProvider,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
-    private val filter = savedStateHandle.getStateFlow(FILTER, JournalFilter.ALL.name)
+    private val filter = savedStateHandle.getStateFlow(FILTER, JournalFilter.WORKOUT.name)
     private val includeAbandoned = savedStateHandle.getStateFlow(INCLUDE_ABANDONED, false)
     private val editor = MutableStateFlow<EditorUiState?>(null)
     private val userMessage = MutableStateFlow<UserMessage?>(null)
@@ -83,7 +83,7 @@ class HistoryViewModel(
         val timeline = JournalAssembler.assemble(
             measurements = items,
             summaries = summaries,
-            filter = runCatching { JournalFilter.valueOf(currentFilter) }.getOrDefault(JournalFilter.ALL),
+            filter = runCatching { JournalFilter.valueOf(currentFilter) }.getOrDefault(JournalFilter.WORKOUT),
             includeAbandoned = abandoned
         )
         HistoryUiState(

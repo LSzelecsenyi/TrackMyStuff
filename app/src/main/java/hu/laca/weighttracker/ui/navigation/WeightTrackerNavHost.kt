@@ -51,7 +51,6 @@ import hu.laca.weighttracker.ui.templates.TemplateListScreen
 import hu.laca.weighttracker.ui.templates.TemplateListViewModel
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutScreen
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutViewModel
-import hu.laca.weighttracker.ui.workout.StartWorkoutSheet
 import hu.laca.weighttracker.ui.workout.WorkoutHubViewModel
 import hu.laca.weighttracker.ui.workout.WorkoutPrimaryAction
 import hu.laca.weighttracker.ui.workout.WorkoutStartPickerSheet
@@ -203,7 +202,6 @@ fun WeightTrackerNavHost(
                     onDeleteDismiss = viewModel::dismissDelete,
                     onDeleteConfirm = viewModel::confirmDelete,
                     onMessageConsumed = viewModel::consumeMessage,
-                    onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
                     onOpenImport = {
                         val navigation = AppNavigation.openWorkoutImport(currentRoute)
                         if (navigation.shouldPush) {
@@ -535,15 +533,6 @@ fun WeightTrackerNavHost(
                 workoutHubViewModel.dismissPicker()
                 navController.navigateInternal(templateEditorRoute(null))
             }
-        )
-    }
-    hubState.startDraft?.let { draft ->
-        StartWorkoutSheet(
-            draft = draft,
-            starting = hubState.isStarting,
-            onDismiss = workoutHubViewModel::dismissStart,
-            onWeightChange = workoutHubViewModel::onStartWeightChange,
-            onConfirm = workoutHubViewModel::confirmStart
         )
     }
 }

@@ -323,6 +323,19 @@ class WorkoutImportResolverTest {
     }
 
     @Test
+    fun givenCsvImportWithManualBodyWeightThenManualPriorityRemainsUnchanged() {
+        val measurements = sampleMeasurements()
+        val csvWins = WorkoutImportResolver.resolve(
+            parse(oneSet("Pullup", body = "82.5")),
+            intendedCatalog(),
+            measurements = measurements
+        )
+        assertEquals(BodyWeightSource.MANUAL, csvWins.workouts[0].bodyWeight.source)
+        assertEquals(82.5, csvWins.workouts[0].bodyWeight.kilograms!!, 0.0)
+        assertTrue(csvWins.warnings.any { it.code == WorkoutImportWarningCode.BodyWeightMismatch })
+    }
+
+    @Test
     fun csvBodyWeightDifferingFromSameDayWarns() {
         val plan = WorkoutImportResolver.resolve(
             parse(oneSet("Pullup", body = "99.9")),

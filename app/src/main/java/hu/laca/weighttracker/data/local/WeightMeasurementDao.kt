@@ -15,10 +15,10 @@ interface WeightMeasurementDao {
     @Query("SELECT * FROM weight_measurements ORDER BY date ASC, id ASC")
     suspend fun getAllAscending(): List<WeightMeasurementEntity>
 
-    @Query("SELECT * FROM weight_measurements WHERE date = :date LIMIT 1")
+    @Query("SELECT * FROM weight_measurements WHERE date = :date ORDER BY date DESC, id DESC LIMIT 1")
     suspend fun getByDate(date: String): WeightMeasurementEntity?
 
-    @Query("SELECT * FROM weight_measurements WHERE date < :date ORDER BY date DESC LIMIT 1")
+    @Query("SELECT * FROM weight_measurements WHERE date < :date ORDER BY date DESC, id DESC LIMIT 1")
     suspend fun getLatestBefore(date: String): WeightMeasurementEntity?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)

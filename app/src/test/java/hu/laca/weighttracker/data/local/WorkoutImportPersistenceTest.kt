@@ -307,7 +307,7 @@ class WorkoutImportPersistenceTest {
                 )
             )
         ) as TemplateSaveResult.Created).id
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
         assertTrue(started is StartWorkoutResult.Started)
         val imported = sessions.importCompletedWorkouts(resolvedOneSet("Chinup"))
         assertTrue(imported is WorkoutImportPersistenceResult.Imported)

@@ -9,6 +9,7 @@ import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.exercise.ExerciseEnumCodec
 import hu.laca.weighttracker.domain.FixedDateProvider
+import hu.laca.weighttracker.domain.SystemDateProvider
 import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.ExerciseDraft
 import hu.laca.weighttracker.domain.exercise.ExerciseSaveResult
@@ -96,7 +97,7 @@ class WorkoutSessionRepositoryRoomTest {
         val pull = savePull()
         val dip = saveDip()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets(), dip to fourSets()))
-        val started = sessions.start(templateId, "88,3", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         val aggregate = sessions.getAggregate(started.sessionId)!!
         assertEquals("Push A", aggregate.session.templateName)
@@ -124,7 +125,7 @@ class WorkoutSessionRepositoryRoomTest {
             )
         ) as ExerciseSaveResult.Created
         val templateId = saveTemplate("Nyak", listOf(created.id to fourSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         val aggregate = sessions.getAggregate(started.sessionId)!!
         assertEquals(MuscleGroup.NECK, aggregate.exercises.single().exercise.primaryMuscle)
@@ -139,7 +140,7 @@ class WorkoutSessionRepositoryRoomTest {
     fun templateAndExerciseEditsDoNotChangeStartedSession() = runTest {
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         templates.save(
             TemplateDraft(
@@ -183,12 +184,12 @@ class WorkoutSessionRepositoryRoomTest {
         templates.archive(templateId)
         assertEquals(
             StartWorkoutResult.TemplateArchived,
-            sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+            sessions.start(templateId)
         )
         val emptyId = (templates.save(TemplateDraft(name = "Üres")) as TemplateSaveResult.Created).id
         assertEquals(
             StartWorkoutResult.TemplateEmpty,
-            sessions.start(emptyId, "", sessions.proposeBodyWeight(), false)
+            sessions.start(emptyId)
         )
     }
 
@@ -197,33 +198,116 @@ class WorkoutSessionRepositoryRoomTest {
         val pull = savePull()
         val first = saveTemplate("Push A", listOf(pull to fourSets()))
         val second = saveTemplate("Pull A", listOf(pull to fourSets()))
-        val started = sessions.start(first, "", sessions.proposeBodyWeight(), false) as StartWorkoutResult.Started
+        val started = sessions.start(first) as StartWorkoutResult.Started
         assertEquals(
             StartWorkoutResult.AlreadyActive,
-            sessions.start(second, "", sessions.proposeBodyWeight(), false)
+            sessions.start(second)
         )
         assertEquals(started.sessionId, sessions.observeInProgress().first()!!.session.id)
     }
 
     @Test
+    fun givenSameDayMeasurementWhenWorkoutStartsThenSnapshotUsesMeasuredSameDay() = runTest {
+        val repo = sessionsOn(today)
+        weights.save(today, 82.4)
+        weights.save(today.minusDays(1), 80.0)
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val started = repo.start(templateId) as StartWorkoutResult.Started
+        val stored = repo.getAggregate(started.sessionId)!!
+        assertEquals(82.4, stored.session.bodyWeightKg!!, 0.0)
+        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, stored.session.bodyWeightSource)
+        assertEquals(today, stored.session.bodyWeightSourceDate)
+    }
+
+    @Test
+    fun givenEarlierMeasurementsWhenWorkoutStartsThenSnapshotUsesNearestPrevious() = runTest {
+        val repo = sessionsOn(today)
+        weights.save(today.minusDays(1), 81.2)
+        weights.save(today.minusDays(4), 79.0)
+        weights.save(today.minusDays(2), 80.5)
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val started = repo.start(templateId) as StartWorkoutResult.Started
+        val stored = repo.getAggregate(started.sessionId)!!
+        assertEquals(81.2, stored.session.bodyWeightKg!!, 0.0)
+        assertEquals(BodyWeightSource.NEAREST_PREVIOUS_MEASUREMENT, stored.session.bodyWeightSource)
+        assertEquals(today.minusDays(1), stored.session.bodyWeightSourceDate)
+    }
+
+    @Test
+    fun givenOnlyFutureMeasurementWhenWorkoutStartsThenSnapshotIsUnknown() = runTest {
+        val repo = sessionsOn(today)
+        weights.save(today.plusDays(1), 90.0)
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val started = repo.start(templateId) as StartWorkoutResult.Started
+        val stored = repo.getAggregate(started.sessionId)!!
+        assertNull(stored.session.bodyWeightKg)
+        assertEquals(BodyWeightSource.UNKNOWN, stored.session.bodyWeightSource)
+        assertNull(stored.session.bodyWeightSourceDate)
+    }
+
+    @Test
+    fun givenNoMeasurementsWhenWorkoutStartsThenSessionStartsWithoutBodyWeight() = runTest {
+        val repo = sessionsOn(today)
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val started = repo.start(templateId)
+        assertTrue(started is StartWorkoutResult.Started)
+        val stored = repo.getAggregate((started as StartWorkoutResult.Started).sessionId)!!
+        assertNull(stored.session.bodyWeightKg)
+        assertEquals(BodyWeightSource.UNKNOWN, stored.session.bodyWeightSource)
+    }
+
+    @Test
     fun bodyWeightSnapshotStaysImmutableAfterDailyEdit() = runTest {
+        val repo = sessionsOn(today)
         weights.save(today, 88.3)
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val proposal = sessions.proposeBodyWeight()
-        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, proposal.source)
-        val started = sessions.start(templateId, "87,9", proposal, true) as StartWorkoutResult.Started
+        val started = repo.start(templateId) as StartWorkoutResult.Started
         weights.save(today, 90.0)
-        val stored = sessions.getAggregate(started.sessionId)!!
-        assertEquals(87.9, stored.session.bodyWeightKg!!, 0.0)
-        assertEquals(BodyWeightSource.MANUAL, stored.session.bodyWeightSource)
+        val afterEdit = repo.getAggregate(started.sessionId)!!
+        assertEquals(88.3, afterEdit.session.bodyWeightKg!!, 0.0)
+        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, afterEdit.session.bodyWeightSource)
+        val measurementId = weights.getByDate(today)!!.id
+        weights.delete(measurementId)
+        val afterDelete = repo.getAggregate(started.sessionId)!!
+        assertEquals(88.3, afterDelete.session.bodyWeightKg!!, 0.0)
+        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, afterDelete.session.bodyWeightSource)
+        assertEquals(today, afterDelete.session.bodyWeightSourceDate)
+    }
+
+    @Test
+    fun givenDifferentTimezonesWhenWorkoutStartsThenSameDayUsesClockZone() = runTest {
+        val instant = Instant.parse("2026-09-16T05:00:00Z")
+        val utcClock = Clock.fixed(instant, ZoneOffset.UTC)
+        val losAngelesClock = Clock.fixed(instant, java.time.ZoneId.of("America/Los_Angeles"))
+        weights.save(LocalDate.parse("2026-09-15"), 81.0)
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val utcRepo = sessionsWithClock(utcClock)
+        val utcStarted = utcRepo.start(templateId) as StartWorkoutResult.Started
+        val utcStored = utcRepo.getAggregate(utcStarted.sessionId)!!
+        assertEquals(LocalDate.parse("2026-09-16"), LocalDate.now(utcClock))
+        assertEquals(81.0, utcStored.session.bodyWeightKg!!, 0.0)
+        assertEquals(BodyWeightSource.NEAREST_PREVIOUS_MEASUREMENT, utcStored.session.bodyWeightSource)
+        assertEquals(FinishWorkoutResult.Finished, utcRepo.finish(utcStarted.sessionId, skipRemaining = true))
+        val laRepo = sessionsWithClock(losAngelesClock)
+        val laStarted = laRepo.start(templateId) as StartWorkoutResult.Started
+        val laStored = laRepo.getAggregate(laStarted.sessionId)!!
+        assertEquals(LocalDate.parse("2026-09-15"), LocalDate.now(losAngelesClock))
+        assertEquals(81.0, laStored.session.bodyWeightKg!!, 0.0)
+        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, laStored.session.bodyWeightSource)
+        assertEquals(LocalDate.parse("2026-09-15"), laStored.session.bodyWeightSourceDate)
     }
 
     @Test
     fun completeSkipExtraFinishAndAbandon() = runTest {
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         val first = sessions.getAggregate(started.sessionId)!!.exercises.single().sets
         val completeDraft = ActualSetDraft(repsText = "7", loadKind = PlannedLoadKind.ADDED_WEIGHT, weightText = "10")
@@ -262,11 +346,11 @@ class WorkoutSessionRepositoryRoomTest {
         assertTrue(completed.exercises.single().sets.none { it.status == SessionSetStatus.PENDING })
 
         val other = saveTemplate("Pull A", listOf(pull to fourSets()))
-        val second = sessions.start(other, "", sessions.proposeBodyWeight(), false) as StartWorkoutResult.Started
+        val second = sessions.start(other) as StartWorkoutResult.Started
         assertEquals(AbandonWorkoutResult.Abandoned, sessions.abandon(second.sessionId))
         assertNull(sessions.observeInProgress().first())
         assertNull(sessions.getAggregate(second.sessionId))
-        val restarted = sessions.start(other, "", sessions.proposeBodyWeight(), false)
+        val restarted = sessions.start(other)
         assertTrue(restarted is StartWorkoutResult.Started)
     }
 
@@ -274,7 +358,7 @@ class WorkoutSessionRepositoryRoomTest {
     fun referencedTemplateAndExerciseCannotBeDeletedWhileSessionExists() = runTest {
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         assertFalse(templates.canDeletePermanently(templateId))
         assertFalse(exercises.canDeletePermanently(pull))
@@ -304,7 +388,7 @@ class WorkoutSessionRepositoryRoomTest {
         val pull = savePull()
         val firstTemplate = saveTemplate("Push A", listOf(pull to fourSets()))
         val secondTemplate = saveTemplate("Push B", listOf(pull to fourSets()))
-        val completed = sessions.start(firstTemplate, "88,3", sessions.proposeBodyWeight(), false)
+        val completed = sessions.start(firstTemplate)
             as StartWorkoutResult.Started
         assertEquals(FinishWorkoutResult.Finished, sessions.finish(completed.sessionId, skipRemaining = true))
         val abandonedId = database.workoutSessionDao().insertSession(
@@ -367,6 +451,22 @@ class WorkoutSessionRepositoryRoomTest {
         val latest = sessions.observeLatestCompleted().first()
         assertEquals("Night", latest?.session?.templateName)
         assertEquals(SessionMutationResult.NotActive, sessions.completeSet(1L, ActualSetDraft(loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
+    }
+
+    private fun sessionsOn(date: LocalDate): WorkoutSessionRepository {
+        val clock = Clock.fixed(date.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+        return sessionsWithClock(clock)
+    }
+
+    private fun sessionsWithClock(clock: Clock): WorkoutSessionRepository {
+        return WorkoutSessionRepository(
+            database.workoutSessionDao(),
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            weights,
+            clock,
+            SystemDateProvider(clock)
+        )
     }
 
     private suspend fun savePull(): Long {

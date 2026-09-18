@@ -2,15 +2,12 @@ package hu.laca.weighttracker.ui.workout
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import hu.laca.weighttracker.R
 import hu.laca.weighttracker.data.repository.ExerciseRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
-import hu.laca.weighttracker.domain.DateProvider
-import hu.laca.weighttracker.domain.WeightParseError
-import hu.laca.weighttracker.domain.WeightParser
 import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import hu.laca.weighttracker.domain.workout.ActiveSessionSummary
-import hu.laca.weighttracker.domain.workout.BodyWeightProposal
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
 import hu.laca.weighttracker.domain.workout.TemplateListItem
 import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
@@ -20,15 +17,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Locale
-
-data class StartWorkoutDraft(
-    val template: TemplateListItem,
-    val proposal: BodyWeightProposal,
-    val weightText: String,
-    val editedManually: Boolean,
-    val weightError: WeightParseError? = null
-)
 
 data class WorkoutHubUiState(
     val loading: Boolean = true,
@@ -38,7 +26,6 @@ data class WorkoutHubUiState(
     val archivedTemplateCount: Int = 0,
     val templates: List<TemplateListItem> = emptyList(),
     val activeSession: ActiveSessionSummary? = null,
-    val startDraft: StartWorkoutDraft? = null,
     val isStarting: Boolean = false,
     val message: WorkoutHubMessage? = null,
     val startedSessionId: Long? = null,
@@ -71,10 +58,8 @@ sealed interface WorkoutPrimaryAction {
 class WorkoutHubViewModel(
     exerciseRepository: ExerciseRepository,
     templateRepository: WorkoutTemplateRepository,
-    private val sessionRepository: WorkoutSessionRepository,
-    private val dateProvider: DateProvider
+    private val sessionRepository: WorkoutSessionRepository
 ) : ViewModel() {
-    private val startDraft = MutableStateFlow<StartWorkoutDraft?>(null)
     private val starting = MutableStateFlow(false)
     private val preparingStart = MutableStateFlow(false)
     private val message = MutableStateFlow<WorkoutHubMessage?>(null)
@@ -89,7 +74,6 @@ class WorkoutHubViewModel(
     )
 
     private data class StartExtras(
-        val draft: StartWorkoutDraft?,
         val currentMessage: WorkoutHubMessage?,
         val started: Long?,
         val isStarting: Boolean,
@@ -107,9 +91,9 @@ class WorkoutHubViewModel(
         },
         templateRepository.observeActive(),
         sessionRepository.observeInProgress(),
-        combine(startDraft, message, startedSessionId, starting, pickerOpen) {
-            draft, currentMessage, started, isStarting, pickerVisible ->
-            StartExtras(draft, currentMessage, started, isStarting, pickerVisible)
+        combine(message, startedSessionId, starting, pickerOpen) {
+            currentMessage, started, isStarting, pickerVisible ->
+            StartExtras(currentMessage, started, isStarting, pickerVisible)
         },
         sessionRepository.observeLatestCompleted()
     ) { counts, templates, active, extras, recent ->
@@ -125,12 +109,11 @@ class WorkoutHubViewModel(
                 key = { it.template.id.toString() }
             ),
             activeSession = active,
-            startDraft = extras.draft,
             isStarting = extras.isStarting,
             message = extras.currentMessage,
             startedSessionId = extras.started,
             recentCompleted = recent,
-            pickerVisible = extras.pickerVisible && active == null && extras.draft == null
+            pickerVisible = extras.pickerVisible && active == null
         )
     }.stateIn(
         scope = viewModelScope,
@@ -144,7 +127,7 @@ class WorkoutHubViewModel(
             pickerOpen.value = false
             return WorkoutPrimaryAction.Resume(active.session.id)
         }
-        if (starting.value || startDraft.value != null || preparingStart.value || pickerOpen.value) {
+        if (starting.value || preparingStart.value || pickerOpen.value) {
             return WorkoutPrimaryAction.Ignored
         }
         pickerOpen.value = true
@@ -152,6 +135,9 @@ class WorkoutHubViewModel(
     }
 
     fun dismissPicker() {
+        if (starting.value || preparingStart.value) {
+            return
+        }
         pickerOpen.value = false
     }
 
@@ -164,106 +150,46 @@ class WorkoutHubViewModel(
         if (!pickerOpen.value) {
             return
         }
-        pickerOpen.value = false
         requestStart(item)
     }
 
     fun requestStart(item: TemplateListItem) {
         if (uiState.value.activeSession != null) {
+            pickerOpen.value = false
             message.value = WorkoutHubMessage.AlreadyActive
             return
         }
-        if (starting.value || startDraft.value != null || preparingStart.value) {
+        if (starting.value || preparingStart.value) {
             return
         }
         preparingStart.value = true
-        viewModelScope.launch {
-            try {
-                if (uiState.value.activeSession != null) {
-                    message.value = WorkoutHubMessage.AlreadyActive
-                    return@launch
-                }
-                val proposal = sessionRepository.proposeBodyWeight(dateProvider.today())
-                if (startDraft.value != null || uiState.value.activeSession != null) {
-                    if (uiState.value.activeSession != null) {
-                        message.value = WorkoutHubMessage.AlreadyActive
-                    }
-                    return@launch
-                }
-                startDraft.value = StartWorkoutDraft(
-                    template = item,
-                    proposal = proposal,
-                    weightText = proposal.kilograms?.let(::formatBodyWeight).orEmpty(),
-                    editedManually = false
-                )
-            } finally {
-                preparingStart.value = false
-            }
-        }
-    }
-
-    fun dismissStart() {
-        if (starting.value) {
-            return
-        }
-        startDraft.value = null
-    }
-
-    fun onStartWeightChange(value: String) {
-        val current = startDraft.value ?: return
-        if (starting.value) {
-            return
-        }
-        val filtered = WeightParser.filterUserInput(value)
-        val error = if (filtered.isBlank()) {
-            null
-        } else {
-            when (val parsed = WeightParser.parseUserInput(filtered)) {
-                is hu.laca.weighttracker.domain.WeightParseResult.Valid -> null
-                is hu.laca.weighttracker.domain.WeightParseResult.Invalid -> parsed.error
-            }
-        }
-        startDraft.value = current.copy(
-            weightText = filtered,
-            editedManually = true,
-            weightError = error
-        )
-    }
-
-    fun confirmStart() {
-        val draft = startDraft.value ?: return
-        if (draft.weightError != null || starting.value) {
-            return
-        }
         starting.value = true
         viewModelScope.launch {
             try {
-                val current = startDraft.value ?: return@launch
-                when (
-                    val result = sessionRepository.start(
-                        templateId = current.template.template.id,
-                        bodyWeightText = current.weightText,
-                        proposal = current.proposal,
-                        editedManually = current.editedManually
-                    )
-                ) {
+                if (uiState.value.activeSession != null) {
+                    pickerOpen.value = false
+                    message.value = WorkoutHubMessage.AlreadyActive
+                    return@launch
+                }
+                when (val result = sessionRepository.start(item.template.id)) {
                     is StartWorkoutResult.Started -> {
-                        startDraft.value = null
+                        pickerOpen.value = false
                         startedSessionId.value = result.sessionId
                     }
                     StartWorkoutResult.AlreadyActive -> {
-                        startDraft.value = null
+                        pickerOpen.value = false
                         message.value = WorkoutHubMessage.AlreadyActive
                     }
                     StartWorkoutResult.TemplateArchived -> message.value = WorkoutHubMessage.TemplateArchived
                     StartWorkoutResult.TemplateEmpty -> message.value = WorkoutHubMessage.TemplateEmpty
                     StartWorkoutResult.TemplateNotFound -> message.value = WorkoutHubMessage.TemplateNotFound
                     is StartWorkoutResult.InvalidBodyWeight -> {
-                        startDraft.value = current.copy(weightError = result.error)
+                        message.value = WorkoutHubMessage.TemplateEmpty
                     }
                 }
             } finally {
                 starting.value = false
+                preparingStart.value = false
             }
         }
     }
@@ -283,8 +209,15 @@ class WorkoutHubViewModel(
     fun showAbandoned() {
         message.value = WorkoutHubMessage.WorkoutAbandoned
     }
+}
 
-    private fun formatBodyWeight(value: Double): String {
-        return String.format(Locale.forLanguageTag("hu-HU"), "%.1f", value)
+fun WorkoutHubMessage.labelRes(): Int {
+    return when (this) {
+        WorkoutHubMessage.AlreadyActive -> R.string.message_workout_already_active
+        WorkoutHubMessage.TemplateArchived -> R.string.message_workout_template_archived
+        WorkoutHubMessage.TemplateEmpty -> R.string.message_workout_template_empty
+        WorkoutHubMessage.TemplateNotFound -> R.string.message_workout_template_empty
+        WorkoutHubMessage.WorkoutFinished -> R.string.message_workout_finished
+        WorkoutHubMessage.WorkoutAbandoned -> R.string.message_workout_abandoned
     }
 }

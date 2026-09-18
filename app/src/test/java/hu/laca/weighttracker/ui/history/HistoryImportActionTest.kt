@@ -1,7 +1,8 @@
 package hu.laca.weighttracker.ui.history
 
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import hu.laca.weighttracker.domain.journal.JournalEmptyKind
 import hu.laca.weighttracker.domain.journal.JournalFilter
@@ -46,7 +47,6 @@ class HistoryImportActionTest {
                     onDeleteDismiss = {},
                     onDeleteConfirm = {},
                     onMessageConsumed = {},
-                    onOpenSettings = {},
                     onOpenImport = { opened += 1 },
                     onFilterSelected = {},
                     onIncludeAbandoned = {},
@@ -57,7 +57,8 @@ class HistoryImportActionTest {
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Edzések importálása").performClick()
+        composeRule.onNodeWithTag(JOURNAL_OVERFLOW_BUTTON).performClick()
+        composeRule.onNodeWithText("Edzések importálása").performClick()
         assertEquals(1, opened)
     }
 }

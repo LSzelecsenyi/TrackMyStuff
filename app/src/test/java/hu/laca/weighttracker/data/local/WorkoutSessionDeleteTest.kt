@@ -94,7 +94,7 @@ class WorkoutSessionDeleteTest {
         weights.save(today, 81.4)
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val started = sessions.start(templateId, "81,4", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         val firstSet = sessions.getAggregate(started.sessionId)!!.exercises.single().sets.first()
         sessions.completeSet(
@@ -187,7 +187,7 @@ class WorkoutSessionDeleteTest {
     fun discardActiveDeletesAggregateReleasesLockAndDoesNotCreateAbandoned() = runTest {
         val pull = savePull()
         val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         val firstSet = sessions.getAggregate(started.sessionId)!!.exercises.single().sets.first()
         sessions.completeSet(
@@ -199,7 +199,7 @@ class WorkoutSessionDeleteTest {
         assertNull(sessions.observeInProgress().first())
         assertTrue(sessions.observeSummaries().first().none { it.session.status == SessionStatus.ABANDONED })
         assertTrue(database.workoutSessionDao().observeAll().first().isEmpty())
-        val restarted = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val restarted = sessions.start(templateId)
         assertTrue(restarted is StartWorkoutResult.Started)
     }
 
@@ -209,7 +209,7 @@ class WorkoutSessionDeleteTest {
         val firstTemplate = saveTemplate("Push A", listOf(pull to fourSets()))
         val secondTemplate = saveTemplate("Pull A", listOf(pull to fourSets()))
         val completed = completeWorkout(firstTemplate)
-        val active = sessions.start(secondTemplate, "", sessions.proposeBodyWeight(), false)
+        val active = sessions.start(secondTemplate)
             as StartWorkoutResult.Started
         assertEquals(DeleteWorkoutResult.NotFound, sessions.deleteWorkout(999_999L))
         assertEquals(DeleteWorkoutResult.ActiveSession, sessions.deleteWorkout(active.sessionId))
@@ -262,7 +262,7 @@ class WorkoutSessionDeleteTest {
     }
 
     private suspend fun completeWorkout(templateId: Long): Long {
-        val started = sessions.start(templateId, "", sessions.proposeBodyWeight(), false)
+        val started = sessions.start(templateId)
             as StartWorkoutResult.Started
         val firstSet = sessions.getAggregate(started.sessionId)!!.exercises.single().sets.first()
         sessions.completeSet(

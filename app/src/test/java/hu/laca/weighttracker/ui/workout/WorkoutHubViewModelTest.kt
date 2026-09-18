@@ -127,12 +127,7 @@ class WorkoutHubViewModelTest {
         val exerciseId = saveExercise("Húzódzkodás")
         val templateId = saveTemplate("Push – Kondipark", exerciseId)
         val sessionRepository = sessions()
-        val started = sessionRepository.start(
-            templateId,
-            "",
-            sessionRepository.proposeBodyWeight(today),
-            false
-        )
+        val started = sessionRepository.start(templateId)
         assertTrue(started is StartWorkoutResult.Started)
         val viewModel = hubViewModel(sessionRepository)
         val state = viewModel.uiState.first { it.activeSession != null }
@@ -142,62 +137,71 @@ class WorkoutHubViewModelTest {
     }
 
     @Test
-    fun givenSameDayWeightWhenStartSheetOpensThenValueIsPrefilled() = runTest {
+    fun givenSameDayWeightWhenTemplateChosenThenSessionUsesMeasuredSameDayWithoutWeightPrompt() = runTest {
         weights.save(today, 82.4)
         val exerciseId = saveExercise("Húzódzkodás")
         saveTemplate("Push – Kondipark", exerciseId)
         val viewModel = hubViewModel()
         val item = viewModel.uiState.first { it.templates.size == 1 }.templates.single()
-        viewModel.requestStart(item)
-        val draft = viewModel.uiState.first { it.startDraft != null }.startDraft!!
-        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, draft.proposal.source)
-        assertEquals("82,4", draft.weightText)
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.uiState.first { it.pickerVisible }
+        viewModel.chooseTemplate(item)
+        val started = viewModel.uiState.first { it.startedSessionId != null }
+        assertNotNull(started.startedSessionId)
+        assertFalse(started.pickerVisible)
+        assertFalse(started.isStarting)
+        val stored = sessions().getAggregate(started.startedSessionId!!)!!
+        assertEquals(82.4, stored.session.bodyWeightKg!!, 0.0)
+        assertEquals(BodyWeightSource.MEASURED_SAME_DAY, stored.session.bodyWeightSource)
     }
 
     @Test
-    fun givenStartAlreadyInProgressWhenConfirmedAgainThenOnlyOneSessionIsCreated() = runTest {
+    fun givenStartAlreadyInProgressWhenChosenAgainThenOnlyOneSessionIsCreated() = runTest {
         val exerciseId = saveExercise("Húzódzkodás")
         saveTemplate("Push – Kondipark", exerciseId)
         val viewModel = hubViewModel()
         val item = viewModel.uiState.first { it.templates.size == 1 }.templates.single()
-        viewModel.requestStart(item)
-        viewModel.uiState.first { it.startDraft != null }
-        viewModel.confirmStart()
-        viewModel.confirmStart()
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.uiState.first { it.pickerVisible }
+        viewModel.chooseTemplate(item)
+        viewModel.chooseTemplate(item)
         val started = viewModel.uiState.first { it.startedSessionId != null }
         assertNotNull(started.startedSessionId)
-        assertNull(started.startDraft)
         assertFalse(started.isStarting)
         val inProgress = sessions().observeInProgress().first()
         assertEquals(started.startedSessionId, inProgress?.session?.id)
     }
 
     @Test
-    fun givenUserCancelsStartWhenSheetClosesThenNothingIsWritten() = runTest {
+    fun givenUserDismissesPickerWhenNoTemplateChosenThenNothingIsWritten() = runTest {
         val exerciseId = saveExercise("Húzódzkodás")
         saveTemplate("Push – Kondipark", exerciseId)
         val viewModel = hubViewModel()
-        val item = viewModel.uiState.first { it.templates.size == 1 }.templates.single()
-        viewModel.requestStart(item)
-        viewModel.uiState.first { it.startDraft != null }
-        viewModel.dismissStart()
-        val state = viewModel.uiState.first { it.startDraft == null && !it.loading }
-        assertNull(state.startDraft)
+        viewModel.uiState.first { it.templates.size == 1 }
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.uiState.first { it.pickerVisible }
+        viewModel.dismissPicker()
+        val state = viewModel.uiState.first { !it.pickerVisible && !it.loading }
+        assertFalse(state.pickerVisible)
         assertNull(state.startedSessionId)
         assertNull(sessions().observeInProgress().first())
     }
 
     @Test
-    fun givenTwoStartRequestsWhenFirstSheetIsOpenThenSecondIsIgnored() = runTest {
+    fun givenTwoStartRequestsWhenFirstStartIsRunningThenSecondIsIgnored() = runTest {
         val exerciseId = saveExercise("Húzódzkodás")
         saveTemplate("Push – Kondipark", exerciseId)
         saveTemplate("Pull", exerciseId)
         val viewModel = hubViewModel()
         val items = viewModel.uiState.first { it.templates.size == 2 }.templates
-        viewModel.requestStart(items[0])
-        viewModel.requestStart(items[1])
-        val draft = viewModel.uiState.first { it.startDraft != null }.startDraft!!
-        assertEquals(items[0].template.id, draft.template.template.id)
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.uiState.first { it.pickerVisible }
+        viewModel.chooseTemplate(items[0])
+        viewModel.chooseTemplate(items[1])
+        val started = viewModel.uiState.first { it.startedSessionId != null }
+        val stored = sessions().getAggregate(started.startedSessionId!!)!!
+        assertEquals(items[0].template.id, stored.session.templateId)
+        assertEquals(1, listOfNotNull(sessions().observeInProgress().first()).size)
     }
 
     @Test
@@ -215,11 +219,11 @@ class WorkoutHubViewModelTest {
         val state = viewModel.uiState.first { it.pickerVisible }
         assertEquals(listOf("Alma", "Álló evezés", "Záró"), state.templates.map { it.template.name })
         assertNull(state.activeSession)
-        assertNull(state.startDraft)
+        assertNull(state.startedSessionId)
     }
 
     @Test
-    fun givenPickerWhenTemplateChosenThenSheetClosesAndStartRunsOnce() = runTest {
+    fun givenPickerWhenTemplateChosenThenStartRunsOnceWithoutWeightDialog() = runTest {
         val exerciseId = saveExercise("Húzódzkodás")
         saveTemplate("Push – Kondipark", exerciseId)
         val viewModel = hubViewModel()
@@ -228,10 +232,29 @@ class WorkoutHubViewModelTest {
         viewModel.uiState.first { it.pickerVisible }
         viewModel.chooseTemplate(item)
         viewModel.chooseTemplate(item)
-        val draft = viewModel.uiState.first { it.startDraft != null }
-        assertFalse(draft.pickerVisible)
-        assertEquals(item.template.id, draft.startDraft!!.template.template.id)
-        assertEquals(1, listOf(draft.startDraft).size)
+        val started = viewModel.uiState.first { it.startedSessionId != null }
+        assertFalse(started.pickerVisible)
+        assertEquals(item.template.id, sessions().getAggregate(started.startedSessionId!!)!!.session.templateId)
+        assertEquals(started.startedSessionId, sessions().observeInProgress().first()?.session?.id)
+    }
+
+    @Test
+    fun givenEmptyTemplateWhenChosenThenExistingErrorIsShownAndPickerStaysRecoverable() = runTest {
+        templates.save(TemplateDraft(name = "Üres"))
+        val viewModel = hubViewModel()
+        val item = viewModel.uiState.first { it.templates.size == 1 }.templates.single()
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.uiState.first { it.pickerVisible }
+        viewModel.chooseTemplate(item)
+        val failed = viewModel.uiState.first { it.message == WorkoutHubMessage.TemplateEmpty }
+        assertEquals(WorkoutHubMessage.TemplateEmpty, failed.message)
+        assertTrue(failed.pickerVisible)
+        assertNull(failed.startedSessionId)
+        assertNull(sessions().observeInProgress().first())
+        assertEquals(WorkoutPrimaryAction.Ignored, viewModel.onPrimaryWorkoutAction())
+        viewModel.dismissPicker()
+        viewModel.uiState.first { !it.pickerVisible }
+        assertEquals(WorkoutPrimaryAction.ShowPicker, viewModel.onPrimaryWorkoutAction())
     }
 
     @Test
@@ -239,12 +262,7 @@ class WorkoutHubViewModelTest {
         val exerciseId = saveExercise("Húzódzkodás")
         val templateId = saveTemplate("Push – Kondipark", exerciseId)
         val sessionRepository = sessions()
-        val started = sessionRepository.start(
-            templateId,
-            "",
-            sessionRepository.proposeBodyWeight(today),
-            false
-        )
+        val started = sessionRepository.start(templateId)
         assertTrue(started is StartWorkoutResult.Started)
         val viewModel = hubViewModel(sessionRepository)
         val state = viewModel.uiState.first { it.activeSession != null }
@@ -253,7 +271,6 @@ class WorkoutHubViewModelTest {
         assertEquals(WorkoutPrimaryAction.Resume(state.activeSession!!.session.id), first)
         assertEquals(WorkoutPrimaryAction.Resume(state.activeSession!!.session.id), second)
         assertFalse(viewModel.uiState.value.pickerVisible)
-        assertNull(viewModel.uiState.value.startDraft)
     }
 
     @Test
@@ -274,12 +291,7 @@ class WorkoutHubViewModelTest {
         viewModel.uiState.first { it.templates.size == 1 }
         viewModel.onPrimaryWorkoutAction()
         viewModel.uiState.first { it.pickerVisible }
-        val started = sessions().start(
-            templateId,
-            "",
-            sessions().proposeBodyWeight(today),
-            false
-        )
+        val started = sessions().start(templateId)
         assertTrue(started is StartWorkoutResult.Started)
         val state = viewModel.uiState.first { it.activeSession != null }
         assertFalse(state.pickerVisible)
@@ -292,13 +304,12 @@ class WorkoutHubViewModelTest {
         return WorkoutHubViewModel(
             repository,
             templates,
-            sessionRepository,
-            FixedDateProvider(today)
+            sessionRepository
         )
     }
 
     private fun sessions(): WorkoutSessionRepository {
-        val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
+        val clock = Clock.fixed(today.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
         return WorkoutSessionRepository(
             sessionDao = database.workoutSessionDao(),
             templateDao = database.workoutTemplateDao(),
