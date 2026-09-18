@@ -1,39 +1,54 @@
 package hu.laca.weighttracker.ui.settings
 
 import android.content.res.Configuration
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.os.SystemClock
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,8 +56,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
@@ -55,14 +85,42 @@ import hu.laca.weighttracker.domain.theme.PaletteType
 import hu.laca.weighttracker.domain.theme.PaletteValidationError
 import hu.laca.weighttracker.domain.theme.SeedField
 import hu.laca.weighttracker.domain.theme.ThemeMode
+import hu.laca.weighttracker.ui.components.CompactEditorDivider
+import hu.laca.weighttracker.ui.components.CompactEditorSection
 import hu.laca.weighttracker.ui.components.PaletteSwatch
-import hu.laca.weighttracker.ui.components.SectionHeader
-import hu.laca.weighttracker.ui.components.SegmentedControl
 import hu.laca.weighttracker.ui.components.UserMessageEffect
 import hu.laca.weighttracker.ui.theme.AppDimens
+import hu.laca.weighttracker.ui.theme.AppTypeTokens
 import hu.laca.weighttracker.ui.theme.WeightTrackerTheme
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+internal const val SETTINGS_ROOT = "settings-root"
+internal const val SETTINGS_THEME_SYSTEM = "settings-theme-system"
+internal const val SETTINGS_THEME_LIGHT = "settings-theme-light"
+internal const val SETTINGS_THEME_DARK = "settings-theme-dark"
+internal const val SETTINGS_PALETTE_DEFAULT = "settings-palette-default"
+internal const val SETTINGS_PALETTE_CUSTOM = "settings-palette-custom"
+internal const val SETTINGS_PREVIEW = "settings-preview"
+internal const val SETTINGS_EDITOR = "settings-editor"
+internal const val SETTINGS_EDITOR_MODE = "settings-editor-mode"
+internal const val SETTINGS_EDITOR_LIGHT = "settings-editor-light"
+internal const val SETTINGS_EDITOR_DARK = "settings-editor-dark"
+internal const val SETTINGS_GENERATE = "settings-generate"
+internal const val SETTINGS_RESET = "settings-reset"
+internal const val SETTINGS_SAVE_BAR = "settings-save-bar"
+internal const val SETTINGS_SAVE = "settings-save"
+internal const val SETTINGS_CANCEL = "settings-cancel"
+internal const val SETTINGS_EXPORT = "settings-export"
+internal const val SETTINGS_IMPORT = "settings-import"
+
+internal fun settingsColorRowTag(field: SeedField): String = "settings-color-${field.name.lowercase(Locale.US)}"
+
+internal fun settingsHexTag(field: SeedField): String = "settings-hex-${field.name.lowercase(Locale.US)}"
+
+internal fun settingsSwatchTag(field: SeedField): String = "settings-swatch-${field.name.lowercase(Locale.US)}"
+
+internal fun settingsPreviewPrimaryTag(hex: String): String = "settings-preview-primary-$hex"
+
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
@@ -86,81 +144,85 @@ fun SettingsScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
+    var lastSaveAt by remember { mutableLongStateOf(Long.MIN_VALUE / 2) }
+    val saveOnce: () -> Unit = {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastSaveAt >= 700L) {
+            lastSaveAt = now
+            onSaveDraft()
+        }
+    }
     UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
+    val customEditorVisible = state.draft != null && state.appearance.paletteType == PaletteType.Custom
+    val saveEnabled = state.draft != null &&
+        SeedField.entries.all { PaletteDraftLogic.fieldError(state.draft.valueFor(it)) == null }
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back)
-                        )
-                    }
-                }
-            )
-        },
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(SETTINGS_ROOT),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            if (customEditorVisible) {
+                SettingsSaveBar(
+                    saveEnabled = saveEnabled,
+                    onSave = saveOnce,
+                    onCancel = onCancelDraft
+                )
+            }
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .statusBarsPadding()
         ) {
+            SettingsHeader(onBack = onBack)
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(scrollState)
-                    .imePadding()
+                    .then(
+                        if (customEditorVisible) {
+                            Modifier
+                        } else {
+                            Modifier.navigationBarsPadding()
+                        }
+                    )
                     .padding(horizontal = AppDimens.screenPadding)
-                    .padding(top = 12.dp, bottom = AppDimens.scrollEndPadding)
+                    .padding(
+                        top = AppDimens.headerStackGap,
+                        bottom = if (customEditorVisible) AppDimens.itemGap else AppDimens.scrollEndPadding
+                    )
             ) {
-            AppearanceSection(
-                state = state,
-                onThemeSelected = onThemeSelected,
-                onSelectDefaultPalette = onSelectDefaultPalette,
-                onSelectCustomPalette = onSelectCustomPalette,
-                onEditingDarkChange = onEditingDarkChange,
-                onDraftFieldChange = onDraftFieldChange,
-                onDraftColorPicked = onDraftColorPicked,
-                onGenerateDark = onGenerateDark,
-                onSaveDraft = onSaveDraft,
-                onCancelDraft = onCancelDraft,
-                onResetCustomDraft = onResetCustomDraft
-            )
-            Spacer(Modifier.height(28.dp))
-            SectionHeader(title = stringResource(R.string.backup_title))
-            Text(
-                text = stringResource(R.string.backup_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = onExportClick,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.action_export))
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onImportClick,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.action_import))
-            }
-            Spacer(Modifier.height(28.dp))
-            SectionHeader(title = stringResource(R.string.privacy_title))
-            Text(
-                text = stringResource(R.string.privacy_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                AppearanceSection(
+                    state = state,
+                    customEditorVisible = customEditorVisible,
+                    onThemeSelected = onThemeSelected,
+                    onSelectDefaultPalette = onSelectDefaultPalette,
+                    onSelectCustomPalette = onSelectCustomPalette,
+                    onEditingDarkChange = onEditingDarkChange,
+                    onDraftFieldChange = onDraftFieldChange,
+                    onDraftColorPicked = onDraftColorPicked,
+                    onGenerateDark = onGenerateDark,
+                    onResetCustomDraft = onResetCustomDraft
+                )
+                CompactEditorDivider()
+                DataSection(
+                    onExportClick = onExportClick,
+                    onImportClick = onImportClick
+                )
+                CompactEditorDivider()
+                CompactEditorSection(title = settingsKicker(stringResource(R.string.privacy_title))) {
+                    Text(
+                        text = stringResource(R.string.privacy_body),
+                        style = AppTypeTokens.statSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -208,8 +270,86 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SettingsHeader(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppDimens.screenPadding)
+            .defaultMinSize(minHeight = AppDimens.minTouch),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.size(AppDimens.minTouch)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.action_back)
+            )
+        }
+        Text(
+            text = stringResource(R.string.settings_title),
+            style = AppTypeTokens.sectionTitle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun SettingsSaveBar(
+    saveEnabled: Boolean,
+    onSave: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
+            .imePadding()
+            .testTag(SETTINGS_SAVE_BAR)
+    ) {
+        HorizontalDivider(
+            thickness = AppDimens.strokeThin,
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.screenPadding, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
+                    .testTag(SETTINGS_CANCEL)
+            ) {
+                Text(text = stringResource(R.string.action_cancel))
+            }
+            TextButton(
+                onClick = onSave,
+                enabled = saveEnabled,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
+                    .testTag(SETTINGS_SAVE)
+            ) {
+                Text(
+                    text = stringResource(R.string.action_save),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun AppearanceSection(
     state: SettingsUiState,
+    customEditorVisible: Boolean,
     onThemeSelected: (ThemeMode) -> Unit,
     onSelectDefaultPalette: () -> Unit,
     onSelectCustomPalette: () -> Unit,
@@ -217,58 +357,63 @@ private fun AppearanceSection(
     onDraftFieldChange: (SeedField, String) -> Unit,
     onDraftColorPicked: (SeedField, Int) -> Unit,
     onGenerateDark: () -> Unit,
-    onSaveDraft: () -> Unit,
-    onCancelDraft: () -> Unit,
     onResetCustomDraft: () -> Unit
 ) {
-    SectionHeader(title = stringResource(R.string.theme_title))
-    Column(modifier = Modifier.selectableGroup()) {
-        ThemeOption(
-            label = stringResource(R.string.theme_system),
-            selected = state.appearance.mode == ThemeMode.System,
-            onClick = { onThemeSelected(ThemeMode.System) }
-        )
-        ThemeOption(
-            label = stringResource(R.string.theme_light),
-            selected = state.appearance.mode == ThemeMode.Light,
-            onClick = { onThemeSelected(ThemeMode.Light) }
-        )
-        ThemeOption(
-            label = stringResource(R.string.theme_dark),
-            selected = state.appearance.mode == ThemeMode.Dark,
-            onClick = { onThemeSelected(ThemeMode.Dark) }
-        )
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.theme_title))) {
+        Column(modifier = Modifier.selectableGroup()) {
+            ChoiceRow(
+                label = stringResource(R.string.theme_system),
+                selected = state.appearance.mode == ThemeMode.System,
+                testTag = SETTINGS_THEME_SYSTEM,
+                onClick = { onThemeSelected(ThemeMode.System) }
+            )
+            ChoiceRow(
+                label = stringResource(R.string.theme_light),
+                selected = state.appearance.mode == ThemeMode.Light,
+                testTag = SETTINGS_THEME_LIGHT,
+                onClick = { onThemeSelected(ThemeMode.Light) }
+            )
+            ChoiceRow(
+                label = stringResource(R.string.theme_dark),
+                selected = state.appearance.mode == ThemeMode.Dark,
+                testTag = SETTINGS_THEME_DARK,
+                onClick = { onThemeSelected(ThemeMode.Dark) }
+            )
+        }
     }
-    Spacer(Modifier.height(20.dp))
-    Text(
-        text = stringResource(R.string.palette_title),
-        style = MaterialTheme.typography.titleMedium
-    )
-    Spacer(Modifier.height(8.dp))
-    val customSelected = state.appearance.paletteType == PaletteType.Custom
-    Column(modifier = Modifier.selectableGroup()) {
-        ThemeOption(
-            label = stringResource(R.string.palette_default),
-            selected = !customSelected,
-            onClick = onSelectDefaultPalette
-        )
-        ThemeOption(
-            label = stringResource(R.string.palette_custom),
-            selected = customSelected,
-            onClick = onSelectCustomPalette
-        )
+    CompactEditorDivider()
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.palette_title))) {
+        val customSelected = state.appearance.paletteType == PaletteType.Custom
+        Column(modifier = Modifier.selectableGroup()) {
+            ChoiceRow(
+                label = stringResource(R.string.palette_default),
+                selected = !customSelected,
+                testTag = SETTINGS_PALETTE_DEFAULT,
+                onClick = onSelectDefaultPalette
+            )
+            ChoiceRow(
+                label = stringResource(R.string.palette_custom),
+                selected = customSelected,
+                testTag = SETTINGS_PALETTE_CUSTOM,
+                onClick = onSelectCustomPalette
+            )
+        }
     }
-    val previewDraft = state.draft
-    val previewDark = previewDraft?.previewIsDark ?: when (state.appearance.mode) {
-        ThemeMode.Dark -> true
-        ThemeMode.Light -> false
-        ThemeMode.System -> isSystemInDarkTheme()
-    }
-    val previewSeeds = previewDraft?.activePreview ?: state.appearance.activeSeeds(previewDark)
-    Spacer(Modifier.height(16.dp))
-    ThemePreviewCard(seeds = previewSeeds, darkTheme = previewDark)
-    if (state.draft != null) {
-        Spacer(Modifier.height(16.dp))
+    if (customEditorVisible && state.draft != null) {
+        CompactEditorDivider()
+        CompactEditorSection(title = settingsKicker(stringResource(R.string.theme_preview_title))) {
+            Text(
+                text = stringResource(R.string.theme_preview_body),
+                style = AppTypeTokens.statCaption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            ThemePreviewCard(
+                seeds = state.draft.activePreview,
+                darkTheme = state.draft.previewIsDark
+            )
+        }
+        CompactEditorDivider()
         CustomPaletteEditor(
             draft = state.draft,
             saveError = state.saveError,
@@ -276,8 +421,6 @@ private fun AppearanceSection(
             onDraftFieldChange = onDraftFieldChange,
             onDraftColorPicked = onDraftColorPicked,
             onGenerateDark = onGenerateDark,
-            onSaveDraft = onSaveDraft,
-            onCancelDraft = onCancelDraft,
             onResetCustomDraft = onResetCustomDraft
         )
     }
@@ -291,62 +434,59 @@ private fun CustomPaletteEditor(
     onDraftFieldChange: (SeedField, String) -> Unit,
     onDraftColorPicked: (SeedField, Int) -> Unit,
     onGenerateDark: () -> Unit,
-    onSaveDraft: () -> Unit,
-    onCancelDraft: () -> Unit,
     onResetCustomDraft: () -> Unit
 ) {
     var pickerField by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmReset by rememberSaveable { mutableStateOf(false) }
-    SegmentedControl(
-        options = listOf(
-            stringResource(R.string.theme_light),
-            stringResource(R.string.theme_dark)
-        ),
-        selectedIndex = if (draft.editingDark) 1 else 0,
-        onSelected = { onEditingDarkChange(it == 1) }
-    )
-    Spacer(Modifier.height(12.dp))
-    SeedField.entries.forEach { field ->
-        ColorFieldRow(
-            field = field,
-            value = draft.valueFor(field),
-            previewRgb = draft.previewRgb(field),
-            onValueChange = { onDraftFieldChange(field, it) },
-            onSwatchClick = { pickerField = field.name }
+    CompactEditorSection(
+        title = settingsKicker(stringResource(R.string.palette_custom)),
+        modifier = Modifier.testTag(SETTINGS_EDITOR)
+    ) {
+        CompactModeSelector(
+            editingDark = draft.editingDark,
+            onEditingDarkChange = onEditingDarkChange
         )
-        Spacer(Modifier.height(8.dp))
-    }
-    saveError?.let { error ->
-        Text(
-            text = saveErrorText(error),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(vertical = 4.dp)
-        )
-    }
-    OutlinedButton(
-        onClick = onGenerateDark,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(stringResource(R.string.action_generate_dark))
-    }
-    Spacer(Modifier.height(8.dp))
-    Button(
-        onClick = onSaveDraft,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = SeedField.entries.all { PaletteDraftLogic.fieldError(draft.valueFor(it)) == null }
-    ) {
-        Text(stringResource(R.string.action_save))
-    }
-    Spacer(Modifier.height(8.dp))
-    OutlinedButton(
-        onClick = onCancelDraft,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(stringResource(R.string.action_cancel))
-    }
-    TextButton(onClick = { confirmReset = true }) {
-        Text(stringResource(R.string.action_reset_custom_colors))
+        Spacer(Modifier.height(AppDimens.itemGap))
+        SeedField.entries.forEach { field ->
+            key(field, draft.editingDark) {
+                ColorFieldRow(
+                    field = field,
+                    value = draft.valueFor(field),
+                    previewRgb = draft.previewRgb(field),
+                    onValueChange = { onDraftFieldChange(field, it) },
+                    onSwatchClick = { pickerField = field.name }
+                )
+            }
+        }
+        saveError?.let { error ->
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            Text(
+                text = saveErrorText(error),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        Spacer(Modifier.height(AppDimens.itemGap))
+        TextButton(
+            onClick = onGenerateDark,
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = AppDimens.minTouch)
+                .testTag(SETTINGS_GENERATE)
+        ) {
+            Text(text = stringResource(R.string.action_generate_dark))
+        }
+        TextButton(
+            onClick = { confirmReset = true },
+            modifier = Modifier
+                .defaultMinSize(minHeight = AppDimens.minTouch)
+                .testTag(SETTINGS_RESET)
+        ) {
+            Text(
+                text = stringResource(R.string.action_reset_custom_colors),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
     if (confirmReset) {
         AlertDialog(
@@ -385,6 +525,78 @@ private fun CustomPaletteEditor(
 }
 
 @Composable
+private fun CompactModeSelector(
+    editingDark: Boolean,
+    onEditingDarkChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(SETTINGS_EDITOR_MODE)
+    ) {
+        ModeTab(
+            label = stringResource(R.string.theme_light),
+            selected = !editingDark,
+            testTag = SETTINGS_EDITOR_LIGHT,
+            onClick = { onEditingDarkChange(false) }
+        )
+        ModeTab(
+            label = stringResource(R.string.theme_dark),
+            selected = editingDark,
+            testTag = SETTINGS_EDITOR_DARK,
+            onClick = { onEditingDarkChange(true) }
+        )
+    }
+}
+
+@Composable
+private fun RowScope.ModeTab(
+    label: String,
+    selected: Boolean,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    val color = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .clickable(onClick = onClick)
+            .semantics {
+                this.selected = selected
+                role = Role.Tab
+            }
+            .testTag(testTag),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                style = AppTypeTokens.sectionTitle,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+        )
+    }
+}
+
+@Composable
 private fun ColorFieldRow(
     field: SeedField,
     value: String,
@@ -393,60 +605,205 @@ private fun ColorFieldRow(
     onSwatchClick: () -> Unit
 ) {
     val error = PaletteDraftLogic.fieldError(value)
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(field.labelRes()),
-            style = MaterialTheme.typography.labelLarge
+    val label = stringResource(field.labelRes())
+    val lineColor = if (error != null) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.outline
+    }
+    var fieldValue by remember { mutableStateOf(TextFieldValue(value)) }
+    LaunchedEffect(value) {
+        if (value != fieldValue.text) {
+            val cursor = fieldValue.selection.start.coerceIn(0, value.length)
+            fieldValue = TextFieldValue(text = value, selection = TextRange(cursor))
+        }
+    }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag(settingsColorRowTag(field)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PaletteSwatch(
+            color = Color(previewRgb),
+            contentDescription = stringResource(R.string.color_swatch_description, label),
+            onClick = onSwatchClick,
+            modifier = Modifier.testTag(settingsSwatchTag(field))
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PaletteSwatch(
-                color = Color(previewRgb),
-                contentDescription = stringResource(R.string.color_swatch_description, stringResource(field.labelRes())),
-                onClick = onSwatchClick
-            )
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 8.dp),
-                singleLine = true,
-                isError = error != null,
-                supportingText = error?.let {
-                    {
-                        Text(stringResource(R.string.error_color_hex))
+        Spacer(Modifier.width(AppDimens.itemGap))
+        BasicTextField(
+            value = fieldValue,
+            onValueChange = { incoming ->
+                fieldValue = incoming
+                onValueChange(incoming.text)
+            },
+            modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = AppDimens.minTouch)
+                .semantics { contentDescription = label }
+                .testTag(settingsHexTag(field)),
+            textStyle = AppTypeTokens.statValue.copy(color = MaterialTheme.colorScheme.onSurface),
+            singleLine = true,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Ascii,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus(force = true)
+                    keyboard?.hide()
+                }
+            ),
+            decorationBox = { inner ->
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = label,
+                        style = AppTypeTokens.statCaption,
+                        color = if (error != null) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    Spacer(Modifier.height(AppDimens.statSecondaryGap))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 28.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        inner()
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(AppDimens.strokeThin)
+                            .background(lineColor)
+                    )
+                    if (error != null) {
+                        Spacer(Modifier.height(AppDimens.statSecondaryGap))
+                        Text(
+                            text = stringResource(R.string.error_color_hex),
+                            style = AppTypeTokens.statCaption,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ChoiceRow(
+    label: String,
+    selected: Boolean,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.RadioButton
+            )
+            .semantics { this.selected = selected }
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = AppTypeTokens.sectionTitle,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
             )
         }
     }
 }
 
 @Composable
-private fun ThemeOption(
-    label: String,
-    selected: Boolean,
+private fun DataSection(
+    onExportClick: () -> Unit,
+    onImportClick: () -> Unit
+) {
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.data_title))) {
+        DataActionRow(
+            icon = Icons.Outlined.FileUpload,
+            title = stringResource(R.string.action_export_weight),
+            subtitle = stringResource(R.string.action_export_weight_subtitle),
+            testTag = SETTINGS_EXPORT,
+            onClick = onExportClick
+        )
+        DataActionRow(
+            icon = Icons.Outlined.FileDownload,
+            title = stringResource(R.string.action_import_weight),
+            subtitle = stringResource(R.string.action_import_weight_subtitle),
+            testTag = SETTINGS_IMPORT,
+            onClick = onImportClick
+        )
+    }
+}
+
+@Composable
+private fun DataActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    testTag: String,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .selectable(
-                selected = selected,
-                onClick = onClick,
-                role = Role.RadioButton
-            )
-            .padding(vertical = 8.dp),
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .clickable(onClick = onClick)
+            .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(start = 12.dp)
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(AppDimens.itemGap))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                style = AppTypeTokens.statCaption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
         )
     }
 }
@@ -479,6 +836,10 @@ private fun saveErrorText(error: PaletteSaveResult): String {
         }
         is PaletteSaveResult.Success -> ""
     }
+}
+
+private fun settingsKicker(text: String): String {
+    return text.uppercase(Locale.forLanguageTag("hu-HU"))
 }
 
 private fun PaletteDraft.valueFor(field: SeedField): String {

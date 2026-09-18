@@ -8,6 +8,7 @@ import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.domain.WeightParseError
 import hu.laca.weighttracker.domain.WeightParser
+import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import hu.laca.weighttracker.domain.workout.ActiveSessionSummary
 import hu.laca.weighttracker.domain.workout.BodyWeightProposal
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
@@ -41,7 +42,8 @@ data class WorkoutHubUiState(
     val isStarting: Boolean = false,
     val message: WorkoutHubMessage? = null,
     val startedSessionId: Long? = null,
-    val recentCompleted: WorkoutSessionSummary? = null
+    val recentCompleted: WorkoutSessionSummary? = null,
+    val pickerVisible: Boolean = false
 ) {
     val isEmpty: Boolean
         get() = !loading &&
@@ -60,6 +62,12 @@ sealed interface WorkoutHubMessage {
     data object WorkoutAbandoned : WorkoutHubMessage
 }
 
+sealed interface WorkoutPrimaryAction {
+    data class Resume(val sessionId: Long) : WorkoutPrimaryAction
+    data object ShowPicker : WorkoutPrimaryAction
+    data object Ignored : WorkoutPrimaryAction
+}
+
 class WorkoutHubViewModel(
     exerciseRepository: ExerciseRepository,
     templateRepository: WorkoutTemplateRepository,
@@ -71,6 +79,7 @@ class WorkoutHubViewModel(
     private val preparingStart = MutableStateFlow(false)
     private val message = MutableStateFlow<WorkoutHubMessage?>(null)
     private val startedSessionId = MutableStateFlow<Long?>(null)
+    private val pickerOpen = MutableStateFlow(false)
 
     private data class Counts(
         val exercises: Int,
@@ -83,7 +92,8 @@ class WorkoutHubViewModel(
         val draft: StartWorkoutDraft?,
         val currentMessage: WorkoutHubMessage?,
         val started: Long?,
-        val isStarting: Boolean
+        val isStarting: Boolean,
+        val pickerVisible: Boolean
     )
 
     val uiState: StateFlow<WorkoutHubUiState> = combine(
@@ -97,8 +107,9 @@ class WorkoutHubViewModel(
         },
         templateRepository.observeActive(),
         sessionRepository.observeInProgress(),
-        combine(startDraft, message, startedSessionId, starting) { draft, currentMessage, started, isStarting ->
-            StartExtras(draft, currentMessage, started, isStarting)
+        combine(startDraft, message, startedSessionId, starting, pickerOpen) {
+            draft, currentMessage, started, isStarting, pickerVisible ->
+            StartExtras(draft, currentMessage, started, isStarting, pickerVisible)
         },
         sessionRepository.observeLatestCompleted()
     ) { counts, templates, active, extras, recent ->
@@ -108,19 +119,54 @@ class WorkoutHubViewModel(
             archivedCount = counts.archivedExercises,
             activeTemplateCount = counts.templates,
             archivedTemplateCount = counts.archivedTemplates,
-            templates = templates,
+            templates = LocalizedLabelOrder.sorted(
+                templates,
+                label = { it.template.name },
+                key = { it.template.id.toString() }
+            ),
             activeSession = active,
             startDraft = extras.draft,
             isStarting = extras.isStarting,
             message = extras.currentMessage,
             startedSessionId = extras.started,
-            recentCompleted = recent
+            recentCompleted = recent,
+            pickerVisible = extras.pickerVisible && active == null && extras.draft == null
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = WorkoutHubUiState()
     )
+
+    fun onPrimaryWorkoutAction(): WorkoutPrimaryAction {
+        val active = uiState.value.activeSession
+        if (active != null) {
+            pickerOpen.value = false
+            return WorkoutPrimaryAction.Resume(active.session.id)
+        }
+        if (starting.value || startDraft.value != null || preparingStart.value || pickerOpen.value) {
+            return WorkoutPrimaryAction.Ignored
+        }
+        pickerOpen.value = true
+        return WorkoutPrimaryAction.ShowPicker
+    }
+
+    fun dismissPicker() {
+        pickerOpen.value = false
+    }
+
+    fun chooseTemplate(item: TemplateListItem) {
+        if (uiState.value.activeSession != null) {
+            pickerOpen.value = false
+            message.value = WorkoutHubMessage.AlreadyActive
+            return
+        }
+        if (!pickerOpen.value) {
+            return
+        }
+        pickerOpen.value = false
+        requestStart(item)
+    }
 
     fun requestStart(item: TemplateListItem) {
         if (uiState.value.activeSession != null) {

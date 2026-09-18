@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.exercise.ArchiveFilter
+import hu.laca.weighttracker.domain.workout.TemplateCatalogLogic
 import hu.laca.weighttracker.domain.workout.TemplateDeleteResult
 import hu.laca.weighttracker.domain.workout.TemplateListItem
-import hu.laca.weighttracker.domain.workout.TemplateNaming
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -60,19 +60,18 @@ class TemplateListViewModel(
     )
 
     val uiState: StateFlow<TemplateListUiState> = combine(
-        repository.observeActive(),
-        repository.observeArchived(),
+        repository.observeAll(),
         repository.observeReferencedTemplateIds(),
         combine(query, archiveFilter, message, pendingDelete, pendingBlocked) {
                 text, filter, currentMessage, delete, blocked ->
             Controls(text, filter, currentMessage, delete, blocked)
         }
-    ) { active, archived, referenced, controls ->
-        val source = if (controls.archiveFilter == ArchiveFilter.ARCHIVED) archived else active
-        val needle = TemplateNaming.normalize(controls.query)
-        val visible = source.filter { item ->
-            needle.isEmpty() || item.template.normalizedName.contains(needle)
-        }
+    ) { items, referenced, controls ->
+        val visible = TemplateCatalogLogic.filter(
+            items = items,
+            query = controls.query,
+            archiveFilter = controls.archiveFilter
+        )
         TemplateListUiState(
             loading = false,
             visibleItems = visible,
@@ -80,7 +79,7 @@ class TemplateListViewModel(
             archiveFilter = controls.archiveFilter,
             emptyKind = when {
                 visible.isNotEmpty() -> null
-                needle.isNotEmpty() -> TemplateEmptyKind.Search
+                TemplateCatalogLogic.hasSearchQuery(controls.query) -> TemplateEmptyKind.Search
                 controls.archiveFilter == ArchiveFilter.ARCHIVED -> TemplateEmptyKind.Archived
                 else -> TemplateEmptyKind.Active
             },

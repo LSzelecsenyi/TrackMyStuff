@@ -4,7 +4,6 @@ import hu.laca.weighttracker.R
 
 object AppRoutes {
     const val OVERVIEW = "dashboard"
-    const val WORKOUT = "workout"
     const val JOURNAL = "history"
     const val SETTINGS = "settings"
     const val EXERCISES = "exercises"
@@ -35,11 +34,17 @@ data class InternalNavigation(
 object AppNavigation {
     val rootTabs: List<RootTab> = listOf(
         RootTab(AppRoutes.OVERVIEW, R.string.nav_dashboard),
-        RootTab(AppRoutes.WORKOUT, R.string.nav_workout),
         RootTab(AppRoutes.JOURNAL, R.string.nav_journal)
     )
 
     private val rootRoutes: Set<String> = rootTabs.map { it.route }.toSet()
+
+    private val bottomBarRoutes: Set<String> = setOf(
+        AppRoutes.OVERVIEW,
+        AppRoutes.JOURNAL,
+        AppRoutes.EXERCISES,
+        AppRoutes.TEMPLATES
+    )
 
     fun canonicalRoute(route: String?): String? {
         return route?.substringBefore("?")
@@ -50,7 +55,7 @@ object AppNavigation {
     }
 
     fun showsBottomBar(route: String?): Boolean {
-        return isRootDestination(route)
+        return canonicalRoute(route) in bottomBarRoutes
     }
 
     fun isSettingsBottomDestination(): Boolean {
@@ -58,7 +63,7 @@ object AppNavigation {
     }
 
     fun catalogEntryPoint(): String {
-        return AppRoutes.WORKOUT
+        return AppRoutes.OVERVIEW
     }
 
     fun settingsContainsCatalog(): Boolean {
@@ -76,7 +81,7 @@ object AppNavigation {
     fun openCatalog(currentRoute: String?): InternalNavigation {
         return InternalNavigation(
             targetRoute = AppRoutes.EXERCISES,
-            backTarget = AppRoutes.WORKOUT,
+            backTarget = AppRoutes.OVERVIEW,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.EXERCISES)
         )
     }
@@ -84,7 +89,7 @@ object AppNavigation {
     fun openActiveWorkout(currentRoute: String?): InternalNavigation {
         return InternalNavigation(
             targetRoute = AppRoutes.ACTIVE_WORKOUT,
-            backTarget = AppRoutes.WORKOUT,
+            backTarget = AppRoutes.OVERVIEW,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.ACTIVE_WORKOUT)
         )
     }
@@ -107,7 +112,7 @@ object AppNavigation {
 
     fun openWorkoutDetail(currentRoute: String?): InternalNavigation {
         val back = when (canonicalRoute(currentRoute)) {
-            AppRoutes.OVERVIEW, AppRoutes.WORKOUT, AppRoutes.JOURNAL -> canonicalRoute(currentRoute)!!
+            AppRoutes.OVERVIEW, AppRoutes.JOURNAL -> canonicalRoute(currentRoute)!!
             else -> AppRoutes.JOURNAL
         }
         return InternalNavigation(
@@ -120,7 +125,7 @@ object AppNavigation {
     fun openTemplates(currentRoute: String?): InternalNavigation {
         return InternalNavigation(
             targetRoute = AppRoutes.TEMPLATES,
-            backTarget = AppRoutes.WORKOUT,
+            backTarget = AppRoutes.OVERVIEW,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.TEMPLATES)
         )
     }

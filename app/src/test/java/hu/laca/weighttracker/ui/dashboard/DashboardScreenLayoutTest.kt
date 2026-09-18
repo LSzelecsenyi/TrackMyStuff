@@ -100,20 +100,20 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun weeklyOverviewKeepsSettingsOnTheHeaderRight() {
+    fun weeklyOverviewKeepsOverflowOnTheHeaderRight() {
         render()
         val header = composeRule.onNodeWithTag("dashboard_weekly_header").getBoundsInRoot()
         val kicker = composeRule.onNodeWithTag("dashboard_weekly_kicker").getBoundsInRoot()
-        val settings = composeRule.onNodeWithTag("dashboard_weekly_settings").getBoundsInRoot()
+        val overflow = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_BUTTON).getBoundsInRoot()
         val stats = composeRule.onNodeWithTag("dashboard_weekly_stats").getBoundsInRoot()
-        composeRule.onNodeWithContentDescription("Beállítások megnyitása").assertIsDisplayed()
-        assertTrue("settings should sit right of the title", settings.left >= kicker.right - 1.dp)
-        assertTrue("settings should stay in the header row", settings.top >= header.top - 1.dp)
-        assertTrue("settings should stay in the header row", settings.bottom <= header.bottom + 1.dp)
-        assertTrue("settings should not float into the stats band", settings.bottom <= stats.top + 1.dp)
-        assertTrue("settings should stay on screen", settings.right <= 360.dp + 1.dp)
-        assertTrue(settings.right - settings.left >= 48.dp)
-        assertTrue(settings.bottom - settings.top >= 48.dp)
+        composeRule.onNodeWithContentDescription("További műveletek").assertIsDisplayed()
+        assertTrue("overflow should sit right of the title", overflow.left >= kicker.right - 1.dp)
+        assertTrue("overflow should stay in the header row", overflow.top >= header.top - 1.dp)
+        assertTrue("overflow should stay in the header row", overflow.bottom <= header.bottom + 1.dp)
+        assertTrue("overflow should not float into the stats band", overflow.bottom <= stats.top + 1.dp)
+        assertTrue("overflow should stay on screen", overflow.right <= 360.dp + 1.dp)
+        assertTrue(overflow.right - overflow.left >= 48.dp)
+        assertTrue(overflow.bottom - overflow.top >= 48.dp)
     }
 
     @Test
@@ -175,6 +175,58 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
+    fun givenOverflowMenuWhenOpenedThenItStaysOnTheRightAndRoutesFireOnce() {
+        var templates = 0
+        var catalog = 0
+        var settings = 0
+        render(
+            onOpenTemplates = { templates += 1 },
+            onOpenCatalog = { catalog += 1 },
+            onOpenSettings = { settings += 1 }
+        )
+        val header = composeRule.onNodeWithTag("dashboard_weekly_header").getBoundsInRoot()
+        val anchor = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_ANCHOR, useUnmergedTree = true).getBoundsInRoot()
+        val button = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_BUTTON).getBoundsInRoot()
+        assertTrue(
+            "anchor should wrap the overflow icon, not the header: anchor=$anchor header=$header",
+            anchor.right - anchor.left < (header.right - header.left) / 2
+        )
+        assertTrue(
+            "anchor should sit on the right of the header: anchor=$anchor header=$header",
+            anchor.left > (header.left + header.right) / 2
+        )
+        composeRule.onNodeWithContentDescription("További műveletek").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_MENU).assertIsDisplayed()
+        composeRule.onNodeWithText("Edzéstervek").assertIsDisplayed()
+        composeRule.onNodeWithText("Gyakorlatok").assertIsDisplayed()
+        composeRule.onNodeWithText("Beállítások").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Napló").assertCountEquals(0)
+        val menu = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_MENU).getBoundsInRoot()
+        val popup = popupWindowLayoutParams().maxByOrNull { params -> params.x }
+            ?: error("expected a DropdownMenu popup window")
+        val density = composeRule.density.density
+        val popupLeft = (popup.x / density).dp
+        val popupRight = popupLeft + (menu.right - menu.left)
+        assertTrue(
+            "menu must not open at the left edge: popupLeft=$popupLeft popupRight=$popupRight button=$button",
+            popupLeft > 40.dp
+        )
+        assertTrue(
+            "menu should stay on the right near the overflow icon: popupRight=$popupRight header=$header",
+            popupRight > (header.left + header.right) / 2
+        )
+        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_TEMPLATES).performClick()
+        composeRule.onNodeWithContentDescription("További műveletek").performClick()
+        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_EXERCISES).performClick()
+        composeRule.onNodeWithContentDescription("További műveletek").performClick()
+        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_SETTINGS).performClick()
+        assertEquals(1, templates)
+        assertEquals(1, catalog)
+        assertEquals(1, settings)
+    }
+
+    @Test
     fun heatmapLegendContainsAllSevenCategories() {
         render()
         composeRule.onNodeWithTag("heatmap_legend").performScrollTo()
@@ -213,7 +265,7 @@ class DashboardScreenLayoutTest {
     private fun assertWeeklyOverviewFitsWithoutClipOrOverlap() {
         val header = composeRule.onNodeWithTag("dashboard_weekly_header").getBoundsInRoot()
         val kicker = composeRule.onNodeWithTag("dashboard_weekly_kicker").getBoundsInRoot()
-        val settings = composeRule.onNodeWithTag("dashboard_weekly_settings").getBoundsInRoot()
+        val overflow = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_BUTTON).getBoundsInRoot()
         val workouts = composeRule.onNodeWithTag("dashboard_stat_workouts").getBoundsInRoot()
         val sets = composeRule.onNodeWithTag("dashboard_stat_sets").getBoundsInRoot()
         val weight = composeRule.onNodeWithTag("dashboard_stat_weight").getBoundsInRoot()
@@ -222,7 +274,7 @@ class DashboardScreenLayoutTest {
             "dashboard_weekly_header",
             "dashboard_weekly_kicker",
             "dashboard_weekly_range",
-            "dashboard_weekly_settings",
+            OVERVIEW_OVERFLOW_BUTTON,
             "dashboard_weekly_stats",
             "dashboard_stat_workouts",
             "dashboard_stat_sets",
@@ -234,8 +286,8 @@ class DashboardScreenLayoutTest {
             "dashboard_stat_weight_label",
             "dashboard_stat_weight_value"
         ).forEach(::assertNotClipped)
-        assertTrue("header and settings should not overlap", kicker.right <= settings.left + 1.dp)
-        assertTrue("settings should stay in the header", settings.bottom <= header.bottom + 1.dp)
+        assertTrue("header and overflow should not overlap", kicker.right <= overflow.left + 1.dp)
+        assertTrue("overflow should stay in the header", overflow.bottom <= header.bottom + 1.dp)
         assertTrue("workout and set columns should not overlap", !overlaps(workouts, sets))
         assertTrue("set and weight columns should not overlap", !overlaps(sets, weight))
         assertEquals((workouts.right - workouts.left).value, (sets.right - sets.left).value, 2f)
@@ -259,7 +311,10 @@ class DashboardScreenLayoutTest {
         fontScale: Float = 1f,
         weeklyOverview: WeeklyOverview = WeeklyOverview(3, 18, 0.4),
         onDaySelected: (LocalDate) -> Unit = {},
-        onOpenWeightDetails: () -> Unit = {}
+        onOpenWeightDetails: () -> Unit = {},
+        onOpenTemplates: () -> Unit = {},
+        onOpenCatalog: () -> Unit = {},
+        onOpenSettings: () -> Unit = {}
     ) {
         val measurement = WeightMeasurement(1, today, 82.4, 0, 0)
         val month = YearMonth.from(today)
@@ -314,7 +369,9 @@ class DashboardScreenLayoutTest {
                             onDeleteDismiss = {},
                             onDeleteConfirm = {},
                             onMessageConsumed = {},
-                            onOpenSettings = {},
+                            onOpenSettings = onOpenSettings,
+                            onOpenTemplates = onOpenTemplates,
+                            onOpenCatalog = onOpenCatalog,
                             onOpenWorkout = {},
                             onOpenWeightDetails = onOpenWeightDetails
                         )
@@ -323,5 +380,22 @@ class DashboardScreenLayoutTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    private fun popupWindowLayoutParams(): List<android.view.WindowManager.LayoutParams> {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val wm = context.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
+        val shadow = org.robolectric.Shadows.shadowOf(wm)
+        val viewsMethod = generateSequence(shadow.javaClass as Class<*>?) { type -> type.superclass }
+            .mapNotNull { type ->
+                type.methods.firstOrNull { method ->
+                    method.name == "getViews" && method.parameterCount == 0
+                }
+            }
+            .firstOrNull()
+        val views = viewsMethod?.invoke(shadow) as? List<*> ?: emptyList<Any>()
+        return views.mapNotNull { view ->
+            (view as? android.view.View)?.layoutParams as? android.view.WindowManager.LayoutParams
+        }
     }
 }

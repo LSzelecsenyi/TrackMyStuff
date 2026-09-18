@@ -7,19 +7,18 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.FitnessCenter
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -30,7 +29,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import hu.laca.weighttracker.R
 import hu.laca.weighttracker.WeightViewModelFactory
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.ui.dashboard.DashboardScreen
@@ -53,8 +51,11 @@ import hu.laca.weighttracker.ui.templates.TemplateListScreen
 import hu.laca.weighttracker.ui.templates.TemplateListViewModel
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutScreen
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutViewModel
-import hu.laca.weighttracker.ui.workout.WorkoutHubScreen
+import hu.laca.weighttracker.ui.workout.StartWorkoutSheet
 import hu.laca.weighttracker.ui.workout.WorkoutHubViewModel
+import hu.laca.weighttracker.ui.workout.WorkoutPrimaryAction
+import hu.laca.weighttracker.ui.workout.WorkoutStartPickerSheet
+import hu.laca.weighttracker.ui.workout.labelRes
 import hu.laca.weighttracker.ui.workoutimport.WorkoutImportScreen
 import hu.laca.weighttracker.ui.workoutimport.WorkoutImportViewModel
 import kotlinx.coroutines.Dispatchers
@@ -68,7 +69,6 @@ private const val ARG_TEMPLATE_ID = "templateId"
 private const val ARG_SESSION_ID = "sessionId"
 private const val KEY_CATALOG_SAVED = "catalog_saved"
 private const val KEY_TEMPLATE_SAVED = "template_saved"
-private const val KEY_WORKOUT_RESULT = "workout_result"
 private const val KEY_WORKOUT_DELETED = "workout_deleted"
 
 private fun editorRoute(exerciseId: Long?): String {
@@ -79,20 +79,12 @@ private fun templateEditorRoute(templateId: Long?): String {
     return "${AppRoutes.TEMPLATE_EDITOR}?$ARG_TEMPLATE_ID=${templateId ?: -1L}"
 }
 
-private fun activeWorkoutRoute(sessionId: Long): String {
+internal fun activeWorkoutRoute(sessionId: Long): String {
     return "${AppRoutes.ACTIVE_WORKOUT}?$ARG_SESSION_ID=$sessionId"
 }
 
 private fun workoutDetailRoute(sessionId: Long): String {
     return "${AppRoutes.WORKOUT_DETAIL}?$ARG_SESSION_ID=$sessionId"
-}
-
-private fun RootTab.icon(): ImageVector {
-    return when (route) {
-        AppRoutes.OVERVIEW -> Icons.Outlined.Home
-        AppRoutes.WORKOUT -> Icons.Outlined.FitnessCenter
-        else -> Icons.AutoMirrored.Outlined.MenuBook
-    }
 }
 
 @Composable
@@ -104,16 +96,42 @@ fun WeightTrackerNavHost(
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showBottomBar = AppNavigation.showsBottomBar(currentRoute)
+    val workoutHubViewModel: WorkoutHubViewModel = viewModel(factory = factory)
+    val hubState by workoutHubViewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val resources = LocalResources.current
+
+    LaunchedEffect(hubState.message) {
+        val message = hubState.message ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(resources.getString(message.labelRes()))
+        workoutHubViewModel.consumeMessage()
+    }
+    LaunchedEffect(hubState.startedSessionId) {
+        val sessionId = hubState.startedSessionId ?: return@LaunchedEffect
+        workoutHubViewModel.consumeStartedSession()
+        navController.openActiveWorkout(sessionId)
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (showBottomBar) {
                 AppBottomBar(
-                    tabs = AppNavigation.rootTabs,
                     selectedRoute = AppNavigation.canonicalRoute(currentRoute),
-                    onTabSelected = { navController.navigateRoot(it) },
-                    iconFor = { it.icon() }
+                    hasActiveSession = hubState.activeSession != null,
+                    onOverview = { navController.navigateRoot(AppRoutes.OVERVIEW) },
+                    onJournal = { navController.navigateRoot(AppRoutes.JOURNAL) },
+                    onWorkoutAction = {
+                        when (val action = workoutHubViewModel.onPrimaryWorkoutAction()) {
+                            is WorkoutPrimaryAction.Resume -> {
+                                navController.openActiveWorkout(action.sessionId)
+                            }
+                            WorkoutPrimaryAction.ShowPicker,
+                            WorkoutPrimaryAction.Ignored -> Unit
+                        }
+                    }
                 )
             }
         }
@@ -148,6 +166,8 @@ fun WeightTrackerNavHost(
                     onDeleteConfirm = viewModel::confirmDelete,
                     onMessageConsumed = viewModel::consumeMessage,
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
+                    onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
+                    onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
                     onOpenWorkout = { id ->
                         viewModel.dismissDaySheet()
                         navController.navigate(workoutDetailRoute(id)) {
@@ -155,49 +175,6 @@ fun WeightTrackerNavHost(
                         }
                     },
                     onOpenWeightDetails = { navController.navigateInternal(AppRoutes.WEIGHT_DETAILS) }
-                )
-            }
-            composable(AppRoutes.WORKOUT) { entry ->
-                val viewModel: WorkoutHubViewModel = viewModel(factory = factory)
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-                val result by entry.savedStateHandle
-                    .getStateFlow(KEY_WORKOUT_RESULT, "")
-                    .collectAsStateWithLifecycle()
-                LaunchedEffect(result) {
-                    when (result) {
-                        "finished" -> viewModel.showFinished()
-                        "abandoned" -> viewModel.showAbandoned()
-                    }
-                    if (result.isNotEmpty()) {
-                        entry.savedStateHandle[KEY_WORKOUT_RESULT] = ""
-                    }
-                }
-                WorkoutHubScreen(
-                    state = state,
-                    onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
-                    onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
-                    onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
-                    onStartTemplate = viewModel::requestStart,
-                    onResume = { id ->
-                        navController.navigate(activeWorkoutRoute(id)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onDismissStart = viewModel::dismissStart,
-                    onStartWeightChange = viewModel::onStartWeightChange,
-                    onConfirmStart = viewModel::confirmStart,
-                    onStartedConsumed = viewModel::consumeStartedSession,
-                    onOpenStarted = { id ->
-                        navController.navigate(activeWorkoutRoute(id)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onMessageConsumed = viewModel::consumeMessage,
-                    onOpenRecent = { id ->
-                        navController.navigate(workoutDetailRoute(id)) {
-                            launchSingleTop = true
-                        }
-                    }
                 )
             }
             composable(AppRoutes.JOURNAL) { entry ->
@@ -387,8 +364,16 @@ fun WeightTrackerNavHost(
                 TemplateListScreen(
                     state = state,
                     onBack = { navController.popBackStack() },
-                    onAdd = { navController.navigate(templateEditorRoute(null)) },
-                    onEdit = { id -> navController.navigate(templateEditorRoute(id)) },
+                    onAdd = {
+                        navController.navigate(templateEditorRoute(null)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onEdit = { id ->
+                        navController.navigate(templateEditorRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onQueryChange = viewModel::onQueryChange,
                     onArchiveFilter = viewModel::onArchiveFilter,
                     onArchive = viewModel::archive,
@@ -489,15 +474,11 @@ fun WeightTrackerNavHost(
                     onDismissAbandon = viewModel::dismissAbandon,
                     onConfirmAbandon = viewModel::confirmAbandon,
                     onFinished = {
-                        navController.previousBackStackEntry
-                            ?.savedStateHandle
-                            ?.set(KEY_WORKOUT_RESULT, "finished")
+                        workoutHubViewModel.showFinished()
                         navController.popBackStack()
                     },
                     onAbandoned = {
-                        navController.previousBackStackEntry
-                            ?.savedStateHandle
-                            ?.set(KEY_WORKOUT_RESULT, "abandoned")
+                        workoutHubViewModel.showAbandoned()
                         navController.popBackStack()
                     },
                     onMessageConsumed = viewModel::consumeMessage
@@ -539,6 +520,31 @@ fun WeightTrackerNavHost(
                 )
             }
         }
+    }
+    if (hubState.pickerVisible) {
+        WorkoutStartPickerSheet(
+            templates = hubState.templates,
+            starting = hubState.isStarting,
+            onDismiss = workoutHubViewModel::dismissPicker,
+            onSelectTemplate = workoutHubViewModel::chooseTemplate,
+            onManageTemplates = {
+                workoutHubViewModel.dismissPicker()
+                navController.navigateInternal(AppRoutes.TEMPLATES)
+            },
+            onCreateTemplate = {
+                workoutHubViewModel.dismissPicker()
+                navController.navigateInternal(templateEditorRoute(null))
+            }
+        )
+    }
+    hubState.startDraft?.let { draft ->
+        StartWorkoutSheet(
+            draft = draft,
+            starting = hubState.isStarting,
+            onDismiss = workoutHubViewModel::dismissStart,
+            onWeightChange = workoutHubViewModel::onStartWeightChange,
+            onConfirm = workoutHubViewModel::confirmStart
+        )
     }
 }
 
@@ -613,7 +619,17 @@ private fun SettingsRoute(
     )
 }
 
-private fun NavHostController.navigateRoot(route: String) {
+internal fun NavHostController.navigateRoot(route: String) {
+    if (route == AppRoutes.OVERVIEW) {
+        if (AppNavigation.canonicalRoute(currentDestination?.route) != AppRoutes.OVERVIEW) {
+            if (!popBackStack(AppRoutes.OVERVIEW, false)) {
+                navigate(AppRoutes.OVERVIEW) {
+                    launchSingleTop = true
+                }
+            }
+        }
+        return
+    }
     navigate(route) {
         popUpTo(graph.findStartDestination().id) {
             saveState = true
@@ -623,11 +639,20 @@ private fun NavHostController.navigateRoot(route: String) {
     }
 }
 
-private fun NavHostController.navigateInternal(route: String) {
+internal fun NavHostController.navigateInternal(route: String) {
     if (!AppNavigation.shouldNavigate(currentDestination?.route, route)) {
         return
     }
     navigate(route) {
+        launchSingleTop = true
+    }
+}
+
+internal fun NavHostController.openActiveWorkout(sessionId: Long) {
+    if (!AppNavigation.shouldNavigate(currentDestination?.route, AppRoutes.ACTIVE_WORKOUT)) {
+        return
+    }
+    navigate(activeWorkoutRoute(sessionId)) {
         launchSingleTop = true
     }
 }

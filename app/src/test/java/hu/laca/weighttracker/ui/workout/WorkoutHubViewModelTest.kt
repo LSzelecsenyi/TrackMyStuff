@@ -200,6 +200,92 @@ class WorkoutHubViewModelTest {
         assertEquals(items[0].template.id, draft.template.template.id)
     }
 
+    @Test
+    fun givenNoActiveSessionWhenPrimaryActionThenPickerOpensWithHungarianAbc() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        saveTemplate("Záró", exerciseId)
+        saveTemplate("Álló evezés", exerciseId)
+        saveTemplate("Alma", exerciseId)
+        val viewModel = hubViewModel()
+        viewModel.uiState.first { !it.loading && it.templates.size == 3 }
+        val first = viewModel.onPrimaryWorkoutAction()
+        val second = viewModel.onPrimaryWorkoutAction()
+        assertEquals(WorkoutPrimaryAction.ShowPicker, first)
+        assertEquals(WorkoutPrimaryAction.Ignored, second)
+        val state = viewModel.uiState.first { it.pickerVisible }
+        assertEquals(listOf("Alma", "Álló evezés", "Záró"), state.templates.map { it.template.name })
+        assertNull(state.activeSession)
+        assertNull(state.startDraft)
+    }
+
+    @Test
+    fun givenPickerWhenTemplateChosenThenSheetClosesAndStartRunsOnce() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        saveTemplate("Push – Kondipark", exerciseId)
+        val viewModel = hubViewModel()
+        val item = viewModel.uiState.first { it.templates.size == 1 }.templates.single()
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.uiState.first { it.pickerVisible }
+        viewModel.chooseTemplate(item)
+        viewModel.chooseTemplate(item)
+        val draft = viewModel.uiState.first { it.startDraft != null }
+        assertFalse(draft.pickerVisible)
+        assertEquals(item.template.id, draft.startDraft!!.template.template.id)
+        assertEquals(1, listOf(draft.startDraft).size)
+    }
+
+    @Test
+    fun givenActiveSessionWhenPrimaryActionThenResumeWithoutPicker() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val templateId = saveTemplate("Push – Kondipark", exerciseId)
+        val sessionRepository = sessions()
+        val started = sessionRepository.start(
+            templateId,
+            "",
+            sessionRepository.proposeBodyWeight(today),
+            false
+        )
+        assertTrue(started is StartWorkoutResult.Started)
+        val viewModel = hubViewModel(sessionRepository)
+        val state = viewModel.uiState.first { it.activeSession != null }
+        val first = viewModel.onPrimaryWorkoutAction()
+        val second = viewModel.onPrimaryWorkoutAction()
+        assertEquals(WorkoutPrimaryAction.Resume(state.activeSession!!.session.id), first)
+        assertEquals(WorkoutPrimaryAction.Resume(state.activeSession!!.session.id), second)
+        assertFalse(viewModel.uiState.value.pickerVisible)
+        assertNull(viewModel.uiState.value.startDraft)
+    }
+
+    @Test
+    fun givenNoTemplatesWhenPickerOpensThenEmptyListIsEmitted() = runTest {
+        val viewModel = hubViewModel()
+        viewModel.uiState.first { !it.loading }
+        viewModel.onPrimaryWorkoutAction()
+        val state = viewModel.uiState.first { it.pickerVisible }
+        assertTrue(state.templates.isEmpty())
+        assertEquals(0, state.activeTemplateCount)
+    }
+
+    @Test
+    fun givenNewRepositoryEmissionWhenSessionAppearsThenPickerCloses() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val templateId = saveTemplate("Push – Kondipark", exerciseId)
+        val viewModel = hubViewModel()
+        viewModel.uiState.first { it.templates.size == 1 }
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.uiState.first { it.pickerVisible }
+        val started = sessions().start(
+            templateId,
+            "",
+            sessions().proposeBodyWeight(today),
+            false
+        )
+        assertTrue(started is StartWorkoutResult.Started)
+        val state = viewModel.uiState.first { it.activeSession != null }
+        assertFalse(state.pickerVisible)
+        assertEquals(WorkoutPrimaryAction.Resume(state.activeSession!!.session.id), viewModel.onPrimaryWorkoutAction())
+    }
+
     private fun hubViewModel(
         sessionRepository: WorkoutSessionRepository = sessions()
     ): WorkoutHubViewModel {

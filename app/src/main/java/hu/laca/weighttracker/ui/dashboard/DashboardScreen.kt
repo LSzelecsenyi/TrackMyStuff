@@ -19,10 +19,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +34,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -64,6 +70,13 @@ import hu.laca.weighttracker.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
 import java.time.YearMonth
 
+internal const val OVERVIEW_OVERFLOW_ANCHOR = "overview-overflow-anchor"
+internal const val OVERVIEW_OVERFLOW_BUTTON = "overview-overflow-button"
+internal const val OVERVIEW_OVERFLOW_MENU = "overview-overflow-menu"
+internal const val OVERVIEW_OVERFLOW_TEMPLATES = "overview-overflow-templates"
+internal const val OVERVIEW_OVERFLOW_EXERCISES = "overview-overflow-exercises"
+internal const val OVERVIEW_OVERFLOW_SETTINGS = "overview-overflow-settings"
+
 @Composable
 fun DashboardScreen(
     state: DashboardUiState,
@@ -84,6 +97,8 @@ fun DashboardScreen(
     onDeleteConfirm: () -> Unit,
     onMessageConsumed: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTemplates: () -> Unit,
+    onOpenCatalog: () -> Unit,
     onOpenWorkout: (Long) -> Unit,
     onOpenWeightDetails: () -> Unit
 ) {
@@ -106,7 +121,9 @@ fun DashboardScreen(
             OverviewHeader(
                 overview = state.weeklyOverview,
                 today = state.today,
-                onOpenSettings = onOpenSettings
+                onOpenSettings = onOpenSettings,
+                onOpenTemplates = onOpenTemplates,
+                onOpenCatalog = onOpenCatalog
             )
             OverviewSectionDivider()
             MuscleHeatmapCard(
@@ -291,7 +308,9 @@ private fun CompactStat(
 private fun OverviewHeader(
     overview: WeeklyOverview,
     today: LocalDate,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenTemplates: () -> Unit,
+    onOpenCatalog: () -> Unit
 ) {
     val dateRange = UiFormatters.inclusiveDateRange(
         WeeklyOverviewLogic.windowStart(today),
@@ -337,19 +356,11 @@ private fun OverviewHeader(
                     modifier = Modifier.testTag("dashboard_weekly_range")
                 )
             }
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier
-                    .size(AppDimens.minTouch)
-                    .testTag("dashboard_weekly_settings")
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(R.string.action_open_settings),
-                    modifier = Modifier.size(22.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            OverviewOverflowMenu(
+                onOpenTemplates = onOpenTemplates,
+                onOpenCatalog = onOpenCatalog,
+                onOpenSettings = onOpenSettings
+            )
         }
         Row(
             modifier = Modifier
@@ -377,6 +388,66 @@ private fun OverviewHeader(
                 value = weightValue,
                 testTagPrefix = "dashboard_stat_weight",
                 modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun OverviewOverflowMenu(
+    onOpenTemplates: () -> Unit,
+    onOpenCatalog: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .wrapContentSize(Alignment.TopEnd)
+            .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
+            .testTag(OVERVIEW_OVERFLOW_ANCHOR),
+        contentAlignment = Alignment.TopEnd
+    ) {
+        IconButton(
+            onClick = { menuOpen = true },
+            modifier = Modifier
+                .size(AppDimens.minTouch)
+                .testTag(OVERVIEW_OVERFLOW_BUTTON)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = stringResource(R.string.action_more_overview),
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false },
+            modifier = Modifier.testTag(OVERVIEW_OVERFLOW_MENU)
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.templates_title)) },
+                onClick = {
+                    menuOpen = false
+                    onOpenTemplates()
+                },
+                modifier = Modifier.testTag(OVERVIEW_OVERFLOW_TEMPLATES)
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.exercises_title)) },
+                onClick = {
+                    menuOpen = false
+                    onOpenCatalog()
+                },
+                modifier = Modifier.testTag(OVERVIEW_OVERFLOW_EXERCISES)
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.settings_title)) },
+                onClick = {
+                    menuOpen = false
+                    onOpenSettings()
+                },
+                modifier = Modifier.testTag(OVERVIEW_OVERFLOW_SETTINGS)
             )
         }
     }
@@ -478,6 +549,8 @@ private fun DashboardPreview() {
             onDeleteConfirm = {},
             onMessageConsumed = {},
             onOpenSettings = {},
+            onOpenTemplates = {},
+            onOpenCatalog = {},
             onOpenWorkout = {},
             onOpenWeightDetails = {}
         )
@@ -514,6 +587,8 @@ private fun EmptyDashboardPreview() {
             onDeleteConfirm = {},
             onMessageConsumed = {},
             onOpenSettings = {},
+            onOpenTemplates = {},
+            onOpenCatalog = {},
             onOpenWorkout = {},
             onOpenWeightDetails = {}
         )

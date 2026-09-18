@@ -9,16 +9,19 @@ import org.junit.Test
 
 class AppNavigationTest {
     @Test
-    fun bottomNavigationContainsExactlyOverviewWorkoutAndJournal() {
-        assertEquals(3, AppNavigation.rootTabs.size)
+    fun bottomNavigationContainsExactlyOverviewAndJournal() {
+        assertEquals(2, AppNavigation.rootTabs.size)
         assertEquals(
-            listOf(R.string.nav_dashboard, R.string.nav_workout, R.string.nav_journal),
+            listOf(R.string.nav_dashboard, R.string.nav_journal),
             AppNavigation.rootTabs.map { it.labelRes }
         )
         assertEquals(
-            listOf(AppRoutes.OVERVIEW, AppRoutes.WORKOUT, AppRoutes.JOURNAL),
+            listOf(AppRoutes.OVERVIEW, AppRoutes.JOURNAL),
             AppNavigation.rootTabs.map { it.route }
         )
+        assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.TEMPLATES })
+        assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.EXERCISES })
+        assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.SETTINGS })
     }
 
     @Test
@@ -40,8 +43,6 @@ class AppNavigationTest {
 
     @Test
     fun backFromSettingsReturnsToOriginatingRoot() {
-        val fromWorkout = AppNavigation.openSettings(AppRoutes.WORKOUT)
-        assertEquals(AppRoutes.WORKOUT, fromWorkout.backTarget)
         val fromJournal = AppNavigation.openSettings(AppRoutes.JOURNAL)
         assertEquals(AppRoutes.JOURNAL, fromJournal.backTarget)
         val fromOverview = AppNavigation.openSettings(AppRoutes.OVERVIEW)
@@ -49,11 +50,16 @@ class AppNavigationTest {
     }
 
     @Test
-    fun exerciseCatalogIsReachableFromWorkoutHub() {
-        val navigation = AppNavigation.openCatalog(AppRoutes.WORKOUT)
-        assertEquals(AppRoutes.EXERCISES, navigation.targetRoute)
-        assertEquals(AppRoutes.WORKOUT, navigation.backTarget)
-        assertEquals(AppRoutes.WORKOUT, AppNavigation.catalogEntryPoint())
+    fun exerciseCatalogAndTemplatesOpenFromOverviewWithoutDuplicating() {
+        val catalog = AppNavigation.openCatalog(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.EXERCISES, catalog.targetRoute)
+        assertEquals(AppRoutes.OVERVIEW, catalog.backTarget)
+        assertEquals(AppRoutes.OVERVIEW, AppNavigation.catalogEntryPoint())
+        assertFalse(AppNavigation.openCatalog(AppRoutes.EXERCISES).shouldPush)
+        val templates = AppNavigation.openTemplates(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.TEMPLATES, templates.targetRoute)
+        assertEquals(AppRoutes.OVERVIEW, templates.backTarget)
+        assertFalse(AppNavigation.openTemplates(AppRoutes.TEMPLATES).shouldPush)
     }
 
     @Test
@@ -63,44 +69,36 @@ class AppNavigationTest {
     }
 
     @Test
-    fun backFromCatalogReturnsToWorkout() {
-        assertEquals(AppRoutes.WORKOUT, AppNavigation.openCatalog(AppRoutes.WORKOUT).backTarget)
-    }
-
-    @Test
     fun rootNavigationDoesNotCreateDuplicateDestinations() {
         assertFalse(AppNavigation.shouldNavigate(AppRoutes.OVERVIEW, AppRoutes.OVERVIEW))
+        assertFalse(AppNavigation.shouldNavigate(AppRoutes.JOURNAL, AppRoutes.JOURNAL))
         assertFalse(AppNavigation.shouldNavigate(AppRoutes.SETTINGS, AppRoutes.SETTINGS))
         assertFalse(AppNavigation.shouldNavigate(AppRoutes.EXERCISES, AppRoutes.EXERCISES))
-        assertTrue(AppNavigation.shouldNavigate(AppRoutes.WORKOUT, AppRoutes.SETTINGS))
+        assertFalse(AppNavigation.shouldNavigate(AppRoutes.TEMPLATES, AppRoutes.TEMPLATES))
+        assertTrue(AppNavigation.shouldNavigate(AppRoutes.OVERVIEW, AppRoutes.SETTINGS))
         assertFalse(
             AppNavigation.openSettings(
-                fromRoute = AppRoutes.WORKOUT,
+                fromRoute = AppRoutes.JOURNAL,
                 currentRoute = AppRoutes.SETTINGS
             ).shouldPush
         )
     }
 
     @Test
-    fun bottomBarIsLimitedToRootDestinations() {
+    fun bottomBarIsVisibleOnOverviewJournalAndRootLists() {
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.OVERVIEW))
-        assertTrue(AppNavigation.showsBottomBar(AppRoutes.WORKOUT))
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.JOURNAL))
+        assertTrue(AppNavigation.showsBottomBar(AppRoutes.EXERCISES))
+        assertTrue(AppNavigation.showsBottomBar(AppRoutes.TEMPLATES))
         assertFalse(AppNavigation.showsBottomBar("unknown"))
         assertFalse(AppNavigation.showsBottomBar(null))
     }
 
     @Test
-    fun bottomBarIsHiddenOnSettings() {
+    fun bottomBarIsHiddenOnActiveEditorsDetailsAndImport() {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.SETTINGS))
-    }
-
-    @Test
-    fun bottomBarIsHiddenOnCatalogAndEditor() {
-        assertFalse(AppNavigation.showsBottomBar(AppRoutes.EXERCISES))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.EXERCISE_EDITOR_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("exercise_editor?exerciseId=12"))
-        assertFalse(AppNavigation.showsBottomBar(AppRoutes.TEMPLATES))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.TEMPLATE_EDITOR_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("template_editor?templateId=4"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.ACTIVE_WORKOUT_PATTERN))
@@ -128,8 +126,7 @@ class AppNavigationTest {
         assertTrue(fromJournal.shouldPush)
         val fromOverview = AppNavigation.openWorkoutDetail(AppRoutes.OVERVIEW)
         assertEquals(AppRoutes.OVERVIEW, fromOverview.backTarget)
-        val fromHub = AppNavigation.openWorkoutDetail(AppRoutes.WORKOUT)
-        assertEquals(AppRoutes.WORKOUT, fromHub.backTarget)
+        assertEquals(AppRoutes.JOURNAL, AppNavigation.openWorkoutDetail(AppRoutes.TEMPLATES).backTarget)
         assertFalse(AppNavigation.openWorkoutDetail(AppRoutes.WORKOUT_DETAIL).shouldPush)
         assertFalse(AppNavigation.openWorkoutDetail("workout_detail?sessionId=3").shouldPush)
     }
@@ -143,15 +140,26 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_IMPORT))
         assertFalse(AppNavigation.openWorkoutImport(AppRoutes.WORKOUT_IMPORT).shouldPush)
         assertEquals(AppRoutes.JOURNAL, AppNavigation.openWorkoutImport(AppRoutes.WORKOUT_IMPORT).backTarget)
-        assertEquals(AppRoutes.WORKOUT, AppNavigation.catalogEntryPoint())
+        assertEquals(AppRoutes.OVERVIEW, AppNavigation.catalogEntryPoint())
         assertTrue(AppNavigation.catalogEntryPoint() != AppRoutes.WORKOUT_IMPORT)
     }
 
     @Test
+    fun activeWorkoutOpensFromOverviewWithoutDuplicating() {
+        val navigation = AppNavigation.openActiveWorkout(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.ACTIVE_WORKOUT, navigation.targetRoute)
+        assertEquals(AppRoutes.OVERVIEW, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.openActiveWorkout(AppRoutes.ACTIVE_WORKOUT_PATTERN).shouldPush)
+        assertFalse(AppNavigation.openActiveWorkout("active_workout?sessionId=9").shouldPush)
+    }
+
+    @Test
     fun backFromNonDefaultRootReturnsToOverview() {
-        assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.WORKOUT))
         assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.JOURNAL))
         assertNull(AppNavigation.backFromRootTab(AppRoutes.OVERVIEW))
         assertNull(AppNavigation.backFromRootTab(AppRoutes.SETTINGS))
+        assertNull(AppNavigation.backFromRootTab(AppRoutes.TEMPLATES))
+        assertNull(AppNavigation.backFromRootTab(AppRoutes.EXERCISES))
     }
 }

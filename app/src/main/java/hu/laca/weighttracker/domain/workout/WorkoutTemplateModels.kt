@@ -51,7 +51,8 @@ data class TemplateListItem(
     val exerciseCount: Int,
     val setCount: Int,
     val primaryMuscles: List<MuscleGroup>,
-    val muscleSummary: TemplateMuscleSummary
+    val muscleSummary: TemplateMuscleSummary,
+    val exerciseNames: List<String> = emptyList()
 )
 
 data class TemplateMuscleCount(

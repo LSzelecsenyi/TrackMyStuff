@@ -39,27 +39,33 @@ class WorkoutTemplateRepository(
     }
 
     fun observeActive(): Flow<List<TemplateListItem>> {
-        return observeList(archived = false)
+        return observeItems(templateDao.observeActive())
     }
 
     fun observeArchived(): Flow<List<TemplateListItem>> {
-        return observeList(archived = true)
+        return observeItems(templateDao.observeArchived())
     }
 
-    private fun observeList(archived: Boolean): Flow<List<TemplateListItem>> {
+    fun observeAll(): Flow<List<TemplateListItem>> {
+        return observeItems(templateDao.observeAll())
+    }
+
+    private fun observeItems(
+        templates: Flow<List<WorkoutTemplateEntity>>
+    ): Flow<List<TemplateListItem>> {
         return combine(
-            if (archived) templateDao.observeArchived() else templateDao.observeActive(),
+            templates,
             templateDao.observeExercises(),
             templateDao.observeSets(),
             exerciseDao.observeAll(),
             exerciseDao.observeMuscles()
-        ) { templates, relations, sets, exercises, muscles ->
+        ) { currentTemplates, relations, sets, exercises, muscles ->
             val catalog = exercises.associate { entity ->
                 entity.id to entity.toModel(muscles.filter { it.exerciseId == entity.id })
             }
             val setsByExercise = sets.groupBy { it.templateExerciseId }
             val relationsByTemplate = relations.groupBy { it.templateId }
-            templates.map { template ->
+            currentTemplates.map { template ->
                 val items = relationsByTemplate[template.id]
                     .orEmpty()
                     .sortedBy { it.position }
@@ -76,7 +82,8 @@ class WorkoutTemplateRepository(
                     exerciseCount = items.size,
                     setCount = items.sumOf { it.sets.size },
                     primaryMuscles = items.map { it.exercise.primaryMuscle }.distinct(),
-                    muscleSummary = TemplateDraftLogic.muscleSummary(items)
+                    muscleSummary = TemplateDraftLogic.muscleSummary(items),
+                    exerciseNames = items.map { it.exercise.name }
                 )
             }
         }
