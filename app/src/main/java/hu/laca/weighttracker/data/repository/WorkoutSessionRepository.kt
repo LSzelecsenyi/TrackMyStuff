@@ -275,7 +275,7 @@ class WorkoutSessionRepository(
         }
     }
 
-    suspend fun proposeBodyWeight(workoutDate: LocalDate = LocalDate.now(clock)): BodyWeightProposal {
+    suspend fun proposeBodyWeight(workoutDate: LocalDate = dateProvider.today()): BodyWeightProposal {
         val sameDay = weightRepository.getByDate(workoutDate)
         val previous = weightRepository.getLatestBefore(workoutDate)
         return BodyWeightSnapshotLogic.propose(workoutDate, sameDay, previous)
@@ -298,6 +298,9 @@ class WorkoutSessionRepository(
             if (scheduled.templateId != templateId) {
                 return StartWorkoutResult.ScheduleTemplateMismatch
             }
+            if (scheduled.scheduledDate != dateProvider.today().toString()) {
+                return StartWorkoutResult.ScheduleNotOnToday
+            }
             if (sessionDao.getSessionIdByScheduledWorkoutId(scheduledWorkoutId) != null) {
                 return StartWorkoutResult.ScheduleAlreadyStarted
             }
@@ -306,14 +309,14 @@ class WorkoutSessionRepository(
         if (relations.isEmpty() || relations.all { templateDao.getSets(it.id).isEmpty() }) {
             return StartWorkoutResult.TemplateEmpty
         }
-        val workoutDate = LocalDate.now(clock)
+        val workoutDate = dateProvider.today()
         val resolvedProposal = proposeBodyWeight(workoutDate)
         val now = clock.millis()
         val session = WorkoutSessionEntity(
             templateId = template.id,
             templateName = template.name,
             status = SessionStatus.IN_PROGRESS.name,
-            workoutDate = dateProvider.today().toString(),
+            workoutDate = workoutDate.toString(),
             startedAt = now,
             finishedAt = null,
             abandonedAt = null,
@@ -387,7 +390,8 @@ class WorkoutSessionRepository(
                     session,
                     children,
                     scheduledWorkoutId,
-                    templateId
+                    templateId,
+                    workoutDate.toString()
                 )
             ) {
                 is InsertStartedSessionResult.Inserted -> StartWorkoutResult.Started(inserted.sessionId)
@@ -397,6 +401,7 @@ class WorkoutSessionRepository(
                 InsertStartedSessionResult.ScheduleNotFound -> StartWorkoutResult.ScheduleNotFound
                 InsertStartedSessionResult.ScheduleTemplateMismatch -> StartWorkoutResult.ScheduleTemplateMismatch
                 InsertStartedSessionResult.ScheduleAlreadyStarted -> StartWorkoutResult.ScheduleAlreadyStarted
+                InsertStartedSessionResult.ScheduleNotOnToday -> StartWorkoutResult.ScheduleNotOnToday
             }
         } catch (error: Exception) {
             if (isUniqueConstraint(error)) {

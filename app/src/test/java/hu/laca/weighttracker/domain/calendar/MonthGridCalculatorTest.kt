@@ -145,6 +145,60 @@ class MonthGridCalculatorTest {
     }
 
     @Test
+    fun dstTransitionDayAppearsOnceInTheMonthGrid() {
+        val month = YearMonth.of(2026, 3)
+        val today = LocalDate.of(2026, 3, 29)
+        val grid = MonthGridCalculator.grid(month, today, emptySet())
+        val dates = grid.cells.map { it.date }
+        assertEquals(42, dates.size)
+        assertEquals(dates.distinct(), dates)
+        assertEquals(1, dates.count { it == LocalDate.of(2026, 3, 29) })
+        assertEquals(LocalDate.of(2026, 3, 28), dates[dates.indexOf(today) - 1])
+        assertEquals(LocalDate.of(2026, 3, 30), dates[dates.indexOf(today) + 1])
+    }
+
+    @Test
+    fun allMarkerCombinationsStayIndependentBooleans() {
+        val today = LocalDate.of(2026, 9, 15)
+        val weightOnly = LocalDate.of(2026, 9, 1)
+        val completedOnly = LocalDate.of(2026, 9, 2)
+        val plannedOnly = LocalDate.of(2026, 9, 3)
+        val weightPlanned = LocalDate.of(2026, 9, 4)
+        val weightCompleted = LocalDate.of(2026, 9, 5)
+        val plannedCompleted = LocalDate.of(2026, 9, 6)
+        val allThree = LocalDate.of(2026, 9, 7)
+        val manyPlanned = LocalDate.of(2026, 9, 8)
+        val grid = MonthGridCalculator.grid(
+            month = YearMonth.of(2026, 9),
+            today = today,
+            measuredDates = setOf(weightOnly, weightPlanned, weightCompleted, allThree),
+            completedWorkoutCounts = mapOf(
+                completedOnly to 1,
+                weightCompleted to 1,
+                plannedCompleted to 1,
+                allThree to 2
+            ),
+            plannedWorkoutCounts = mapOf(
+                plannedOnly to 1,
+                weightPlanned to 1,
+                plannedCompleted to 1,
+                allThree to 1,
+                manyPlanned to 3
+            )
+        )
+        fun cell(date: LocalDate) = grid.cells.first { it.date == date }
+        assertTrue(cell(weightOnly).hasMeasurement && !cell(weightOnly).hasPlannedWorkout && !cell(weightOnly).hasCompletedWorkout)
+        assertTrue(!cell(completedOnly).hasMeasurement && !cell(completedOnly).hasPlannedWorkout && cell(completedOnly).hasCompletedWorkout)
+        assertTrue(!cell(plannedOnly).hasMeasurement && cell(plannedOnly).hasPlannedWorkout && !cell(plannedOnly).hasCompletedWorkout)
+        assertTrue(cell(weightPlanned).hasMeasurement && cell(weightPlanned).hasPlannedWorkout && !cell(weightPlanned).hasCompletedWorkout)
+        assertTrue(cell(weightCompleted).hasMeasurement && !cell(weightCompleted).hasPlannedWorkout && cell(weightCompleted).hasCompletedWorkout)
+        assertTrue(!cell(plannedCompleted).hasMeasurement && cell(plannedCompleted).hasPlannedWorkout && cell(plannedCompleted).hasCompletedWorkout)
+        assertTrue(cell(allThree).hasMeasurement && cell(allThree).hasPlannedWorkout && cell(allThree).hasCompletedWorkout)
+        assertTrue(cell(manyPlanned).hasPlannedWorkout)
+        assertEquals(3, cell(manyPlanned).plannedWorkoutCount)
+    }
+
+    @Test
     fun plannedOnlyMarkerDoesNotCreateCompletedDot() {
         val today = LocalDate.of(2026, 9, 15)
         val grid = MonthGridCalculator.grid(

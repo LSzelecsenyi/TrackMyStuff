@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -223,26 +225,35 @@ private fun CalendarDayCell(
                     Modifier
                 }
             )
+            .clip(AppShapeTokens.compact)
             .clickable(enabled = enabled, onClick = onClick)
-            .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center
+            .semantics { contentDescription = label }
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = cell.date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (cell.isToday || selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = textColor
-            )
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = cell.date.dayOfMonth.toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (cell.isToday || selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = textColor
+                )
+            }
             if (cell.hasMeasurement || cell.hasPlannedWorkout || cell.hasCompletedWorkout) {
                 Row(
-                    modifier = Modifier.padding(top = 1.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    modifier = Modifier.padding(bottom = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(1.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (cell.hasMeasurement) {
                         Box(
                             modifier = Modifier
-                                .size(5.dp)
+                                .size(4.dp)
                                 .testTag("calendar-weight-dot")
                                 .border(
                                     width = AppDimens.strokeThin,
@@ -254,7 +265,7 @@ private fun CalendarDayCell(
                     if (cell.hasPlannedWorkout) {
                         Box(
                             modifier = Modifier
-                                .size(5.dp)
+                                .size(4.dp)
                                 .testTag("calendar-planned-dot")
                                 .border(
                                     width = AppDimens.strokeThin,
@@ -266,7 +277,7 @@ private fun CalendarDayCell(
                     if (cell.hasCompletedWorkout) {
                         Box(
                             modifier = Modifier
-                                .size(5.dp)
+                                .size(4.dp)
                                 .testTag("calendar-completed-dot")
                                 .background(
                                     color = MaterialTheme.colorScheme.primary,

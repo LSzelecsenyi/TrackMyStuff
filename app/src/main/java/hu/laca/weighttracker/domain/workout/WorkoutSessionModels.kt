@@ -145,6 +145,7 @@ sealed class StartWorkoutResult {
     data object ScheduleNotFound : StartWorkoutResult()
     data object ScheduleTemplateMismatch : StartWorkoutResult()
     data object ScheduleAlreadyStarted : StartWorkoutResult()
+    data object ScheduleNotOnToday : StartWorkoutResult()
     data class InvalidBodyWeight(val error: hu.laca.weighttracker.domain.WeightParseError) : StartWorkoutResult()
 }
 

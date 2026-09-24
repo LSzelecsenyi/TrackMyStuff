@@ -12,6 +12,7 @@ import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.FixedDateProvider
+import hu.laca.weighttracker.domain.MutableDateProvider
 import hu.laca.weighttracker.domain.WeeklyOverview
 import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.ExerciseDraft
@@ -376,13 +377,46 @@ class DashboardViewModelTest {
         assertEquals(1, sheet.scheduledWorkouts.size)
     }
 
+    @Test
+    fun givenPlannedTodayWhenDateProviderMovesPastMidnightThenCalendarTodayMoves() = runTest {
+        val dates = MutableDateProvider(today, LocalTime.of(23, 50))
+        scheduled.schedule(saveTemplate("Push A"), today)
+        val viewModel = dashboard(dates = dates)
+        val before = viewModel.uiState.first {
+            it.monthGrid.cells.any { cell -> cell.date == today && cell.hasPlannedWorkout && cell.isToday }
+        }
+        assertEquals(today, before.today)
+        dates.setNow(today.plusDays(1), LocalTime.of(0, 5))
+        val after = viewModel.uiState.first { it.today == today.plusDays(1) }
+        assertFalse(after.monthGrid.cells.first { it.date == today }.isToday)
+        assertTrue(after.monthGrid.cells.first { it.date == today.plusDays(1) }.isToday)
+        assertTrue(after.monthGrid.cells.first { it.date == today }.hasPlannedWorkout)
+        assertNull(after.daySheet)
+    }
+
+    @Test
+    fun givenSelectedDayWhenNewDashboardViewModelThenSheetIsNotRestoredButScheduleRemains() = runTest {
+        scheduled.schedule(saveTemplate("Push A"), today)
+        val first = dashboard()
+        first.selectDay(today)
+        first.uiState.first { it.daySheet?.scheduledWorkouts?.size == 1 }
+        val second = dashboard()
+        val restored = second.uiState.first {
+            it.monthGrid.cells.first { cell -> cell.date == today }.hasPlannedWorkout
+        }
+        assertNull(restored.daySheet)
+        assertEquals(today, restored.today)
+        assertTrue(restored.monthGrid.cells.first { it.date == today }.hasPlannedWorkout)
+    }
+
     private fun dashboard(
-        weights: WeightRepository = WeightRepository(FakeWeightMeasurementDao(), clock)
+        weights: WeightRepository = WeightRepository(FakeWeightMeasurementDao(), clock),
+        dates: hu.laca.weighttracker.domain.DateProvider = dateProvider
     ): DashboardViewModel {
         return DashboardViewModel(
             repository = weights,
             sessionRepository = sessionRepository,
-            dateProvider = dateProvider,
+            dateProvider = dates,
             scheduledWorkoutRepository = scheduled,
             templateRepository = templates
         )

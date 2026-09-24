@@ -33,6 +33,7 @@ import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
 import hu.laca.weighttracker.domain.model.ChartPoint
 import hu.laca.weighttracker.domain.model.WeightMeasurement
 import hu.laca.weighttracker.domain.musclemap.MuscleHeatmapAssembler
+import hu.laca.weighttracker.domain.theme.ThemeSeeds
 import hu.laca.weighttracker.ui.components.UiFormatters
 import hu.laca.weighttracker.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -254,6 +255,75 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
+    fun calendarMarkerCombinationsStayInOneRowAtPhoneWidthAndFontScale() {
+        val month = YearMonth.from(today)
+        val weightOnly = LocalDate.of(2026, 3, 1)
+        val completedOnly = LocalDate.of(2026, 3, 2)
+        val plannedOnly = LocalDate.of(2026, 3, 3)
+        val weightPlanned = LocalDate.of(2026, 3, 4)
+        val weightCompleted = LocalDate.of(2026, 3, 5)
+        val plannedCompleted = LocalDate.of(2026, 3, 6)
+        val allThree = LocalDate.of(2026, 3, 7)
+        val manyPlanned = LocalDate.of(2026, 3, 8)
+        render(
+            fontScale = 1.3f,
+            monthGrid = MonthGridCalculator.grid(
+                month = month,
+                today = today,
+                measuredDates = setOf(weightOnly, weightPlanned, weightCompleted, allThree),
+                completedWorkoutCounts = mapOf(
+                    completedOnly to 1,
+                    weightCompleted to 1,
+                    plannedCompleted to 1,
+                    allThree to 2
+                ),
+                plannedWorkoutCounts = mapOf(
+                    plannedOnly to 1,
+                    weightPlanned to 1,
+                    plannedCompleted to 1,
+                    allThree to 1,
+                    manyPlanned to 3
+                )
+            )
+        )
+        composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
+        composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).assertCountEquals(5)
+        composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).assertCountEquals(4)
+        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).assertCountEquals(4)
+        val crowded = composeRule.onNode(hasContentDescription("2026. március 7.", substring = true))
+        val bounds = crowded.getBoundsInRoot()
+        assertTrue(bounds.bottom - bounds.top <= 48.dp)
+        crowded.assert(hasContentDescription("1 tervezett edzés", substring = true))
+        crowded.assert(hasContentDescription("2 befejezett edzés", substring = true))
+        val many = composeRule.onNode(hasContentDescription("2026. március 8.", substring = true))
+        many.assert(hasContentDescription("3 tervezett edzés", substring = true))
+        assertNotClipped("calendar-legend")
+        composeRule.onNodeWithTag("calendar-legend-planned").assertExists()
+        composeRule.onNodeWithTag("calendar-legend-completed").assertExists()
+        composeRule.onNodeWithTag("calendar-legend-weight").assertExists()
+    }
+
+    @Test
+    fun calendarMarkersRemainDistinctInDarkTheme() {
+        render(
+            darkTheme = true,
+            monthGrid = MonthGridCalculator.grid(
+                month = YearMonth.from(today),
+                today = today,
+                measuredDates = setOf(today),
+                completedWorkoutCounts = mapOf(today to 1),
+                plannedWorkoutCounts = mapOf(today to 1)
+            )
+        )
+        composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
+        composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onNodeWithText("Tervezett edzés").assertExists()
+        composeRule.onNodeWithText("Edzés").assertExists()
+    }
+
+    @Test
     fun heatmapLegendContainsAllSevenCategories() {
         render()
         composeRule.onNodeWithTag("heatmap_legend").performScrollTo()
@@ -336,6 +406,7 @@ class DashboardScreenLayoutTest {
 
     private fun render(
         fontScale: Float = 1f,
+        darkTheme: Boolean = false,
         weeklyOverview: WeeklyOverview = WeeklyOverview(3, 18, 0.4),
         monthGrid: MonthGrid? = null,
         onDaySelected: (LocalDate) -> Unit = {},
@@ -352,7 +423,10 @@ class DashboardScreenLayoutTest {
             CompositionLocalProvider(
                 LocalDensity provides Density(density = density.density, fontScale = fontScale)
             ) {
-                WeightTrackerThemeForPreview {
+                WeightTrackerThemeForPreview(
+                    seeds = if (darkTheme) ThemeSeeds.DefaultDark else ThemeSeeds.DefaultLight,
+                    darkTheme = darkTheme
+                ) {
                     Box(
                         modifier = Modifier
                             .width(360.dp)

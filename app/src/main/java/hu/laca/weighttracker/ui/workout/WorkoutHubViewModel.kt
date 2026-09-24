@@ -15,10 +15,13 @@ import hu.laca.weighttracker.domain.workout.ScheduledWorkout
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
 import hu.laca.weighttracker.domain.workout.TemplateListItem
 import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
+import hu.laca.weighttracker.domain.workout.ScheduledWorkoutUiLogic
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -66,7 +69,7 @@ class WorkoutHubViewModel(
     templateRepository: WorkoutTemplateRepository,
     private val sessionRepository: WorkoutSessionRepository,
     scheduledWorkoutRepository: ScheduledWorkoutRepository,
-    dateProvider: DateProvider
+    private val dateProvider: DateProvider
 ) : ViewModel() {
     private val starting = MutableStateFlow(false)
     private val preparingStart = MutableStateFlow(false)
@@ -88,6 +91,7 @@ class WorkoutHubViewModel(
         val pickerVisible: Boolean
     )
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<WorkoutHubUiState> = combine(
         combine(
             exerciseRepository.observeActiveCount(),
@@ -105,7 +109,9 @@ class WorkoutHubViewModel(
         },
         combine(
             sessionRepository.observeLatestCompleted(),
-            scheduledWorkoutRepository.observeOnDate(dateProvider.today())
+            dateProvider.observeToday().flatMapLatest { today ->
+                scheduledWorkoutRepository.observeOnDate(today)
+            }
         ) { recent, todaySchedules ->
             recent to todaySchedules
         }
@@ -182,6 +188,9 @@ class WorkoutHubViewModel(
         if (!pickerOpen.value) {
             return
         }
+        if (!ScheduledWorkoutUiLogic.actions(item, dateProvider.today()).canStart) {
+            return
+        }
         requestStart(item.templateId, scheduledWorkoutId = item.id)
     }
 
@@ -226,6 +235,7 @@ class WorkoutHubViewModel(
                     StartWorkoutResult.TemplateEmpty -> message.value = WorkoutHubMessage.TemplateEmpty
                     StartWorkoutResult.TemplateNotFound -> message.value = WorkoutHubMessage.TemplateNotFound
                     StartWorkoutResult.ScheduleNotFound,
+                    StartWorkoutResult.ScheduleNotOnToday,
                     StartWorkoutResult.ScheduleTemplateMismatch -> {
                         message.value = WorkoutHubMessage.TemplateNotFound
                     }

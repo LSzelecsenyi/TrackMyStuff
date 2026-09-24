@@ -226,7 +226,8 @@ abstract class WorkoutSessionDao {
         session: WorkoutSessionEntity,
         exercises: List<Triple<WorkoutSessionExerciseEntity, List<WorkoutSessionExerciseMuscleEntity>, List<WorkoutSessionSetEntity>>>,
         scheduledWorkoutId: Long?,
-        expectedTemplateId: Long
+        expectedTemplateId: Long,
+        todayIso: String
     ): InsertStartedSessionResult {
         if (getInProgress() != null) {
             return InsertStartedSessionResult.AlreadyActive
@@ -240,6 +241,9 @@ abstract class WorkoutSessionDao {
                 ?: return InsertStartedSessionResult.ScheduleNotFound
             if (scheduled.templateId != expectedTemplateId) {
                 return InsertStartedSessionResult.ScheduleTemplateMismatch
+            }
+            if (scheduled.scheduledDate != todayIso) {
+                return InsertStartedSessionResult.ScheduleNotOnToday
             }
             if (getSessionIdByScheduledWorkoutId(scheduledWorkoutId) != null) {
                 return InsertStartedSessionResult.ScheduleAlreadyStarted
@@ -261,4 +265,5 @@ sealed class InsertStartedSessionResult {
     data object ScheduleNotFound : InsertStartedSessionResult()
     data object ScheduleTemplateMismatch : InsertStartedSessionResult()
     data object ScheduleAlreadyStarted : InsertStartedSessionResult()
+    data object ScheduleNotOnToday : InsertStartedSessionResult()
 }

@@ -179,10 +179,13 @@ class DashboardViewModel(
         }
     }
 
-    private val weekSessions = sessionRepository.observeSummariesBetween(
-        WeeklyOverviewLogic.windowStart(dateProvider.today()),
-        dateProvider.today()
-    )
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val weekSessions = dateProvider.observeToday().flatMapLatest { today ->
+        sessionRepository.observeSummariesBetween(
+            WeeklyOverviewLogic.windowStart(today),
+            today
+        )
+    }
 
     private val scheduleSignals = combine(
         monthSchedules,
@@ -228,9 +231,10 @@ class DashboardViewModel(
             combine(completedCounts, dayWorkouts, weekSessions) { counts, workouts, week ->
                 SessionSignals(counts, workouts, week)
             },
-            scheduleSignals
-        ) { items, chromeState, deleteConfirm, sessions, schedules ->
-            val today = dateProvider.today()
+            combine(scheduleSignals, dateProvider.observeToday(), ::Pair)
+        ) { items, chromeState, deleteConfirm, sessions, schedulesAndToday ->
+            val schedules = schedulesAndToday.first
+            val today = schedulesAndToday.second
             val snapshot = DashboardAssembler.assemble(items, today, chromeState.range)
             DashboardUiState(
                 snapshot = snapshot,
@@ -608,6 +612,7 @@ class DashboardViewModel(
                     }
                     StartWorkoutResult.TemplateNotFound,
                     StartWorkoutResult.ScheduleNotFound,
+                    StartWorkoutResult.ScheduleNotOnToday,
                     StartWorkoutResult.ScheduleTemplateMismatch -> {
                         userMessage.value = UserMessage.ScheduleTemplateNotFound
                     }

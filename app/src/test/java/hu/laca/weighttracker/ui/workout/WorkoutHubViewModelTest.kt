@@ -11,6 +11,7 @@ import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.FixedDateProvider
+import hu.laca.weighttracker.domain.MutableDateProvider
 import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.ExerciseDraft
 import hu.laca.weighttracker.domain.exercise.ExerciseSaveResult
@@ -355,8 +356,73 @@ class WorkoutHubViewModelTest {
         assertEquals(started.sessionId, viewModel.uiState.first { it.startedSessionId != null }.startedSessionId)
     }
 
+    @Test
+    fun givenTodayScheduleWhenLocalDatePassesMidnightThenHubDropsItFromTodaySection() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val push = saveTemplate("Push A", exerciseId)
+        val dates = MutableDateProvider(today, java.time.LocalTime.of(23, 50))
+        (scheduled().schedule(push, today) as ScheduleWorkoutResult.Scheduled)
+        val viewModel = hubViewModel(dateProvider = dates)
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.uiState.first { it.pickerVisible && it.todayPlanned.size == 1 }
+        dates.setNow(today.plusDays(1), java.time.LocalTime.of(0, 5))
+        val afterMidnight = viewModel.uiState.first { it.todayPlanned.isEmpty() && !it.loading }
+        assertTrue(afterMidnight.todayPlanned.isEmpty())
+        assertTrue(afterMidnight.todayInProgress.isEmpty())
+        assertEquals(listOf("Push A"), afterMidnight.templates.map { it.template.name })
+    }
+
+    @Test
+    fun givenActiveScheduledSessionWhenDayChangesThenResumeStillWorks() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val push = saveTemplate("Push A", exerciseId)
+        val dates = MutableDateProvider(today)
+        val scheduleId = (scheduled().schedule(push, today) as ScheduleWorkoutResult.Scheduled).id
+        val sessionRepository = sessions(dates)
+        val started = sessionRepository.start(push, scheduleId) as StartWorkoutResult.Started
+        val viewModel = hubViewModel(sessionRepository, dates)
+        viewModel.uiState.first { it.activeSession != null && it.todayInProgress.size == 1 }
+        dates.setDate(today.plusDays(1))
+        val afterMidnight = viewModel.uiState.first {
+            it.activeSession != null && it.todayInProgress.isEmpty()
+        }
+        assertEquals(started.sessionId, afterMidnight.activeSession!!.session.id)
+        assertEquals(WorkoutPrimaryAction.Resume(started.sessionId), viewModel.onPrimaryWorkoutAction())
+    }
+
+    @Test
+    fun givenExistingScheduleWhenNewHubViewModelIsCreatedThenTodayPlannedIsRestored() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val push = saveTemplate("Push A", exerciseId)
+        val scheduleId = (scheduled().schedule(push, today) as ScheduleWorkoutResult.Scheduled).id
+        val first = hubViewModel()
+        assertEquals(listOf(scheduleId), first.uiState.first { it.todayPlanned.size == 1 }.todayPlanned.map { it.id })
+        val second = hubViewModel()
+        assertEquals(listOf(scheduleId), second.uiState.first { it.todayPlanned.size == 1 }.todayPlanned.map { it.id })
+        assertNull(second.uiState.value.startedSessionId)
+        assertFalse(second.uiState.value.pickerVisible)
+    }
+
+    @Test
+    fun givenStalePlannedItemWhenDayChangedThenStartIsIgnored() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val push = saveTemplate("Push A", exerciseId)
+        val dates = MutableDateProvider(today)
+        (scheduled().schedule(push, today) as ScheduleWorkoutResult.Scheduled)
+        val sessionRepository = sessions(dates)
+        val viewModel = hubViewModel(sessionRepository, dates)
+        viewModel.onPrimaryWorkoutAction()
+        val planned = viewModel.uiState.first { it.pickerVisible && it.todayPlanned.size == 1 }.todayPlanned.single()
+        dates.setDate(today.plusDays(1))
+        viewModel.uiState.first { it.todayPlanned.isEmpty() }
+        viewModel.startScheduled(planned)
+        assertNull(viewModel.uiState.value.startedSessionId)
+        assertNull(sessionRepository.observeInProgress().first())
+    }
+
     private fun hubViewModel(
-        sessionRepository: WorkoutSessionRepository = sessions()
+        sessionRepository: WorkoutSessionRepository = sessions(),
+        dateProvider: hu.laca.weighttracker.domain.DateProvider = FixedDateProvider(today)
     ): WorkoutHubViewModel {
         return WorkoutHubViewModel(
             repository,
@@ -368,7 +434,7 @@ class WorkoutHubViewModelTest {
                 database.workoutSessionDao(),
                 Clock.fixed(today.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
             ),
-            FixedDateProvider(today)
+            dateProvider
         )
     }
 
@@ -381,7 +447,9 @@ class WorkoutHubViewModelTest {
         )
     }
 
-    private fun sessions(): WorkoutSessionRepository {
+    private fun sessions(
+        dateProvider: hu.laca.weighttracker.domain.DateProvider = FixedDateProvider(today)
+    ): WorkoutSessionRepository {
         val clock = Clock.fixed(today.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
         return WorkoutSessionRepository(
             sessionDao = database.workoutSessionDao(),
@@ -389,7 +457,7 @@ class WorkoutHubViewModelTest {
             exerciseDao = database.exerciseDao(),
             weightRepository = weights,
             clock = clock,
-            dateProvider = FixedDateProvider(today)
+            dateProvider = dateProvider
         )
     }
 

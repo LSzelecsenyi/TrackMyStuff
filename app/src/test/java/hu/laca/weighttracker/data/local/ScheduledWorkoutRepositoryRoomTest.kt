@@ -32,6 +32,8 @@ import hu.laca.weighttracker.domain.workout.TemplateDraft
 import hu.laca.weighttracker.domain.workout.TemplateExerciseDraft
 import hu.laca.weighttracker.domain.workout.TemplateSaveResult
 import hu.laca.weighttracker.domain.workout.UnscheduleWorkoutResult
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -249,6 +251,54 @@ class ScheduledWorkoutRepositoryRoomTest {
         assertEquals(ScheduledWorkoutStatus.PLANNED, afterDelete.status)
         val third = sessions.start(templateId, scheduleId)
         assertTrue(third is StartWorkoutResult.Started)
+    }
+
+    @Test
+    fun givenPastOrFutureScheduleWhenStartedThenItIsRejectedWithoutASession() = runTest {
+        val templateId = savePush("Push A")
+        val pastId = (scheduled.schedule(templateId, today.minusDays(1)) as ScheduleWorkoutResult.Scheduled).id
+        val futureTemplate = savePush("Jövő")
+        val futureId = (scheduled.schedule(futureTemplate, today.plusDays(1)) as ScheduleWorkoutResult.Scheduled).id
+        assertEquals(StartWorkoutResult.ScheduleNotOnToday, sessions.start(templateId, pastId))
+        assertEquals(StartWorkoutResult.ScheduleNotOnToday, sessions.start(futureTemplate, futureId))
+        assertNull(sessions.observeInProgress().first())
+        assertEquals(ScheduledWorkoutStatus.PLANNED, scheduled.getById(pastId)!!.status)
+        assertEquals(ScheduledWorkoutStatus.PLANNED, scheduled.getById(futureId)!!.status)
+    }
+
+    @Test
+    fun givenTwoConcurrentStartsWhenSameScheduleThenOnlyOneSessionExists() = runTest {
+        val templateId = savePush("Push A")
+        val scheduleId = (scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled).id
+        val results = coroutineScope {
+            val first = async { sessions.start(templateId, scheduleId) }
+            val second = async { sessions.start(templateId, scheduleId) }
+            listOf(first.await(), second.await())
+        }
+        assertEquals(1, results.count { it is StartWorkoutResult.Started })
+        assertTrue(results.any { it is StartWorkoutResult.AlreadyActive || it is StartWorkoutResult.ScheduleAlreadyStarted })
+        assertEquals(1, database.workoutSessionDao().observeAll().first().count { it.scheduledWorkoutId == scheduleId })
+        assertEquals(scheduleId, sessions.observeInProgress().first()!!.session.scheduledWorkoutId)
+    }
+
+    @Test
+    fun givenArchivedThenRestoredTemplateWhenScheduleRemainsThenItCanStart() = runTest {
+        val templateId = savePush("Push A")
+        val scheduleId = (scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled).id
+        assertTrue(templates.archive(templateId))
+        assertEquals(StartWorkoutResult.TemplateArchived, sessions.start(templateId, scheduleId))
+        assertTrue(templates.restore(templateId))
+        val started = sessions.start(templateId, scheduleId) as StartWorkoutResult.Started
+        assertEquals(scheduleId, sessions.getAggregate(started.sessionId)!!.session.scheduledWorkoutId)
+    }
+
+    @Test
+    fun givenDstTransitionDateWhenScheduledThenIsoCalendarDayIsStored() = runTest {
+        val templateId = savePush("Push A")
+        val dstDay = LocalDate.of(2026, 3, 29)
+        val id = (scheduled.schedule(templateId, dstDay) as ScheduleWorkoutResult.Scheduled).id
+        assertEquals(dstDay, scheduled.getById(id)!!.scheduledDate)
+        assertEquals("2026-03-29", database.scheduledWorkoutDao().getEntity(id)!!.scheduledDate)
     }
 
     @Test

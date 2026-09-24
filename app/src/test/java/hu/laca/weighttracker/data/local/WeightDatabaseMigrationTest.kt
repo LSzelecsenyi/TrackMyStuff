@@ -408,6 +408,31 @@ class WeightDatabaseMigrationTest {
                 VALUES (1, 0, 8, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL, 'COMPLETED', 2000, 0)
                 """.trimIndent()
             )
+            execSQL(
+                """
+                INSERT INTO workout_sessions (templateId, templateName, status, workoutDate, startedAt, finishedAt, abandonedAt,
+                    notes, bodyWeightKg, bodyWeightSource, bodyWeightSourceDate, createdAt, updatedAt, activeLock, importFingerprint)
+                VALUES (1, 'Push A', 'IN_PROGRESS', '2026-09-15', 3000, NULL, NULL, NULL, NULL, 'UNKNOWN', NULL, 3000, 3000, 1, NULL)
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                INSERT INTO workout_session_exercises (sessionId, exerciseId, position, name, category, movementPattern,
+                    measurementType, resistanceBasis, weightInterpretation, primaryMuscle, notes)
+                VALUES (2, 1, 0, 'Húzódzkodás', 'STRENGTH', 'VERTICAL_PULL', 'REPETITIONS', 'BODYWEIGHT', 'NOT_APPLICABLE', 'LATS', NULL)
+                """.trimIndent()
+            )
+            execSQL(
+                "INSERT INTO workout_session_exercise_muscles (sessionExerciseId, muscleGroup, role) VALUES (2, 'LATS', 'PRIMARY')"
+            )
+            execSQL(
+                """
+                INSERT INTO workout_session_sets (sessionExerciseId, position, plannedMinReps, plannedMaxReps, plannedLoadKind,
+                    plannedWeightKg, plannedDurationSeconds, plannedDistanceMeters, actualReps, actualLoadKind, actualWeightKg,
+                    actualDurationSeconds, actualDistanceMeters, status, completedAt, addedDuringWorkout)
+                VALUES (2, 0, 8, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL, 8, 'BODYWEIGHT_ONLY', NULL, NULL, NULL, 'PENDING', NULL, 0)
+                """.trimIndent()
+            )
             close()
         }
 
@@ -425,7 +450,18 @@ class WeightDatabaseMigrationTest {
             assertNull(session.scheduledWorkoutId)
             assertEquals("done", session.notes)
             assertEquals(1, database.workoutSessionDao().getExercises(1).size)
+            val active = database.workoutSessionDao().getById(2)!!
+            assertEquals("IN_PROGRESS", active.status)
+            assertNull(active.scheduledWorkoutId)
+            assertEquals(1, database.workoutSessionDao().getExercises(2).size)
+            assertEquals(1, database.workoutSessionDao().getMuscles(1).size)
             assertTrue(database.scheduledWorkoutDao().observeOnDate("2026-09-15").first().isEmpty())
+            val sessionIdx = sessionIndexes(database)
+            assertTrue(sessionIdx.contains("index_workout_sessions_scheduledWorkoutId:1"))
+            val scheduledIdx = scheduledIndexes(database)
+            assertTrue(scheduledIdx.contains("index_scheduled_workouts_scheduledDate_templateId:1"))
+            val sessionColumn = tableColumns(database, "workout_sessions").first { it.startsWith("scheduledWorkoutId:") }
+            assertTrue(sessionColumn.startsWith("scheduledWorkoutId:INTEGER:0"))
 
             val firstId = database.scheduledWorkoutDao().insert(
                 ScheduledWorkoutEntity(
@@ -469,7 +505,30 @@ class WeightDatabaseMigrationTest {
             }
             assertTrue(missingTemplateFailed)
 
-            database.workoutSessionDao().updateSession(session.copy(scheduledWorkoutId = firstId))
+            val clock = java.time.Clock.fixed(java.time.Instant.ofEpochMilli(5_000L), java.time.ZoneOffset.UTC)
+            val dateProvider = hu.laca.weighttracker.domain.FixedDateProvider(java.time.LocalDate.parse("2026-09-15"))
+            val sessionRepository = hu.laca.weighttracker.data.repository.WorkoutSessionRepository(
+                sessionDao = database.workoutSessionDao(),
+                templateDao = database.workoutTemplateDao(),
+                exerciseDao = database.exerciseDao(),
+                weightRepository = hu.laca.weighttracker.data.repository.WeightRepository(
+                    database.weightMeasurementDao(),
+                    clock
+                ),
+                clock = clock,
+                dateProvider = dateProvider
+            )
+            assertEquals(
+                hu.laca.weighttracker.domain.workout.AbandonWorkoutResult.Abandoned,
+                sessionRepository.abandon(2L)
+            )
+            assertNull(database.workoutSessionDao().getById(2))
+            val started = sessionRepository.start(1L, firstId)
+            assertTrue(started is hu.laca.weighttracker.domain.workout.StartWorkoutResult.Started)
+            val startedId = (started as hu.laca.weighttracker.domain.workout.StartWorkoutResult.Started).sessionId
+            assertEquals(firstId, database.workoutSessionDao().getById(startedId)!!.scheduledWorkoutId)
+            assertNull(database.workoutSessionDao().getById(1)!!.scheduledWorkoutId)
+
             var deleteLinkedFailed = false
             try {
                 database.scheduledWorkoutDao().deleteById(firstId)
@@ -477,7 +536,7 @@ class WeightDatabaseMigrationTest {
                 deleteLinkedFailed = true
             }
             assertTrue(deleteLinkedFailed)
-            assertEquals(firstId, database.workoutSessionDao().getById(1)!!.scheduledWorkoutId)
+            assertEquals(firstId, database.workoutSessionDao().getById(startedId)!!.scheduledWorkoutId)
 
             var secondLinkFailed = false
             try {
