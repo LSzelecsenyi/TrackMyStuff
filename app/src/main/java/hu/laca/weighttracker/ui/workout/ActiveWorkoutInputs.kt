@@ -23,6 +23,8 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -38,7 +40,9 @@ fun ConsoleNumericField(
     unit: String? = null,
     isError: Boolean = false,
     decimal: Boolean = false,
-    supportingText: String? = null
+    supportingText: String? = null,
+    traversalIndex: Float? = null,
+    valueInSemantics: Boolean = false
 ) {
     val lineColor = if (isError) {
         MaterialTheme.colorScheme.error
@@ -58,7 +62,15 @@ fun ConsoleNumericField(
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = AppDimens.minTouch)
-            .semantics { contentDescription = label }
+            .semantics {
+                contentDescription = label
+                if (traversalIndex != null) {
+                    this.traversalIndex = traversalIndex
+                }
+                if (valueInSemantics) {
+                    stateDescription = value.ifBlank { label }
+                }
+            }
             .testTag("set-numeric-field"),
         textStyle = AppTypeTokens.statValue.copy(color = MaterialTheme.colorScheme.onSurface),
         singleLine = true,

@@ -452,6 +452,7 @@ fun WeightTrackerNavHost(
                     state = state,
                     onBack = { navController.popBackStack() },
                     onReps = viewModel::onReps,
+                    onStepReps = viewModel::stepReps,
                     onLoadKind = viewModel::onLoadKind,
                     onWeight = viewModel::onWeight,
                     onMinutes = viewModel::onMinutes,

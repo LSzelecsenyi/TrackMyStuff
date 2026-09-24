@@ -124,6 +124,79 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
+    fun plusIncreasesRepsByOneInDraft() = runTest {
+        val viewModel = startTwoExercises()
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.stepReps(first.id, 1)
+        val state = awaitReal {
+            viewModel.uiState.first { it.drafts[first.id]?.repsText == "9" }
+        }
+        assertEquals("9", state.drafts[first.id]!!.repsText)
+    }
+
+    @Test
+    fun minusDecreasesRepsByOneInDraft() = runTest {
+        val viewModel = startTwoExercises()
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.stepReps(first.id, -1)
+        val state = awaitReal {
+            viewModel.uiState.first { it.drafts[first.id]?.repsText == "7" }
+        }
+        assertEquals("7", state.drafts[first.id]!!.repsText)
+    }
+
+    @Test
+    fun minusAtMinimumKeepsValidCompletedReps() = runTest {
+        val viewModel = startTwoExercises()
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.onReps(first.id, "1")
+        awaitReal { viewModel.uiState.first { it.drafts[first.id]?.repsText == "1" } }
+        viewModel.stepReps(first.id, -1)
+        val minState = awaitReal {
+            viewModel.uiState.first { it.drafts[first.id]?.repsText == "1" }
+        }
+        assertEquals("1", minState.drafts[first.id]!!.repsText)
+        viewModel.onReps(first.id, "")
+        awaitReal { viewModel.uiState.first { it.drafts[first.id]?.repsText == "" } }
+        viewModel.stepReps(first.id, -1)
+        val emptyState = awaitReal {
+            viewModel.uiState.first { it.drafts[first.id]?.repsText == "" }
+        }
+        assertEquals("", emptyState.drafts[first.id]!!.repsText)
+    }
+
+    @Test
+    fun plusOnEmptyRepsUsesMinimumValidValue() = runTest {
+        val viewModel = startTwoExercises()
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.onReps(first.id, "")
+        awaitReal { viewModel.uiState.first { it.drafts[first.id]?.repsText == "" } }
+        viewModel.stepReps(first.id, 1)
+        val state = awaitReal {
+            viewModel.uiState.first { it.drafts[first.id]?.repsText == "1" }
+        }
+        assertEquals("1", state.drafts[first.id]!!.repsText)
+    }
+
+    @Test
+    fun steppedRepsPersistThroughExistingCompleteFlow() = runTest {
+        val viewModel = startTwoExercises()
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        val next = viewModel.loaded().aggregate!!.exercises[0].sets[1]
+        viewModel.stepReps(first.id, 1)
+        viewModel.completeSet(first.id)
+        awaitReal {
+            viewModel.uiState.first { state ->
+                first.id !in state.completingSetIds &&
+                    state.currentSetId == next.id
+            }
+        }
+        val stored = sessions.getAggregate(sessionId)!!.exercises[0].sets[0]
+        assertEquals(SessionSetStatus.COMPLETED, stored.status)
+        assertEquals(9, stored.actualReps)
+    }
+
+    @Test
     fun completeSetSavesCompletedWithoutImeAction() = runTest {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]

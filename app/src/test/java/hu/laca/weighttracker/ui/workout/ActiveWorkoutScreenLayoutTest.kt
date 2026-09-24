@@ -377,6 +377,125 @@ class ActiveWorkoutScreenLayoutTest {
         )
     }
 
+    @Test
+    fun setHeaderShowsExerciseNameBesideIndex() {
+        render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithText("1. sorozat · Vádli").assertIsDisplayed()
+        composeRule.onNodeWithText("Aktuális").assertIsDisplayed()
+        composeRule.onNodeWithText("Vádli").assertIsDisplayed()
+    }
+
+    @Test
+    fun longExerciseNameEllipsizesWithoutCoveringStatusOrActions() {
+        val name = "Nagyon hosszú gyakorlatnév ami a sorozat fejlécében nem fér el"
+        render(state = pendingNamedState(name), width = 360.dp, fontScale = 1.3f)
+        val title = composeRule.onAllNodesWithTag(SET_HEADER_TITLE)[0].getBoundsInRoot()
+        val status = composeRule.onAllNodesWithTag(SET_HEADER_STATUS)[0].getBoundsInRoot()
+        val complete = composeRule.onNodeWithTag(SET_COMPLETE_ACTION).getBoundsInRoot()
+        val skip = composeRule.onNodeWithTag(SET_SKIP_ACTION).getBoundsInRoot()
+        composeRule.onNodeWithText("Aktuális").assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_SKIP_ACTION).assertIsDisplayed()
+        assertTrue("title=$title status=$status", title.right <= status.left + 1.dp)
+        assertTrue("status=$status complete=$complete", !overlaps(status, complete))
+        assertTrue("status=$status skip=$skip", !overlaps(status, skip))
+        assertTrue("title=$title complete=$complete", !overlaps(title, complete))
+    }
+
+    @Test
+    fun repsSteppersShowForRepetitionMeasurements() {
+        render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithTag(SET_REPS_MINUS).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Ismétlésszám csökkentése").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Ismétlésszám növelése").assertIsDisplayed()
+        composeRule.onNode(hasStateDescription("8")).assertIsDisplayed()
+    }
+
+    @Test
+    fun repsSteppersShowForRepetitionsAndWeight() {
+        render(
+            state = pendingNamedState("Fekvenyomás", MeasurementType.REPETITIONS_AND_WEIGHT),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_REPS_MINUS).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertIsDisplayed()
+    }
+
+    @Test
+    fun repsSteppersHiddenForDuration() {
+        render(
+            state = pendingNamedState("Plank", MeasurementType.DURATION),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_REPS_MINUS).assertDoesNotExist()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertDoesNotExist()
+    }
+
+    @Test
+    fun repsSteppersHiddenForDistanceAndDuration() {
+        render(
+            state = pendingNamedState("Futás", MeasurementType.DISTANCE_AND_DURATION),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_REPS_MINUS).assertDoesNotExist()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertDoesNotExist()
+    }
+
+    @Test
+    fun pendingSetsShowRepsSteppersWhileResolvedSetsDoNot() {
+        render(state = mixedSetsState(), width = 360.dp, fontScale = 1f)
+        composeRule.onAllNodesWithTag(SET_REPS_MINUS).assertCountEquals(2)
+        composeRule.onAllNodesWithTag(SET_REPS_PLUS).assertCountEquals(2)
+    }
+
+    @Test
+    fun completedSetsHaveNoActiveRepsSteppers() {
+        render(state = completedState(), width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithTag(SET_REPS_MINUS).assertDoesNotExist()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertDoesNotExist()
+    }
+
+    @Test
+    fun repsStepperClickDoesNotFocusInput() {
+        render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
+        composeRule.onAllNodesWithTag("set-numeric-field")[0].assertIsNotFocused()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).performClick()
+        composeRule.onAllNodesWithTag("set-numeric-field")[0].assertIsNotFocused()
+        composeRule.onNodeWithTag(SET_REPS_MINUS).performClick()
+        composeRule.onAllNodesWithTag("set-numeric-field")[0].assertIsNotFocused()
+    }
+
+    @Test
+    fun repsStepperCirclesMatchCompleteCircleAndTouchTargets() {
+        render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
+        val completeCircle = composeRule.onNodeWithTag(SET_COMPLETE_CIRCLE, useUnmergedTree = true).getBoundsInRoot()
+        val minusCircle = composeRule.onNodeWithTag(SET_REPS_MINUS_CIRCLE, useUnmergedTree = true).getBoundsInRoot()
+        val plusCircle = composeRule.onNodeWithTag(SET_REPS_PLUS_CIRCLE, useUnmergedTree = true).getBoundsInRoot()
+        val minus = composeRule.onNodeWithTag(SET_REPS_MINUS).getBoundsInRoot()
+        val plus = composeRule.onNodeWithTag(SET_REPS_PLUS).getBoundsInRoot()
+        val complete = composeRule.onNodeWithTag(SET_COMPLETE_ACTION).getBoundsInRoot()
+        val completeDiameter = completeCircle.right - completeCircle.left
+        assertEquals(completeDiameter, minusCircle.right - minusCircle.left)
+        assertEquals(completeDiameter, plusCircle.right - plusCircle.left)
+        assertEquals(completeCircle.bottom - completeCircle.top, minusCircle.bottom - minusCircle.top)
+        assertTrue(minus.right - minus.left >= 48.dp)
+        assertTrue(minus.bottom - minus.top >= 48.dp)
+        assertTrue(plus.right - plus.left >= 48.dp)
+        assertTrue(plus.bottom - plus.top >= 48.dp)
+        assertTrue(complete.right - complete.left >= 48.dp)
+        assertTrue(plus.left - minus.right >= 12.dp)
+        val field = composeRule.onAllNodesWithTag("set-numeric-field")[0].getBoundsInRoot()
+        assertTrue("field=$field minus=$minus", field.right <= minus.left + 1.dp)
+    }
+
+    private fun overlaps(a: androidx.compose.ui.unit.DpRect, b: androidx.compose.ui.unit.DpRect): Boolean {
+        return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+    }
+
     private fun popupWindowLayoutParams(): List<android.view.WindowManager.LayoutParams> {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val wm = context.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
@@ -417,6 +536,7 @@ class ActiveWorkoutScreenLayoutTest {
                             state = state,
                             onBack = {},
                             onReps = { _, _ -> },
+                            onStepReps = { _, _ -> },
                             onLoadKind = { _, _ -> },
                             onWeight = { _, _ -> },
                             onMinutes = { _, _ -> },
@@ -508,12 +628,68 @@ class ActiveWorkoutScreenLayoutTest {
         )
     }
 
+    private fun pendingNamedState(
+        name: String,
+        measurement: MeasurementType = MeasurementType.REPETITIONS
+    ): ActiveWorkoutUiState {
+        val current = set(2L, 10L, 0, SessionSetStatus.PENDING)
+        val first = item(10L, name, 0, listOf(current), measurement)
+        val loadKind = if (measurement == MeasurementType.REPETITIONS_AND_WEIGHT) {
+            PlannedLoadKind.EXTERNAL_WEIGHT
+        } else if (measurement == MeasurementType.REPETITIONS) {
+            PlannedLoadKind.BODYWEIGHT_ONLY
+        } else {
+            PlannedLoadKind.NONE
+        }
+        val draft = when (measurement) {
+            MeasurementType.REPETITIONS_AND_WEIGHT -> ActualSetDraft(
+                repsText = "8",
+                loadKind = loadKind,
+                weightText = "20"
+            )
+            MeasurementType.DURATION -> ActualSetDraft(
+                loadKind = PlannedLoadKind.NONE,
+                minutesText = "1",
+                secondsText = "0"
+            )
+            MeasurementType.DISTANCE_AND_DURATION -> ActualSetDraft(
+                loadKind = PlannedLoadKind.NONE,
+                minutesText = "30",
+                secondsText = "0",
+                distanceText = "5"
+            )
+            else -> ActualSetLogic.draftFromSet(current)
+        }
+        return ActiveWorkoutUiState(
+            loading = false,
+            aggregate = WorkoutSessionAggregate(session(), listOf(first)),
+            currentExerciseId = 10L,
+            currentSetId = current.id,
+            focusedSetId = current.id,
+            expandedExerciseIds = setOf(10L),
+            drafts = mapOf(current.id to draft)
+        )
+    }
+
     private fun item(
         id: Long,
         name: String,
         position: Int,
-        sets: List<SessionSet>
+        sets: List<SessionSet>,
+        measurement: MeasurementType = MeasurementType.REPETITIONS
     ): SessionExerciseItem {
+        val resistance = if (measurement == MeasurementType.REPETITIONS_AND_WEIGHT) {
+            ResistanceBasis.EXTERNAL
+        } else if (measurement == MeasurementType.REPETITIONS) {
+            ResistanceBasis.BODYWEIGHT
+        } else {
+            ResistanceBasis.NONE
+        }
+        val weightInterpretation = if (measurement == MeasurementType.REPETITIONS_AND_WEIGHT) {
+            WeightInterpretation.TOTAL
+        } else {
+            WeightInterpretation.NOT_APPLICABLE
+        }
         return SessionExerciseItem(
             exercise = SessionExercise(
                 id = id,
@@ -523,9 +699,9 @@ class ActiveWorkoutScreenLayoutTest {
                 name = name,
                 category = ExerciseCategory.STRENGTH,
                 movementPattern = MovementPattern.VERTICAL_PULL,
-                measurementType = MeasurementType.REPETITIONS,
-                resistanceBasis = ResistanceBasis.BODYWEIGHT,
-                weightInterpretation = WeightInterpretation.NOT_APPLICABLE,
+                measurementType = measurement,
+                resistanceBasis = resistance,
+                weightInterpretation = weightInterpretation,
                 primaryMuscle = MuscleGroup.LATS,
                 secondaryMuscles = emptyList(),
                 notes = null

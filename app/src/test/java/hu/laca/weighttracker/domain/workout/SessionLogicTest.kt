@@ -187,6 +187,30 @@ class SessionLogicTest {
     }
 
     @Test
+    fun plusIncreasesRepsByOne() {
+        assertEquals("9", ActualSetLogic.adjustRepsText("8", 1))
+    }
+
+    @Test
+    fun minusDecreasesRepsByOne() {
+        assertEquals("7", ActualSetLogic.adjustRepsText("8", -1))
+    }
+
+    @Test
+    fun minusAtMinimumDoesNotCreateInvalidValue() {
+        assertEquals("1", ActualSetLogic.adjustRepsText("1", -1))
+        assertEquals("0", ActualSetLogic.adjustRepsText("0", -1))
+        assertEquals("", ActualSetLogic.adjustRepsText("", -1))
+        assertEquals("abc", ActualSetLogic.adjustRepsText("abc", -1))
+    }
+
+    @Test
+    fun plusOnEmptyUsesMinimumValidReps() {
+        assertEquals("1", ActualSetLogic.adjustRepsText("", 1))
+        assertEquals("1", ActualSetLogic.adjustRepsText("   ", 1))
+    }
+
+    @Test
     fun currentPendingExerciseIgnoresCompletedAndSkipped() {
         val first = item(1L, "A", listOf(set(1L, SessionSetStatus.COMPLETED), set(2L, SessionSetStatus.SKIPPED)))
         val second = item(2L, "B", listOf(set(3L, SessionSetStatus.PENDING)))

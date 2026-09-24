@@ -192,6 +192,7 @@
     <string name="action_apply_to_all">Alkalmazás minden sorozatra</string>
     <string name="field_set_count">Sorozatok száma</string>
     <string name="field_set_label">%1$d. sorozat</string>
+    <string name="field_set_label_with_exercise">%1$d. sorozat · %2$s</string>
     <string name="field_reps">Ismétlés</string>
     <string name="field_reps_min">Min. ismétlés</string>
     <string name="field_reps_max">Max. ismétlés (üresen pontos érték)</string>
@@ -374,6 +375,8 @@
     <string name="action_delete_workout">Edzés törlése</string>
     <string name="action_complete_set">Kész</string>
     <string name="action_complete_set_a11y">Sorozat befejezése</string>
+    <string name="action_decrease_reps_a11y">Ismétlésszám csökkentése</string>
+    <string name="action_increase_reps_a11y">Ismétlésszám növelése</string>
     <string name="action_save_set">Mentés</string>
     <string name="action_update_set">Frissítés</string>
     <string name="action_edit_set">Szerkesztés</string>

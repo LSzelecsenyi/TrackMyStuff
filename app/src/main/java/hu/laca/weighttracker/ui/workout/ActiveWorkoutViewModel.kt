@@ -228,6 +228,12 @@ class ActiveWorkoutViewModel(
         updateDraft(setId) { it.copy(repsText = value) }
     }
 
+    fun stepReps(setId: Long, delta: Int) {
+        updateDraft(setId) { draft ->
+            draft.copy(repsText = ActualSetLogic.adjustRepsText(draft.repsText, delta))
+        }
+    }
+
     fun onLoadKind(setId: Long, kind: PlannedLoadKind) {
         updateDraft(setId) { draft ->
             draft.copy(

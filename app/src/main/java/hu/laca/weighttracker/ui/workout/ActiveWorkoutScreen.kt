@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -74,10 +75,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
@@ -109,7 +112,15 @@ internal const val WORKOUT_FINISH_CTA_STRONG = "workout-finish-cta-strong"
 internal const val SET_COMPLETE_ACTION = "complete-set"
 internal const val SET_SKIP_ACTION = "skip-set"
 internal const val SET_COMPLETE_PROGRESS = "complete-set-progress"
+internal const val SET_COMPLETE_CIRCLE = "complete-set-circle"
 internal const val SET_CURRENT_ACTIONS = "current-set-actions"
+internal const val SET_REPS_MINUS = "set-reps-minus"
+internal const val SET_REPS_PLUS = "set-reps-plus"
+internal const val SET_REPS_MINUS_CIRCLE = "set-reps-minus-circle"
+internal const val SET_REPS_PLUS_CIRCLE = "set-reps-plus-circle"
+internal const val SET_HEADER_TITLE = "set-header-title"
+internal const val SET_HEADER_STATUS = "set-header-status"
+private val SetActionCircleSize = 32.dp
 internal const val WORKOUT_TOP_BAR = "workout-top-bar"
 internal const val WORKOUT_OVERFLOW_ANCHOR = "workout-overflow-anchor"
 internal const val WORKOUT_OVERFLOW_BUTTON = "workout-overflow-button"
@@ -167,6 +178,7 @@ fun ActiveWorkoutScreen(
     state: ActiveWorkoutUiState,
     onBack: () -> Unit,
     onReps: (Long, String) -> Unit,
+    onStepReps: (Long, Int) -> Unit,
     onLoadKind: (Long, PlannedLoadKind) -> Unit,
     onWeight: (Long, String) -> Unit,
     onMinutes: (Long, String) -> Unit,
@@ -329,6 +341,7 @@ fun ActiveWorkoutScreen(
                         discarding = state.discarding,
                         onToggle = { onToggleExercise(item.exercise.id) },
                         onReps = onReps,
+                        onStepReps = onStepReps,
                         onLoadKind = onLoadKind,
                         onWeight = onWeight,
                         onMinutes = onMinutes,
@@ -613,6 +626,7 @@ private fun ExerciseBlock(
     discarding: Boolean,
     onToggle: () -> Unit,
     onReps: (Long, String) -> Unit,
+    onStepReps: (Long, Int) -> Unit,
     onLoadKind: (Long, PlannedLoadKind) -> Unit,
     onWeight: (Long, String) -> Unit,
     onMinutes: (Long, String) -> Unit,
@@ -711,6 +725,7 @@ private fun ExerciseBlock(
                     focusGeneration = focusGeneration,
                     listState = listState,
                     onReps = { onReps(set.id, it) },
+                    onStepReps = { onStepReps(set.id, it) },
                     onLoadKind = { onLoadKind(set.id, it) },
                     onWeight = { onWeight(set.id, it) },
                     onMinutes = { onMinutes(set.id, it) },
@@ -763,6 +778,7 @@ private fun SetRow(
     focusGeneration: Long?,
     listState: LazyListState,
     onReps: (String) -> Unit,
+    onStepReps: (Int) -> Unit,
     onLoadKind: (PlannedLoadKind) -> Unit,
     onWeight: (String) -> Unit,
     onMinutes: (String) -> Unit,
@@ -836,7 +852,11 @@ private fun SetRow(
             }
             .padding(horizontal = if (current) 10.dp else 0.dp, vertical = if (current) 8.dp else 4.dp)
     ) {
-        Column(modifier = Modifier.bringIntoViewRequester(requester)) {
+        Column(
+            modifier = Modifier
+                .bringIntoViewRequester(requester)
+                .semantics { isTraversalGroup = true }
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
             if (current) {
                 Box(
@@ -849,23 +869,38 @@ private fun SetRow(
                 )
             }
             Text(
-                text = stringResource(R.string.field_set_label, set.position + 1),
+                text = stringResource(
+                    R.string.field_set_label_with_exercise,
+                    set.position + 1,
+                    item.exercise.name
+                ),
                 style = AppTypeTokens.sectionTitle,
-                modifier = Modifier.weight(1f)
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(SET_HEADER_TITLE)
             )
-            when {
-                current -> {
-                    Text(
-                        text = currentBadge,
-                        style = AppTypeTokens.statSecondary,
-                        color = currentGreen
-                    )
-                }
-                set.status == SessionSetStatus.COMPLETED -> {
-                    CompletedSetIndicator(accent = currentGreen)
-                }
-                set.status == SessionSetStatus.SKIPPED -> {
-                    SkippedSetIndicator()
+            Box(
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .testTag(SET_HEADER_STATUS)
+            ) {
+                when {
+                    current -> {
+                        Text(
+                            text = currentBadge,
+                            style = AppTypeTokens.statSecondary,
+                            color = currentGreen,
+                            maxLines = 1
+                        )
+                    }
+                    set.status == SessionSetStatus.COMPLETED -> {
+                        CompletedSetIndicator(accent = currentGreen)
+                    }
+                    set.status == SessionSetStatus.SKIPPED -> {
+                        SkippedSetIndicator()
+                    }
                 }
             }
         }
@@ -888,7 +923,9 @@ private fun SetRow(
                 item = item,
                 draft = draft,
                 errors = errors,
+                steppersEnabled = !completing,
                 onReps = onReps,
+                onStepReps = onStepReps,
                 onLoadKind = onLoadKind,
                 onWeight = onWeight,
                 onMinutes = onMinutes,
@@ -911,11 +948,13 @@ private fun SetRow(
                     ) {
                         SkipSetAction(
                             enabled = !completing,
+                            traversalIndex = 5f,
                             onClick = onSkip
                         )
                         CompleteSetAction(
                             completing = completing,
                             accent = currentGreen,
+                            traversalIndex = 6f,
                             onClick = onComplete
                         )
                     }
@@ -965,9 +1004,64 @@ private fun SetRow(
 }
 
 @Composable
+private fun RepsStepButton(
+    symbol: String,
+    enabled: Boolean,
+    contentDescription: String,
+    testTag: String,
+    circleTag: String,
+    traversalIndex: Float,
+    onClick: () -> Unit
+) {
+    val stroke = if (enabled) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outline
+    }
+    val glyph = if (enabled) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    }
+    val fill = if (enabled) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+    } else {
+        Color.Transparent
+    }
+    Box(
+        modifier = Modifier
+            .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
+            .testTag(testTag)
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics {
+                role = Role.Button
+                this.contentDescription = contentDescription
+                this.traversalIndex = traversalIndex
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(SetActionCircleSize)
+                .background(fill, CircleShape)
+                .border(AppDimens.strokeThin, stroke, CircleShape)
+                .testTag(circleTag),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = symbol,
+                style = AppTypeTokens.statValue,
+                color = glyph
+            )
+        }
+    }
+}
+
+@Composable
 private fun CompleteSetAction(
     completing: Boolean,
     accent: Color,
+    traversalIndex: Float,
     onClick: () -> Unit
 ) {
     val label = stringResource(R.string.action_complete_set_a11y)
@@ -979,13 +1073,15 @@ private fun CompleteSetAction(
             .semantics {
                 role = Role.Button
                 contentDescription = label
+                this.traversalIndex = traversalIndex
             },
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(32.dp)
-                .border(AppDimens.strokeThin, accent, CircleShape),
+                .size(SetActionCircleSize)
+                .border(AppDimens.strokeThin, accent, CircleShape)
+                .testTag(SET_COMPLETE_CIRCLE),
             contentAlignment = Alignment.Center
         ) {
             if (completing) {
@@ -1011,6 +1107,7 @@ private fun CompleteSetAction(
 @Composable
 private fun SkipSetAction(
     enabled: Boolean,
+    traversalIndex: Float,
     onClick: () -> Unit
 ) {
     val label = stringResource(R.string.action_skip_set_a11y)
@@ -1022,6 +1119,7 @@ private fun SkipSetAction(
             .semantics {
                 role = Role.Button
                 contentDescription = label
+                this.traversalIndex = traversalIndex
             },
         contentAlignment = Alignment.Center
     ) {
@@ -1082,7 +1180,9 @@ private fun ActualFields(
     item: SessionExerciseItem,
     draft: ActualSetDraft,
     errors: List<TemplateFieldError>,
+    steppersEnabled: Boolean,
     onReps: (String) -> Unit,
+    onStepReps: (Int) -> Unit,
     onLoadKind: (PlannedLoadKind) -> Unit,
     onWeight: (String) -> Unit,
     onMinutes: (String) -> Unit,
@@ -1093,12 +1193,46 @@ private fun ActualFields(
     val measurement = item.exercise.measurementType
     val resistance = item.exercise.resistanceBasis
     if (PlannedSetLogic.requiresReps(measurement)) {
-        ConsoleNumericField(
-            value = draft.repsText,
-            onValueChange = onReps,
-            label = stringResource(R.string.field_actual_reps),
-            isError = errors.any { it.name.startsWith("Reps") }
-        )
+        val parsedReps = draft.repsText.trim().toIntOrNull()
+        val minusEnabled = steppersEnabled &&
+            parsedReps != null &&
+            parsedReps > ActualSetLogic.MIN_COMPLETED_REPS
+        val plusEnabled = steppersEnabled &&
+            (draft.repsText.isBlank() || (parsedReps != null && parsedReps < QuantityParser.MAX_REPS))
+        Row(verticalAlignment = Alignment.Top) {
+            ConsoleNumericField(
+                value = draft.repsText,
+                onValueChange = onReps,
+                label = stringResource(R.string.field_actual_reps),
+                modifier = Modifier.weight(1f),
+                isError = errors.any { it.name.startsWith("Reps") },
+                traversalIndex = 0f,
+                valueInSemantics = true
+            )
+            Spacer(Modifier.width(AppDimens.itemGap))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
+            ) {
+                RepsStepButton(
+                    symbol = "−",
+                    enabled = minusEnabled,
+                    contentDescription = stringResource(R.string.action_decrease_reps_a11y),
+                    testTag = SET_REPS_MINUS,
+                    circleTag = SET_REPS_MINUS_CIRCLE,
+                    traversalIndex = 1f,
+                    onClick = { onStepReps(-1) }
+                )
+                RepsStepButton(
+                    symbol = "+",
+                    enabled = plusEnabled,
+                    contentDescription = stringResource(R.string.action_increase_reps_a11y),
+                    testTag = SET_REPS_PLUS,
+                    circleTag = SET_REPS_PLUS_CIRCLE,
+                    traversalIndex = 2f,
+                    onClick = { onStepReps(1) }
+                )
+            }
+        }
         Spacer(Modifier.height(AppDimens.headerStackGap))
     }
     val kinds = PlannedLoadLogic.compatibleKinds(resistance, measurement).toList()
@@ -1112,7 +1246,8 @@ private fun ActualFields(
         CompactChoiceChips(
             labels = kinds.map { stringResource(it.labelRes()) },
             selectedIndex = kinds.indexOf(draft.loadKind).coerceAtLeast(0),
-            onSelected = { onLoadKind(kinds[it]) }
+            onSelected = { onLoadKind(kinds[it]) },
+            traversalIndex = 3f
         )
         Spacer(Modifier.height(AppDimens.headerStackGap))
     }
@@ -1129,7 +1264,8 @@ private fun ActualFields(
             unit = "kg",
             supportingText = hint,
             isError = errors.any { it.name.startsWith("Weight") },
-            decimal = true
+            decimal = true,
+            traversalIndex = 4f
         )
         Spacer(Modifier.height(AppDimens.headerStackGap))
     }
@@ -1184,11 +1320,17 @@ private fun ActualFields(
 private fun CompactChoiceChips(
     labels: List<String>,
     selectedIndex: Int,
-    onSelected: (Int) -> Unit
+    onSelected: (Int) -> Unit,
+    traversalIndex: Float? = null
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.semantics {
+            if (traversalIndex != null) {
+                this.traversalIndex = traversalIndex
+            }
+        }
     ) {
         labels.forEachIndexed { index, label ->
             val selected = index == selectedIndex

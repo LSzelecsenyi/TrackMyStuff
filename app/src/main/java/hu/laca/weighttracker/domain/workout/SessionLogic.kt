@@ -247,6 +247,27 @@ object ActualSetLogic {
         return set.addedDuringWorkout && set.status == SessionSetStatus.PENDING
     }
 
+    fun adjustRepsText(
+        current: String,
+        delta: Int,
+        min: Int = MIN_COMPLETED_REPS,
+        max: Int = QuantityParser.MAX_REPS
+    ): String {
+        val trimmed = current.trim()
+        if (trimmed.isEmpty()) {
+            return if (delta > 0) min.toString() else current
+        }
+        val value = trimmed.toIntOrNull() ?: return current
+        val next = value + delta
+        return when {
+            next < min -> if (value < min) current else min.toString()
+            next > max -> if (value > max) current else max.toString()
+            else -> next.toString()
+        }
+    }
+
+    const val MIN_COMPLETED_REPS = 1
+
     fun nextExerciseIndex(
         exercises: List<SessionExerciseItem>,
         currentIndex: Int
