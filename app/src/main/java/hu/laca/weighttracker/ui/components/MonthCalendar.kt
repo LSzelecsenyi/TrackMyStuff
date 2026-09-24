@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -47,7 +50,9 @@ fun MonthCalendar(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onDayClick: (LocalDate) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDayEnabled: (CalendarCell) -> Boolean = { true },
+    showLegend: Boolean = true
 ) {
     val locale = Locale.forLanguageTag("hu-HU")
     Column(modifier = modifier.fillMaxWidth()) {
@@ -104,27 +109,34 @@ fun MonthCalendar(
                     CalendarDayCell(
                         cell = cell,
                         selected = selectedDate == cell.date,
+                        enabled = isDayEnabled(cell),
                         onClick = { onDayClick(cell.date) },
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
         }
-        Spacer(Modifier.height(AppDimens.headerStackGap))
-        CalendarLegend()
+        if (showLegend) {
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            CalendarLegend()
+        }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CalendarLegend() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("calendar-legend"),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.testTag("calendar-legend-weight")
         ) {
             Box(
                 modifier = Modifier
@@ -139,7 +151,8 @@ private fun CalendarLegend() {
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.testTag("calendar-legend-completed")
         ) {
             Box(
                 modifier = Modifier
@@ -152,6 +165,22 @@ private fun CalendarLegend() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.testTag("calendar-legend-planned")
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .border(AppDimens.strokeThin, MaterialTheme.colorScheme.secondary, CircleShape)
+            )
+            Text(
+                text = stringResource(R.string.calendar_legend_planned),
+                style = AppTypeTokens.statCaption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -159,6 +188,7 @@ private fun CalendarLegend() {
 private fun CalendarDayCell(
     cell: CalendarCell,
     selected: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -167,12 +197,14 @@ private fun CalendarDayCell(
         hasMeasurement = cell.hasMeasurement,
         completedWorkoutCount = cell.completedWorkoutCount,
         isToday = cell.isToday,
-        isFuture = cell.isFuture
+        isFuture = cell.isFuture,
+        plannedWorkoutCount = cell.plannedWorkoutCount
     )
     val textColor = when {
         !cell.inDisplayedMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-        cell.isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
         selected || cell.isToday -> MaterialTheme.colorScheme.primary
+        cell.isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
         else -> MaterialTheme.colorScheme.onSurface
     }
     val outline = when {
@@ -191,7 +223,7 @@ private fun CalendarDayCell(
                     Modifier
                 }
             )
-            .clickable(enabled = !cell.isFuture, onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center
     ) {
@@ -202,7 +234,7 @@ private fun CalendarDayCell(
                 fontWeight = if (cell.isToday || selected) FontWeight.SemiBold else FontWeight.Normal,
                 color = textColor
             )
-            if (cell.hasMeasurement || cell.hasCompletedWorkout) {
+            if (cell.hasMeasurement || cell.hasPlannedWorkout || cell.hasCompletedWorkout) {
                 Row(
                     modifier = Modifier.padding(top = 1.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -211,9 +243,22 @@ private fun CalendarDayCell(
                         Box(
                             modifier = Modifier
                                 .size(5.dp)
+                                .testTag("calendar-weight-dot")
                                 .border(
                                     width = AppDimens.strokeThin,
                                     color = MaterialTheme.colorScheme.tertiary,
+                                    shape = CircleShape
+                                )
+                        )
+                    }
+                    if (cell.hasPlannedWorkout) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .testTag("calendar-planned-dot")
+                                .border(
+                                    width = AppDimens.strokeThin,
+                                    color = MaterialTheme.colorScheme.secondary,
                                     shape = CircleShape
                                 )
                         )
@@ -222,6 +267,7 @@ private fun CalendarDayCell(
                         Box(
                             modifier = Modifier
                                 .size(5.dp)
+                                .testTag("calendar-completed-dot")
                                 .background(
                                     color = MaterialTheme.colorScheme.primary,
                                     shape = CircleShape

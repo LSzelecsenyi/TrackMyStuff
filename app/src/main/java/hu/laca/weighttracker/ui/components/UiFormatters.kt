@@ -11,6 +11,8 @@ object UiFormatters {
     private val locale: Locale = Locale.forLanguageTag("hu-HU")
     private val longDate: DateTimeFormatter =
         DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale)
+    private val longDateWithWeekday: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("yyyy. MMMM d., EEEE", locale)
     private val chartDate: DateTimeFormatter =
         DateTimeFormatter.ofPattern("MMM d.", locale)
     private val compactDate: DateTimeFormatter =
@@ -38,6 +40,8 @@ object UiFormatters {
     }
 
     fun longDate(date: LocalDate): String = date.format(longDate)
+
+    fun longDateWithWeekday(date: LocalDate): String = date.format(longDateWithWeekday)
 
     fun chartDate(date: LocalDate): String = date.format(chartDate)
 

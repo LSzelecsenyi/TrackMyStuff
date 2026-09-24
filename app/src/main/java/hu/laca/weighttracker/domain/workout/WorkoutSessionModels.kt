@@ -23,7 +23,8 @@ data class WorkoutSession(
     val bodyWeightSourceDate: LocalDate?,
     val createdAt: Long,
     val updatedAt: Long,
-    val importFingerprint: String? = null
+    val importFingerprint: String? = null,
+    val scheduledWorkoutId: Long? = null
 )
 
 data class SessionExercise(
@@ -141,6 +142,9 @@ sealed class StartWorkoutResult {
     data object TemplateArchived : StartWorkoutResult()
     data object TemplateEmpty : StartWorkoutResult()
     data object AlreadyActive : StartWorkoutResult()
+    data object ScheduleNotFound : StartWorkoutResult()
+    data object ScheduleTemplateMismatch : StartWorkoutResult()
+    data object ScheduleAlreadyStarted : StartWorkoutResult()
     data class InvalidBodyWeight(val error: hu.laca.weighttracker.domain.WeightParseError) : StartWorkoutResult()
 }
 

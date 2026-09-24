@@ -14,6 +14,13 @@ import androidx.room.PrimaryKey
             childColumns = ["templateId"],
             onDelete = ForeignKey.RESTRICT,
             onUpdate = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = ScheduledWorkoutEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["scheduledWorkoutId"],
+            onDelete = ForeignKey.RESTRICT,
+            onUpdate = ForeignKey.CASCADE
         )
     ],
     indices = [
@@ -21,7 +28,8 @@ import androidx.room.PrimaryKey
         Index(value = ["status"]),
         Index(value = ["templateId"]),
         Index(value = ["workoutDate"]),
-        Index(value = ["importFingerprint"], unique = true)
+        Index(value = ["importFingerprint"], unique = true),
+        Index(value = ["scheduledWorkoutId"], unique = true)
     ]
 )
 data class WorkoutSessionEntity(
@@ -40,7 +48,8 @@ data class WorkoutSessionEntity(
     val createdAt: Long,
     val updatedAt: Long,
     val activeLock: Int?,
-    val importFingerprint: String? = null
+    val importFingerprint: String? = null,
+    val scheduledWorkoutId: Long? = null
 )
 
 @Entity(

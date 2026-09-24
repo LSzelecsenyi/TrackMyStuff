@@ -2,8 +2,10 @@ package hu.laca.weighttracker.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import hu.laca.weighttracker.data.repository.ScheduledWorkoutRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
+import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.domain.DashboardAssembler
 import hu.laca.weighttracker.domain.DashboardSnapshot
 import hu.laca.weighttracker.domain.DateProvider
@@ -15,11 +17,19 @@ import hu.laca.weighttracker.domain.WeeklyOverviewLogic
 import hu.laca.weighttracker.domain.MeasurementValidator
 import hu.laca.weighttracker.domain.calendar.MonthGrid
 import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
+import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import hu.laca.weighttracker.domain.musclemap.MuscleHeatmapAssembler
 import hu.laca.weighttracker.domain.musclemap.MuscleHeatmapState
 import hu.laca.weighttracker.domain.model.ChartRange
 import hu.laca.weighttracker.domain.model.SaveOutcome
 import hu.laca.weighttracker.domain.model.WeightMeasurement
+import hu.laca.weighttracker.domain.workout.RescheduleWorkoutResult
+import hu.laca.weighttracker.domain.workout.ScheduleWorkoutResult
+import hu.laca.weighttracker.domain.workout.ScheduledWorkout
+import hu.laca.weighttracker.domain.workout.ScheduledWorkoutUiLogic
+import hu.laca.weighttracker.domain.workout.StartWorkoutResult
+import hu.laca.weighttracker.domain.workout.TemplateListItem
+import hu.laca.weighttracker.domain.workout.UnscheduleWorkoutResult
 import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
 import hu.laca.weighttracker.ui.components.EditorUiState
 import hu.laca.weighttracker.ui.components.UserMessage
@@ -61,7 +71,15 @@ data class DashboardUiState(
     ),
     val daySheet: DaySheetState? = null,
     val showDayDeleteConfirm: Boolean = false,
-    val heatmap: MuscleHeatmapState = MuscleHeatmapAssembler.assemble(emptyList(), LocalDate.of(1970, 1, 1))
+    val heatmap: MuscleHeatmapState = MuscleHeatmapAssembler.assemble(emptyList(), LocalDate.of(1970, 1, 1)),
+    val schedulePickerVisible: Boolean = false,
+    val availableTemplates: List<TemplateListItem> = emptyList(),
+    val rescheduleTarget: ScheduledWorkout? = null,
+    val removeTarget: ScheduledWorkout? = null,
+    val scheduleBusy: Boolean = false,
+    val scheduleActionError: UserMessage? = null,
+    val startedSessionId: Long? = null,
+    val journalSessionId: Long? = null
 )
 
 private data class DashboardChrome(
@@ -72,10 +90,34 @@ private data class DashboardChrome(
     val selectedDay: LocalDate?
 )
 
+private data class SessionSignals(
+    val counts: Map<LocalDate, Int>,
+    val dayWorkouts: List<WorkoutSessionSummary>,
+    val weekSessions: List<WorkoutSessionSummary>
+)
+
+private data class ScheduleSignals(
+    val plannedCounts: Map<LocalDate, Int>,
+    val daySchedules: List<ScheduledWorkout>,
+    val templates: List<TemplateListItem>
+)
+
+private data class DialogChrome(
+    val pickerVisible: Boolean,
+    val reschedule: ScheduledWorkout?,
+    val remove: ScheduledWorkout?,
+    val busy: Boolean,
+    val actionError: UserMessage?,
+    val startedSessionId: Long?,
+    val journalSessionId: Long?
+)
+
 class DashboardViewModel(
     private val repository: WeightRepository,
     private val sessionRepository: WorkoutSessionRepository,
-    private val dateProvider: DateProvider
+    private val dateProvider: DateProvider,
+    private val scheduledWorkoutRepository: ScheduledWorkoutRepository,
+    private val templateRepository: WorkoutTemplateRepository
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
     private val editor = MutableStateFlow<EditorUiState?>(null)
@@ -84,6 +126,14 @@ class DashboardViewModel(
     private val displayedMonth = MutableStateFlow(YearMonth.from(dateProvider.today()))
     private val selectedDay = MutableStateFlow<LocalDate?>(null)
     private val showDayDeleteConfirm = MutableStateFlow(false)
+    private val schedulePickerOpen = MutableStateFlow(false)
+    private val rescheduleTarget = MutableStateFlow<ScheduledWorkout?>(null)
+    private val removeTarget = MutableStateFlow<ScheduledWorkout?>(null)
+    private val scheduleBusy = MutableStateFlow(false)
+    private val scheduleActionError = MutableStateFlow<UserMessage?>(null)
+    private val startedSessionId = MutableStateFlow<Long?>(null)
+    private val journalSessionId = MutableStateFlow<Long?>(null)
+    private val starting = MutableStateFlow(false)
 
     private val chrome = combine(
         chartRange,
@@ -112,16 +162,63 @@ class DashboardViewModel(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val monthSchedules = displayedMonth.flatMapLatest { month ->
+        scheduledWorkoutRepository.observeBetween(
+            MonthGridCalculator.gridStart(month),
+            MonthGridCalculator.gridEnd(month)
+        )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val daySchedules = selectedDay.flatMapLatest { date ->
+        if (date == null) {
+            flowOf(emptyList())
+        } else {
+            scheduledWorkoutRepository.observeOnDate(date)
+        }
+    }
+
     private val weekSessions = sessionRepository.observeSummariesBetween(
         WeeklyOverviewLogic.windowStart(dateProvider.today()),
         dateProvider.today()
     )
 
-    private data class SessionSignals(
-        val counts: Map<LocalDate, Int>,
-        val dayWorkouts: List<WorkoutSessionSummary>,
-        val weekSessions: List<WorkoutSessionSummary>
-    )
+    private val scheduleSignals = combine(
+        monthSchedules,
+        daySchedules,
+        templateRepository.observeActive()
+    ) { monthItems, dayItems, templates ->
+        ScheduleSignals(
+            plannedCounts = ScheduledWorkoutUiLogic.plannedMarkerCounts(monthItems),
+            daySchedules = dayItems,
+            templates = LocalizedLabelOrder.sorted(
+                templates,
+                label = { it.template.name },
+                key = { it.template.id.toString() }
+            )
+        )
+    }
+
+    private val dialogs = combine(
+        combine(schedulePickerOpen, rescheduleTarget, removeTarget, scheduleBusy) {
+            picker, reschedule, remove, busy ->
+            Quad(picker, reschedule, remove, busy)
+        },
+        combine(scheduleActionError, startedSessionId, journalSessionId) { error, started, journal ->
+            Triple(error, started, journal)
+        }
+    ) { openState, navState ->
+        DialogChrome(
+            pickerVisible = openState.first,
+            reschedule = openState.second,
+            remove = openState.third,
+            busy = openState.fourth,
+            actionError = navState.first,
+            startedSessionId = navState.second,
+            journalSessionId = navState.third
+        )
+    }
 
     val uiState: StateFlow<DashboardUiState> = combine(
         combine(
@@ -130,8 +227,9 @@ class DashboardViewModel(
             showDayDeleteConfirm,
             combine(completedCounts, dayWorkouts, weekSessions) { counts, workouts, week ->
                 SessionSignals(counts, workouts, week)
-            }
-        ) { items, chromeState, deleteConfirm, sessions ->
+            },
+            scheduleSignals
+        ) { items, chromeState, deleteConfirm, sessions, schedules ->
             val today = dateProvider.today()
             val snapshot = DashboardAssembler.assemble(items, today, chromeState.range)
             DashboardUiState(
@@ -146,17 +244,38 @@ class DashboardViewModel(
                     month = chromeState.month,
                     today = today,
                     measuredDates = snapshot.measurementDates,
-                    completedWorkoutCounts = sessions.counts
+                    completedWorkoutCounts = sessions.counts,
+                    plannedWorkoutCounts = schedules.plannedCounts
                 ),
                 daySheet = chromeState.selectedDay?.let { date ->
-                    DaySheetFactory.create(date, items, today, sessions.dayWorkouts)
+                    DaySheetFactory.create(
+                        date = date,
+                        measurements = items,
+                        today = today,
+                        workouts = sessions.dayWorkouts,
+                        scheduledWorkouts = schedules.daySchedules
+                    )
                 },
-                showDayDeleteConfirm = deleteConfirm
+                showDayDeleteConfirm = deleteConfirm,
+                availableTemplates = ScheduledWorkoutUiLogic.availableTemplates(
+                    schedules.templates,
+                    schedules.daySchedules
+                )
             )
         },
-        sessionRepository.observeHeatmapExercises()
-    ) { state, exercises ->
-        state.copy(heatmap = MuscleHeatmapAssembler.assemble(exercises, state.today))
+        sessionRepository.observeHeatmapExercises(),
+        dialogs
+    ) { state, exercises, dialogState ->
+        state.copy(
+            heatmap = MuscleHeatmapAssembler.assemble(exercises, state.today),
+            schedulePickerVisible = dialogState.pickerVisible,
+            rescheduleTarget = dialogState.reschedule,
+            removeTarget = dialogState.remove,
+            scheduleBusy = dialogState.busy,
+            scheduleActionError = dialogState.actionError,
+            startedSessionId = dialogState.startedSessionId,
+            journalSessionId = dialogState.journalSessionId
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -190,20 +309,28 @@ class DashboardViewModel(
     }
 
     fun selectDay(date: LocalDate) {
-        if (!MonthGridCalculator.canOpenDay(date, dateProvider.today())) {
-            return
-        }
         selectedDay.value = date
         showDayDeleteConfirm.value = false
+        schedulePickerOpen.value = false
+        rescheduleTarget.value = null
+        removeTarget.value = null
+        scheduleActionError.value = null
     }
 
     fun dismissDaySheet() {
         selectedDay.value = null
         showDayDeleteConfirm.value = false
+        schedulePickerOpen.value = false
+        rescheduleTarget.value = null
+        removeTarget.value = null
+        scheduleActionError.value = null
     }
 
     fun recordSelectedDay() {
         val date = selectedDay.value ?: return
+        if (date.isAfter(dateProvider.today())) {
+            return
+        }
         selectedDay.value = null
         showDayDeleteConfirm.value = false
         openEditor(date)
@@ -235,6 +362,9 @@ class DashboardViewModel(
     }
 
     fun openEditor(date: LocalDate = dateProvider.today()) {
+        if (date.isAfter(dateProvider.today())) {
+            return
+        }
         val existing = measurements.value.find { it.date == date }
         editor.value = EditorUiState(
             date = date,
@@ -309,7 +439,225 @@ class DashboardViewModel(
         }
     }
 
+    fun openSchedulePicker() {
+        if (selectedDay.value == null) {
+            return
+        }
+        scheduleActionError.value = null
+        schedulePickerOpen.value = true
+    }
+
+    fun dismissSchedulePicker() {
+        if (scheduleBusy.value) {
+            return
+        }
+        schedulePickerOpen.value = false
+        scheduleActionError.value = null
+    }
+
+    fun scheduleTemplate(templateId: Long) {
+        val date = selectedDay.value ?: return
+        if (scheduleBusy.value) {
+            return
+        }
+        scheduleBusy.value = true
+        viewModelScope.launch {
+            try {
+                when (scheduledWorkoutRepository.schedule(templateId, date)) {
+                    is ScheduleWorkoutResult.Scheduled -> {
+                        schedulePickerOpen.value = false
+                        scheduleActionError.value = null
+                    }
+                    ScheduleWorkoutResult.Duplicate -> {
+                        scheduleActionError.value = UserMessage.ScheduleDuplicate
+                    }
+                    ScheduleWorkoutResult.TemplateArchived -> {
+                        scheduleActionError.value = UserMessage.ScheduleTemplateArchived
+                    }
+                    ScheduleWorkoutResult.TemplateNotFound -> {
+                        scheduleActionError.value = UserMessage.ScheduleTemplateNotFound
+                    }
+                }
+            } finally {
+                scheduleBusy.value = false
+            }
+        }
+    }
+
+    fun openReschedule(item: ScheduledWorkout) {
+        val actions = ScheduledWorkoutUiLogic.actions(item, dateProvider.today())
+        if (!actions.canReschedule) {
+            return
+        }
+        scheduleActionError.value = null
+        rescheduleTarget.value = item
+    }
+
+    fun dismissReschedule() {
+        if (scheduleBusy.value) {
+            return
+        }
+        rescheduleTarget.value = null
+        scheduleActionError.value = null
+    }
+
+    fun confirmReschedule(date: LocalDate) {
+        val target = rescheduleTarget.value ?: return
+        if (scheduleBusy.value) {
+            return
+        }
+        if (!ScheduledWorkoutUiLogic.canSelectRescheduleDate(date, dateProvider.today())) {
+            return
+        }
+        if (date == target.scheduledDate) {
+            rescheduleTarget.value = null
+            return
+        }
+        scheduleBusy.value = true
+        viewModelScope.launch {
+            try {
+                when (scheduledWorkoutRepository.reschedule(target.id, date)) {
+                    RescheduleWorkoutResult.Moved -> {
+                        rescheduleTarget.value = null
+                        scheduleActionError.value = null
+                    }
+                    RescheduleWorkoutResult.Duplicate -> {
+                        scheduleActionError.value = UserMessage.ScheduleDuplicate
+                    }
+                    RescheduleWorkoutResult.LinkedToSession -> {
+                        scheduleActionError.value = UserMessage.ScheduleLinked
+                    }
+                    RescheduleWorkoutResult.NotFound -> {
+                        scheduleActionError.value = UserMessage.ScheduleTemplateNotFound
+                    }
+                }
+            } finally {
+                scheduleBusy.value = false
+            }
+        }
+    }
+
+    fun openRemove(item: ScheduledWorkout) {
+        val actions = ScheduledWorkoutUiLogic.actions(item, dateProvider.today())
+        if (!actions.canUnschedule) {
+            return
+        }
+        removeTarget.value = item
+    }
+
+    fun dismissRemove() {
+        if (scheduleBusy.value) {
+            return
+        }
+        removeTarget.value = null
+    }
+
+    fun confirmRemove() {
+        val target = removeTarget.value ?: return
+        if (scheduleBusy.value) {
+            return
+        }
+        scheduleBusy.value = true
+        viewModelScope.launch {
+            try {
+                when (scheduledWorkoutRepository.unschedule(target.id)) {
+                    UnscheduleWorkoutResult.Removed -> {
+                        removeTarget.value = null
+                        userMessage.value = UserMessage.ScheduleRemoved
+                    }
+                    UnscheduleWorkoutResult.LinkedToSession -> {
+                        removeTarget.value = null
+                        userMessage.value = UserMessage.ScheduleLinked
+                    }
+                    UnscheduleWorkoutResult.NotFound -> {
+                        removeTarget.value = null
+                    }
+                }
+            } finally {
+                scheduleBusy.value = false
+            }
+        }
+    }
+
+    fun startScheduled(id: Long) {
+        val item = uiState.value.daySheet?.scheduledWorkouts?.firstOrNull { it.id == id } ?: return
+        val actions = ScheduledWorkoutUiLogic.actions(item, dateProvider.today())
+        if (!actions.canStart) {
+            return
+        }
+        if (starting.value || scheduleBusy.value) {
+            return
+        }
+        starting.value = true
+        scheduleBusy.value = true
+        viewModelScope.launch {
+            try {
+                when (val result = sessionRepository.start(item.templateId, item.id)) {
+                    is StartWorkoutResult.Started -> {
+                        startedSessionId.value = result.sessionId
+                    }
+                    StartWorkoutResult.AlreadyActive,
+                    StartWorkoutResult.ScheduleAlreadyStarted -> {
+                        userMessage.value = UserMessage.WorkoutAlreadyActive
+                    }
+                    StartWorkoutResult.TemplateArchived -> {
+                        userMessage.value = UserMessage.WorkoutTemplateArchived
+                    }
+                    StartWorkoutResult.TemplateEmpty -> {
+                        userMessage.value = UserMessage.WorkoutTemplateEmpty
+                    }
+                    StartWorkoutResult.TemplateNotFound,
+                    StartWorkoutResult.ScheduleNotFound,
+                    StartWorkoutResult.ScheduleTemplateMismatch -> {
+                        userMessage.value = UserMessage.ScheduleTemplateNotFound
+                    }
+                    is StartWorkoutResult.InvalidBodyWeight -> {
+                        userMessage.value = UserMessage.WorkoutTemplateEmpty
+                    }
+                }
+            } finally {
+                starting.value = false
+                scheduleBusy.value = false
+            }
+        }
+    }
+
+    fun continueScheduled(id: Long) {
+        val item = uiState.value.daySheet?.scheduledWorkouts?.firstOrNull { it.id == id } ?: return
+        val actions = ScheduledWorkoutUiLogic.actions(item, dateProvider.today())
+        if (!actions.canContinue) {
+            return
+        }
+        val sessionId = item.sessionId ?: return
+        startedSessionId.value = sessionId
+    }
+
+    fun openScheduledJournal(id: Long) {
+        val item = uiState.value.daySheet?.scheduledWorkouts?.firstOrNull { it.id == id } ?: return
+        val actions = ScheduledWorkoutUiLogic.actions(item, dateProvider.today())
+        if (!actions.canOpenJournal) {
+            return
+        }
+        val sessionId = item.sessionId ?: return
+        journalSessionId.value = sessionId
+    }
+
+    fun consumeStartedSession() {
+        startedSessionId.value = null
+    }
+
+    fun consumeJournalSession() {
+        journalSessionId.value = null
+    }
+
     fun consumeMessage() {
         userMessage.value = null
     }
 }
+
+private data class Quad<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)

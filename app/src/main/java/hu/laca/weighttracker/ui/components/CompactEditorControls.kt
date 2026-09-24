@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -284,6 +285,14 @@ fun <T> CompactDropdown(
     anchorTestTag: String = "$testTag-anchor"
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val view = LocalView.current
+    val dismissTextInput = {
+        focusManager.clearFocus(force = true)
+        view.clearFocus()
+        keyboardController?.hide()
+    }
     val value = selected?.let(optionLabel) ?: placeholder
     val captionColor = if (isError) {
         MaterialTheme.colorScheme.error
@@ -302,6 +311,7 @@ fun <T> CompactDropdown(
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = AppDimens.minTouch)
                 .clickable(enabled = enabled, role = Role.DropdownList) {
+                    dismissTextInput()
                     expanded = true
                 }
                 .semantics { contentDescription = "$label: $value" }

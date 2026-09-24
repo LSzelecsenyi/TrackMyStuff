@@ -13,28 +13,42 @@ object CalendarDayCopy {
         hasMeasurement: Boolean,
         completedWorkoutCount: Int,
         isToday: Boolean = false,
-        isFuture: Boolean = false
+        isFuture: Boolean = false,
+        plannedWorkoutCount: Int = 0
     ): String {
         val parts = mutableListOf(date.format(longDate))
         if (isToday) {
             parts += "ma"
         }
-        parts += entryState(hasMeasurement, completedWorkoutCount)
+        parts += entryState(hasMeasurement, completedWorkoutCount, plannedWorkoutCount)
         if (isFuture) {
-            parts += "jövőbeli nap, nem rögzíthető"
+            parts += "jövőbeli nap"
         }
         return parts.joinToString(", ")
     }
 
-    fun entryState(hasMeasurement: Boolean, completedWorkoutCount: Int): String {
-        return when {
-            hasMeasurement && completedWorkoutCount == 1 -> "testsúlymérés és 1 befejezett edzés"
-            hasMeasurement && completedWorkoutCount > 1 ->
-                "testsúlymérés és $completedWorkoutCount befejezett edzés"
-            hasMeasurement -> "testsúlymérés"
-            completedWorkoutCount == 1 -> "1 befejezett edzés"
-            completedWorkoutCount > 1 -> "$completedWorkoutCount befejezett edzés"
-            else -> "nincs bejegyzés"
+    fun entryState(
+        hasMeasurement: Boolean,
+        completedWorkoutCount: Int,
+        plannedWorkoutCount: Int = 0
+    ): String {
+        val parts = mutableListOf<String>()
+        if (hasMeasurement) {
+            parts += "testsúlymérés"
+        }
+        when {
+            completedWorkoutCount == 1 -> parts += "1 befejezett edzés"
+            completedWorkoutCount > 1 -> parts += "$completedWorkoutCount befejezett edzés"
+        }
+        when {
+            plannedWorkoutCount == 1 -> parts += "1 tervezett edzés"
+            plannedWorkoutCount > 1 -> parts += "$plannedWorkoutCount tervezett edzés"
+        }
+        return when (parts.size) {
+            0 -> "nincs bejegyzés"
+            1 -> parts[0]
+            2 -> "${parts[0]} és ${parts[1]}"
+            else -> parts.dropLast(1).joinToString(", ") + " és " + parts.last()
         }
     }
 }

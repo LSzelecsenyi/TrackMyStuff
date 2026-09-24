@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import hu.laca.weighttracker.MainDispatcherRule
 import hu.laca.weighttracker.data.local.WeightDatabase
 import hu.laca.weighttracker.data.repository.ExerciseRepository
+import hu.laca.weighttracker.data.repository.ScheduledWorkoutRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
@@ -21,6 +22,7 @@ import hu.laca.weighttracker.domain.exercise.WeightInterpretation
 import hu.laca.weighttracker.domain.workout.BodyWeightSource
 import hu.laca.weighttracker.domain.workout.PlannedLoadKind
 import hu.laca.weighttracker.domain.workout.PlannedSetDraft
+import hu.laca.weighttracker.domain.workout.ScheduleWorkoutResult
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
 import hu.laca.weighttracker.domain.workout.TemplateDraft
 import hu.laca.weighttracker.domain.workout.TemplateExerciseDraft
@@ -298,13 +300,84 @@ class WorkoutHubViewModelTest {
         assertEquals(WorkoutPrimaryAction.Resume(state.activeSession!!.session.id), viewModel.onPrimaryWorkoutAction())
     }
 
+    @Test
+    fun givenTodaySchedulesWhenPickerOpensThenTheySitAboveRemainingTemplates() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val push = saveTemplate("Push A", exerciseId)
+        saveTemplate("Záró", exerciseId)
+        val scheduleId = (scheduled().schedule(push, today) as ScheduleWorkoutResult.Scheduled).id
+        val viewModel = hubViewModel()
+        viewModel.onPrimaryWorkoutAction()
+        val state = viewModel.uiState.first { it.pickerVisible && it.todayPlanned.size == 1 }
+        assertEquals(listOf(scheduleId), state.todayPlanned.map { it.id })
+        assertEquals(listOf("Push A"), state.todayPlanned.map { it.templateName })
+        assertEquals(listOf("Záró"), state.templates.map { it.template.name })
+        assertTrue(state.todayInProgress.isEmpty())
+    }
+
+    @Test
+    fun givenTodayPlannedWhenStartedFromHubThenScheduledWorkoutIdIsPassed() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val push = saveTemplate("Push A", exerciseId)
+        val scheduleId = (scheduled().schedule(push, today) as ScheduleWorkoutResult.Scheduled).id
+        val viewModel = hubViewModel()
+        val planned = viewModel.uiState.first { it.todayPlanned.size == 1 }.todayPlanned.single()
+        viewModel.onPrimaryWorkoutAction()
+        viewModel.startScheduled(planned)
+        viewModel.startScheduled(planned)
+        val started = viewModel.uiState.first { it.startedSessionId != null }
+        val stored = sessions().getAggregate(started.startedSessionId!!)!!
+        assertEquals(scheduleId, stored.session.scheduledWorkoutId)
+        assertEquals(started.startedSessionId, sessions().observeInProgress().first()?.session?.id)
+    }
+
+    @Test
+    fun givenNoTodaySchedulesWhenPickerOpensThenTodaySectionStaysEmpty() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        saveTemplate("Push A", exerciseId)
+        val viewModel = hubViewModel()
+        viewModel.onPrimaryWorkoutAction()
+        val state = viewModel.uiState.first { it.pickerVisible }
+        assertTrue(state.todayPlanned.isEmpty())
+        assertTrue(state.todayInProgress.isEmpty())
+        assertEquals(listOf("Push A"), state.templates.map { it.template.name })
+    }
+
+    @Test
+    fun givenTodayInProgressWhenContinuedThenActiveRouteIdIsEmitted() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val push = saveTemplate("Push A", exerciseId)
+        val scheduleId = (scheduled().schedule(push, today) as ScheduleWorkoutResult.Scheduled).id
+        val started = sessions().start(push, scheduleId) as StartWorkoutResult.Started
+        val viewModel = hubViewModel()
+        val inProgress = viewModel.uiState.first { it.todayInProgress.size == 1 }.todayInProgress.single()
+        viewModel.continueScheduled(inProgress)
+        assertEquals(started.sessionId, viewModel.uiState.first { it.startedSessionId != null }.startedSessionId)
+    }
+
     private fun hubViewModel(
         sessionRepository: WorkoutSessionRepository = sessions()
     ): WorkoutHubViewModel {
         return WorkoutHubViewModel(
             repository,
             templates,
-            sessionRepository
+            sessionRepository,
+            ScheduledWorkoutRepository(
+                database.scheduledWorkoutDao(),
+                database.workoutTemplateDao(),
+                database.workoutSessionDao(),
+                Clock.fixed(today.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+            ),
+            FixedDateProvider(today)
+        )
+    }
+
+    private fun scheduled(): ScheduledWorkoutRepository {
+        return ScheduledWorkoutRepository(
+            database.scheduledWorkoutDao(),
+            database.workoutTemplateDao(),
+            database.workoutSessionDao(),
+            Clock.fixed(today.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
         )
     }
 

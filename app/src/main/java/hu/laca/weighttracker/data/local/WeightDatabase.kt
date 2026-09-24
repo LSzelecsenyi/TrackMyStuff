@@ -13,18 +13,20 @@ import androidx.room.RoomDatabase
         WorkoutTemplateEntity::class,
         WorkoutTemplateExerciseEntity::class,
         WorkoutTemplateSetEntity::class,
+        ScheduledWorkoutEntity::class,
         WorkoutSessionEntity::class,
         WorkoutSessionExerciseEntity::class,
         WorkoutSessionExerciseMuscleEntity::class,
         WorkoutSessionSetEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
     abstract fun weightMeasurementDao(): WeightMeasurementDao
     abstract fun exerciseDao(): ExerciseDao
     abstract fun workoutTemplateDao(): WorkoutTemplateDao
+    abstract fun scheduledWorkoutDao(): ScheduledWorkoutDao
     abstract fun workoutSessionDao(): WorkoutSessionDao
 
     companion object {
@@ -34,7 +36,13 @@ abstract class WeightDatabase : RoomDatabase() {
                 WeightDatabase::class.java,
                 "weight_tracker.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6
+                )
                 .build()
         }
     }

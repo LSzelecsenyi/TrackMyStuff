@@ -4,10 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.data.repository.ExerciseRepository
+import hu.laca.weighttracker.data.repository.ScheduledWorkoutRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
+import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import hu.laca.weighttracker.domain.workout.ActiveSessionSummary
+import hu.laca.weighttracker.domain.workout.QuickStartAssembler
+import hu.laca.weighttracker.domain.workout.ScheduledWorkout
 import hu.laca.weighttracker.domain.workout.StartWorkoutResult
 import hu.laca.weighttracker.domain.workout.TemplateListItem
 import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
@@ -25,6 +29,8 @@ data class WorkoutHubUiState(
     val activeTemplateCount: Int = 0,
     val archivedTemplateCount: Int = 0,
     val templates: List<TemplateListItem> = emptyList(),
+    val todayPlanned: List<ScheduledWorkout> = emptyList(),
+    val todayInProgress: List<ScheduledWorkout> = emptyList(),
     val activeSession: ActiveSessionSummary? = null,
     val isStarting: Boolean = false,
     val message: WorkoutHubMessage? = null,
@@ -58,7 +64,9 @@ sealed interface WorkoutPrimaryAction {
 class WorkoutHubViewModel(
     exerciseRepository: ExerciseRepository,
     templateRepository: WorkoutTemplateRepository,
-    private val sessionRepository: WorkoutSessionRepository
+    private val sessionRepository: WorkoutSessionRepository,
+    scheduledWorkoutRepository: ScheduledWorkoutRepository,
+    dateProvider: DateProvider
 ) : ViewModel() {
     private val starting = MutableStateFlow(false)
     private val preparingStart = MutableStateFlow(false)
@@ -95,19 +103,31 @@ class WorkoutHubViewModel(
             currentMessage, started, isStarting, pickerVisible ->
             StartExtras(currentMessage, started, isStarting, pickerVisible)
         },
-        sessionRepository.observeLatestCompleted()
-    ) { counts, templates, active, extras, recent ->
+        combine(
+            sessionRepository.observeLatestCompleted(),
+            scheduledWorkoutRepository.observeOnDate(dateProvider.today())
+        ) { recent, todaySchedules ->
+            recent to todaySchedules
+        }
+    ) { counts, templates, active, extras, recentAndToday ->
+        val (recent, todaySchedules) = recentAndToday
+        val assembled = QuickStartAssembler.assemble(
+            templates = LocalizedLabelOrder.sorted(
+                templates,
+                label = { it.template.name },
+                key = { it.template.id.toString() }
+            ),
+            todaySchedules = todaySchedules
+        )
         WorkoutHubUiState(
             loading = false,
             activeCount = counts.exercises,
             archivedCount = counts.archivedExercises,
             activeTemplateCount = counts.templates,
             archivedTemplateCount = counts.archivedTemplates,
-            templates = LocalizedLabelOrder.sorted(
-                templates,
-                label = { it.template.name },
-                key = { it.template.id.toString() }
-            ),
+            templates = assembled.remainingTemplates,
+            todayPlanned = assembled.todayPlanned,
+            todayInProgress = assembled.todayInProgress,
             activeSession = active,
             isStarting = extras.isStarting,
             message = extras.currentMessage,
@@ -150,10 +170,32 @@ class WorkoutHubViewModel(
         if (!pickerOpen.value) {
             return
         }
-        requestStart(item)
+        requestStart(item.template.id, scheduledWorkoutId = null)
+    }
+
+    fun startScheduled(item: ScheduledWorkout) {
+        if (uiState.value.activeSession != null) {
+            pickerOpen.value = false
+            message.value = WorkoutHubMessage.AlreadyActive
+            return
+        }
+        if (!pickerOpen.value) {
+            return
+        }
+        requestStart(item.templateId, scheduledWorkoutId = item.id)
+    }
+
+    fun continueScheduled(item: ScheduledWorkout) {
+        val sessionId = item.sessionId ?: return
+        pickerOpen.value = false
+        startedSessionId.value = sessionId
     }
 
     fun requestStart(item: TemplateListItem) {
+        requestStart(item.template.id, scheduledWorkoutId = null)
+    }
+
+    private fun requestStart(templateId: Long, scheduledWorkoutId: Long?) {
         if (uiState.value.activeSession != null) {
             pickerOpen.value = false
             message.value = WorkoutHubMessage.AlreadyActive
@@ -171,7 +213,7 @@ class WorkoutHubViewModel(
                     message.value = WorkoutHubMessage.AlreadyActive
                     return@launch
                 }
-                when (val result = sessionRepository.start(item.template.id)) {
+                when (val result = sessionRepository.start(templateId, scheduledWorkoutId)) {
                     is StartWorkoutResult.Started -> {
                         pickerOpen.value = false
                         startedSessionId.value = result.sessionId
@@ -183,6 +225,14 @@ class WorkoutHubViewModel(
                     StartWorkoutResult.TemplateArchived -> message.value = WorkoutHubMessage.TemplateArchived
                     StartWorkoutResult.TemplateEmpty -> message.value = WorkoutHubMessage.TemplateEmpty
                     StartWorkoutResult.TemplateNotFound -> message.value = WorkoutHubMessage.TemplateNotFound
+                    StartWorkoutResult.ScheduleNotFound,
+                    StartWorkoutResult.ScheduleTemplateMismatch -> {
+                        message.value = WorkoutHubMessage.TemplateNotFound
+                    }
+                    StartWorkoutResult.ScheduleAlreadyStarted -> {
+                        pickerOpen.value = false
+                        message.value = WorkoutHubMessage.AlreadyActive
+                    }
                     is StartWorkoutResult.InvalidBodyWeight -> {
                         message.value = WorkoutHubMessage.TemplateEmpty
                     }

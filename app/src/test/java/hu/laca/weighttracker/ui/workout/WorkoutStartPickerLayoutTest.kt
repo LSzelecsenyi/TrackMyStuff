@@ -17,6 +17,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hu.laca.weighttracker.domain.workout.ScheduledWorkout
+import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.TemplateListItem
 import hu.laca.weighttracker.domain.workout.TemplateMuscleSummary
 import hu.laca.weighttracker.domain.workout.WorkoutTemplate
@@ -45,7 +47,7 @@ class WorkoutStartPickerLayoutTest {
             )
         )
         composeRule.onNodeWithTag(START_PICKER_SHEET).assertIsDisplayed()
-        composeRule.onNodeWithText("Edzés indítása").assertIsDisplayed()
+        composeRule.onNodeWithTag(START_PICKER_TITLE).assertIsDisplayed()
         val alma = composeRule.onNodeWithTag(startPickerRowTag(2)).getBoundsInRoot()
         val allo = composeRule.onNodeWithTag(startPickerRowTag(1)).getBoundsInRoot()
         val zaro = composeRule.onNodeWithTag(startPickerRowTag(3)).getBoundsInRoot()
@@ -111,6 +113,36 @@ class WorkoutStartPickerLayoutTest {
     }
 
     @Test
+    fun givenTodaySchedulesWhenPickerOpensThenTheySitAboveTemplatesWithoutDuplication() {
+        render(
+            templates = listOf(templateItem(3, "Záró", 1, 2)),
+            todayPlanned = listOf(scheduled(10, "Push A")),
+            todayInProgress = listOf(scheduled(11, "Pull A", inProgress = true))
+        )
+        composeRule.onNodeWithTag(START_PICKER_TODAY_SECTION).assertIsDisplayed()
+        composeRule.onNodeWithText("MÁRA TERVEZVE").assertIsDisplayed()
+        val planned = composeRule.onNodeWithTag(startPickerScheduledRowTag(10)).getBoundsInRoot()
+        val inProgress = composeRule.onNodeWithTag(startPickerScheduledRowTag(11)).getBoundsInRoot()
+        val remaining = composeRule.onNodeWithTag(startPickerRowTag(3)).getBoundsInRoot()
+        assertTrue(planned.top < inProgress.top)
+        assertTrue(inProgress.top < remaining.top)
+        composeRule.onNodeWithTag(startPickerScheduledRowTag(10)).assertIsDisplayed()
+        composeRule.onNodeWithText("Folyamatban").assertIsDisplayed()
+        composeRule.onNodeWithText("Folytatás").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Push A").assertCountEquals(1)
+        composeRule.onAllNodesWithTag(START_PICKER_TODAY_SECTION).assertCountEquals(1)
+        assertTrue(planned.bottom - planned.top >= 48.dp)
+    }
+
+    @Test
+    fun givenNoTodaySchedulesWhenPickerOpensThenTodayHeaderIsAbsent() {
+        render(templates = listOf(templateItem(4, "Push – Kondipark", 3, 8)))
+        composeRule.onAllNodesWithTag(START_PICKER_TODAY_SECTION).assertCountEquals(0)
+        composeRule.onAllNodesWithText("MÁRA TERVEZVE").assertCountEquals(0)
+        composeRule.onNodeWithTag(startPickerRowTag(4)).assertIsDisplayed()
+    }
+
+    @Test
     fun givenFontScale13WhenPickerAppearsThenRowsStay48DpWithoutOverflow() {
         render(
             templates = listOf(templateItem(9, "Nagyon hosszú edzéstervnév keskeny telefonra", 2, 4)),
@@ -129,7 +161,9 @@ class WorkoutStartPickerLayoutTest {
         fontScale: Float = 1f,
         onManage: () -> Unit = {},
         onCreate: () -> Unit = {},
-        onSelect: (TemplateListItem) -> Unit = {}
+        onSelect: (TemplateListItem) -> Unit = {},
+        todayPlanned: List<ScheduledWorkout> = emptyList(),
+        todayInProgress: List<ScheduledWorkout> = emptyList()
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -144,7 +178,9 @@ class WorkoutStartPickerLayoutTest {
                             onDismiss = {},
                             onSelectTemplate = onSelect,
                             onManageTemplates = onManage,
-                            onCreateTemplate = onCreate
+                            onCreateTemplate = onCreate,
+                            todayPlanned = todayPlanned,
+                            todayInProgress = todayInProgress
                         )
                     }
                 }
@@ -173,6 +209,25 @@ class WorkoutStartPickerLayoutTest {
             setCount = sets,
             primaryMuscles = emptyList(),
             muscleSummary = TemplateMuscleSummary(emptyList(), emptyList())
+        )
+    }
+
+    private fun scheduled(
+        id: Long,
+        name: String,
+        inProgress: Boolean = false
+    ): ScheduledWorkout {
+        return ScheduledWorkout(
+            id = id,
+            scheduledDate = java.time.LocalDate.of(2026, 9, 15),
+            templateId = id,
+            templateName = name,
+            exerciseCount = 2,
+            plannedSetCount = 6,
+            templateArchived = false,
+            sessionId = if (inProgress) id + 100 else null,
+            sessionStatus = if (inProgress) SessionStatus.IN_PROGRESS else null,
+            createdAt = id
         )
     }
 }

@@ -1,6 +1,7 @@
 package hu.laca.weighttracker.domain
 
 import hu.laca.weighttracker.domain.model.WeightMeasurement
+import hu.laca.weighttracker.domain.workout.ScheduledWorkout
 import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.WorkoutSessionSummary
 import java.time.LocalDate
@@ -9,10 +10,13 @@ data class DaySheetState(
     val date: LocalDate,
     val measurement: WeightMeasurement?,
     val differenceFromPreviousKg: Double?,
-    val workouts: List<WorkoutSessionSummary> = emptyList()
+    val workouts: List<WorkoutSessionSummary> = emptyList(),
+    val scheduledWorkouts: List<ScheduledWorkout> = emptyList(),
+    val canRecordWeight: Boolean = true
 ) {
     val hasMeasurement: Boolean get() = measurement != null
     val hasWorkouts: Boolean get() = workouts.isNotEmpty()
+    val hasScheduledWorkouts: Boolean get() = scheduledWorkouts.isNotEmpty()
 }
 
 object DaySheetFactory {
@@ -20,9 +24,9 @@ object DaySheetFactory {
         date: LocalDate,
         measurements: List<WeightMeasurement>,
         today: LocalDate,
-        workouts: List<WorkoutSessionSummary> = emptyList()
-    ): DaySheetState? {
-        if (date.isAfter(today)) return null
+        workouts: List<WorkoutSessionSummary> = emptyList(),
+        scheduledWorkouts: List<ScheduledWorkout> = emptyList()
+    ): DaySheetState {
         val chronological = measurements.sortedWith(compareBy({ it.date }, { it.id }))
         val current = chronological.lastOrNull { it.date == date }
         val previous = chronological.lastOrNull { it.date.isBefore(date) }
@@ -39,7 +43,9 @@ object DaySheetFactory {
                 .sortedWith(
                     compareByDescending<WorkoutSessionSummary> { it.session.startedAt }
                         .thenByDescending { it.session.id }
-                )
+                ),
+            scheduledWorkouts = scheduledWorkouts,
+            canRecordWeight = !date.isAfter(today)
         )
     }
 }

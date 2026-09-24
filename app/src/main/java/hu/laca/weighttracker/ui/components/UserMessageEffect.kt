@@ -5,23 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalResources
 
-@Composable
-fun UserMessageEffect(
-    message: UserMessage?,
-    snackbarHostState: SnackbarHostState,
-    onConsumed: () -> Unit
-) {
-    val resources = LocalResources.current
-    LaunchedEffect(message) {
-        if (message != null) {
-            val text = resources.getString(message.toStringRes(), *message.args())
-            snackbarHostState.showSnackbar(text)
-            onConsumed()
-        }
-    }
-}
-
-private fun UserMessage.toStringRes(): Int {
+fun UserMessage.stringRes(): Int {
     return when (this) {
         UserMessage.Created -> hu.laca.weighttracker.R.string.message_created
         UserMessage.Updated -> hu.laca.weighttracker.R.string.message_updated
@@ -33,6 +17,30 @@ private fun UserMessage.toStringRes(): Int {
         UserMessage.ExportFailed -> hu.laca.weighttracker.R.string.message_export_failed
         UserMessage.ImportReadFailed -> hu.laca.weighttracker.R.string.message_import_read_failed
         UserMessage.PaletteSaved -> hu.laca.weighttracker.R.string.message_palette_saved
+        UserMessage.ScheduleRemoved -> hu.laca.weighttracker.R.string.message_schedule_removed
+        UserMessage.ScheduleDuplicate -> hu.laca.weighttracker.R.string.message_schedule_duplicate
+        UserMessage.ScheduleLinked -> hu.laca.weighttracker.R.string.message_schedule_linked
+        UserMessage.ScheduleTemplateArchived -> hu.laca.weighttracker.R.string.message_schedule_template_archived
+        UserMessage.ScheduleTemplateNotFound -> hu.laca.weighttracker.R.string.message_schedule_template_not_found
+        UserMessage.WorkoutAlreadyActive -> hu.laca.weighttracker.R.string.message_workout_already_active
+        UserMessage.WorkoutTemplateEmpty -> hu.laca.weighttracker.R.string.message_workout_template_empty
+        UserMessage.WorkoutTemplateArchived -> hu.laca.weighttracker.R.string.message_workout_template_archived
+    }
+}
+
+@Composable
+fun UserMessageEffect(
+    message: UserMessage?,
+    snackbarHostState: SnackbarHostState,
+    onConsumed: () -> Unit
+) {
+    val resources = LocalResources.current
+    LaunchedEffect(message) {
+        if (message != null) {
+            val text = resources.getString(message.stringRes(), *message.args())
+            snackbarHostState.showSnackbar(text)
+            onConsumed()
+        }
     }
 }
 

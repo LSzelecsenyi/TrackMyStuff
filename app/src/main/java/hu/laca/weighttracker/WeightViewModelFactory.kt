@@ -7,6 +7,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import hu.laca.weighttracker.data.preferences.ThemePreferences
 import hu.laca.weighttracker.data.repository.ExerciseRepository
+import hu.laca.weighttracker.data.repository.ScheduledWorkoutRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
@@ -32,6 +33,7 @@ class WeightViewModelFactory(
     private val exerciseRepository: ExerciseRepository,
     private val workoutTemplateRepository: WorkoutTemplateRepository,
     private val workoutSessionRepository: WorkoutSessionRepository,
+    private val scheduledWorkoutRepository: ScheduledWorkoutRepository,
     private val dateProvider: DateProvider,
     private val themePreferences: ThemePreferences,
     private val workoutImportFileReader: WorkoutImportFileReader
@@ -40,7 +42,13 @@ class WeightViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
         return when {
             modelClass.isAssignableFrom(DashboardViewModel::class.java) -> {
-                DashboardViewModel(weightRepository, workoutSessionRepository, dateProvider)
+                DashboardViewModel(
+                    weightRepository,
+                    workoutSessionRepository,
+                    dateProvider,
+                    scheduledWorkoutRepository,
+                    workoutTemplateRepository
+                )
             }
             modelClass.isAssignableFrom(WeightDetailsViewModel::class.java) -> {
                 WeightDetailsViewModel(weightRepository, dateProvider)
@@ -57,7 +65,9 @@ class WeightViewModelFactory(
                 WorkoutHubViewModel(
                     exerciseRepository,
                     workoutTemplateRepository,
-                    workoutSessionRepository
+                    workoutSessionRepository,
+                    scheduledWorkoutRepository,
+                    dateProvider
                 )
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {

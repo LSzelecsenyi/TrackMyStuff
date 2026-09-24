@@ -185,8 +185,38 @@ fun WeightTrackerNavHost(
                             launchSingleTop = true
                         }
                     },
-                    onOpenWeightDetails = { navController.navigateInternal(AppRoutes.WEIGHT_DETAILS) }
+                    onOpenWeightDetails = { navController.navigateInternal(AppRoutes.WEIGHT_DETAILS) },
+                    onOpenSchedulePicker = viewModel::openSchedulePicker,
+                    onDismissSchedulePicker = viewModel::dismissSchedulePicker,
+                    onScheduleTemplate = viewModel::scheduleTemplate,
+                    onOpenReschedule = viewModel::openReschedule,
+                    onDismissReschedule = viewModel::dismissReschedule,
+                    onConfirmReschedule = viewModel::confirmReschedule,
+                    onOpenRemove = viewModel::openRemove,
+                    onDismissRemove = viewModel::dismissRemove,
+                    onConfirmRemove = viewModel::confirmRemove,
+                    onStartScheduled = viewModel::startScheduled,
+                    onContinueScheduled = viewModel::continueScheduled,
+                    onOpenScheduledJournal = viewModel::openScheduledJournal,
+                    onCreateTemplateFromSchedule = {
+                        viewModel.dismissSchedulePicker()
+                        navController.navigateInternal(templateEditorRoute(null))
+                    }
                 )
+                LaunchedEffect(state.startedSessionId) {
+                    val sessionId = state.startedSessionId ?: return@LaunchedEffect
+                    viewModel.consumeStartedSession()
+                    viewModel.dismissDaySheet()
+                    navController.openActiveWorkout(sessionId)
+                }
+                LaunchedEffect(state.journalSessionId) {
+                    val sessionId = state.journalSessionId ?: return@LaunchedEffect
+                    viewModel.consumeJournalSession()
+                    viewModel.dismissDaySheet()
+                    navController.navigate(workoutDetailRoute(sessionId)) {
+                        launchSingleTop = true
+                    }
+                }
             }
             composable(AppRoutes.JOURNAL) { entry ->
                 val viewModel: HistoryViewModel = viewModel(factory = factory)
@@ -571,7 +601,11 @@ fun WeightTrackerNavHost(
             onCreateTemplate = {
                 workoutHubViewModel.dismissPicker()
                 navController.navigateInternal(templateEditorRoute(null))
-            }
+            },
+            todayPlanned = hubState.todayPlanned,
+            todayInProgress = hubState.todayInProgress,
+            onStartScheduled = workoutHubViewModel::startScheduled,
+            onContinueScheduled = workoutHubViewModel::continueScheduled
         )
     }
 }

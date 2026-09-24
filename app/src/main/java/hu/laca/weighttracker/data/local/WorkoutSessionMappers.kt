@@ -28,7 +28,8 @@ fun WorkoutSessionEntity.toModel(): WorkoutSession {
         bodyWeightSourceDate = bodyWeightSourceDate?.let(LocalDate::parse),
         createdAt = createdAt,
         updatedAt = updatedAt,
-        importFingerprint = importFingerprint
+        importFingerprint = importFingerprint,
+        scheduledWorkoutId = scheduledWorkoutId
     )
 }
 

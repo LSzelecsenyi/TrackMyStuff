@@ -45,6 +45,27 @@ class CalendarDayCopyTest {
     }
 
     @Test
+    fun plannedWorkoutDescription() {
+        assertEquals("1 tervezett edzés", CalendarDayCopy.entryState(false, 0, 1))
+        assertEquals(
+            "testsúlymérés, 1 befejezett edzés és 1 tervezett edzés",
+            CalendarDayCopy.entryState(true, 1, 1)
+        )
+    }
+
+    @Test
+    fun futureDayStaysSelectableInCopy() {
+        val text = CalendarDayCopy.description(
+            date,
+            hasMeasurement = false,
+            completedWorkoutCount = 0,
+            isFuture = true
+        )
+        assertTrue(text.contains("jövőbeli nap"))
+        assertFalse(text.contains("nem rögzíthető"))
+    }
+
+    @Test
     fun abandonedDoesNotCreateCompletedMarker() {
         val grid = MonthGridCalculator.grid(
             month = YearMonth.of(2026, 9),

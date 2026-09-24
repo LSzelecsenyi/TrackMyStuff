@@ -1,6 +1,7 @@
 package hu.laca.weighttracker.data.repository
 
 import android.database.sqlite.SQLiteConstraintException
+import hu.laca.weighttracker.data.local.InsertStartedSessionResult
 import hu.laca.weighttracker.data.local.WorkoutSessionDao
 import hu.laca.weighttracker.data.local.WorkoutSessionEntity
 import hu.laca.weighttracker.data.local.WorkoutSessionExerciseEntity
@@ -280,13 +281,26 @@ class WorkoutSessionRepository(
         return BodyWeightSnapshotLogic.propose(workoutDate, sameDay, previous)
     }
 
-    suspend fun start(templateId: Long): StartWorkoutResult = mutex.withLock {
+    suspend fun start(
+        templateId: Long,
+        scheduledWorkoutId: Long? = null
+    ): StartWorkoutResult = mutex.withLock {
         if (sessionDao.getInProgress() != null) {
             return StartWorkoutResult.AlreadyActive
         }
         val template = templateDao.getById(templateId) ?: return StartWorkoutResult.TemplateNotFound
         if (template.archived) {
             return StartWorkoutResult.TemplateArchived
+        }
+        if (scheduledWorkoutId != null) {
+            val scheduled = sessionDao.getScheduledWorkout(scheduledWorkoutId)
+                ?: return StartWorkoutResult.ScheduleNotFound
+            if (scheduled.templateId != templateId) {
+                return StartWorkoutResult.ScheduleTemplateMismatch
+            }
+            if (sessionDao.getSessionIdByScheduledWorkoutId(scheduledWorkoutId) != null) {
+                return StartWorkoutResult.ScheduleAlreadyStarted
+            }
         }
         val relations = templateDao.getExercises(templateId)
         if (relations.isEmpty() || relations.all { templateDao.getSets(it.id).isEmpty() }) {
@@ -310,7 +324,8 @@ class WorkoutSessionRepository(
             createdAt = now,
             updatedAt = now,
             activeLock = SessionStatus.IN_PROGRESS.activeLock(),
-            importFingerprint = null
+            importFingerprint = null,
+            scheduledWorkoutId = scheduledWorkoutId
         )
         val children = relations.sortedBy { it.position }.mapNotNull { relation ->
             val exercise = exerciseDao.getById(relation.exerciseId) ?: return@mapNotNull null
@@ -367,11 +382,30 @@ class WorkoutSessionRepository(
             return StartWorkoutResult.TemplateEmpty
         }
         return try {
-            val id = sessionDao.insertAggregate(session, children)
-            StartWorkoutResult.Started(id)
+            when (
+                val inserted = sessionDao.insertStartedSession(
+                    session,
+                    children,
+                    scheduledWorkoutId,
+                    templateId
+                )
+            ) {
+                is InsertStartedSessionResult.Inserted -> StartWorkoutResult.Started(inserted.sessionId)
+                InsertStartedSessionResult.AlreadyActive -> StartWorkoutResult.AlreadyActive
+                InsertStartedSessionResult.TemplateNotFound -> StartWorkoutResult.TemplateNotFound
+                InsertStartedSessionResult.TemplateArchived -> StartWorkoutResult.TemplateArchived
+                InsertStartedSessionResult.ScheduleNotFound -> StartWorkoutResult.ScheduleNotFound
+                InsertStartedSessionResult.ScheduleTemplateMismatch -> StartWorkoutResult.ScheduleTemplateMismatch
+                InsertStartedSessionResult.ScheduleAlreadyStarted -> StartWorkoutResult.ScheduleAlreadyStarted
+            }
         } catch (error: Exception) {
             if (isUniqueConstraint(error)) {
-                StartWorkoutResult.AlreadyActive
+                val message = error.message.orEmpty()
+                if (message.contains("scheduledWorkoutId", ignoreCase = true)) {
+                    StartWorkoutResult.ScheduleAlreadyStarted
+                } else {
+                    StartWorkoutResult.AlreadyActive
+                }
             } else {
                 throw error
             }

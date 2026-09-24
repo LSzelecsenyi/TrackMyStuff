@@ -318,3 +318,102 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         )
     }
 }
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `scheduled_workouts` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `scheduledDate` TEXT NOT NULL,
+                `templateId` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                FOREIGN KEY(`templateId`) REFERENCES `workout_templates`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_scheduled_workouts_scheduledDate_templateId` ON `scheduled_workouts` (`scheduledDate`, `templateId`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_scheduled_workouts_scheduledDate` ON `scheduled_workouts` (`scheduledDate`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_scheduled_workouts_templateId` ON `scheduled_workouts` (`templateId`)"
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `workout_sessions_new` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `templateId` INTEGER,
+                `templateName` TEXT NOT NULL,
+                `status` TEXT NOT NULL,
+                `workoutDate` TEXT NOT NULL,
+                `startedAt` INTEGER NOT NULL,
+                `finishedAt` INTEGER,
+                `abandonedAt` INTEGER,
+                `notes` TEXT,
+                `bodyWeightKg` REAL,
+                `bodyWeightSource` TEXT NOT NULL,
+                `bodyWeightSourceDate` TEXT,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                `activeLock` INTEGER,
+                `importFingerprint` TEXT,
+                `scheduledWorkoutId` INTEGER,
+                FOREIGN KEY(`templateId`) REFERENCES `workout_templates`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT,
+                FOREIGN KEY(`scheduledWorkoutId`) REFERENCES `scheduled_workouts`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO `workout_sessions_new` (
+                `id`, `templateId`, `templateName`, `status`, `workoutDate`, `startedAt`, `finishedAt`,
+                `abandonedAt`, `notes`, `bodyWeightKg`, `bodyWeightSource`, `bodyWeightSourceDate`,
+                `createdAt`, `updatedAt`, `activeLock`, `importFingerprint`, `scheduledWorkoutId`
+            )
+            SELECT
+                `id`, `templateId`, `templateName`, `status`, `workoutDate`, `startedAt`, `finishedAt`,
+                `abandonedAt`, `notes`, `bodyWeightKg`, `bodyWeightSource`, `bodyWeightSourceDate`,
+                `createdAt`, `updatedAt`, `activeLock`, `importFingerprint`, NULL
+            FROM `workout_sessions`
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE `workout_sessions`")
+        db.execSQL("ALTER TABLE `workout_sessions_new` RENAME TO `workout_sessions`")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_workout_sessions_activeLock` ON `workout_sessions` (`activeLock`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_workout_sessions_status` ON `workout_sessions` (`status`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_workout_sessions_templateId` ON `workout_sessions` (`templateId`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_workout_sessions_workoutDate` ON `workout_sessions` (`workoutDate`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_workout_sessions_importFingerprint` ON `workout_sessions` (`importFingerprint`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_workout_sessions_scheduledWorkoutId` ON `workout_sessions` (`scheduledWorkoutId`)"
+        )
+        db.execSQL(
+            """
+            UPDATE sqlite_sequence
+            SET seq = (SELECT IFNULL(MAX(id), 0) FROM `workout_sessions`)
+            WHERE name = 'workout_sessions'
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO sqlite_sequence(name, seq)
+            SELECT 'workout_sessions', IFNULL(MAX(id), 0) FROM `workout_sessions`
+            WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'workout_sessions')
+              AND EXISTS (SELECT 1 FROM `workout_sessions`)
+            """.trimIndent()
+        )
+    }
+}

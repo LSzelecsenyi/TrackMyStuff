@@ -4,6 +4,7 @@ import android.content.Context
 import hu.laca.weighttracker.data.local.WeightDatabase
 import hu.laca.weighttracker.data.preferences.ThemePreferences
 import hu.laca.weighttracker.data.repository.ExerciseRepository
+import hu.laca.weighttracker.data.repository.ScheduledWorkoutRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
@@ -31,7 +32,14 @@ class AppContainer(context: Context) {
         templateDao = database.workoutTemplateDao(),
         exerciseDao = database.exerciseDao(),
         clock = clock,
-        sessionDao = database.workoutSessionDao()
+        sessionDao = database.workoutSessionDao(),
+        scheduledWorkoutDao = database.scheduledWorkoutDao()
+    )
+    val scheduledWorkoutRepository = ScheduledWorkoutRepository(
+        scheduledWorkoutDao = database.scheduledWorkoutDao(),
+        templateDao = database.workoutTemplateDao(),
+        sessionDao = database.workoutSessionDao(),
+        clock = clock
     )
     val workoutSessionRepository = WorkoutSessionRepository(
         sessionDao = database.workoutSessionDao(),
@@ -47,6 +55,7 @@ class AppContainer(context: Context) {
         exerciseRepository = exerciseRepository,
         workoutTemplateRepository = workoutTemplateRepository,
         workoutSessionRepository = workoutSessionRepository,
+        scheduledWorkoutRepository = scheduledWorkoutRepository,
         dateProvider = dateProvider,
         themePreferences = themePreferences,
         workoutImportFileReader = ContentWorkoutImportFileReader(appContext)

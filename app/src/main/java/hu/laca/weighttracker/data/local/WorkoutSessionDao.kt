@@ -153,6 +153,15 @@ abstract class WorkoutSessionDao {
     @Query("SELECT DISTINCT exerciseId FROM workout_session_exercises")
     abstract fun observeReferencedExerciseIds(): Flow<List<Long>>
 
+    @Query("SELECT * FROM scheduled_workouts WHERE id = :id LIMIT 1")
+    abstract suspend fun getScheduledWorkout(id: Long): ScheduledWorkoutEntity?
+
+    @Query("SELECT id FROM workout_sessions WHERE scheduledWorkoutId = :scheduledWorkoutId LIMIT 1")
+    abstract suspend fun getSessionIdByScheduledWorkoutId(scheduledWorkoutId: Long): Long?
+
+    @Query("SELECT * FROM workout_templates WHERE id = :id LIMIT 1")
+    abstract suspend fun getTemplate(id: Long): WorkoutTemplateEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertSession(entity: WorkoutSessionEntity): Long
 
@@ -211,4 +220,45 @@ abstract class WorkoutSessionDao {
     ): List<Long> {
         return sessions.map { (session, exercises) -> insertAggregate(session, exercises) }
     }
+
+    @Transaction
+    open suspend fun insertStartedSession(
+        session: WorkoutSessionEntity,
+        exercises: List<Triple<WorkoutSessionExerciseEntity, List<WorkoutSessionExerciseMuscleEntity>, List<WorkoutSessionSetEntity>>>,
+        scheduledWorkoutId: Long?,
+        expectedTemplateId: Long
+    ): InsertStartedSessionResult {
+        if (getInProgress() != null) {
+            return InsertStartedSessionResult.AlreadyActive
+        }
+        val template = getTemplate(expectedTemplateId) ?: return InsertStartedSessionResult.TemplateNotFound
+        if (template.archived) {
+            return InsertStartedSessionResult.TemplateArchived
+        }
+        if (scheduledWorkoutId != null) {
+            val scheduled = getScheduledWorkout(scheduledWorkoutId)
+                ?: return InsertStartedSessionResult.ScheduleNotFound
+            if (scheduled.templateId != expectedTemplateId) {
+                return InsertStartedSessionResult.ScheduleTemplateMismatch
+            }
+            if (getSessionIdByScheduledWorkoutId(scheduledWorkoutId) != null) {
+                return InsertStartedSessionResult.ScheduleAlreadyStarted
+            }
+        }
+        val sessionId = insertAggregate(
+            session.copy(scheduledWorkoutId = scheduledWorkoutId),
+            exercises
+        )
+        return InsertStartedSessionResult.Inserted(sessionId)
+    }
+}
+
+sealed class InsertStartedSessionResult {
+    data class Inserted(val sessionId: Long) : InsertStartedSessionResult()
+    data object AlreadyActive : InsertStartedSessionResult()
+    data object TemplateNotFound : InsertStartedSessionResult()
+    data object TemplateArchived : InsertStartedSessionResult()
+    data object ScheduleNotFound : InsertStartedSessionResult()
+    data object ScheduleTemplateMismatch : InsertStartedSessionResult()
+    data object ScheduleAlreadyStarted : InsertStartedSessionResult()
 }

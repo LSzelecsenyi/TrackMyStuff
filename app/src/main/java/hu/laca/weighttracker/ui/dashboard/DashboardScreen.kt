@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -56,12 +57,17 @@ import hu.laca.weighttracker.domain.WeeklyOverviewLogic
 import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
 import hu.laca.weighttracker.domain.model.ChartPoint
 import hu.laca.weighttracker.domain.model.WeightMeasurement
+import hu.laca.weighttracker.domain.workout.ScheduledWorkout
 import hu.laca.weighttracker.ui.components.DayDetailsSheet
 import hu.laca.weighttracker.ui.components.DeleteMeasurementDialog
 import hu.laca.weighttracker.ui.components.MeasurementEditorSheet
 import hu.laca.weighttracker.ui.components.MonthCalendar
+import hu.laca.weighttracker.ui.components.RescheduleDateSheet
+import hu.laca.weighttracker.ui.components.ScheduleWorkoutPickerSheet
 import hu.laca.weighttracker.ui.components.UiFormatters
+import hu.laca.weighttracker.ui.components.UnscheduleWorkoutDialog
 import hu.laca.weighttracker.ui.components.UserMessageEffect
+import hu.laca.weighttracker.ui.components.stringRes
 import hu.laca.weighttracker.ui.components.WeightChart
 import hu.laca.weighttracker.ui.components.musclemap.MuscleHeatmapCard
 import hu.laca.weighttracker.ui.theme.AppDimens
@@ -100,9 +106,23 @@ fun DashboardScreen(
     onOpenTemplates: () -> Unit,
     onOpenCatalog: () -> Unit,
     onOpenWorkout: (Long) -> Unit,
-    onOpenWeightDetails: () -> Unit
+    onOpenWeightDetails: () -> Unit,
+    onOpenSchedulePicker: () -> Unit = {},
+    onDismissSchedulePicker: () -> Unit = {},
+    onScheduleTemplate: (Long) -> Unit = {},
+    onOpenReschedule: (ScheduledWorkout) -> Unit = {},
+    onDismissReschedule: () -> Unit = {},
+    onConfirmReschedule: (LocalDate) -> Unit = {},
+    onOpenRemove: (ScheduledWorkout) -> Unit = {},
+    onDismissRemove: () -> Unit = {},
+    onConfirmRemove: () -> Unit = {},
+    onStartScheduled: (Long) -> Unit = {},
+    onContinueScheduled: (Long) -> Unit = {},
+    onOpenScheduledJournal: (Long) -> Unit = {},
+    onCreateTemplateFromSchedule: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val resources = LocalResources.current
     UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -156,11 +176,48 @@ fun DashboardScreen(
     state.daySheet?.let { sheet ->
         DayDetailsSheet(
             state = sheet,
+            today = state.today,
             onRecordWeight = onRecordSelectedDay,
             onEditWeight = onRecordSelectedDay,
             onDeleteWeight = onRequestDayDelete,
             onOpenWorkout = onOpenWorkout,
-            onDismiss = onDismissDaySheet
+            onScheduleWorkout = onOpenSchedulePicker,
+            onStartScheduled = onStartScheduled,
+            onContinueScheduled = onContinueScheduled,
+            onOpenScheduledJournal = onOpenScheduledJournal,
+            onReschedule = onOpenReschedule,
+            onUnschedule = onOpenRemove,
+            onDismiss = onDismissDaySheet,
+            busy = state.scheduleBusy
+        )
+    }
+    if (state.schedulePickerVisible) {
+        state.daySheet?.let { sheet ->
+            ScheduleWorkoutPickerSheet(
+                date = sheet.date,
+                templates = state.availableTemplates,
+                busy = state.scheduleBusy,
+                errorText = state.scheduleActionError?.let { resources.getString(it.stringRes()) },
+                onDismiss = onDismissSchedulePicker,
+                onSelectTemplate = { onScheduleTemplate(it.template.id) },
+                onCreateTemplate = onCreateTemplateFromSchedule
+            )
+        }
+    }
+    state.rescheduleTarget?.let { target ->
+        RescheduleDateSheet(
+            target = target,
+            today = state.today,
+            errorText = state.scheduleActionError?.let { resources.getString(it.stringRes()) },
+            onDismiss = onDismissReschedule,
+            onSelectDate = onConfirmReschedule
+        )
+    }
+    state.removeTarget?.let { target ->
+        UnscheduleWorkoutDialog(
+            item = target,
+            onConfirm = onConfirmRemove,
+            onDismiss = onDismissRemove
         )
     }
     if (state.showDayDeleteConfirm) {

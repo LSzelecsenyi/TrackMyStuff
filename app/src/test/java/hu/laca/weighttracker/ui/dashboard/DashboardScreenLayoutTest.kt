@@ -14,6 +14,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.domain.DashboardSnapshot
 import hu.laca.weighttracker.domain.WeeklyOverview
 import hu.laca.weighttracker.domain.WeeklyOverviewLogic
+import hu.laca.weighttracker.domain.calendar.MonthGrid
 import hu.laca.weighttracker.domain.calendar.MonthGridCalculator
 import hu.laca.weighttracker.domain.model.ChartPoint
 import hu.laca.weighttracker.domain.model.WeightMeasurement
@@ -149,17 +151,18 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun calendarDaySelectionStillWorksAndFutureDaysStayBlocked() {
+    fun calendarDaySelectionStillWorksAndFutureDaysAreSelectable() {
         val selected = AtomicReference<LocalDate?>(null)
         render(onDaySelected = { selected.set(it) })
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
         composeRule.onNode(hasContentDescription("2026. március 11.", substring = true)).performClick()
         assertEquals(today, selected.get())
         selected.set(null)
-        composeRule.onAllNodes(hasContentDescription("jövőbeli nap, nem rögzíthető", substring = true))
+        composeRule.onAllNodes(hasContentDescription("jövőbeli nap", substring = true))
             .onFirst()
             .performClick()
-        assertEquals(null, selected.get())
+        assertEquals(LocalDate.of(2026, 3, 12), selected.get())
+        composeRule.onNodeWithText("Tervezett edzés").assertExists()
     }
 
     @Test
@@ -224,6 +227,30 @@ class DashboardScreenLayoutTest {
         assertEquals(1, templates)
         assertEquals(1, catalog)
         assertEquals(1, settings)
+    }
+
+    @Test
+    fun calendarShowsPlannedAndCompletedMarkersSeparately() {
+        render(
+            monthGrid = MonthGridCalculator.grid(
+                month = YearMonth.from(today),
+                today = today,
+                measuredDates = setOf(today),
+                completedWorkoutCounts = mapOf(today to 1),
+                plannedWorkoutCounts = mapOf(today to 1)
+            )
+        )
+        composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
+        composeRule.onNodeWithTag("calendar-legend-planned").assertExists()
+        composeRule.onNodeWithText("Tervezett edzés").assertExists()
+        composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
+        val todayCell = composeRule.onNode(hasContentDescription("2026. március 11.", substring = true))
+        todayCell.assert(hasContentDescription("1 befejezett edzés", substring = true))
+        todayCell.assert(hasContentDescription("1 tervezett edzés", substring = true))
+        val cellBounds = todayCell.getBoundsInRoot()
+        assertTrue(cellBounds.bottom - cellBounds.top <= 48.dp)
     }
 
     @Test
@@ -310,6 +337,7 @@ class DashboardScreenLayoutTest {
     private fun render(
         fontScale: Float = 1f,
         weeklyOverview: WeeklyOverview = WeeklyOverview(3, 18, 0.4),
+        monthGrid: MonthGrid? = null,
         onDaySelected: (LocalDate) -> Unit = {},
         onOpenWeightDetails: () -> Unit = {},
         onOpenTemplates: () -> Unit = {},
@@ -318,6 +346,7 @@ class DashboardScreenLayoutTest {
     ) {
         val measurement = WeightMeasurement(1, today, 82.4, 0, 0)
         val month = YearMonth.from(today)
+        val grid = monthGrid ?: MonthGridCalculator.grid(month, today, setOf(today))
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -350,7 +379,7 @@ class DashboardScreenLayoutTest {
                                 today = today,
                                 weeklyOverview = weeklyOverview,
                                 displayedMonth = month,
-                                monthGrid = MonthGridCalculator.grid(month, today, setOf(today)),
+                                monthGrid = grid,
                                 heatmap = MuscleHeatmapAssembler.assemble(emptyList(), today)
                             ),
                             onPreviousMonth = {},

@@ -99,6 +99,7 @@ class WorkoutImportPersistenceTest {
         assertEquals(4, result.sessionIds.size)
         val stored = result.sessionIds.map { sessions.getAggregate(it)!! }
         assertTrue(stored.all { it.session.templateId == null })
+        assertTrue(stored.all { it.session.scheduledWorkoutId == null })
         assertTrue(stored.all { it.session.status == SessionStatus.COMPLETED })
         assertTrue(stored.all { it.session.importFingerprint != null })
         assertEquals(4, stored.map { it.session.importFingerprint }.distinct().size)
@@ -315,6 +316,7 @@ class WorkoutImportPersistenceTest {
             (imported as WorkoutImportPersistenceResult.Imported).sessionIds.single()
         )!!
         assertNull(importedSession.session.templateId)
+        assertNull(importedSession.session.scheduledWorkoutId)
         var failed = false
         try {
             database.workoutSessionDao().insertSession(

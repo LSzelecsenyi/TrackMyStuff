@@ -2,6 +2,7 @@ package hu.laca.weighttracker.data.repository
 
 import android.database.sqlite.SQLiteConstraintException
 import hu.laca.weighttracker.data.local.ExerciseDao
+import hu.laca.weighttracker.data.local.ScheduledWorkoutDao
 import hu.laca.weighttracker.data.local.WorkoutSessionDao
 import hu.laca.weighttracker.data.local.WorkoutTemplateDao
 import hu.laca.weighttracker.data.local.WorkoutTemplateEntity
@@ -28,7 +29,8 @@ class WorkoutTemplateRepository(
     private val templateDao: WorkoutTemplateDao,
     private val exerciseDao: ExerciseDao,
     private val clock: Clock,
-    private val sessionDao: WorkoutSessionDao? = null
+    private val sessionDao: WorkoutSessionDao? = null,
+    private val scheduledWorkoutDao: ScheduledWorkoutDao? = null
 ) {
     fun observeActiveCount(): Flow<Int> = templateDao.observeActiveCount()
 
@@ -204,12 +206,17 @@ class WorkoutTemplateRepository(
     }
 
     fun observeReferencedTemplateIds(): Flow<Set<Long>> {
-        val dao = sessionDao ?: return MutableStateFlow(emptySet())
-        return dao.observeReferencedTemplateIds().map { it.toSet() }
+        val sessionIds = sessionDao?.observeReferencedTemplateIds() ?: MutableStateFlow(emptyList())
+        val scheduledIds = scheduledWorkoutDao?.observeTemplateIds() ?: MutableStateFlow(emptyList())
+        return combine(sessionIds, scheduledIds) { sessions, scheduled ->
+            (sessions + scheduled).toSet()
+        }
     }
 
     private suspend fun hasPerformedSessionReferences(templateId: Long): Boolean {
-        return (sessionDao?.countTemplateReferences(templateId) ?: 0) > 0
+        val sessionRefs = sessionDao?.countTemplateReferences(templateId) ?: 0
+        val scheduledRefs = scheduledWorkoutDao?.countByTemplate(templateId) ?: 0
+        return sessionRefs > 0 || scheduledRefs > 0
     }
 
     private suspend fun catalogMap(ids: List<Long>): Map<Long, Exercise> {

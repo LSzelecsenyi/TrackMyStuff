@@ -75,9 +75,9 @@ class MonthGridCalculatorTest {
     }
 
     @Test
-    fun futureDatesCannotBeOpened() {
+    fun futureDatesCanBeOpened() {
         val today = LocalDate.of(2026, 3, 11)
-        assertFalse(MonthGridCalculator.canOpenDay(today.plusDays(1), today))
+        assertTrue(MonthGridCalculator.canOpenDay(today.plusDays(1), today))
         assertTrue(MonthGridCalculator.canOpenDay(today, today))
         assertTrue(MonthGridCalculator.canOpenDay(today.minusDays(1), today))
     }
@@ -126,6 +126,38 @@ class MonthGridCalculatorTest {
         assertTrue(cell.hasCompletedWorkout)
         assertEquals(3, cell.completedWorkoutCount)
     }
+
+    @Test
+    fun plannedAndCompletedMarkersRemainIndependent() {
+        val today = LocalDate.of(2026, 9, 15)
+        val grid = MonthGridCalculator.grid(
+            month = YearMonth.of(2026, 9),
+            today = today,
+            measuredDates = emptySet(),
+            completedWorkoutCounts = mapOf(today to 1),
+            plannedWorkoutCounts = mapOf(today to 2)
+        )
+        val cell = grid.cells.first { it.date == today }
+        assertTrue(cell.hasCompletedWorkout)
+        assertTrue(cell.hasPlannedWorkout)
+        assertEquals(1, cell.completedWorkoutCount)
+        assertEquals(2, cell.plannedWorkoutCount)
+    }
+
+    @Test
+    fun plannedOnlyMarkerDoesNotCreateCompletedDot() {
+        val today = LocalDate.of(2026, 9, 15)
+        val grid = MonthGridCalculator.grid(
+            month = YearMonth.of(2026, 9),
+            today = today,
+            measuredDates = emptySet(),
+            completedWorkoutCounts = emptyMap(),
+            plannedWorkoutCounts = mapOf(today to 1)
+        )
+        val cell = grid.cells.first { it.date == today }
+        assertFalse(cell.hasCompletedWorkout)
+        assertTrue(cell.hasPlannedWorkout)
+    }
 }
 
 class DaySheetFactoryTest {
@@ -138,8 +170,8 @@ class DaySheetFactoryTest {
             measurements = emptyList(),
             today = today
         )
-        assertEquals(today, state?.date)
-        assertFalse(state!!.hasMeasurement)
+        assertEquals(today, state.date)
+        assertFalse(state.hasMeasurement)
         assertNull(state.differenceFromPreviousKg)
     }
 
@@ -154,20 +186,22 @@ class DaySheetFactoryTest {
             measurements = measurements,
             today = today
         )
-        assertTrue(state!!.hasMeasurement)
+        assertTrue(state.hasMeasurement)
         assertEquals(81.4, state.measurement!!.weightKg, 0.0)
         assertEquals(0.4, state.differenceFromPreviousKg!!, 0.0001)
     }
 
     @Test
-    fun futureDateIsRejected() {
-        assertNull(
-            hu.laca.weighttracker.domain.DaySheetFactory.create(
-                date = today.plusDays(1),
-                measurements = listOf(measurement("2026-03-11", 80.0)),
-                today = today
-            )
+    fun futureDateCanBeOpenedWithoutWeightRecording() {
+        val state = hu.laca.weighttracker.domain.DaySheetFactory.create(
+            date = today.plusDays(1),
+            measurements = listOf(measurement("2026-03-11", 80.0)),
+            today = today
         )
+        assertEquals(today.plusDays(1), state.date)
+        assertFalse(state.canRecordWeight)
+        assertFalse(state.hasMeasurement)
+        assertFalse(state.hasScheduledWorkouts)
     }
 
     @Test
@@ -181,10 +215,44 @@ class DaySheetFactoryTest {
             today = today,
             workouts = listOf(workout, abandoned, otherDay)
         )
-        assertTrue(state!!.hasMeasurement)
+        assertTrue(state.hasMeasurement)
         assertEquals(0.4, state.differenceFromPreviousKg!!, 0.0001)
         assertEquals(listOf(1L), state.workouts.map { it.session.id })
         assertTrue(state.hasWorkouts)
+    }
+
+    @Test
+    fun selectedDayIncludesScheduledWorkoutsInGivenOrder() {
+        val first = scheduled(1, today, "Push A")
+        val second = scheduled(2, today, "Pull A")
+        val state = hu.laca.weighttracker.domain.DaySheetFactory.create(
+            date = today,
+            measurements = emptyList(),
+            today = today,
+            scheduledWorkouts = listOf(first, second)
+        )
+        assertEquals(listOf("Push A", "Pull A"), state.scheduledWorkouts.map { it.templateName })
+        assertTrue(state.hasScheduledWorkouts)
+        assertTrue(state.canRecordWeight)
+    }
+
+    private fun scheduled(
+        id: Long,
+        date: LocalDate,
+        name: String
+    ): hu.laca.weighttracker.domain.workout.ScheduledWorkout {
+        return hu.laca.weighttracker.domain.workout.ScheduledWorkout(
+            id = id,
+            scheduledDate = date,
+            templateId = id,
+            templateName = name,
+            exerciseCount = 1,
+            plannedSetCount = 2,
+            templateArchived = false,
+            sessionId = null,
+            sessionStatus = null,
+            createdAt = id
+        )
     }
 
     private fun summary(

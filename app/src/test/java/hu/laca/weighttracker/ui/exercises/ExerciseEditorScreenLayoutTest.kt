@@ -2,14 +2,25 @@ package hu.laca.weighttracker.ui.exercises
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -20,6 +31,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
@@ -27,10 +39,14 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import hu.laca.weighttracker.domain.exercise.ExerciseCategory
 import hu.laca.weighttracker.domain.exercise.ExerciseDraft
+import hu.laca.weighttracker.domain.exercise.ExerciseDraftLogic
 import hu.laca.weighttracker.domain.exercise.ExerciseFieldError
+import hu.laca.weighttracker.domain.exercise.ExerciseNaming
 import hu.laca.weighttracker.domain.exercise.MeasurementType
 import hu.laca.weighttracker.domain.exercise.MovementPattern
 import hu.laca.weighttracker.domain.exercise.MuscleGroup
+import hu.laca.weighttracker.domain.exercise.ResistanceBasis
+import hu.laca.weighttracker.domain.exercise.WeightInterpretation
 import hu.laca.weighttracker.domain.locale.LocalizedLabelOrder
 import hu.laca.weighttracker.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -253,6 +269,189 @@ class ExerciseEditorScreenLayoutTest {
         composeRule.onNodeWithTag(EXERCISE_EDITOR_SAVE).assertIsDisplayed()
     }
 
+    @Test
+    fun givenNameFocusedWhenCategoryDropdownOpensThenNameLosesFocusAndImeCloses() {
+        renderInteractive()
+        focusNameField()
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_CATEGORY).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("$EXERCISE_DROPDOWN_CATEGORY-menu").assertIsDisplayed()
+        assertTextFieldsDoNotHaveInputFocus()
+    }
+
+    @Test
+    fun givenCategorySelectedThenValueUpdatesAndNameDoesNotRegainFocus() {
+        renderInteractive()
+        focusNameField()
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Kardió")
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_CATEGORY)
+            .assert(hasContentDescription("Kategória: Kardió"))
+        assertTextFieldsDoNotHaveInputFocus()
+    }
+
+    @Test
+    fun givenOtherDropdownsSelectedThenNoneRefocusesTheNameField() {
+        renderInteractive()
+        focusNameField()
+        selectDropdown(EXERCISE_DROPDOWN_WEIGHT, "Oldalanként / kézenként")
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_WEIGHT)
+            .assert(hasContentDescription("Súly értelmezése: Oldalanként / kézenként"))
+        assertTextFieldsDoNotHaveInputFocus()
+
+        selectDropdown(EXERCISE_DROPDOWN_PATTERN, "Guggolás")
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PATTERN)
+            .assert(hasContentDescription("Mozgásminta: Guggolás"))
+        assertTextFieldsDoNotHaveInputFocus()
+
+        selectDropdown(EXERCISE_DROPDOWN_MEASUREMENT, "Idő")
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_MEASUREMENT)
+            .assert(hasContentDescription("Mérési mód: Idő"))
+        assertTextFieldsDoNotHaveInputFocus()
+
+        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, "Saját testsúly")
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_RESISTANCE)
+            .assert(hasContentDescription("Terhelés alapja: Saját testsúly"))
+        assertTextFieldsDoNotHaveInputFocus()
+
+        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, "Nyak")
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY)
+            .assert(hasContentDescription("Elsődleges izomcsoport: Nyak"))
+        assertTextFieldsDoNotHaveInputFocus()
+
+        selectDropdown(EXERCISE_DROPDOWN_ADD_SECONDARY, "Bicepsz")
+        composeRule.onNodeWithTag(secondaryChipTag(MuscleGroup.BICEPS)).assertIsDisplayed()
+        assertTextFieldsDoNotHaveInputFocus()
+    }
+
+    @Test
+    fun givenDropdownRevealsConditionalFieldThenNoTextFieldReceivesAutofocus() {
+        renderInteractive(
+            initial = ExerciseEditorUiState(
+                draft = ExerciseDraft(
+                    measurementType = MeasurementType.REPETITIONS_AND_WEIGHT,
+                    resistanceBasis = ResistanceBasis.BODYWEIGHT
+                )
+            )
+        )
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_WEIGHT).assertDoesNotExist()
+        assertTextFieldsDoNotHaveInputFocus()
+        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, "Külső ellenállás")
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_WEIGHT).assertIsDisplayed()
+        assertTextFieldsDoNotHaveInputFocus()
+    }
+
+    @Test
+    fun givenNameTextAndCursorWhenDropdownSelectedThenTextAndCursorStayUnchanged() {
+        renderInteractive()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).performTextInput("abx")
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assert(hasText("Abx"))
+        val cursorBefore = nameSelection()
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Kardió")
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assert(hasText("Abx"))
+        val cursorAfter = nameSelection()
+        if (cursorBefore != null) {
+            assertEquals(cursorBefore, cursorAfter)
+        }
+        assertTextFieldsDoNotHaveInputFocus()
+    }
+
+    @Test
+    fun givenDropdownSelectionThenScrollDoesNotJumpToTheNameField() {
+        renderInteractive(height = 560.dp)
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY).performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsNotDisplayed()
+        val before = composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY).getBoundsInRoot()
+        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, "Nyak")
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsNotDisplayed()
+        val after = composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY).getBoundsInRoot()
+        assertTrue(
+            "primary dropdown should stay in place after selection: before=$before after=$after",
+            kotlin.math.abs(before.top.value - after.top.value) <= 8f
+        )
+        assertTextFieldsDoNotHaveInputFocus()
+    }
+
+    @Test
+    fun givenLaterManualTapOnNameThenFieldIsEditableAndKeyboardCanOpen() {
+        renderInteractive()
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Kardió")
+        assertTextFieldsDoNotHaveInputFocus()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).performClick()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsFocused()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).performTextInput("húzó")
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assert(hasText("Húzó"))
+    }
+
+    @Test
+    fun givenSuccessiveDropdownSelectionsThenImeDoesNotReopenByItself() {
+        renderInteractive()
+        focusNameField()
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Mobilitás / nyújtás")
+        assertTextFieldsDoNotHaveInputFocus()
+        selectDropdown(EXERCISE_DROPDOWN_PATTERN, "Izoláció")
+        assertTextFieldsDoNotHaveInputFocus()
+        selectDropdown(EXERCISE_DROPDOWN_MEASUREMENT, "Ismétlés")
+        assertTextFieldsDoNotHaveInputFocus()
+        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, "Nincs külön terhelés")
+        assertTextFieldsDoNotHaveInputFocus()
+        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, "Nyak")
+        assertTextFieldsDoNotHaveInputFocus()
+        selectDropdown(EXERCISE_DROPDOWN_ADD_SECONDARY, "Alkar")
+        assertTextFieldsDoNotHaveInputFocus()
+    }
+
+    @Test
+    fun givenEditingExistingExerciseThenDropdownsDoNotRefocusTheNameField() {
+        renderInteractive(
+            initial = ExerciseEditorUiState(
+                isEditing = true,
+                draft = ExerciseDraft(
+                    id = 12L,
+                    name = "Tolódzkodás",
+                    category = ExerciseCategory.STRENGTH,
+                    primaryMuscle = MuscleGroup.CHEST
+                )
+            )
+        )
+        composeRule.onNodeWithText("Gyakorlat szerkesztése").assertIsDisplayed()
+        focusNameField()
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Készség / technika")
+        composeRule.onNodeWithTag(EXERCISE_DROPDOWN_CATEGORY)
+            .assert(hasContentDescription("Kategória: Készség / technika"))
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assert(hasText("Tolódzkodás"))
+        assertTextFieldsDoNotHaveInputFocus()
+        selectDropdown(EXERCISE_DROPDOWN_PATTERN, "Függőleges húzás")
+        assertTextFieldsDoNotHaveInputFocus()
+        selectDropdown(EXERCISE_DROPDOWN_WEIGHT, "Oldalanként / kézenként")
+        assertTextFieldsDoNotHaveInputFocus()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).performClick()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsFocused()
+    }
+
+    @Test
+    fun givenRecompositionThenNameIsNotAutofocusedAndHasNoRequestFocusLoop() {
+        val state = renderInteractive()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsNotFocused()
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Kardió")
+        assertTextFieldsDoNotHaveInputFocus()
+        state.value = state.value.copy(duplicateName = true)
+        composeRule.waitForIdle()
+        assertTextFieldsDoNotHaveInputFocus()
+        state.value = state.value.copy(
+            duplicateName = false,
+            fieldErrors = listOf(ExerciseFieldError.NameTooLong)
+        )
+        composeRule.waitForIdle()
+        assertTextFieldsDoNotHaveInputFocus()
+        state.value = state.value.copy(fieldErrors = emptyList(), saving = true)
+        composeRule.waitForIdle()
+        assertTextFieldsDoNotHaveInputFocus()
+        state.value = state.value.copy(saving = false)
+        composeRule.waitForIdle()
+        assertTextFieldsDoNotHaveInputFocus()
+    }
+
     private fun comesBefore(first: DpRect, second: DpRect): Boolean {
         return first.top < second.top - 1.dp ||
             (kotlin.math.abs(first.top.value - second.top.value) <= 1f && first.left < second.left)
@@ -299,5 +498,122 @@ class ExerciseEditorScreenLayoutTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    private fun renderInteractive(
+        initial: ExerciseEditorUiState = ExerciseEditorUiState(),
+        width: Dp = 360.dp,
+        height: Dp? = null,
+        fontScale: Float = 1f
+    ): MutableState<ExerciseEditorUiState> {
+        val state = mutableStateOf(initial)
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = density.density, fontScale = fontScale)
+            ) {
+                WeightTrackerThemeForPreview {
+                    Box(
+                        modifier = if (height != null) {
+                            Modifier.width(width).height(height)
+                        } else {
+                            Modifier.width(width).fillMaxSize()
+                        }
+                    ) {
+                        ExerciseEditorScreen(
+                            state = state.value,
+                            onBack = {},
+                            onNameChange = { name ->
+                                state.value = state.value.withName(name)
+                            },
+                            onCategoryChange = { category ->
+                                state.value = state.value.withCategory(category)
+                            },
+                            onMovementChange = { pattern ->
+                                state.value = state.value.copy(
+                                    draft = state.value.draft.copy(movementPattern = pattern)
+                                )
+                            },
+                            onMeasurementChange = { measurement ->
+                                state.value = state.value.copy(
+                                    draft = ExerciseDraftLogic.applyMeasurement(state.value.draft, measurement)
+                                )
+                            },
+                            onResistanceChange = { resistance ->
+                                state.value = state.value.copy(
+                                    draft = ExerciseDraftLogic.applyResistance(state.value.draft, resistance)
+                                )
+                            },
+                            onWeightInterpretationChange = { weight ->
+                                state.value = state.value.copy(
+                                    draft = state.value.draft.copy(weightInterpretation = weight)
+                                )
+                            },
+                            onPrimaryMuscleChange = { muscle ->
+                                state.value = state.value.copy(
+                                    draft = ExerciseDraftLogic.applyPrimaryMuscle(state.value.draft, muscle)
+                                )
+                            },
+                            onToggleSecondary = { muscle ->
+                                state.value = state.value.copy(
+                                    draft = ExerciseDraftLogic.toggleSecondary(state.value.draft, muscle)
+                                )
+                            },
+                            onNotesChange = { notes ->
+                                state.value = state.value.copy(
+                                    draft = state.value.draft.copy(notes = notes)
+                                )
+                            },
+                            onSave = {},
+                            onDismissDiscard = {},
+                            onConfirmDiscard = {},
+                            onFinished = { _, _ -> }
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        return state
+    }
+
+    private fun ExerciseEditorUiState.withName(name: String): ExerciseEditorUiState {
+        return copy(draft = draft.copy(name = ExerciseNaming.capitalizeFirstLetter(name)))
+    }
+
+    private fun ExerciseEditorUiState.withCategory(category: ExerciseCategory): ExerciseEditorUiState {
+        val next = if (draft.id == null) {
+            ExerciseDraftLogic.applyCategory(draft, category)
+        } else {
+            draft.copy(category = category)
+        }
+        return copy(draft = next)
+    }
+
+    private fun focusNameField() {
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).performClick()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsFocused()
+    }
+
+    private fun selectDropdown(tag: String, option: String) {
+        composeRule.onNodeWithTag(tag).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("$tag-menu").assertIsDisplayed()
+        composeRule.onNode(
+            hasText(option) and hasAnyAncestor(hasTestTag("$tag-menu"))
+        ).performScrollTo().performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun assertTextFieldsDoNotHaveInputFocus() {
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsNotFocused()
+        composeRule.onNodeWithTag(EXERCISE_FIELD_NOTES).assertIsNotFocused()
+    }
+
+    private fun nameSelection(): TextRange? {
+        return composeRule.onNodeWithTag(EXERCISE_FIELD_NAME)
+            .fetchSemanticsNode()
+            .config
+            .getOrNull(SemanticsProperties.TextSelectionRange)
     }
 }

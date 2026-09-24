@@ -33,4 +33,12 @@ sealed interface UserMessage {
     data object ExportFailed : UserMessage
     data object ImportReadFailed : UserMessage
     data object PaletteSaved : UserMessage
+    data object ScheduleRemoved : UserMessage
+    data object ScheduleDuplicate : UserMessage
+    data object ScheduleLinked : UserMessage
+    data object ScheduleTemplateArchived : UserMessage
+    data object ScheduleTemplateNotFound : UserMessage
+    data object WorkoutAlreadyActive : UserMessage
+    data object WorkoutTemplateEmpty : UserMessage
+    data object WorkoutTemplateArchived : UserMessage
 }
