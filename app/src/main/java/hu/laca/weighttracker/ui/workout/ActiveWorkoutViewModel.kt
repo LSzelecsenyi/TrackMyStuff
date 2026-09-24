@@ -20,6 +20,8 @@ import hu.laca.weighttracker.domain.workout.SessionSet
 import hu.laca.weighttracker.domain.workout.SessionSetStatus
 import hu.laca.weighttracker.domain.workout.SessionStatus
 import hu.laca.weighttracker.domain.workout.TemplateFieldError
+import hu.laca.weighttracker.domain.workout.WorkoutCompletionLogic
+import hu.laca.weighttracker.domain.workout.WorkoutCompletionSummary
 import hu.laca.weighttracker.domain.workout.WorkoutFocusTarget
 import hu.laca.weighttracker.domain.workout.WorkoutSessionAggregate
 import kotlinx.coroutines.CancellationException
@@ -62,7 +64,9 @@ data class ActiveWorkoutUiState(
     val message: ActiveWorkoutMessage? = null,
     val focusEvent: WorkoutFocusEvent? = null,
     val focusedSetId: Long? = null,
-    val expandedExerciseIds: Set<Long> = emptySet()
+    val expandedExerciseIds: Set<Long> = emptySet(),
+    val finishing: Boolean = false,
+    val completionSummary: WorkoutCompletionSummary? = null
 ) {
     val progress: SessionProgress
         get() = aggregate?.let(SessionProgressLogic::fromAggregate) ?: SessionProgress(0, 0, 0, 0)
@@ -98,6 +102,8 @@ class ActiveWorkoutViewModel(
     private val pendingFinishCount = MutableStateFlow<Int?>(null)
     private val confirmAbandon = MutableStateFlow(false)
     private val finished = MutableStateFlow(false)
+    private val finishing = MutableStateFlow(false)
+    private val completionSummary = MutableStateFlow<WorkoutCompletionSummary?>(null)
     private val abandoned = MutableStateFlow(false)
     private val discarding = MutableStateFlow(false)
     private val message = MutableStateFlow<ActiveWorkoutMessage?>(null)
@@ -112,7 +118,8 @@ class ActiveWorkoutViewModel(
         val confirmAbandon: Boolean,
         val finished: Boolean,
         val abandoned: Boolean,
-        val discarding: Boolean
+        val discarding: Boolean,
+        val finishing: Boolean
     )
 
     private data class EditorSignals(
@@ -120,7 +127,8 @@ class ActiveWorkoutViewModel(
         val dirty: Set<Long>,
         val completing: Set<Long>,
         val errors: Map<Long, List<TemplateFieldError>>,
-        val message: ActiveWorkoutMessage?
+        val message: ActiveWorkoutMessage?,
+        val completionSummary: WorkoutCompletionSummary?
     )
 
     private data class FocusChrome(
@@ -132,14 +140,28 @@ class ActiveWorkoutViewModel(
     val uiState: StateFlow<ActiveWorkoutUiState> = combine(
         sessionRepository.observeAggregate(sessionId),
         selectedIndex,
-        combine(drafts, dirtyIds, completingIds, setErrors, message) {
-                currentDrafts, dirty, completing, errors, currentMessage ->
-            EditorSignals(currentDrafts, dirty, completing, errors, currentMessage)
+        combine(drafts, dirtyIds, completingIds, setErrors, combine(message, completionSummary) { currentMessage, summary ->
+            currentMessage to summary
+        }) { currentDrafts, dirty, completing, errors, messageAndSummary ->
+            EditorSignals(
+                currentDrafts,
+                dirty,
+                completing,
+                errors,
+                messageAndSummary.first,
+                messageAndSummary.second
+            )
         },
-        combine(nowMillis, pendingFinishCount, confirmAbandon, finished, combine(abandoned, discarding) { left, discardingNow ->
-            left to discardingNow
-        }) { now, pending, abandon, done, left ->
-            Dialogs(now, pending, abandon, done, left.first, left.second)
+        combine(
+            nowMillis,
+            pendingFinishCount,
+            confirmAbandon,
+            finished,
+            combine(abandoned, discarding, finishing) { left, discardingNow, finishingNow ->
+                Triple(left, discardingNow, finishingNow)
+            }
+        ) { now, pending, abandon, done, triple ->
+            Dialogs(now, pending, abandon, done, triple.first, triple.second, triple.third)
         },
         combine(focusEvent, focusedSetId, expandedIds) { focus, focused, expanded ->
             FocusChrome(focus, focused, expanded)
@@ -148,7 +170,8 @@ class ActiveWorkoutViewModel(
         if (aggregate == null) {
             return@combine ActiveWorkoutUiState(
                 loading = false,
-                missing = !dialogs.abandoned && !dialogs.finished && !dialogs.discarding,
+                missing = !dialogs.abandoned && !dialogs.finished && !dialogs.discarding &&
+                    signals.completionSummary == null,
                 nowMillis = dialogs.now,
                 pendingFinishCount = dialogs.pendingFinish,
                 confirmAbandon = dialogs.confirmAbandon,
@@ -158,7 +181,9 @@ class ActiveWorkoutViewModel(
                 message = signals.message,
                 focusEvent = chrome.focus,
                 focusedSetId = chrome.focusedSetId,
-                expandedExerciseIds = chrome.expanded
+                expandedExerciseIds = chrome.expanded,
+                finishing = dialogs.finishing,
+                completionSummary = signals.completionSummary
             )
         }
         val notActive = aggregate.session.status != SessionStatus.IN_PROGRESS
@@ -169,7 +194,7 @@ class ActiveWorkoutViewModel(
         }
         ActiveWorkoutUiState(
             loading = false,
-            missing = notActive,
+            missing = notActive && !dialogs.finished && signals.completionSummary == null,
             aggregate = aggregate,
             selectedIndex = bounded,
             currentExerciseId = SessionFocusLogic.currentPendingExercise(aggregate)?.exercise?.id,
@@ -181,13 +206,15 @@ class ActiveWorkoutViewModel(
             nowMillis = dialogs.now,
             pendingFinishCount = dialogs.pendingFinish,
             confirmAbandon = dialogs.confirmAbandon,
-            finished = dialogs.finished || aggregate.session.status == SessionStatus.COMPLETED,
+            finished = dialogs.finished,
             abandoned = dialogs.abandoned || aggregate.session.status == SessionStatus.ABANDONED,
             discarding = dialogs.discarding,
             message = signals.message,
             focusEvent = chrome.focus,
             focusedSetId = chrome.focusedSetId,
-            expandedExerciseIds = chrome.expanded
+            expandedExerciseIds = chrome.expanded,
+            finishing = dialogs.finishing,
+            completionSummary = signals.completionSummary
         )
     }.stateIn(
         scope = viewModelScope,
@@ -374,7 +401,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun requestFinish() {
-        if (discarding.value) {
+        if (discarding.value || finishing.value || finished.value) {
             return
         }
         val pending = uiState.value.progress.pending
@@ -386,21 +413,46 @@ class ActiveWorkoutViewModel(
     }
 
     fun dismissFinish() {
+        if (finishing.value) {
+            return
+        }
         pendingFinishCount.value = null
     }
 
     fun confirmFinish(skipRemaining: Boolean) {
-        if (discarding.value) {
+        if (discarding.value || finishing.value || finished.value || completionSummary.value != null) {
             return
         }
+        finishing.value = true
         viewModelScope.launch {
-            when (sessionRepository.finish(sessionId, skipRemaining)) {
-                FinishWorkoutResult.Finished, FinishWorkoutResult.AlreadyTerminal -> {
-                    pendingFinishCount.value = null
-                    finished.value = true
+            val result = try {
+                sessionRepository.finish(sessionId, skipRemaining)
+            } catch (cancelled: CancellationException) {
+                finishing.value = false
+                throw cancelled
+            } catch (_: Exception) {
+                finishing.value = false
+                message.value = ActiveWorkoutMessage.SaveFailed
+                return@launch
+            }
+            when (result) {
+                FinishWorkoutResult.Finished -> {
+                    val aggregate = sessionRepository.getAggregate(sessionId)
+                    val summary = aggregate?.let(WorkoutCompletionLogic::from)
+                    if (summary == null) {
+                        finishing.value = false
+                        message.value = ActiveWorkoutMessage.SaveFailed
+                    } else {
+                        completionSummary.value = summary
+                        pendingFinishCount.value = null
+                        finished.value = true
+                    }
                 }
-                is FinishWorkoutResult.PendingRemaining -> Unit
-                FinishWorkoutResult.NotFound -> Unit
+                FinishWorkoutResult.AlreadyTerminal,
+                is FinishWorkoutResult.PendingRemaining,
+                FinishWorkoutResult.NotFound -> {
+                    finishing.value = false
+                }
             }
         }
     }

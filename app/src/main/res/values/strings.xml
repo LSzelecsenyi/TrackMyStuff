@@ -427,6 +427,10 @@
     <string name="finish_pending_body">Még %1$d befejezetlen sorozat van.</string>
     <string name="finish_confirm_title">Edzés befejezése</string>
     <string name="finish_confirm_body">Befejezed az edzést? Ezután ebből a nézetből már nem szerkeszthető.</string>
+    <string name="workout_complete_title">Edzés teljesítve</string>
+    <string name="workout_complete_summary">%1$d gyakorlat · %2$d sorozat · %3$s</string>
+    <string name="workout_complete_back">Vissza az Áttekintésre</string>
+    <string name="workout_complete_mark_a11y">Edzés sikeresen teljesítve</string>
     <string name="abandon_title">Elveted az edzést?</string>
     <string name="abandon_body">Az eddig rögzített sorozatok véglegesen elvesznek, és az edzés nem kerül be a Naplóba.</string>
     <string name="field_actual_reps">Tényleges ismétlés</string>

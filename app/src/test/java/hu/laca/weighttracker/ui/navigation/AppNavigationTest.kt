@@ -107,6 +107,9 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar("workout_detail?sessionId=3"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WEIGHT_DETAILS))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_IMPORT))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_COMPLETE))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_COMPLETE_PATTERN))
+        assertFalse(AppNavigation.showsBottomBar("workout_complete?exercises=4&completedSets=14&durationMillis=3020000"))
     }
 
     @Test
@@ -152,6 +155,18 @@ class AppNavigationTest {
         assertTrue(navigation.shouldPush)
         assertFalse(AppNavigation.openActiveWorkout(AppRoutes.ACTIVE_WORKOUT_PATTERN).shouldPush)
         assertFalse(AppNavigation.openActiveWorkout("active_workout?sessionId=9").shouldPush)
+    }
+
+    @Test
+    fun workoutCompleteOpensFromActiveWorkoutHidesBottomBarAndReturnsToOverview() {
+        val navigation = AppNavigation.openWorkoutComplete(AppRoutes.ACTIVE_WORKOUT)
+        assertEquals(AppRoutes.WORKOUT_COMPLETE, navigation.targetRoute)
+        assertEquals(AppRoutes.OVERVIEW, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertEquals(AppRoutes.OVERVIEW, AppNavigation.leaveWorkoutComplete())
+        assertFalse(AppNavigation.openWorkoutComplete(AppRoutes.WORKOUT_COMPLETE).shouldPush)
+        assertFalse(AppNavigation.openWorkoutComplete(AppRoutes.WORKOUT_COMPLETE_PATTERN).shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_COMPLETE))
     }
 
     @Test

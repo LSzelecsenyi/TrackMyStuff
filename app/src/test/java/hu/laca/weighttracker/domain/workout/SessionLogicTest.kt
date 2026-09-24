@@ -263,6 +263,56 @@ class SessionLogicTest {
         assertFalse(names.any { it.contains("rir") || it.contains("rpe") })
     }
 
+    @Test
+    fun completionSummaryUsesSessionExercisesAndCompletedSets() {
+        val exercises = listOf(
+            item(1L, "A", List(4) { index -> set(index.toLong() + 1, SessionSetStatus.COMPLETED) }),
+            item(2L, "B", List(4) { index -> set(index.toLong() + 5, SessionSetStatus.COMPLETED) }),
+            item(3L, "C", List(3) { index -> set(index.toLong() + 9, SessionSetStatus.COMPLETED) }),
+            item(
+                4L,
+                "D",
+                listOf(
+                    set(12L, SessionSetStatus.COMPLETED),
+                    set(13L, SessionSetStatus.COMPLETED),
+                    set(14L, SessionSetStatus.COMPLETED),
+                    set(15L, SessionSetStatus.SKIPPED),
+                    set(16L, SessionSetStatus.SKIPPED)
+                )
+            )
+        )
+        val aggregate = WorkoutSessionAggregate(
+            session(SessionStatus.COMPLETED, startedAt = 1_000L, finishedAt = 3_021_000L),
+            exercises
+        )
+        val summary = WorkoutCompletionLogic.from(aggregate)!!
+        assertEquals(4, summary.exerciseCount)
+        assertEquals(14, summary.completedSetCount)
+        assertEquals("50:20", summary.durationLabel)
+        assertEquals(3_020_000L, summary.durationMillis)
+    }
+
+    @Test
+    fun completionSummaryIgnoresSkippedSetsAndDoesNotUseClockNow() {
+        val aggregate = WorkoutSessionAggregate(
+            session(SessionStatus.COMPLETED, startedAt = 5_000L, finishedAt = 8_000L),
+            listOf(
+                item(1L, "A", listOf(set(1L, SessionSetStatus.COMPLETED), set(2L, SessionSetStatus.SKIPPED))),
+                item(2L, "B", listOf(set(3L, SessionSetStatus.SKIPPED)))
+            )
+        )
+        val summary = WorkoutCompletionLogic.from(aggregate)!!
+        assertEquals(2, summary.exerciseCount)
+        assertEquals(1, summary.completedSetCount)
+        assertEquals(ElapsedTime.formatMillis(3_000L), summary.durationLabel)
+        assertEquals(3_000L, summary.durationMillis)
+        assertNull(
+            WorkoutCompletionLogic.from(
+                WorkoutSessionAggregate(session(SessionStatus.IN_PROGRESS, 1_000L), listOf(item(1L, "A", listOf(set(1L, SessionSetStatus.COMPLETED)))))
+            )
+        )
+    }
+
     private fun measurement(date: LocalDate, kg: Double): WeightMeasurement {
         return WeightMeasurement(1L, date, kg, 1L, 1L)
     }

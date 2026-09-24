@@ -555,7 +555,7 @@ class ActiveWorkoutScreenLayoutTest {
                             onRequestAbandon = onRequestAbandon,
                             onDismissAbandon = {},
                             onConfirmAbandon = {},
-                            onFinished = {},
+                            onFinished = { _ -> },
                             onAbandoned = {},
                             onMessageConsumed = {},
                             onFocusConsumed = {}

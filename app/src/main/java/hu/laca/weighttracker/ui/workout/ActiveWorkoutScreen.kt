@@ -97,6 +97,7 @@ import hu.laca.weighttracker.domain.workout.SessionExerciseItem
 import hu.laca.weighttracker.domain.workout.SessionSet
 import hu.laca.weighttracker.domain.workout.SessionSetStatus
 import hu.laca.weighttracker.domain.workout.TemplateFieldError
+import hu.laca.weighttracker.domain.workout.WorkoutCompletionSummary
 import hu.laca.weighttracker.domain.workout.WorkoutFocusTarget
 import hu.laca.weighttracker.ui.components.SegmentedControl
 import hu.laca.weighttracker.ui.templates.labelRes
@@ -197,7 +198,7 @@ fun ActiveWorkoutScreen(
     onRequestAbandon: () -> Unit,
     onDismissAbandon: () -> Unit,
     onConfirmAbandon: () -> Unit,
-    onFinished: () -> Unit,
+    onFinished: (WorkoutCompletionSummary) -> Unit,
     onAbandoned: () -> Unit,
     onMessageConsumed: () -> Unit,
     onFocusConsumed: () -> Unit
@@ -213,8 +214,11 @@ fun ActiveWorkoutScreen(
         keyboardController?.hide()
     }
     BackHandler(enabled = state.discarding) { }
-    LaunchedEffect(state.finished) {
-        if (state.finished) onFinished()
+    LaunchedEffect(state.finished, state.completionSummary) {
+        val summary = state.completionSummary
+        if (state.finished && summary != null) {
+            onFinished(summary)
+        }
     }
     LaunchedEffect(state.abandoned) {
         if (state.abandoned) onAbandoned()
@@ -281,7 +285,7 @@ fun ActiveWorkoutScreen(
                 if (allResolved) {
                     Button(
                         onClick = onRequestFinish,
-                        enabled = !state.discarding,
+                        enabled = !state.discarding && !state.finishing,
                         shape = AppShapeTokens.button,
                         modifier = finishModifier
                     ) {
@@ -290,7 +294,7 @@ fun ActiveWorkoutScreen(
                 } else {
                     OutlinedButton(
                         onClick = onRequestFinish,
-                        enabled = !state.discarding,
+                        enabled = !state.discarding && !state.finishing,
                         shape = AppShapeTokens.button,
                         modifier = finishModifier
                     ) {
@@ -402,32 +406,44 @@ fun ActiveWorkoutScreen(
     state.pendingFinishCount?.let { count ->
         if (count > 0) {
             AlertDialog(
-                onDismissRequest = onDismissFinish,
+                onDismissRequest = { if (!state.finishing) onDismissFinish() },
                 title = { Text(stringResource(R.string.finish_pending_title)) },
                 text = { Text(stringResource(R.string.finish_pending_body, count)) },
                 confirmButton = {
-                    TextButton(onClick = { onConfirmFinish(true) }) {
+                    TextButton(
+                        onClick = { onConfirmFinish(true) },
+                        enabled = !state.finishing
+                    ) {
                         Text(stringResource(R.string.action_finish_skip_remaining))
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = onDismissFinish) {
+                    TextButton(
+                        onClick = onDismissFinish,
+                        enabled = !state.finishing
+                    ) {
                         Text(stringResource(R.string.action_return_to_workout))
                     }
                 }
             )
         } else {
             AlertDialog(
-                onDismissRequest = onDismissFinish,
+                onDismissRequest = { if (!state.finishing) onDismissFinish() },
                 title = { Text(stringResource(R.string.finish_confirm_title)) },
                 text = { Text(stringResource(R.string.finish_confirm_body)) },
                 confirmButton = {
-                    TextButton(onClick = { onConfirmFinish(false) }) {
+                    TextButton(
+                        onClick = { onConfirmFinish(false) },
+                        enabled = !state.finishing
+                    ) {
                         Text(stringResource(R.string.action_finish_workout))
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = onDismissFinish) {
+                    TextButton(
+                        onClick = onDismissFinish,
+                        enabled = !state.finishing
+                    ) {
                         Text(stringResource(R.string.action_cancel))
                     }
                 }

@@ -160,6 +160,20 @@ object ElapsedTime {
     }
 }
 
+object WorkoutCompletionLogic {
+    fun from(aggregate: WorkoutSessionAggregate): WorkoutCompletionSummary? {
+        if (aggregate.session.status != SessionStatus.COMPLETED) {
+            return null
+        }
+        val progress = SessionProgressLogic.fromAggregate(aggregate)
+        return WorkoutCompletionSummary(
+            exerciseCount = aggregate.exercises.size,
+            completedSetCount = progress.completed,
+            durationMillis = ElapsedTime.forSession(aggregate.session)
+        )
+    }
+}
+
 object ActualSetLogic {
     /**
      * Skipping keeps the planned snapshot and clears actual values so skipped

@@ -18,6 +18,9 @@ object AppRoutes {
     const val WORKOUT_DETAIL_PATTERN = "workout_detail?sessionId={sessionId}"
     const val WEIGHT_DETAILS = "weight_details"
     const val WORKOUT_IMPORT = "workout_import"
+    const val WORKOUT_COMPLETE = "workout_complete"
+    const val WORKOUT_COMPLETE_PATTERN =
+        "workout_complete?exercises={exercises}&completedSets={completedSets}&durationMillis={durationMillis}"
 }
 
 data class RootTab(
@@ -128,6 +131,18 @@ object AppNavigation {
             backTarget = AppRoutes.OVERVIEW,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.TEMPLATES)
         )
+    }
+
+    fun openWorkoutComplete(currentRoute: String?): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.WORKOUT_COMPLETE,
+            backTarget = AppRoutes.OVERVIEW,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.WORKOUT_COMPLETE)
+        )
+    }
+
+    fun leaveWorkoutComplete(): String {
+        return AppRoutes.OVERVIEW
     }
 
     fun shouldNavigate(currentRoute: String?, targetRoute: String): Boolean {

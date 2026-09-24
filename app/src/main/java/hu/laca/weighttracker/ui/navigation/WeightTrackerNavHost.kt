@@ -31,6 +31,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import hu.laca.weighttracker.WeightViewModelFactory
 import hu.laca.weighttracker.domain.DateProvider
+import hu.laca.weighttracker.domain.workout.WorkoutCompletionSummary
 import hu.laca.weighttracker.ui.dashboard.DashboardScreen
 import hu.laca.weighttracker.ui.dashboard.DashboardViewModel
 import hu.laca.weighttracker.ui.dashboard.WeightDetailsScreen
@@ -51,6 +52,7 @@ import hu.laca.weighttracker.ui.templates.TemplateListScreen
 import hu.laca.weighttracker.ui.templates.TemplateListViewModel
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutScreen
 import hu.laca.weighttracker.ui.workout.ActiveWorkoutViewModel
+import hu.laca.weighttracker.ui.workout.WorkoutCompletionScreen
 import hu.laca.weighttracker.ui.workout.WorkoutHubViewModel
 import hu.laca.weighttracker.ui.workout.WorkoutPrimaryAction
 import hu.laca.weighttracker.ui.workout.WorkoutStartPickerSheet
@@ -66,6 +68,9 @@ import java.time.LocalDate
 private const val ARG_EXERCISE_ID = "exerciseId"
 private const val ARG_TEMPLATE_ID = "templateId"
 private const val ARG_SESSION_ID = "sessionId"
+private const val ARG_EXERCISES = "exercises"
+private const val ARG_COMPLETED_SETS = "completedSets"
+private const val ARG_DURATION_MILLIS = "durationMillis"
 private const val KEY_CATALOG_SAVED = "catalog_saved"
 private const val KEY_TEMPLATE_SAVED = "template_saved"
 private const val KEY_WORKOUT_DELETED = "workout_deleted"
@@ -80,6 +85,13 @@ private fun templateEditorRoute(templateId: Long?): String {
 
 internal fun activeWorkoutRoute(sessionId: Long): String {
     return "${AppRoutes.ACTIVE_WORKOUT}?$ARG_SESSION_ID=$sessionId"
+}
+
+internal fun workoutCompleteRoute(summary: WorkoutCompletionSummary): String {
+    return "${AppRoutes.WORKOUT_COMPLETE}?" +
+        "$ARG_EXERCISES=${summary.exerciseCount}&" +
+        "$ARG_COMPLETED_SETS=${summary.completedSetCount}&" +
+        "$ARG_DURATION_MILLIS=${summary.durationMillis}"
 }
 
 private fun workoutDetailRoute(sessionId: Long): String {
@@ -472,15 +484,41 @@ fun WeightTrackerNavHost(
                     onRequestAbandon = viewModel::requestAbandon,
                     onDismissAbandon = viewModel::dismissAbandon,
                     onConfirmAbandon = viewModel::confirmAbandon,
-                    onFinished = {
-                        workoutHubViewModel.showFinished()
-                        navController.popBackStack()
+                    onFinished = { summary ->
+                        navController.openWorkoutComplete(summary)
                     },
                     onAbandoned = {
                         workoutHubViewModel.showAbandoned()
                         navController.popBackStack()
                     },
                     onMessageConsumed = viewModel::consumeMessage
+                )
+            }
+            composable(
+                route = AppRoutes.WORKOUT_COMPLETE_PATTERN,
+                arguments = listOf(
+                    navArgument(ARG_EXERCISES) {
+                        type = NavType.IntType
+                        defaultValue = 0
+                    },
+                    navArgument(ARG_COMPLETED_SETS) {
+                        type = NavType.IntType
+                        defaultValue = 0
+                    },
+                    navArgument(ARG_DURATION_MILLIS) {
+                        type = NavType.LongType
+                        defaultValue = 0L
+                    }
+                )
+            ) { entry ->
+                val summary = WorkoutCompletionSummary(
+                    exerciseCount = entry.arguments?.getInt(ARG_EXERCISES) ?: 0,
+                    completedSetCount = entry.arguments?.getInt(ARG_COMPLETED_SETS) ?: 0,
+                    durationMillis = entry.arguments?.getLong(ARG_DURATION_MILLIS) ?: 0L
+                )
+                WorkoutCompletionScreen(
+                    summary = summary,
+                    onBackToOverview = { navController.leaveWorkoutComplete() }
                 )
             }
             composable(
@@ -636,6 +674,20 @@ internal fun NavHostController.navigateInternal(route: String) {
     navigate(route) {
         launchSingleTop = true
     }
+}
+
+internal fun NavHostController.openWorkoutComplete(summary: WorkoutCompletionSummary) {
+    if (!AppNavigation.shouldNavigate(currentDestination?.route, AppRoutes.WORKOUT_COMPLETE)) {
+        return
+    }
+    navigate(workoutCompleteRoute(summary)) {
+        popUpTo(AppRoutes.OVERVIEW) { inclusive = false }
+        launchSingleTop = true
+    }
+}
+
+internal fun NavHostController.leaveWorkoutComplete() {
+    navigateRoot(AppRoutes.OVERVIEW)
 }
 
 internal fun NavHostController.openActiveWorkout(sessionId: Long) {

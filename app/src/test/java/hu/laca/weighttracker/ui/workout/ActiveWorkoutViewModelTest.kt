@@ -19,6 +19,7 @@ import hu.laca.weighttracker.domain.exercise.MovementPattern
 import hu.laca.weighttracker.domain.exercise.MuscleGroup
 import hu.laca.weighttracker.domain.exercise.ResistanceBasis
 import hu.laca.weighttracker.domain.exercise.WeightInterpretation
+import hu.laca.weighttracker.domain.workout.ElapsedTime
 import hu.laca.weighttracker.domain.workout.PlannedLoadKind
 import hu.laca.weighttracker.domain.workout.PlannedSetDraft
 import hu.laca.weighttracker.domain.workout.SessionSetStatus
@@ -395,6 +396,63 @@ class ActiveWorkoutViewModelTest {
         assertEquals(ActiveWorkoutMessage.SaveFailed, state.message)
         assertNull(state.focusEvent)
         assertEquals(SessionSetStatus.SKIPPED, sessions.getAggregate(sessionId)!!.exercises[0].sets.single().status)
+    }
+
+    @Test
+    fun successfulFinishExposesCompletionSummaryOnce() = runTest {
+        val viewModel = startSingleSet()
+        val set = viewModel.loaded().aggregate!!.exercises[0].sets.single()
+        viewModel.onReps(set.id, "8")
+        viewModel.completeSet(set.id)
+        awaitReal {
+            viewModel.uiState.first { set.id !in it.completingSetIds && it.progress.pending == 0 }
+        }
+        viewModel.confirmFinish(false)
+        viewModel.confirmFinish(false)
+        val state = awaitReal {
+            viewModel.uiState.first { it.finished && it.completionSummary != null }
+        }
+        viewModel.confirmFinish(false)
+        val summary = state.completionSummary!!
+        assertEquals(1, summary.exerciseCount)
+        assertEquals(1, summary.completedSetCount)
+        assertEquals(
+            sessions.getAggregate(sessionId)!!.session.let { ElapsedTime.forSession(it) },
+            summary.durationMillis
+        )
+        assertEquals(summary, viewModel.uiState.value.completionSummary)
+        assertEquals(SessionStatus.COMPLETED, sessions.getAggregate(sessionId)!!.session.status)
+    }
+
+    @Test
+    fun failedFinishDoesNotExposeCompletionSummary() = runTest {
+        val viewModel = startTwoExercises()
+        viewModel.loaded()
+        viewModel.confirmFinish(false)
+        val state = awaitReal {
+            viewModel.uiState.first { !it.finishing }
+        }
+        assertFalse(state.finished)
+        assertNull(state.completionSummary)
+        assertEquals(SessionStatus.IN_PROGRESS, sessions.getAggregate(sessionId)!!.session.status)
+        assertNull(viewModel.uiState.value.completionSummary)
+    }
+
+    @Test
+    fun restoredViewModelDoesNotFinishCompletedSessionAgain() = runTest {
+        val viewModel = startSingleSet()
+        viewModel.loaded()
+        viewModel.confirmFinish(true)
+        awaitReal { viewModel.uiState.first { it.finished && it.completionSummary != null } }
+        val restored = active(sessionId)
+        val restoredState = restored.loaded()
+        assertFalse(restoredState.finished)
+        assertNull(restoredState.completionSummary)
+        assertEquals(SessionStatus.COMPLETED, sessions.getAggregate(sessionId)!!.session.status)
+        restored.confirmFinish(true)
+        awaitReal { restored.uiState.first { !it.finishing } }
+        assertFalse(restored.uiState.value.finished)
+        assertNull(restored.uiState.value.completionSummary)
     }
 
     @Test
