@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Testsúly</string>
+    <string name="app_name">My Muscle Map</string>
     <string name="nav_dashboard">Áttekintés</string>
     <string name="nav_workout">Edzés</string>
     <string name="nav_journal">Napló</string>

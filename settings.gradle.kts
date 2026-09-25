@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TrackMyStuff"
+rootProject.name = "MyMuscleMap"
 include(":app")

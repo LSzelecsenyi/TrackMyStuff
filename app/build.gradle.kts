@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "hu.laca.weighttracker"
+    namespace = "app.mymusclemap"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "hu.laca.weighttracker"
+        applicationId = "app.mymusclemap"
         minSdk = 26
         targetSdk = 37
         versionCode = 1
