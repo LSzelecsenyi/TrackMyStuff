@@ -172,9 +172,12 @@ class DashboardViewModelTest {
         scheduled.schedule(pull, today)
         val viewModel = dashboard()
         viewModel.selectDay(today)
-        val sheet = viewModel.uiState.first { it.daySheet?.scheduledWorkouts?.size == 2 }.daySheet!!
-        assertEquals(listOf("Push A", "Pull A"), sheet.scheduledWorkouts.map { it.templateName })
-        val cell = viewModel.uiState.value.monthGrid.cells.first { it.date == today }
+        val state = viewModel.uiState.first { snapshot ->
+            snapshot.daySheet?.scheduledWorkouts?.size == 2 &&
+                snapshot.monthGrid.cells.first { it.date == today }.plannedWorkoutCount == 2
+        }
+        assertEquals(listOf("Push A", "Pull A"), state.daySheet!!.scheduledWorkouts.map { it.templateName })
+        val cell = state.monthGrid.cells.first { it.date == today }
         assertTrue(cell.hasPlannedWorkout)
         assertEquals(2, cell.plannedWorkoutCount)
     }
@@ -232,9 +235,16 @@ class DashboardViewModelTest {
         assertEquals(scheduleId, item.id)
         viewModel.openReschedule(item)
         viewModel.confirmReschedule(today.plusDays(3))
-        viewModel.uiState.first { it.daySheet?.scheduledWorkouts.isNullOrEmpty() && it.rescheduleTarget == null }
-        assertTrue(viewModel.uiState.value.monthGrid.cells.first { it.date == today.plusDays(3) }.hasPlannedWorkout)
-        assertFalse(viewModel.uiState.value.monthGrid.cells.first { it.date == today }.hasPlannedWorkout)
+        val movedOnCalendar = viewModel.uiState.first { state ->
+            state.rescheduleTarget == null &&
+                !state.scheduleBusy &&
+                state.daySheet?.date == today &&
+                state.daySheet.scheduledWorkouts.isEmpty() &&
+                state.monthGrid.cells.first { it.date == today.plusDays(3) }.hasPlannedWorkout &&
+                !state.monthGrid.cells.first { it.date == today }.hasPlannedWorkout
+        }
+        assertTrue(movedOnCalendar.monthGrid.cells.first { it.date == today.plusDays(3) }.hasPlannedWorkout)
+        assertFalse(movedOnCalendar.monthGrid.cells.first { it.date == today }.hasPlannedWorkout)
         viewModel.selectDay(today.plusDays(3))
         val moved = viewModel.uiState.first { it.daySheet?.scheduledWorkouts?.size == 1 }.daySheet!!
         assertEquals(today.plusDays(3), moved.scheduledWorkouts.single().scheduledDate)
@@ -269,9 +279,12 @@ class DashboardViewModelTest {
             .daySheet!!.scheduledWorkouts.single()
         viewModel.openRemove(item)
         viewModel.confirmRemove()
-        val state = viewModel.uiState.first {
-            it.userMessage == UserMessage.ScheduleRemoved &&
-                it.daySheet?.scheduledWorkouts.isNullOrEmpty()
+        val state = viewModel.uiState.first { snapshot ->
+            snapshot.userMessage == UserMessage.ScheduleRemoved &&
+                !snapshot.scheduleBusy &&
+                snapshot.daySheet?.date == today &&
+                snapshot.daySheet.scheduledWorkouts.isEmpty() &&
+                !snapshot.monthGrid.cells.first { it.date == today }.hasPlannedWorkout
         }
         assertTrue(state.daySheet!!.scheduledWorkouts.isEmpty())
         assertFalse(state.monthGrid.cells.first { it.date == today }.hasPlannedWorkout)
