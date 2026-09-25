@@ -130,6 +130,72 @@ fun OnboardingHeatmapSpotlight(
 }
 
 @Composable
+fun OnboardingCalendarWeightSpotlight(
+    dayInRoot: Rect,
+    calendarInRoot: Rect,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val useDay = dayInRoot.width > 1f && dayInRoot.height > 1f
+    OnboardingSpotlight(
+        targetInRoot = if (useDay) dayInRoot else calendarInRoot,
+        shape = if (useDay) {
+            OnboardingSpotlightShape.Circle(extraRadius = 8.dp)
+        } else {
+            OnboardingSpotlightShape.RoundedRect()
+        },
+        title = stringResource(R.string.onboarding_weight_calendar_title),
+        body = stringResource(R.string.onboarding_weight_calendar_body),
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        overlayTestTag = ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT,
+        calloutTestTag = ONBOARDING_CALENDAR_WEIGHT_COACH,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun OnboardingChartSpotlight(
+    targetInRoot: Rect,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OnboardingSpotlight(
+        targetInRoot = targetInRoot,
+        shape = OnboardingSpotlightShape.RoundedRect(),
+        title = stringResource(R.string.onboarding_chart_title),
+        body = stringResource(R.string.onboarding_chart_body),
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        overlayTestTag = ONBOARDING_CHART_SPOTLIGHT,
+        calloutTestTag = ONBOARDING_CHART_COACH,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun OnboardingCalendarHistorySpotlight(
+    targetInRoot: Rect,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OnboardingSpotlight(
+        targetInRoot = targetInRoot,
+        shape = OnboardingSpotlightShape.RoundedRect(),
+        title = stringResource(R.string.onboarding_calendar_title),
+        body = stringResource(R.string.onboarding_calendar_body),
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        overlayTestTag = ONBOARDING_CALENDAR_HISTORY_SPOTLIGHT,
+        calloutTestTag = ONBOARDING_CALENDAR_COACH,
+        modifier = modifier
+    )
+}
+
+@Composable
 fun OnboardingSpotlight(
     targetInRoot: Rect,
     shape: OnboardingSpotlightShape,

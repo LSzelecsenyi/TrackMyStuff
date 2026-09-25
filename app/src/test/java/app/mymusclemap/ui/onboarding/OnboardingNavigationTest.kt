@@ -86,6 +86,7 @@ class OnboardingNavigationTest {
     private lateinit var exerciseRepository: ExerciseRepository
     private lateinit var workoutTemplateRepository: WorkoutTemplateRepository
     private lateinit var workoutSessionRepository: WorkoutSessionRepository
+    private lateinit var weightRepository: WeightRepository
     private val dateProvider = FixedDateProvider(LocalDate.of(2026, 9, 25), LocalTime.of(8, 0))
     private val backDispatcher = AtomicReference<OnBackPressedDispatcher?>(null)
 
@@ -115,7 +116,7 @@ class OnboardingNavigationTest {
             sessionDao = database.workoutSessionDao(),
             clock = clock
         )
-        val weightRepository = WeightRepository(database.weightMeasurementDao(), clock)
+        weightRepository = WeightRepository(database.weightMeasurementDao(), clock)
         workoutSessionRepository = WorkoutSessionRepository(
             sessionDao = database.workoutSessionDao(),
             templateDao = database.workoutTemplateDao(),
@@ -342,7 +343,7 @@ class OnboardingNavigationTest {
     }
 
     @Test
-    fun acknowledgingHeatmapSpotlightPersistsAndDoesNotShowAgain() {
+    fun acknowledgingHeatmapSpotlightAdvancesToCalendarWeightDiscoveryWithoutOpeningWeightEntry() {
         startProgressiveOnboarding()
         completeFirstWorkout()
         composeApp()
@@ -355,24 +356,111 @@ class OnboardingNavigationTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).fetchSemanticsNodes().isEmpty()
         }
-        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag(ONBOARDING_WEIGHT_SHEET).fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithText("●  Discover your muscle map").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
         }
-        if (composeRule.onAllNodesWithTag(ONBOARDING_WEIGHT_SHEET).fetchSemanticsNodes().isNotEmpty()) {
-            composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SKIP).performClick()
-            composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_COACH).assertIsDisplayed()
+        composeRule.onNodeWithText("Track your body weight").assertIsDisplayed()
+        composeRule.onNodeWithText("Tap a day to add your weight and see your progress over time.").assertIsDisplayed()
+        composeRule.onNodeWithTag("dashboard_calendar").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
+        composeRule.onNodeWithText("●  Discover your muscle map").assertExists()
+        composeRule.onNodeWithText("○  Track your body weight").assertExists()
+    }
+
+    @Test
+    fun calendarWeightCoachAcknowledgementLeavesWeightChecklistOpen() {
+        startProgressiveOnboarding()
+        completeFirstWorkout()
+        composeApp()
+        revealCalendarWeightCoach()
+        composeRule.onNodeWithText("Got it").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("●  Discover your muscle map").assertIsDisplayed()
+        composeRule.onNodeWithText("○  Track your body weight").assertIsDisplayed()
+        composeRule.onNodeWithText("○  See your training history").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithText("○  Track your body weight").assertExists()
+    }
+
+    @Test
+    fun systemBackDismissesCalendarWeightSpotlightWithoutCompletingWeight() {
+        startProgressiveOnboarding()
+        completeFirstWorkout()
+        composeApp()
+        revealCalendarWeightCoach()
+        composeRule.runOnIdle {
+            backDispatcher.get()!!.onBackPressed()
         }
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText("●  Discover your muscle map").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isEmpty()
         }
-        composeRule.onNodeWithText("●  Discover your muscle map").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
-        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performScrollTo().performClick()
-        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("○  Track your body weight").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertIsDisplayed()
+    }
+
+    @Test
+    fun chartSeenWithoutARealWeightStillResumesCalendarWeightDiscovery() {
+        startProgressiveOnboarding()
+        completeFirstWorkout()
+        runBlocking {
+            themePreferences.setHeatmapSeen()
+            themePreferences.setWeightChartSeen()
+        }
+        composeApp()
+        waitForTag(ONBOARDING_REMINDER)
+        composeRule.onNodeWithText("●  Discover your muscle map").assertExists()
+        composeRule.onNodeWithText("○  Track your body weight").assertExists()
+        composeRule.onNodeWithText("○  See your training history").assertExists()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_CHART_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_HISTORY_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithText("○  Track your body weight").assertExists()
+    }
+
+    @Test
+    fun acknowledgingHeatmapSpotlightPersistsAndDoesNotShowAgain() {
+        startProgressiveOnboarding()
+        completeFirstWorkout()
+        composeApp()
+        revealCalendarWeightCoach()
         composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
         composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
+        composeRule.runOnIdle {
+            backDispatcher.get()!!.onBackPressed()
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertIsDisplayed()
     }
 
     @Test
@@ -414,6 +502,27 @@ class OnboardingNavigationTest {
         composeRule.onNodeWithTag("dashboard_heatmap").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(ONBOARDING_WORKOUT_SPOTLIGHT).assertDoesNotExist()
         composeRule.onNodeWithTag(ONBOARDING_WORKOUT_COACH).assertDoesNotExist()
+    }
+
+    @Test
+    fun restartAfterHeatmapSeenResumesCalendarWeightDiscovery() {
+        startProgressiveOnboarding()
+        completeFirstWorkout()
+        runBlocking { themePreferences.setHeatmapSeen() }
+        composeApp()
+        waitForTag(ONBOARDING_REMINDER)
+        composeRule.onNodeWithText("●  Discover your muscle map").assertIsDisplayed()
+        composeRule.onNodeWithText("○  Track your body weight").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithText("Track your body weight").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
+        composeRule.onNodeWithText("○  Track your body weight").assertExists()
     }
 
     @Test
@@ -467,6 +576,20 @@ class OnboardingNavigationTest {
                 }
             }
         }
+    }
+
+    private fun revealCalendarWeightCoach() {
+        waitForTag(ONBOARDING_REMINDER)
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Got it").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
     }
 
     private fun waitForTag(tag: String) {

@@ -49,7 +49,12 @@ data class OnboardingGuide(
     val showHeatmapCompletionCta: Boolean = false,
     val showWorkoutActionCoach: Boolean = false,
     val heatmapRevealRequested: Boolean = false,
-    val showHeatmapSpotlight: Boolean = false
+    val showHeatmapSpotlight: Boolean = false,
+    val calendarRevealRequested: Boolean = false,
+    val showCalendarWeightSpotlight: Boolean = false,
+    val chartRevealRequested: Boolean = false,
+    val showChartSpotlight: Boolean = false,
+    val showCalendarHistorySpotlight: Boolean = false
 ) {
     companion object {
         val Inactive = OnboardingGuide()
@@ -61,13 +66,13 @@ object ProgressiveOnboardingLogic {
         if (!flags.isActive) {
             return OnboardingGuide(flags = flags, facts = facts)
         }
-        val weightReady = flags.weightIntroduced || facts.hasWeight
         val heatmapCoach = facts.hasCompletedWorkout && !flags.heatmapSeen
-        val weightPrompt = flags.heatmapSeen && !weightReady && !heatmapCoach
-        val weightChartCoach = flags.heatmapSeen && weightReady && facts.hasWeight && !flags.weightChartSeen
-        val calendarReady = flags.heatmapSeen && weightReady && (!facts.hasWeight || flags.weightChartSeen)
-        val calendarCoach = calendarReady && !flags.calendarSeen && !weightPrompt && !heatmapCoach
-        val resume = resumeTarget(flags, facts, weightReady)
+        val weightChartCoach = flags.heatmapSeen && facts.hasWeight && !flags.weightChartSeen
+        val calendarHistoryCoach = flags.heatmapSeen &&
+            facts.hasWeight &&
+            flags.weightChartSeen &&
+            !flags.calendarSeen
+        val resume = resumeTarget(flags, facts)
         return OnboardingGuide(
             flags = flags,
             facts = facts,
@@ -76,38 +81,19 @@ object ProgressiveOnboardingLogic {
                 planCreated = facts.hasPlan,
                 firstWorkoutDone = facts.hasCompletedWorkout,
                 heatmapDone = flags.heatmapSeen,
-                weightDone = weightReady,
+                weightDone = facts.hasWeight,
                 historyDone = flags.calendarSeen
             ),
             resumeTarget = resume,
             showHeatmapCoach = heatmapCoach,
-            showWeightPrompt = weightPrompt,
+            showWeightPrompt = false,
             showWeightChartCoach = weightChartCoach,
-            showCalendarCoach = calendarCoach,
+            showCalendarCoach = calendarHistoryCoach,
             showHeatmapCompletionCta = heatmapCoach
         )
     }
 
     fun resumeTarget(flags: OnboardingFlags, facts: OnboardingFacts): OnboardingResumeTarget {
-        val weightReady = flags.weightIntroduced || facts.hasWeight
-        return resumeTarget(flags, facts, weightReady)
-    }
-
-    fun shouldComplete(flags: OnboardingFlags, facts: OnboardingFacts): Boolean {
-        if (!flags.started) return false
-        if (flags.completed) return true
-        val weightReady = flags.weightIntroduced || facts.hasWeight
-        return flags.heatmapSeen &&
-            weightReady &&
-            (!facts.hasWeight || flags.weightChartSeen) &&
-            flags.calendarSeen
-    }
-
-    private fun resumeTarget(
-        flags: OnboardingFlags,
-        facts: OnboardingFacts,
-        weightReady: Boolean
-    ): OnboardingResumeTarget {
         if (!flags.isActive) return OnboardingResumeTarget.None
         if (!flags.heatmapSeen) {
             if (!facts.hasCompletedWorkout) {
@@ -119,9 +105,18 @@ object ProgressiveOnboardingLogic {
             }
             return OnboardingResumeTarget.Heatmap
         }
-        if (!weightReady) return OnboardingResumeTarget.WeightPrompt
-        if (facts.hasWeight && !flags.weightChartSeen) return OnboardingResumeTarget.WeightChart
+        if (!facts.hasWeight) return OnboardingResumeTarget.WeightPrompt
+        if (!flags.weightChartSeen) return OnboardingResumeTarget.WeightChart
         if (!flags.calendarSeen) return OnboardingResumeTarget.Calendar
         return OnboardingResumeTarget.None
+    }
+
+    fun shouldComplete(flags: OnboardingFlags, facts: OnboardingFacts): Boolean {
+        if (!flags.started) return false
+        if (flags.completed) return true
+        return flags.heatmapSeen &&
+            facts.hasWeight &&
+            flags.weightChartSeen &&
+            flags.calendarSeen
     }
 }

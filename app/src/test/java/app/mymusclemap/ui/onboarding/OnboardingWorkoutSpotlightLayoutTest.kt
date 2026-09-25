@@ -164,6 +164,61 @@ class OnboardingWorkoutSpotlightLayoutTest {
         assertEquals(0, confirmed.get())
     }
 
+    @Test
+    fun calendarAndChartSpotlightsReuseTheSharedOverlay() {
+        val confirmed = AtomicInteger(0)
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = density.density, fontScale = 1f)
+            ) {
+                WeightTrackerThemeForPreview {
+                    Box(modifier = Modifier.width(360.dp).fillMaxSize()) {
+                        OnboardingCalendarWeightSpotlight(
+                            dayInRoot = Rect(160f, 420f, 200f, 460f),
+                            calendarInRoot = Rect(20f, 280f, 340f, 620f),
+                            onDismiss = {},
+                            onConfirm = { confirmed.incrementAndGet() }
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_WEIGHT_COACH).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_weight_calendar_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_got_it)).performClick()
+        assertEquals(1, confirmed.get())
+    }
+
+    @Test
+    fun chartSpotlightReusesTheSharedOverlay() {
+        val confirmed = AtomicInteger(0)
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = density.density, fontScale = 1f)
+            ) {
+                WeightTrackerThemeForPreview {
+                    Box(modifier = Modifier.width(360.dp).fillMaxSize()) {
+                        OnboardingChartSpotlight(
+                            targetInRoot = Rect(24f, 360f, 336f, 620f),
+                            onDismiss = {},
+                            onConfirm = { confirmed.incrementAndGet() }
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ONBOARDING_CHART_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_CHART_COACH).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_chart_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_got_it)).performClick()
+        assertEquals(1, confirmed.get())
+    }
+
     private fun render(
         darkTheme: Boolean = false,
         onWorkout: () -> Unit = {},

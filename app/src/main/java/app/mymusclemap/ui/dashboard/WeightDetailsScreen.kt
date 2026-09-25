@@ -42,8 +42,6 @@ import app.mymusclemap.ui.components.SegmentedControl
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.components.WeightChart
-import app.mymusclemap.ui.onboarding.ONBOARDING_CHART_COACH
-import app.mymusclemap.ui.onboarding.OnboardingTipCard
 import app.mymusclemap.ui.theme.AppDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,8 +58,7 @@ fun WeightDetailsScreen(
     onDeleteRequest: () -> Unit,
     onDeleteDismiss: () -> Unit,
     onDeleteConfirm: () -> Unit,
-    onMessageConsumed: () -> Unit,
-    onConfirmWeightChartCoach: () -> Unit = {}
+    onMessageConsumed: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedPoint by remember { mutableStateOf<ChartPoint?>(null) }
@@ -111,15 +108,6 @@ fun WeightDetailsScreen(
                 selectedPoint = selectedPoint,
                 onPointSelected = { selectedPoint = it }
             )
-            if (state.showWeightChartCoach) {
-                Spacer(Modifier.height(AppDimens.itemGap))
-                OnboardingTipCard(
-                    title = stringResource(R.string.onboarding_chart_title),
-                    body = stringResource(R.string.onboarding_chart_body),
-                    onConfirm = onConfirmWeightChartCoach,
-                    testTag = ONBOARDING_CHART_COACH
-                )
-            }
         }
     }
     state.editor?.let { editor ->

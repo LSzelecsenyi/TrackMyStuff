@@ -25,6 +25,7 @@ import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.model.ChartRange
+import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedSetDraft
 import app.mymusclemap.domain.workout.ScheduleWorkoutResult
@@ -138,14 +139,19 @@ class DashboardViewModelTest {
             templateRepository = templates,
             onboardingRepository = onboarding
         )
-        viewModel.uiState.first { it.onboarding.showWeightPrompt }
-        viewModel.onOnboardingWeightChange("81.5")
-        viewModel.saveOnboardingWeight()
-        val saved = viewModel.uiState.first { it.openWeightDetailsForOnboarding }
+        viewModel.uiState.first { it.onboarding.resumeTarget == OnboardingResumeTarget.WeightPrompt }
+        assertFalse(viewModel.uiState.value.onboarding.showWeightPrompt)
+        assertFalse(viewModel.uiState.value.onboarding.checklist.weightDone)
+        viewModel.openEditor()
+        viewModel.onEditorWeightChange("81.5")
+        viewModel.saveEditor()
+        val saved = viewModel.uiState.first { it.snapshot.todayHasMeasurement }
         assertEquals(81.5, weights.all().single().weightKg, 0.0)
         assertEquals(today, weights.all().single().date)
-        assertTrue(saved.openWeightDetailsForOnboarding)
-        assertTrue(themePreferences.currentOnboardingFlags().weightIntroduced)
+        assertTrue(saved.onboarding.checklist.weightDone)
+        assertEquals(OnboardingResumeTarget.WeightChart, saved.onboarding.resumeTarget)
+        assertFalse(saved.openWeightDetailsForOnboarding)
+        assertFalse(saved.onboarding.showWeightPrompt)
     }
 
     @Test

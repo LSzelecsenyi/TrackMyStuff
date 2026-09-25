@@ -21,6 +21,7 @@ class ProgressiveOnboardingLogicTest {
         assertFalse(guide.showWorkoutActionCoach)
         assertFalse(guide.heatmapRevealRequested)
         assertFalse(guide.showHeatmapSpotlight)
+        assertFalse(guide.showWeightPrompt)
     }
 
     @Test
@@ -65,69 +66,93 @@ class ProgressiveOnboardingLogicTest {
     }
 
     @Test
-    fun heatmapCoachIsShownOnlyUntilSeen() {
-        val facts = OnboardingFacts(hasCompletedWorkout = true)
+    fun heatmapAcknowledgementAdvancesToCalendarWeightDiscoveryWithoutOpeningWeightEntry() {
+        val facts = OnboardingFacts(hasCompletedWorkout = true, hasPlan = true)
         val pending = ProgressiveOnboardingLogic.guide(started, facts)
         assertTrue(pending.showHeatmapCoach)
         val seen = ProgressiveOnboardingLogic.guide(started.copy(heatmapSeen = true), facts)
         assertFalse(seen.showHeatmapCoach)
         assertFalse(seen.showHeatmapCompletionCta)
-        assertTrue(seen.showWeightPrompt)
+        assertFalse(seen.showWeightPrompt)
         assertEquals(OnboardingResumeTarget.WeightPrompt, seen.resumeTarget)
+        assertTrue(seen.checklist.heatmapDone)
+        assertFalse(seen.checklist.weightDone)
+        assertFalse(seen.showWeightChartCoach)
+        assertFalse(seen.showCalendarCoach)
     }
 
     @Test
-    fun weightPromptCanBeSkippedAndOnboardingCanStillComplete() {
-        val afterSkip = started.copy(heatmapSeen = true, weightIntroduced = true)
-        val facts = OnboardingFacts(hasCompletedWorkout = true)
-        val guide = ProgressiveOnboardingLogic.guide(afterSkip, facts)
-        assertFalse(guide.showWeightPrompt)
-        assertFalse(guide.showWeightChartCoach)
-        assertTrue(guide.showCalendarCoach)
-        assertEquals(OnboardingResumeTarget.Calendar, guide.resumeTarget)
-        assertTrue(guide.checklist.weightDone)
-
-        val completeFlags = afterSkip.copy(calendarSeen = true)
-        assertTrue(ProgressiveOnboardingLogic.shouldComplete(completeFlags, facts))
-        val completed = ProgressiveOnboardingLogic.guide(
-            completeFlags.copy(completed = true),
+    fun calendarWeightCoachAcknowledgementDoesNotCompleteWeightChecklist() {
+        val facts = OnboardingFacts(hasCompletedWorkout = true, hasPlan = true)
+        val afterCoach = ProgressiveOnboardingLogic.guide(
+            started.copy(heatmapSeen = true, weightIntroduced = true),
             facts
         )
-        assertFalse(completed.reminderVisible)
-        assertEquals(OnboardingResumeTarget.None, completed.resumeTarget)
+        assertEquals(OnboardingResumeTarget.WeightPrompt, afterCoach.resumeTarget)
+        assertFalse(afterCoach.checklist.weightDone)
+        assertFalse(afterCoach.showWeightPrompt)
+        assertFalse(afterCoach.showWeightChartCoach)
+        assertFalse(afterCoach.showCalendarCoach)
+        assertFalse(ProgressiveOnboardingLogic.shouldComplete(afterCoach.flags, facts))
     }
 
     @Test
-    fun savingWeightUsesChartDiscoveryThenCalendar() {
-        val afterSave = started.copy(heatmapSeen = true, weightIntroduced = true)
-        val facts = OnboardingFacts(hasCompletedWorkout = true, hasWeight = true)
-        val chart = ProgressiveOnboardingLogic.guide(afterSave, facts)
+    fun realWeightSaveCompletesWeightChecklistAndUnlocksChartDiscovery() {
+        val flags = started.copy(heatmapSeen = true, weightIntroduced = true)
+        val facts = OnboardingFacts(hasCompletedWorkout = true, hasPlan = true, hasWeight = true)
+        val chart = ProgressiveOnboardingLogic.guide(flags, facts)
+        assertTrue(chart.checklist.weightDone)
         assertTrue(chart.showWeightChartCoach)
         assertFalse(chart.showCalendarCoach)
         assertEquals(OnboardingResumeTarget.WeightChart, chart.resumeTarget)
 
-        val afterChart = ProgressiveOnboardingLogic.guide(
-            afterSave.copy(weightChartSeen = true),
-            facts
-        )
+        val afterChart = ProgressiveOnboardingLogic.guide(flags.copy(weightChartSeen = true), facts)
         assertFalse(afterChart.showWeightChartCoach)
         assertTrue(afterChart.showCalendarCoach)
         assertEquals(OnboardingResumeTarget.Calendar, afterChart.resumeTarget)
+        assertFalse(afterChart.checklist.historyDone)
     }
 
     @Test
-    fun calendarAndChartGuidanceAreShownOnlyOnce() {
+    fun existingWeightSkipsCalendarWeightDiscoveryAndGoesToChart() {
+        val guide = ProgressiveOnboardingLogic.guide(
+            started.copy(heatmapSeen = true),
+            OnboardingFacts(hasCompletedWorkout = true, hasWeight = true, hasPlan = true)
+        )
+        assertEquals(OnboardingResumeTarget.WeightChart, guide.resumeTarget)
+        assertTrue(guide.checklist.weightDone)
+        assertTrue(guide.showWeightChartCoach)
+        assertFalse(guide.showWeightPrompt)
+    }
+
+    @Test
+    fun finalCalendarGotItCompletesOnboarding() {
         val flags = started.copy(
             heatmapSeen = true,
             weightIntroduced = true,
             weightChartSeen = true,
             calendarSeen = true
         )
-        val facts = OnboardingFacts(hasCompletedWorkout = true, hasWeight = true)
-        val guide = ProgressiveOnboardingLogic.guide(flags, facts)
-        assertFalse(guide.showWeightChartCoach)
-        assertFalse(guide.showCalendarCoach)
+        val facts = OnboardingFacts(hasCompletedWorkout = true, hasWeight = true, hasPlan = true)
         assertTrue(ProgressiveOnboardingLogic.shouldComplete(flags, facts))
+        val completed = ProgressiveOnboardingLogic.guide(flags.copy(completed = true), facts)
+        assertFalse(completed.reminderVisible)
+        assertEquals(OnboardingResumeTarget.None, completed.resumeTarget)
+        assertFalse(completed.showWeightChartCoach)
+        assertFalse(completed.showCalendarCoach)
+    }
+
+    @Test
+    fun onboardingCannotCompleteWithoutARealWeightMeasurement() {
+        val flags = started.copy(
+            heatmapSeen = true,
+            weightIntroduced = true,
+            weightChartSeen = true,
+            calendarSeen = true
+        )
+        val facts = OnboardingFacts(hasCompletedWorkout = true, hasPlan = true)
+        assertFalse(ProgressiveOnboardingLogic.shouldComplete(flags, facts))
+        assertFalse(ProgressiveOnboardingLogic.guide(flags, facts).checklist.weightDone)
     }
 
     @Test

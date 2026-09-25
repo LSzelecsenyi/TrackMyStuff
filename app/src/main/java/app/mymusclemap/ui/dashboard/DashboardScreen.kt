@@ -1,6 +1,7 @@
 package app.mymusclemap.ui.dashboard
 
 import android.content.res.Configuration
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -80,10 +81,7 @@ import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.components.stringRes
 import app.mymusclemap.ui.components.WeightChart
 import app.mymusclemap.ui.components.musclemap.MuscleHeatmapCard
-import app.mymusclemap.ui.onboarding.ONBOARDING_CALENDAR_COACH
 import app.mymusclemap.ui.onboarding.OnboardingReminderCard
-import app.mymusclemap.ui.onboarding.OnboardingTipCard
-import app.mymusclemap.ui.onboarding.OnboardingWeightSheet
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
@@ -139,13 +137,14 @@ fun DashboardScreen(
     onCreateTemplateFromSchedule: () -> Unit = {},
     onContinueOnboarding: () -> Unit = {},
     onDismissOnboardingReminder: () -> Unit = {},
-    onConfirmCalendarCoach: () -> Unit = {},
-    onOnboardingWeightChange: (String) -> Unit = {},
-    onSaveOnboardingWeight: () -> Unit = {},
-    onSkipOnboardingWeight: () -> Unit = {},
     heatmapRevealRequested: Boolean = false,
+    calendarRevealRequested: Boolean = false,
+    chartRevealRequested: Boolean = false,
     onHeatmapBounds: (Rect) -> Unit = {},
-    onHeatmapRevealed: () -> Unit = {}
+    onCalendarBounds: (Rect) -> Unit = {},
+    onTodayBounds: (Rect) -> Unit = {},
+    onChartBounds: (Rect) -> Unit = {},
+    onDashboardTargetRevealed: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -153,15 +152,51 @@ fun DashboardScreen(
     val scrollState = rememberScrollState()
     var heatmapSize by remember { mutableStateOf(IntSize.Zero) }
     var heatmapYInContent by remember { mutableStateOf(0) }
-    val revealHeatmap by rememberUpdatedState(onHeatmapRevealed)
+    var calendarSize by remember { mutableStateOf(IntSize.Zero) }
+    var calendarYInContent by remember { mutableStateOf(0) }
+    var chartSize by remember { mutableStateOf(IntSize.Zero) }
+    var chartYInContent by remember { mutableStateOf(0) }
+    val revealTarget by rememberUpdatedState(onDashboardTargetRevealed)
     val reportHeatmapBounds by rememberUpdatedState(onHeatmapBounds)
-    LaunchedEffect(heatmapRevealRequested) {
-        if (!heatmapRevealRequested) return@LaunchedEffect
-        snapshotFlow { heatmapSize }.first { it != IntSize.Zero }
-        val extra = with(density) { HeatmapCoachCalloutSpace.roundToPx() }
-        val target = (heatmapYInContent - extra).coerceAtLeast(0)
-        scrollState.animateScrollTo(target)
-        revealHeatmap()
+    val reportCalendarBounds by rememberUpdatedState(onCalendarBounds)
+    val reportTodayBounds by rememberUpdatedState(onTodayBounds)
+    val reportChartBounds by rememberUpdatedState(onChartBounds)
+    val revealRequest = when {
+        heatmapRevealRequested -> "heatmap"
+        calendarRevealRequested -> "calendar"
+        chartRevealRequested -> "chart"
+        else -> null
+    }
+    var scrolledRevealKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(revealRequest) {
+        val key = revealRequest
+        if (key == null) {
+            scrolledRevealKey = null
+            return@LaunchedEffect
+        }
+        snapshotFlow {
+            when (key) {
+                "heatmap" -> heatmapSize
+                "calendar" -> calendarSize
+                else -> chartSize
+            }
+        }.first { it != IntSize.Zero }
+        if (scrolledRevealKey != key) {
+            scrolledRevealKey = key
+            val extra = with(density) { HeatmapCoachCalloutSpace.roundToPx() }
+            val y = when (key) {
+                "heatmap" -> heatmapYInContent
+                "calendar" -> calendarYInContent
+                else -> chartYInContent
+            }
+            val target = (y - extra).coerceAtLeast(0)
+            if (Build.FINGERPRINT.contains("robolectric", ignoreCase = true)) {
+                scrollState.scrollTo(target)
+            } else {
+                scrollState.animateScrollTo(target)
+            }
+        }
+        revealTarget()
     }
     UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
     Scaffold(
@@ -205,34 +240,41 @@ fun DashboardScreen(
                     }
             )
             OverviewSectionDivider()
-            Text(
-                text = stringResource(R.string.calendar_title),
-                style = AppTypeTokens.sectionTitle,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.testTag("dashboard_calendar_title")
-            )
-            Spacer(Modifier.height(AppDimens.statSecondaryGap))
-            MonthCalendar(
-                grid = state.monthGrid,
-                selectedDate = state.daySheet?.date,
-                onPreviousMonth = onPreviousMonth,
-                onNextMonth = onNextMonth,
-                onDayClick = onDaySelected,
-                modifier = Modifier.testTag("dashboard_calendar")
-            )
-            if (state.onboarding.showCalendarCoach) {
-                Spacer(Modifier.height(AppDimens.itemGap))
-                OnboardingTipCard(
-                    title = stringResource(R.string.onboarding_calendar_title),
-                    body = stringResource(R.string.onboarding_calendar_body),
-                    onConfirm = onConfirmCalendarCoach,
-                    testTag = ONBOARDING_CALENDAR_COACH
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        calendarSize = coordinates.size
+                        calendarYInContent = coordinates.positionInParent().y.roundToInt()
+                        reportCalendarBounds(coordinates.boundsInRoot())
+                    }
+            ) {
+                Text(
+                    text = stringResource(R.string.calendar_title),
+                    style = AppTypeTokens.sectionTitle,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.testTag("dashboard_calendar_title")
+                )
+                Spacer(Modifier.height(AppDimens.statSecondaryGap))
+                MonthCalendar(
+                    grid = state.monthGrid,
+                    selectedDate = state.daySheet?.date,
+                    onPreviousMonth = onPreviousMonth,
+                    onNextMonth = onNextMonth,
+                    onDayClick = onDaySelected,
+                    onTodayBounds = reportTodayBounds,
+                    modifier = Modifier.testTag("dashboard_calendar")
                 )
             }
             OverviewSectionDivider()
             CompactWeightChartSection(
                 snapshot = state.snapshot,
-                onOpenDetails = onOpenWeightDetails
+                onOpenDetails = onOpenWeightDetails,
+                modifier = Modifier.onGloballyPositioned { coordinates ->
+                    chartSize = coordinates.size
+                    chartYInContent = coordinates.positionInParent().y.roundToInt()
+                    reportChartBounds(coordinates.boundsInRoot())
+                }
             )
         }
     }
@@ -305,15 +347,6 @@ fun DashboardScreen(
             onDeleteConfirm = onDeleteConfirm
         )
     }
-    if (state.onboarding.showWeightPrompt) {
-        OnboardingWeightSheet(
-            weightInput = state.onboardingWeightInput,
-            weightError = state.onboardingWeightError,
-            onWeightChange = onOnboardingWeightChange,
-            onSave = onSaveOnboardingWeight,
-            onNotNow = onSkipOnboardingWeight
-        )
-    }
 }
 
 @Composable
@@ -333,10 +366,11 @@ private fun OverviewSectionDivider() {
 @Composable
 private fun CompactWeightChartSection(
     snapshot: DashboardSnapshot,
-    onOpenDetails: () -> Unit
+    onOpenDetails: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .testTag("dashboard_weight_chart")
     ) {

@@ -27,6 +27,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -56,7 +58,8 @@ fun MonthCalendar(
     onDayClick: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
     isDayEnabled: (CalendarCell) -> Boolean = { true },
-    showLegend: Boolean = true
+    showLegend: Boolean = true,
+    onTodayBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {}
 ) {
     val locale = AppLocale.UI
     Column(modifier = modifier.fillMaxWidth()) {
@@ -115,6 +118,7 @@ fun MonthCalendar(
                         selected = selectedDate == cell.date,
                         enabled = isDayEnabled(cell),
                         onClick = { onDayClick(cell.date) },
+                        onTodayBounds = onTodayBounds,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -194,6 +198,7 @@ private fun CalendarDayCell(
     selected: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
+    onTodayBounds: (androidx.compose.ui.geometry.Rect) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val label = CalendarDayCopy.description(
@@ -230,6 +235,15 @@ private fun CalendarDayCell(
             )
             .clip(AppShapeTokens.compact)
             .clickable(enabled = enabled, onClick = onClick)
+            .then(
+                if (cell.isToday) {
+                    Modifier.onGloballyPositioned { coordinates ->
+                        onTodayBounds(coordinates.boundsInRoot())
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .semantics { contentDescription = label }
     ) {
         Column(

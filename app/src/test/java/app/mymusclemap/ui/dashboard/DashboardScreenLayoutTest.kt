@@ -43,10 +43,12 @@ import app.mymusclemap.domain.onboarding.OnboardingGuide
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
 import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.ui.onboarding.ONBOARDING_CALENDAR_COACH
+import app.mymusclemap.ui.onboarding.ONBOARDING_CHART_COACH
 import app.mymusclemap.ui.onboarding.ONBOARDING_HEATMAP_COACH
 import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER
 import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER_CONTINUE
 import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER_DISMISS
+import app.mymusclemap.ui.onboarding.ONBOARDING_WEIGHT_SHEET
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -508,6 +510,33 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
+    fun completedProgressiveOnboardingRemovesGetStartedCard() {
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(
+                    started = true,
+                    completed = true,
+                    heatmapSeen = true,
+                    weightIntroduced = true,
+                    weightChartSeen = true,
+                    calendarSeen = true
+                ),
+                facts = OnboardingFacts(hasPlan = true, hasCompletedWorkout = true, hasWeight = true),
+                checklist = OnboardingChecklist(
+                    planCreated = true,
+                    firstWorkoutDone = true,
+                    heatmapDone = true,
+                    weightDone = true,
+                    historyDone = true
+                )
+            )
+        )
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_CHART_COACH).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_COACH).assertDoesNotExist()
+    }
+
+    @Test
     fun heatmapCoachDoesNotAutoAppearOnTheRealHeatmap() {
         render(
             onboarding = OnboardingGuide(
@@ -541,7 +570,7 @@ class DashboardScreenLayoutTest {
             ),
             heatmapRevealRequested = true,
             onHeatmapBounds = { bounds.set(it) },
-            onHeatmapRevealed = { revealed.set(true) }
+            onDashboardTargetRevealed = { revealed.set(true) }
         )
         composeRule.waitUntil(timeoutMillis = 5_000) { revealed.get() }
         composeRule.onNodeWithTag("dashboard_heatmap").assertIsDisplayed()
@@ -553,20 +582,75 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun calendarCoachIsShownOnceOnTheRealCalendar() {
-        val confirmed = AtomicBoolean(false)
+    fun calendarAndChartCoachesDoNotAutoAppearInline() {
         render(
             onboarding = OnboardingGuide(
-                flags = OnboardingFlags(started = true, heatmapSeen = true, weightIntroduced = true),
-                showCalendarCoach = true
-            ),
-            onConfirmCalendarCoach = { confirmed.set(true) }
+                flags = OnboardingFlags(started = true, heatmapSeen = true, weightChartSeen = true),
+                facts = OnboardingFacts(hasPlan = true, hasCompletedWorkout = true, hasWeight = true),
+                reminderVisible = true,
+                showCalendarCoach = true,
+                showWeightChartCoach = true
+            )
         )
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_COACH).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.onboarding_calendar_title)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.onboarding_got_it)).performClick()
-        assertTrue(confirmed.get())
+        composeRule.onNodeWithTag("dashboard_weight_chart").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_COACH).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_CHART_COACH).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SHEET).assertDoesNotExist()
+    }
+
+    @Test
+    fun calendarRevealRequestScrollsToTheRealCalendarAndReportsBounds() {
+        val revealed = AtomicBoolean(false)
+        val bounds = AtomicReference<androidx.compose.ui.geometry.Rect?>(null)
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(started = true, heatmapSeen = true),
+                facts = OnboardingFacts(hasPlan = true, hasCompletedWorkout = true),
+                reminderVisible = true,
+                checklist = OnboardingChecklist(planCreated = true, firstWorkoutDone = true, heatmapDone = true),
+                resumeTarget = OnboardingResumeTarget.WeightPrompt
+            ),
+            calendarRevealRequested = true,
+            onCalendarBounds = { bounds.set(it) },
+            onDashboardTargetRevealed = { revealed.set(true) }
+        )
+        composeRule.waitUntil(timeoutMillis = 5_000) { revealed.get() }
+        composeRule.onNodeWithTag("dashboard_calendar").assertIsDisplayed()
+        val rect = bounds.get()
+        assertNotNull(rect)
+        assertTrue(rect!!.width > 1f)
+        assertTrue(rect.height > 1f)
+    }
+
+    @Test
+    fun chartRevealRequestScrollsToTheRealChartAndReportsBounds() {
+        val revealed = AtomicBoolean(false)
+        val bounds = AtomicReference<androidx.compose.ui.geometry.Rect?>(null)
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(started = true, heatmapSeen = true),
+                facts = OnboardingFacts(hasPlan = true, hasCompletedWorkout = true, hasWeight = true),
+                reminderVisible = true,
+                checklist = OnboardingChecklist(
+                    planCreated = true,
+                    firstWorkoutDone = true,
+                    heatmapDone = true,
+                    weightDone = true
+                ),
+                resumeTarget = OnboardingResumeTarget.WeightChart,
+                showWeightChartCoach = true
+            ),
+            chartRevealRequested = true,
+            onChartBounds = { bounds.set(it) },
+            onDashboardTargetRevealed = { revealed.set(true) }
+        )
+        composeRule.waitUntil(timeoutMillis = 5_000) { revealed.get() }
+        composeRule.onNodeWithTag("dashboard_weight_chart").assertIsDisplayed()
+        val rect = bounds.get()
+        assertNotNull(rect)
+        assertTrue(rect!!.width > 1f)
+        assertTrue(rect.height > 1f)
     }
 
     private fun reminderGuide(): OnboardingGuide {
@@ -598,10 +682,13 @@ class DashboardScreenLayoutTest {
         onboarding: OnboardingGuide = OnboardingGuide.Inactive,
         onContinueOnboarding: () -> Unit = {},
         onDismissOnboardingReminder: () -> Unit = {},
-        onConfirmCalendarCoach: () -> Unit = {},
         heatmapRevealRequested: Boolean = false,
+        calendarRevealRequested: Boolean = false,
+        chartRevealRequested: Boolean = false,
         onHeatmapBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
-        onHeatmapRevealed: () -> Unit = {}
+        onCalendarBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
+        onChartBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
+        onDashboardTargetRevealed: () -> Unit = {}
     ) {
         val measurement = WeightMeasurement(1, today, 82.4, 0, 0)
         val month = YearMonth.from(today)
@@ -668,10 +755,13 @@ class DashboardScreenLayoutTest {
                             onOpenWeightDetails = onOpenWeightDetails,
                             onContinueOnboarding = onContinueOnboarding,
                             onDismissOnboardingReminder = onDismissOnboardingReminder,
-                            onConfirmCalendarCoach = onConfirmCalendarCoach,
                             heatmapRevealRequested = heatmapRevealRequested,
+                            calendarRevealRequested = calendarRevealRequested,
+                            chartRevealRequested = chartRevealRequested,
                             onHeatmapBounds = onHeatmapBounds,
-                            onHeatmapRevealed = onHeatmapRevealed
+                            onCalendarBounds = onCalendarBounds,
+                            onChartBounds = onChartBounds,
+                            onDashboardTargetRevealed = onDashboardTargetRevealed
                         )
                     }
                 }

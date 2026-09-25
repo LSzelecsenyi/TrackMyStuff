@@ -195,9 +195,11 @@
     <string name="onboarding_weight_body">Add your current weight to start building your trend.</string>
     <string name="onboarding_weight_save">Save weight</string>
     <string name="onboarding_weight_not_now">Not now</string>
-    <string name="onboarding_chart_title">Your trend starts here</string>
-    <string name="onboarding_chart_body">Keep logging your weight and your progress will appear here.</string>
-    <string name="onboarding_calendar_title">Your history, at a glance</string>
+    <string name="onboarding_weight_calendar_title">Track your body weight</string>
+    <string name="onboarding_weight_calendar_body">Tap a day to add your weight and see your progress over time.</string>
+    <string name="onboarding_chart_title">Your progress over time</string>
+    <string name="onboarding_chart_body">Your weight history appears here. Keep logging to build your trend.</string>
+    <string name="onboarding_calendar_title">Your training history</string>
     <string name="onboarding_calendar_body">Workouts and weight entries appear here automatically.</string>
     <string name="workout_complete_see_trained">See what you trained</string>
     <string name="action_open_settings">Open settings</string>

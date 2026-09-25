@@ -61,6 +61,7 @@ class OnboardingGuideViewModelTest {
     private lateinit var exerciseRepository: ExerciseRepository
     private lateinit var templateRepository: WorkoutTemplateRepository
     private lateinit var sessionRepository: WorkoutSessionRepository
+    private lateinit var weightRepository: WeightRepository
     private var lastTemplateId: Long = 0L
 
     @Before
@@ -72,7 +73,7 @@ class OnboardingGuideViewModelTest {
         val clock = Clock.fixed(Instant.parse("2026-09-25T08:00:00Z"), ZoneOffset.UTC)
         val dateProvider = FixedDateProvider(LocalDate.of(2026, 9, 25), LocalTime.of(8, 0))
         themePreferences = ThemePreferences(context)
-        val weightRepository = WeightRepository(database.weightMeasurementDao(), clock)
+        weightRepository = WeightRepository(database.weightMeasurementDao(), clock)
         exerciseRepository = ExerciseRepository(
             dao = database.exerciseDao(),
             clock = clock,
@@ -176,16 +177,90 @@ class OnboardingGuideViewModelTest {
         viewModel.requestHeatmapCoach()
         viewModel.markHeatmapReady()
         viewModel.confirmHeatmapCoach()
-        viewModel.guide.first { it.flags.heatmapSeen }
+        viewModel.guide.first { it.flags.heatmapSeen && it.calendarRevealRequested }
         assertTrue(viewModel.guide.value.checklist.heatmapDone)
         assertFalse(viewModel.guide.value.showHeatmapCoach)
         assertFalse(viewModel.guide.value.showHeatmapSpotlight)
+        assertFalse(viewModel.guide.value.showWeightPrompt)
         assertEquals(OnboardingResumeTarget.WeightPrompt, viewModel.guide.value.resumeTarget)
+        assertTrue(viewModel.guide.value.calendarRevealRequested)
+        assertFalse(viewModel.guide.value.checklist.weightDone)
 
         viewModel.requestHeatmapCoach()
         viewModel.markHeatmapReady()
         assertFalse(viewModel.guide.value.heatmapRevealRequested)
         assertFalse(viewModel.guide.value.showHeatmapSpotlight)
+    }
+
+    @Test
+    fun calendarWeightCoachAcknowledgementDoesNotCreateWeight() = runTest {
+        repository.markStarted()
+        completeFirstWorkout()
+        val viewModel = guideViewModel()
+        viewModel.guide.first { it.resumeTarget == OnboardingResumeTarget.Heatmap }
+        viewModel.confirmHeatmapCoach()
+        viewModel.guide.first { it.flags.heatmapSeen && it.calendarRevealRequested }
+        assertEquals(OnboardingResumeTarget.WeightPrompt, viewModel.guide.value.resumeTarget)
+        viewModel.markDashboardTargetReady()
+        assertTrue(viewModel.guide.value.showCalendarWeightSpotlight)
+        viewModel.dismissCalendarWeightCoach()
+        assertFalse(viewModel.guide.value.showCalendarWeightSpotlight)
+        assertFalse(viewModel.guide.value.flags.weightIntroduced)
+        assertFalse(viewModel.guide.value.facts.hasWeight)
+
+        viewModel.requestCalendarWeightCoach()
+        viewModel.markDashboardTargetReady()
+        viewModel.confirmCalendarWeightCoach()
+        viewModel.guide.first { it.flags.weightIntroduced }
+        assertTrue(viewModel.guide.value.flags.weightIntroduced)
+        assertFalse(viewModel.guide.value.facts.hasWeight)
+        assertFalse(viewModel.guide.value.checklist.weightDone)
+        assertEquals(OnboardingResumeTarget.WeightPrompt, viewModel.guide.value.resumeTarget)
+        assertFalse(viewModel.guide.value.showCalendarWeightSpotlight)
+        assertFalse(viewModel.guide.value.showWeightPrompt)
+    }
+
+    @Test
+    fun heatmapConfirmWithExistingWeightSkipsCalendarAndRequestsChart() = runTest {
+        repository.markStarted()
+        completeFirstWorkout()
+        weightRepository.save(LocalDate.of(2026, 9, 25), 81.5)
+        val viewModel = guideViewModel()
+        viewModel.guide.first { it.resumeTarget == OnboardingResumeTarget.Heatmap }
+        viewModel.confirmHeatmapCoach()
+        viewModel.guide.first { it.flags.heatmapSeen && it.chartRevealRequested }
+        assertEquals(OnboardingResumeTarget.WeightChart, viewModel.guide.value.resumeTarget)
+        assertTrue(viewModel.guide.value.checklist.weightDone)
+        assertFalse(viewModel.guide.value.calendarRevealRequested)
+        assertTrue(viewModel.guide.value.chartRevealRequested)
+        viewModel.markDashboardTargetReady()
+        viewModel.guide.first { it.showChartSpotlight }
+    }
+
+    @Test
+    fun firstRealWeightMakesChartDiscoveryAvailableOnce() = runTest {
+        repository.markStarted()
+        completeFirstWorkout()
+        val viewModel = guideViewModel()
+        viewModel.guide.first { it.resumeTarget == OnboardingResumeTarget.Heatmap }
+        viewModel.confirmHeatmapCoach()
+        viewModel.guide.first { it.flags.heatmapSeen && it.calendarRevealRequested }
+        assertEquals(OnboardingResumeTarget.WeightPrompt, viewModel.guide.value.resumeTarget)
+        weightRepository.save(LocalDate.of(2026, 9, 25), 81.5)
+        viewModel.guide.first { it.resumeTarget == OnboardingResumeTarget.WeightChart }
+        assertTrue(viewModel.guide.value.checklist.weightDone)
+        assertTrue(viewModel.guide.value.showWeightChartCoach)
+        viewModel.requestChartCoach()
+        viewModel.markDashboardTargetReady()
+        viewModel.guide.first { it.showChartSpotlight }
+        viewModel.confirmChartCoach()
+        viewModel.guide.first { it.flags.weightChartSeen && it.calendarRevealRequested }
+        assertFalse(viewModel.guide.value.showChartSpotlight)
+        assertEquals(OnboardingResumeTarget.Calendar, viewModel.guide.value.resumeTarget)
+        viewModel.requestChartCoach()
+        viewModel.markDashboardTargetReady()
+        assertFalse(viewModel.guide.value.showChartSpotlight)
+        assertFalse(viewModel.guide.value.chartRevealRequested)
     }
 
     private fun guideViewModel(): OnboardingGuideViewModel {

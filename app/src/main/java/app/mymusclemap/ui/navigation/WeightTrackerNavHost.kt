@@ -55,6 +55,9 @@ import app.mymusclemap.ui.history.HistoryViewModel
 import app.mymusclemap.ui.history.WorkoutDetailScreen
 import app.mymusclemap.ui.history.WorkoutDetailViewModel
 import app.mymusclemap.ui.settings.FeedbackComposer
+import app.mymusclemap.ui.onboarding.OnboardingCalendarHistorySpotlight
+import app.mymusclemap.ui.onboarding.OnboardingCalendarWeightSpotlight
+import app.mymusclemap.ui.onboarding.OnboardingChartSpotlight
 import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingHeatmapSpotlight
 import app.mymusclemap.ui.onboarding.OnboardingWorkoutSpotlight
@@ -131,6 +134,9 @@ fun WeightTrackerNavHost(
     val resources = LocalResources.current
     var workoutActionBounds by remember { mutableStateOf(Rect.Zero) }
     var heatmapBounds by remember { mutableStateOf(Rect.Zero) }
+    var calendarBounds by remember { mutableStateOf(Rect.Zero) }
+    var todayBounds by remember { mutableStateOf(Rect.Zero) }
+    var chartBounds by remember { mutableStateOf(Rect.Zero) }
     val onPrimaryWorkoutClick = {
         onboardingGuideViewModel.dismissStartWorkoutCoach()
         when (val action = workoutHubViewModel.onPrimaryWorkoutAction()) {
@@ -151,6 +157,11 @@ fun WeightTrackerNavHost(
         val sessionId = hubState.startedSessionId ?: return@LaunchedEffect
         workoutHubViewModel.consumeStartedSession()
         navController.openActiveWorkout(sessionId)
+    }
+    LaunchedEffect(onboardingGuide.resumeTarget) {
+        if (onboardingGuide.resumeTarget == OnboardingResumeTarget.WeightChart) {
+            onboardingGuideViewModel.requestChartCoach()
+        }
     }
     LaunchedEffect(openNewTemplate) {
         if (!openNewTemplate) return@LaunchedEffect
@@ -246,26 +257,43 @@ fun WeightTrackerNavHost(
                             OnboardingResumeTarget.Heatmap -> {
                                 onboardingGuideViewModel.requestHeatmapCoach()
                             }
-                            OnboardingResumeTarget.WeightChart -> {
-                                navController.navigateInternal(AppRoutes.WEIGHT_DETAILS)
+                            OnboardingResumeTarget.WeightPrompt -> {
+                                onboardingGuideViewModel.requestCalendarWeightCoach()
                             }
-                            OnboardingResumeTarget.None,
-                            OnboardingResumeTarget.WeightPrompt,
-                            OnboardingResumeTarget.Calendar -> Unit
+                            OnboardingResumeTarget.WeightChart -> {
+                                onboardingGuideViewModel.requestChartCoach()
+                            }
+                            OnboardingResumeTarget.Calendar -> {
+                                onboardingGuideViewModel.requestCalendarHistoryCoach()
+                            }
+                            OnboardingResumeTarget.None -> Unit
                         }
                     },
                     onDismissOnboardingReminder = viewModel::dismissOnboardingReminder,
-                    onConfirmCalendarCoach = viewModel::markCalendarSeen,
-                    onOnboardingWeightChange = viewModel::onOnboardingWeightChange,
-                    onSaveOnboardingWeight = viewModel::saveOnboardingWeight,
-                    onSkipOnboardingWeight = viewModel::skipOnboardingWeight,
                     heatmapRevealRequested = onboardingGuide.heatmapRevealRequested,
+                    calendarRevealRequested = onboardingGuide.calendarRevealRequested,
+                    chartRevealRequested = onboardingGuide.chartRevealRequested,
                     onHeatmapBounds = { bounds ->
                         if (bounds != heatmapBounds) {
                             heatmapBounds = bounds
                         }
                     },
-                    onHeatmapRevealed = onboardingGuideViewModel::markHeatmapReady
+                    onCalendarBounds = { bounds ->
+                        if (bounds != calendarBounds) {
+                            calendarBounds = bounds
+                        }
+                    },
+                    onTodayBounds = { bounds ->
+                        if (bounds != todayBounds) {
+                            todayBounds = bounds
+                        }
+                    },
+                    onChartBounds = { bounds ->
+                        if (bounds != chartBounds) {
+                            chartBounds = bounds
+                        }
+                    },
+                    onDashboardTargetRevealed = onboardingGuideViewModel::markDashboardTargetReady
                 )
                 LaunchedEffect(state.startedSessionId) {
                     val sessionId = state.startedSessionId ?: return@LaunchedEffect
@@ -383,11 +411,7 @@ fun WeightTrackerNavHost(
                     onDeleteRequest = viewModel::requestDelete,
                     onDeleteDismiss = viewModel::dismissDelete,
                     onDeleteConfirm = viewModel::confirmDelete,
-                    onMessageConsumed = viewModel::consumeMessage,
-                    onConfirmWeightChartCoach = {
-                        viewModel.markWeightChartSeen()
-                        navController.popBackStack()
-                    }
+                    onMessageConsumed = viewModel::consumeMessage
                 )
             }
             composable(AppRoutes.EXERCISES) { entry ->
@@ -679,6 +703,34 @@ fun WeightTrackerNavHost(
             targetInRoot = heatmapBounds,
             onDismiss = onboardingGuideViewModel::dismissHeatmapCoach,
             onConfirm = onboardingGuideViewModel::confirmHeatmapCoach
+        )
+    }
+    if (onboardingGuide.showCalendarWeightSpotlight &&
+        AppNavigation.canonicalRoute(currentRoute) == AppRoutes.OVERVIEW
+    ) {
+        OnboardingCalendarWeightSpotlight(
+            dayInRoot = todayBounds,
+            calendarInRoot = calendarBounds,
+            onDismiss = onboardingGuideViewModel::dismissCalendarWeightCoach,
+            onConfirm = onboardingGuideViewModel::confirmCalendarWeightCoach
+        )
+    }
+    if (onboardingGuide.showChartSpotlight &&
+        AppNavigation.canonicalRoute(currentRoute) == AppRoutes.OVERVIEW
+    ) {
+        OnboardingChartSpotlight(
+            targetInRoot = chartBounds,
+            onDismiss = onboardingGuideViewModel::dismissChartCoach,
+            onConfirm = onboardingGuideViewModel::confirmChartCoach
+        )
+    }
+    if (onboardingGuide.showCalendarHistorySpotlight &&
+        AppNavigation.canonicalRoute(currentRoute) == AppRoutes.OVERVIEW
+    ) {
+        OnboardingCalendarHistorySpotlight(
+            targetInRoot = calendarBounds,
+            onDismiss = onboardingGuideViewModel::dismissCalendarHistoryCoach,
+            onConfirm = onboardingGuideViewModel::confirmCalendarHistoryCoach
         )
     }
     }

@@ -107,17 +107,42 @@ class OnboardingRepositoryTest {
     }
 
     @Test
-    fun skippingWeightStillAllowsCalendarCompletion() = runTest {
+    fun restartPreservesCalendarWeightDiscoveryUntilARealWeightExists() = runTest {
+        repository.markStarted()
+        repository.markHeatmapSeen()
+        val resumed = repository.observe().first { it.flags.heatmapSeen }
+        assertEquals(OnboardingResumeTarget.WeightPrompt, resumed.resumeTarget)
+        assertFalse(resumed.checklist.weightDone)
+        assertFalse(resumed.showWeightPrompt)
+        assertTrue(resumed.reminderVisible)
+
+        val restored = OnboardingRepository(
+            themePreferences,
+            sessionRepository,
+            weightRepository,
+            templateRepository
+        )
+        val afterRestart = restored.observe().first { it.flags.started && it.flags.heatmapSeen }
+        assertEquals(OnboardingResumeTarget.WeightPrompt, afterRestart.resumeTarget)
+        assertFalse(afterRestart.checklist.weightDone)
+        assertFalse(afterRestart.flags.completed)
+    }
+
+    @Test
+    fun acknowledgingCalendarWeightCoachDoesNotCompleteWithoutARealWeight() = runTest {
         repository.markStarted()
         repository.markHeatmapSeen()
         repository.markWeightIntroduced()
-        val afterSkip = repository.observe().first { it.flags.weightIntroduced }
-        assertTrue(afterSkip.showCalendarCoach)
-        assertFalse(afterSkip.showWeightChartCoach)
+        val afterCoach = repository.observe().first { it.flags.weightIntroduced }
+        assertEquals(OnboardingResumeTarget.WeightPrompt, afterCoach.resumeTarget)
+        assertFalse(afterCoach.checklist.weightDone)
+        assertFalse(afterCoach.showWeightPrompt)
+        assertFalse(afterCoach.showWeightChartCoach)
+        assertFalse(afterCoach.flags.completed)
         repository.markCalendarSeen()
-        val done = repository.observe().first { it.flags.completed }
-        assertTrue(done.flags.completed)
-        assertFalse(done.reminderVisible)
+        val stillOpen = repository.observe().first { it.flags.calendarSeen }
+        assertFalse(stillOpen.flags.completed)
+        assertFalse(stillOpen.checklist.weightDone)
     }
 
     @Test
@@ -125,15 +150,20 @@ class OnboardingRepositoryTest {
         repository.markStarted()
         repository.markHeatmapSeen()
         weightRepository.save(dateProvider.today(), 82.4)
-        repository.markWeightIntroduced()
-        val afterSave = repository.observe().first { it.facts.hasWeight && it.flags.weightIntroduced }
+        val afterSave = repository.observe().first { it.facts.hasWeight }
         assertEquals(82.4, weightRepository.observeAll().first().single().weightKg, 0.0)
+        assertTrue(afterSave.checklist.weightDone)
         assertTrue(afterSave.showWeightChartCoach)
         assertEquals(OnboardingResumeTarget.WeightChart, afterSave.resumeTarget)
         repository.markWeightChartSeen()
         val afterChart = repository.observe().first { it.flags.weightChartSeen }
         assertFalse(afterChart.showWeightChartCoach)
         assertTrue(afterChart.showCalendarCoach)
+        assertEquals(OnboardingResumeTarget.Calendar, afterChart.resumeTarget)
+        repository.markCalendarSeen()
+        val done = repository.observe().first { it.flags.completed }
+        assertTrue(done.flags.completed)
+        assertFalse(done.reminderVisible)
     }
 
     @Test
