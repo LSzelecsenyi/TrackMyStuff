@@ -102,7 +102,9 @@ private fun workoutDetailRoute(sessionId: Long): String {
 @Composable
 fun WeightTrackerNavHost(
     factory: WeightViewModelFactory,
-    dateProvider: DateProvider
+    dateProvider: DateProvider,
+    openNewTemplate: Boolean = false,
+    onOpenedNewTemplate: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -122,6 +124,11 @@ fun WeightTrackerNavHost(
         val sessionId = hubState.startedSessionId ?: return@LaunchedEffect
         workoutHubViewModel.consumeStartedSession()
         navController.openActiveWorkout(sessionId)
+    }
+    LaunchedEffect(openNewTemplate) {
+        if (!openNewTemplate) return@LaunchedEffect
+        navController.navigateInternal(templateEditorRoute(null))
+        onOpenedNewTemplate()
     }
 
     Scaffold(

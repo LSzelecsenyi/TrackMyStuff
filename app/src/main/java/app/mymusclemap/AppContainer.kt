@@ -5,6 +5,7 @@ import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.ExerciseRepository
+import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
@@ -52,6 +53,7 @@ class AppContainer(context: Context) {
     )
     val themePreferences = ThemePreferences(appContext)
     val appBackupRepository = AppBackupRepository(database, themePreferences)
+    val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     val viewModelFactory = WeightViewModelFactory(
         weightRepository = weightRepository,
         exerciseRepository = exerciseRepository,
@@ -61,6 +63,7 @@ class AppContainer(context: Context) {
         dateProvider = dateProvider,
         themePreferences = themePreferences,
         workoutImportFileReader = ContentWorkoutImportFileReader(appContext),
-        appBackupRepository = appBackupRepository
+        appBackupRepository = appBackupRepository,
+        firstRunCoordinator = firstRunCoordinator
     )
 }

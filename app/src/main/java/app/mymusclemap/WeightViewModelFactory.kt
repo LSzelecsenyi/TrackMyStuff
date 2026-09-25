@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.ExerciseRepository
+import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
@@ -22,6 +23,7 @@ import app.mymusclemap.ui.exercises.ExerciseListViewModel
 import app.mymusclemap.ui.exercises.labelRes
 import app.mymusclemap.ui.history.HistoryViewModel
 import app.mymusclemap.ui.history.WorkoutDetailViewModel
+import app.mymusclemap.ui.onboarding.OnboardingViewModel
 import app.mymusclemap.ui.settings.SettingsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
 import app.mymusclemap.ui.templates.TemplateListViewModel
@@ -38,7 +40,8 @@ class WeightViewModelFactory(
     private val dateProvider: DateProvider,
     private val themePreferences: ThemePreferences,
     private val workoutImportFileReader: WorkoutImportFileReader,
-    private val appBackupRepository: AppBackupRepository
+    private val appBackupRepository: AppBackupRepository,
+    private val firstRunCoordinator: FirstRunCoordinator
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -74,6 +77,9 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
                 SettingsViewModel(weightRepository, themePreferences, dateProvider, appBackupRepository)
+            }
+            modelClass.isAssignableFrom(OnboardingViewModel::class.java) -> {
+                OnboardingViewModel(firstRunCoordinator)
             }
             modelClass.isAssignableFrom(ExerciseListViewModel::class.java) -> {
                 ExerciseListViewModel(exerciseRepository)

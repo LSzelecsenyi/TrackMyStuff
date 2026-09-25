@@ -3,6 +3,7 @@ package app.mymusclemap.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -39,9 +40,33 @@ class ThemePreferences(context: Context) {
 
     suspend fun current(): AppearanceSettings = appearance.first()
 
+    /**
+     * First-run onboarding lives in DataStore, not in the v1 backup file.
+     * Appearance restore keeps this flag so a backup cannot re-open onboarding
+     * or wipe a completed first-run on the current device.
+     */
+    suspend fun isOnboardingCompleted(): Boolean {
+        return dataStore.data.first()[KEY_ONBOARDING_COMPLETED] == true
+    }
+
+    suspend fun markOnboardingCompleted() {
+        setOnboardingCompleted(true)
+    }
+
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        dataStore.edit { prefs ->
+            if (completed) {
+                prefs[KEY_ONBOARDING_COMPLETED] = true
+            } else {
+                prefs.remove(KEY_ONBOARDING_COMPLETED)
+            }
+        }
+    }
+
     suspend fun replaceAppearance(settings: AppearanceSettings) {
         val encoded = AppearanceCodec.encode(settings)
         dataStore.edit { prefs ->
+            val onboardingCompleted = prefs[KEY_ONBOARDING_COMPLETED]
             prefs.clear()
             prefs[KEY_THEME] = encoded.getValue(AppearanceCodec.KEY_THEME)
             prefs[KEY_PALETTE_TYPE] = encoded.getValue(AppearanceCodec.KEY_PALETTE_TYPE)
@@ -53,6 +78,9 @@ class ThemePreferences(context: Context) {
             prefs[KEY_DARK_PRIMARY] = encoded.getValue(AppearanceCodec.KEY_DARK_PRIMARY)
             prefs[KEY_DARK_SECONDARY] = encoded.getValue(AppearanceCodec.KEY_DARK_SECONDARY)
             prefs[KEY_DARK_TERTIARY] = encoded.getValue(AppearanceCodec.KEY_DARK_TERTIARY)
+            if (onboardingCompleted != null) {
+                prefs[KEY_ONBOARDING_COMPLETED] = onboardingCompleted
+            }
         }
     }
 
@@ -99,5 +127,6 @@ class ThemePreferences(context: Context) {
         val KEY_DARK_PRIMARY = stringPreferencesKey(AppearanceCodec.KEY_DARK_PRIMARY)
         val KEY_DARK_SECONDARY = stringPreferencesKey(AppearanceCodec.KEY_DARK_SECONDARY)
         val KEY_DARK_TERTIARY = stringPreferencesKey(AppearanceCodec.KEY_DARK_TERTIARY)
+        val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     }
 }

@@ -120,6 +120,7 @@ internal const val SET_REPS_PLUS = "set-reps-plus"
 internal const val SET_REPS_MINUS_CIRCLE = "set-reps-minus-circle"
 internal const val SET_REPS_PLUS_CIRCLE = "set-reps-plus-circle"
 internal const val SET_HEADER_TITLE = "set-header-title"
+internal const val SET_HEADER_COUNT = "set-header-count"
 internal const val SET_HEADER_STATUS = "set-header-status"
 private val SetActionCircleSize = 32.dp
 internal const val WORKOUT_TOP_BAR = "workout-top-bar"
@@ -921,11 +922,14 @@ private fun SetRow(
         Column(
             modifier = Modifier.semantics { isTraversalGroup = true }
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
             if (current) {
                 Box(
                     modifier = Modifier
-                        .padding(end = 8.dp)
                         .width(3.dp)
                         .height(28.dp)
                         .clip(AppShapeTokens.compact)
@@ -933,11 +937,15 @@ private fun SetRow(
                 )
             }
             Text(
-                text = stringResource(
-                    R.string.field_set_label_with_exercise,
-                    set.position + 1,
+                text = if (current) {
                     item.exercise.name
-                ),
+                } else {
+                    stringResource(
+                        R.string.field_set_label_with_exercise,
+                        set.position + 1,
+                        item.exercise.name
+                    )
+                },
                 style = AppTypeTokens.sectionTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -945,6 +953,19 @@ private fun SetRow(
                     .weight(1f)
                     .testTag(SET_HEADER_TITLE)
             )
+            if (current) {
+                Text(
+                    text = stringResource(
+                        R.string.active_console_sets,
+                        set.position + 1,
+                        item.sets.size
+                    ),
+                    style = AppTypeTokens.statSecondary,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.testTag(SET_HEADER_COUNT)
+                )
+            }
             Box(
                 modifier = Modifier
                     .wrapContentWidth()

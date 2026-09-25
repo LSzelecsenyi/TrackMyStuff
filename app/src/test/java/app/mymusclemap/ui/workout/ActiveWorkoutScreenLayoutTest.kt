@@ -208,7 +208,7 @@ class ActiveWorkoutScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_COMPLETE_ACTION).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SET_SKIP_ACTION).assertIsDisplayed()
-        composeRule.onNodeWithText("Húzódzkodás").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Húzódzkodás")[0].assertIsDisplayed()
         composeRule.onNodeWithTag(WORKOUT_FINISH_CTA).assertIsDisplayed()
         val complete = composeRule.onNodeWithTag(SET_COMPLETE_ACTION).getBoundsInRoot()
         assertTrue(complete.bottom - complete.top >= 48.dp)
@@ -416,11 +416,38 @@ class ActiveWorkoutScreenLayoutTest {
     }
 
     @Test
-    fun setHeaderShowsExerciseNameBesideIndex() {
+    fun currentSetHeaderShowsExercisePositionInsteadOfGlobalIndex() {
         render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
-        composeRule.onNodeWithText(testString(R.string.field_set_label_with_exercise, 1, "Vádli")).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_HEADER_TITLE).assertIsDisplayed()
+        composeRule.onAllNodesWithText("Vádli").assertCountEquals(2)
+        composeRule.onNodeWithText(testString(R.string.field_set_label_with_exercise, 1, "Vádli")).assertDoesNotExist()
+        composeRule.onNodeWithTag(SET_HEADER_COUNT).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_console_sets, 1, 1)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertIsDisplayed()
-        composeRule.onNodeWithText("Vádli").assertIsDisplayed()
+    }
+
+    @Test
+    fun currentSetCounterUsesPositionWithinItsExercise() {
+        render(state = multiExerciseState(), width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithTag(SET_HEADER_COUNT).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_console_sets, 3, 3)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.field_set_label_with_exercise, 5, "Húzódzkodás")).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.active_console_sets, 4, 5)).assertIsDisplayed()
+        val titles = composeRule.onAllNodesWithTag(SET_HEADER_TITLE)
+        val title = titles[titles.fetchSemanticsNodes().lastIndex].getBoundsInRoot()
+        val count = composeRule.onNodeWithTag(SET_HEADER_COUNT).getBoundsInRoot()
+        val statuses = composeRule.onAllNodesWithTag(SET_HEADER_STATUS)
+        val status = statuses[statuses.fetchSemanticsNodes().lastIndex].getBoundsInRoot()
+        assertTrue(title.right <= count.left)
+        assertTrue(count.right <= status.left)
+    }
+
+    @Test
+    fun extraSetIsCountedInTheExerciseTotal() {
+        render(state = extraSetState(), width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithTag(SET_HEADER_COUNT).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_console_sets, 4, 4)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.field_set_label_with_exercise, 4, "Húzódzkodás")).assertDoesNotExist()
     }
 
     @Test
@@ -431,9 +458,12 @@ class ActiveWorkoutScreenLayoutTest {
         val status = composeRule.onAllNodesWithTag(SET_HEADER_STATUS)[0].getBoundsInRoot()
         val complete = composeRule.onNodeWithTag(SET_COMPLETE_ACTION).getBoundsInRoot()
         val skip = composeRule.onNodeWithTag(SET_SKIP_ACTION).getBoundsInRoot()
+        val count = composeRule.onNodeWithTag(SET_HEADER_COUNT).getBoundsInRoot()
         composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_SKIP_ACTION).assertIsDisplayed()
+        assertTrue("title=$title count=$count", title.right <= count.left + 1.dp)
+        assertTrue("count=$count status=$status", count.right <= status.left + 1.dp)
         assertTrue("title=$title status=$status", title.right <= status.left + 1.dp)
         assertTrue("status=$status complete=$complete", !overlaps(status, complete))
         assertTrue("status=$status skip=$skip", !overlaps(status, skip))
@@ -671,6 +701,65 @@ class ActiveWorkoutScreenLayoutTest {
             currentSetId = null,
             expandedExerciseIds = setOf(10L),
             drafts = mapOf(done.id to ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY))
+        )
+    }
+
+    private fun multiExerciseState(): ActiveWorkoutUiState {
+        val bench = listOf(
+            set(1L, 10L, 0, SessionSetStatus.COMPLETED),
+            set(2L, 10L, 1, SessionSetStatus.COMPLETED)
+        )
+        val pullup = listOf(
+            set(3L, 11L, 0, SessionSetStatus.COMPLETED),
+            set(4L, 11L, 1, SessionSetStatus.COMPLETED),
+            set(5L, 11L, 2, SessionSetStatus.PENDING)
+        )
+        val current = pullup.last()
+        return ActiveWorkoutUiState(
+            loading = false,
+            aggregate = WorkoutSessionAggregate(
+                session(),
+                listOf(
+                    item(10L, "Fekvenyomás", 0, bench),
+                    item(11L, "Húzódzkodás", 1, pullup)
+                )
+            ),
+            currentExerciseId = 11L,
+            currentSetId = current.id,
+            focusedSetId = current.id,
+            expandedExerciseIds = setOf(11L),
+            drafts = (bench + pullup).associate { item ->
+                item.id to if (item.status == SessionSetStatus.COMPLETED) {
+                    ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+                } else {
+                    ActualSetLogic.draftFromSet(item)
+                }
+            }
+        )
+    }
+
+    private fun extraSetState(): ActiveWorkoutUiState {
+        val sets = listOf(
+            set(1L, 10L, 0, SessionSetStatus.COMPLETED),
+            set(2L, 10L, 1, SessionSetStatus.COMPLETED),
+            set(3L, 10L, 2, SessionSetStatus.COMPLETED),
+            set(4L, 10L, 3, SessionSetStatus.PENDING).copy(addedDuringWorkout = true)
+        )
+        val current = sets.last()
+        return ActiveWorkoutUiState(
+            loading = false,
+            aggregate = WorkoutSessionAggregate(session(), listOf(item(10L, "Húzódzkodás", 0, sets))),
+            currentExerciseId = 10L,
+            currentSetId = current.id,
+            focusedSetId = current.id,
+            expandedExerciseIds = setOf(10L),
+            drafts = sets.associate { item ->
+                item.id to if (item.status == SessionSetStatus.COMPLETED) {
+                    ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+                } else {
+                    ActualSetLogic.draftFromSet(item)
+                }
+            }
         )
     }
 

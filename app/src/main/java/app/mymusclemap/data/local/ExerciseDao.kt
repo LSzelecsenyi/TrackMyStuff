@@ -28,6 +28,9 @@ abstract class ExerciseDao {
     @Query("SELECT COUNT(*) FROM exercises WHERE archived = 1")
     abstract fun observeArchivedCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM exercises")
+    abstract suspend fun countAll(): Int
+
     @Query("SELECT * FROM exercises ORDER BY name COLLATE NOCASE ASC, id ASC")
     abstract suspend fun getAll(): List<ExerciseEntity>
 

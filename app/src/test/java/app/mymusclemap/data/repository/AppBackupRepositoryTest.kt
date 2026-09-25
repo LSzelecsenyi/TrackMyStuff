@@ -46,6 +46,7 @@ import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -67,6 +68,7 @@ class AppBackupRepositoryTest {
         targetDb = openDb(context)
         themePreferences = ThemePreferences(context)
         themePreferences.replaceAppearance(AppearanceSettings.Default)
+        themePreferences.setOnboardingCompleted(false)
     }
 
     @After
@@ -209,6 +211,26 @@ class AppBackupRepositoryTest {
         }
         assertTrue(failed)
         assertEquals(original, targetDb.appBackupDao().loadTables())
+    }
+
+    @Test
+    fun exportOmitsOnboardingFlagAndRestorePreservesLocalCompletion() = runTest {
+        themePreferences.markOnboardingCompleted()
+        sourceDb.appBackupDao().replaceAll(representativeTables())
+        themePreferences.replaceAppearance(customAppearance())
+        val json = AppBackupRepository(sourceDb, themePreferences)
+            .exportJson(AppBackupSource("app.mymusclemap.debug", "1.0-debug"))
+        val parsed = AppBackupJson.parse(json) as AppBackupParseResult.Success
+        assertFalse(parsed.snapshot.settings.containsKey("onboarding_completed"))
+
+        themePreferences.setOnboardingCompleted(false)
+        assertEquals(AppBackupRestoreResult.Success, AppBackupRepository(targetDb, themePreferences).restoreJson(json))
+        assertFalse(themePreferences.isOnboardingCompleted())
+
+        themePreferences.markOnboardingCompleted()
+        assertEquals(AppBackupRestoreResult.Success, AppBackupRepository(targetDb, themePreferences).restoreJson(json))
+        assertTrue(themePreferences.isOnboardingCompleted())
+        assertEquals(customAppearance().mode, themePreferences.current().mode)
     }
 
     @Test

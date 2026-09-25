@@ -160,6 +160,14 @@
     <string name="message_app_backup_export_failed">The backup file could not be saved.</string>
     <string name="message_app_backup_restore_success">Data restored.</string>
     <string name="message_app_backup_read_failed">The backup file could not be read.</string>
+    <string name="onboarding_kicker">My Muscle Map</string>
+    <string name="onboarding_welcome_title">Track your training</string>
+    <string name="onboarding_welcome_body">Build workout plans, log sets, and see which muscles you train. A starter catalog of common exercises is ready to use.</string>
+    <string name="onboarding_setup_title">Create your first workout</string>
+    <string name="onboarding_setup_body">Add exercises from the starter catalog to a plan. After you save it, you can start it anytime from Workout.</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_create_plan">Create workout plan</string>
+    <string name="onboarding_skip">Skip for now</string>
     <string name="action_open_settings">Open settings</string>
     <string name="action_more_overview">More actions</string>
     <string name="workout_hub_intro">Start a workout from a plan, or manage workout plans and the exercise catalog.</string>
