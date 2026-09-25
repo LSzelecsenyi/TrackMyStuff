@@ -54,6 +54,15 @@ class AppBottomBarLayoutTest {
     }
 
     @Test
+    fun highlightedWorkoutActionStillInvokesTheExistingClickHandler() {
+        var workouts = 0
+        render(highlightWorkoutAction = true, onWorkoutAction = { workouts += 1 })
+        composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).performClick()
+        assertEquals(1, workouts)
+    }
+
+    @Test
     fun givenActiveSessionWhenBarAppearsThenMiddleActionResumesWorkout() {
         render(hasActiveSession = true)
         composeRule.onNodeWithContentDescription(testString(R.string.action_resume_workout)).assertIsDisplayed()
@@ -81,6 +90,7 @@ class AppBottomBarLayoutTest {
     private fun render(
         hasActiveSession: Boolean = false,
         fontScale: Float = 1f,
+        highlightWorkoutAction: Boolean = false,
         onWorkoutAction: () -> Unit = {}
     ) {
         composeRule.setContent {
@@ -97,6 +107,7 @@ class AppBottomBarLayoutTest {
                         AppBottomBar(
                             selectedRoute = AppRoutes.OVERVIEW,
                             hasActiveSession = hasActiveSession,
+                            highlightWorkoutAction = highlightWorkoutAction,
                             onOverview = {},
                             onJournal = {},
                             onWorkoutAction = onWorkoutAction

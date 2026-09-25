@@ -75,12 +75,35 @@ class WorkoutCompletionScreenLayoutTest {
         assertEquals(1, back)
     }
 
+    @Test
+    fun firstCompletedWorkoutOffersHeatmapDiscoveryOnTheRealCompletionScreen() {
+        var heatmap = 0
+        var back = 0
+        render(
+            WorkoutCompletionSummary(2, 8, 600_000L),
+            width = 360.dp,
+            fontScale = 1f,
+            onBack = { back += 1 },
+            playAnimation = false,
+            showHeatmapCta = true,
+            onSeeWhatYouTrained = { heatmap += 1 }
+        )
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_HEATMAP).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_complete_see_trained)).assertIsDisplayed()
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_HEATMAP).performClick()
+        assertEquals(1, heatmap)
+        assertEquals(0, back)
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_BACK).assertIsDisplayed()
+    }
+
     private fun render(
         summary: WorkoutCompletionSummary,
         width: Dp,
         fontScale: Float,
         onBack: () -> Unit,
-        playAnimation: Boolean = false
+        playAnimation: Boolean = false,
+        showHeatmapCta: Boolean = false,
+        onSeeWhatYouTrained: () -> Unit = onBack
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -96,7 +119,9 @@ class WorkoutCompletionScreenLayoutTest {
                         WorkoutCompletionScreen(
                             summary = summary,
                             onBackToOverview = onBack,
-                            playAnimation = playAnimation
+                            playAnimation = playAnimation,
+                            showHeatmapCta = showHeatmapCta,
+                            onSeeWhatYouTrained = onSeeWhatYouTrained
                         )
                     }
                 }

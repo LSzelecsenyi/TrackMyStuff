@@ -9,11 +9,12 @@ import app.mymusclemap.domain.exercise.StarterCatalog
 /**
  * First-run catalog seed and onboarding gate.
  *
- * Onboarding completion is stored in DataStore (`onboarding_completed`), not in the
- * v1 backup file. Appearance restore preserves that flag so restore cannot reopen
- * first-run or clear it. Starter exercises are inserted only when the catalog is
- * empty and onboarding is not yet complete. A restored, upgraded, or already-used
- * catalog is left untouched, and existing users are not sent through first-run.
+ * Onboarding completion and progressive-discovery flags live in DataStore, not in
+ * the v1 backup file. Appearance restore preserves those flags so restore cannot
+ * reopen first-run or reset discoveries. Starter exercises are inserted only when
+ * the catalog is empty and onboarding has not started or completed. A restored,
+ * upgraded, or already-used catalog is left untouched, and existing users are
+ * migrated to completed onboarding instead of the progressive journey.
  */
 class FirstRunCoordinator(
     private val database: WeightDatabase,
@@ -24,12 +25,19 @@ class FirstRunCoordinator(
         if (themePreferences.isOnboardingCompleted()) {
             return FirstRunDecision.Ready
         }
+        if (themePreferences.isOnboardingStarted()) {
+            return FirstRunDecision.Ready
+        }
         val seeded = seedStarterCatalogIfEmpty()
         if (!seeded) {
             themePreferences.markOnboardingCompleted()
             return FirstRunDecision.Ready
         }
         return FirstRunDecision.ShowOnboarding
+    }
+
+    suspend fun markOnboardingStarted() {
+        themePreferences.markOnboardingStarted()
     }
 
     suspend fun completeOnboarding() {

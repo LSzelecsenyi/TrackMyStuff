@@ -48,7 +48,7 @@ class FirstRunCoordinatorTest {
             clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
         )
         themePreferences = ThemePreferences(context)
-        themePreferences.setOnboardingCompleted(false)
+        themePreferences.clearOnboardingProgress()
         coordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     }
 
@@ -119,6 +119,16 @@ class FirstRunCoordinatorTest {
     }
 
     @Test
+    fun startedOnboardingSkipsWelcomeOnRestartWithoutCompleting() = runTest {
+        assertEquals(FirstRunDecision.ShowOnboarding, coordinator.prepare())
+        coordinator.markOnboardingStarted()
+        assertTrue(themePreferences.isOnboardingStarted())
+        assertFalse(themePreferences.isOnboardingCompleted())
+        assertEquals(FirstRunDecision.Ready, coordinator.prepare())
+        assertEquals(StarterCatalog.drafts.size, exerciseRepository.observeAll().first().size)
+    }
+
+    @Test
     fun appearanceRestoreKeepsOnboardingCompleted() = runTest {
         coordinator.completeOnboarding()
         themePreferences.replaceAppearance(AppearanceSettings.Default)
@@ -126,6 +136,19 @@ class FirstRunCoordinatorTest {
         themePreferences.setOnboardingCompleted(false)
         themePreferences.replaceAppearance(AppearanceSettings.Default)
         assertFalse(themePreferences.isOnboardingCompleted())
+    }
+
+    @Test
+    fun appearanceRestoreKeepsProgressiveOnboardingFlags() = runTest {
+        coordinator.markOnboardingStarted()
+        themePreferences.setHeatmapSeen()
+        themePreferences.setReminderDismissed()
+        themePreferences.replaceAppearance(AppearanceSettings.Default)
+        val flags = themePreferences.currentOnboardingFlags()
+        assertTrue(flags.started)
+        assertTrue(flags.heatmapSeen)
+        assertTrue(flags.reminderDismissed)
+        assertFalse(flags.completed)
     }
 
     private fun customDraft(): ExerciseDraft {

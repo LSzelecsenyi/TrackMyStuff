@@ -40,7 +40,7 @@ class OnboardingViewModel(
 
     private fun finish(exit: OnboardingExit) {
         viewModelScope.launch {
-            firstRunCoordinator.completeOnboarding()
+            firstRunCoordinator.markOnboardingStarted()
             exitState.value = exit
         }
     }

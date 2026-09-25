@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -41,7 +42,7 @@ class OnboardingViewModelTest {
             .allowMainThreadQueries()
             .build()
         themePreferences = ThemePreferences(context)
-        themePreferences.setOnboardingCompleted(false)
+        themePreferences.clearOnboardingProgress()
         coordinator = FirstRunCoordinator(
             database,
             ExerciseRepository(
@@ -59,7 +60,7 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun createPlanMarksOnboardingCompleteAndOpensTemplateEditor() = runTest {
+    fun createPlanMarksOnboardingStartedAndOpensTemplateEditor() = runTest {
         assertEquals(FirstRunDecision.ShowOnboarding, coordinator.prepare())
         assertEquals(OnboardingStep.Welcome, viewModel.step.value)
         assertNull(viewModel.exit.value)
@@ -67,15 +68,18 @@ class OnboardingViewModelTest {
         assertEquals(OnboardingStep.CreatePlan, viewModel.step.value)
         viewModel.onCreatePlan()
         assertEquals(OnboardingExit.OpenTemplateEditor, viewModel.exit.first { it != null })
-        assertTrue(themePreferences.isOnboardingCompleted())
+        assertTrue(themePreferences.isOnboardingStarted())
+        assertFalse(themePreferences.isOnboardingCompleted())
         assertEquals(FirstRunDecision.Ready, coordinator.prepare())
     }
 
     @Test
-    fun skipMarksOnboardingCompleteWithoutOpeningTemplateEditor() = runTest {
+    fun skipMarksOnboardingStartedWithoutOpeningTemplateEditor() = runTest {
         viewModel.onContinue()
         viewModel.onSkip()
         assertEquals(OnboardingExit.Dismiss, viewModel.exit.first { it != null })
-        assertTrue(themePreferences.isOnboardingCompleted())
+        assertTrue(themePreferences.isOnboardingStarted())
+        assertFalse(themePreferences.isOnboardingCompleted())
+        assertEquals(FirstRunDecision.Ready, coordinator.prepare())
     }
 }

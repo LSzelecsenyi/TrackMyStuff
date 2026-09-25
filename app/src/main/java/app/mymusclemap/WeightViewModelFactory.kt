@@ -9,6 +9,7 @@ import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.FirstRunCoordinator
+import app.mymusclemap.data.repository.OnboardingRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
@@ -23,6 +24,7 @@ import app.mymusclemap.ui.exercises.ExerciseListViewModel
 import app.mymusclemap.ui.exercises.labelRes
 import app.mymusclemap.ui.history.HistoryViewModel
 import app.mymusclemap.ui.history.WorkoutDetailViewModel
+import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingViewModel
 import app.mymusclemap.ui.settings.SettingsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
@@ -41,7 +43,8 @@ class WeightViewModelFactory(
     private val themePreferences: ThemePreferences,
     private val workoutImportFileReader: WorkoutImportFileReader,
     private val appBackupRepository: AppBackupRepository,
-    private val firstRunCoordinator: FirstRunCoordinator
+    private val firstRunCoordinator: FirstRunCoordinator,
+    private val onboardingRepository: OnboardingRepository
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -52,11 +55,12 @@ class WeightViewModelFactory(
                     workoutSessionRepository,
                     dateProvider,
                     scheduledWorkoutRepository,
-                    workoutTemplateRepository
+                    workoutTemplateRepository,
+                    onboardingRepository
                 )
             }
             modelClass.isAssignableFrom(WeightDetailsViewModel::class.java) -> {
-                WeightDetailsViewModel(weightRepository, dateProvider)
+                WeightDetailsViewModel(weightRepository, dateProvider, onboardingRepository)
             }
             modelClass.isAssignableFrom(HistoryViewModel::class.java) -> {
                 HistoryViewModel(
@@ -80,6 +84,9 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(OnboardingViewModel::class.java) -> {
                 OnboardingViewModel(firstRunCoordinator)
+            }
+            modelClass.isAssignableFrom(OnboardingGuideViewModel::class.java) -> {
+                OnboardingGuideViewModel(onboardingRepository)
             }
             modelClass.isAssignableFrom(ExerciseListViewModel::class.java) -> {
                 ExerciseListViewModel(exerciseRepository)

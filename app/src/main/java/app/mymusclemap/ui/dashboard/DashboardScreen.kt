@@ -71,6 +71,11 @@ import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.components.stringRes
 import app.mymusclemap.ui.components.WeightChart
 import app.mymusclemap.ui.components.musclemap.MuscleHeatmapCard
+import app.mymusclemap.ui.onboarding.ONBOARDING_CALENDAR_COACH
+import app.mymusclemap.ui.onboarding.ONBOARDING_HEATMAP_COACH
+import app.mymusclemap.ui.onboarding.OnboardingReminderCard
+import app.mymusclemap.ui.onboarding.OnboardingTipCard
+import app.mymusclemap.ui.onboarding.OnboardingWeightSheet
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
@@ -120,7 +125,14 @@ fun DashboardScreen(
     onStartScheduled: (Long) -> Unit = {},
     onContinueScheduled: (Long) -> Unit = {},
     onOpenScheduledJournal: (Long) -> Unit = {},
-    onCreateTemplateFromSchedule: () -> Unit = {}
+    onCreateTemplateFromSchedule: () -> Unit = {},
+    onContinueOnboarding: () -> Unit = {},
+    onDismissOnboardingReminder: () -> Unit = {},
+    onConfirmHeatmapCoach: () -> Unit = {},
+    onConfirmCalendarCoach: () -> Unit = {},
+    onOnboardingWeightChange: (String) -> Unit = {},
+    onSaveOnboardingWeight: () -> Unit = {},
+    onSkipOnboardingWeight: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -146,11 +158,28 @@ fun DashboardScreen(
                 onOpenTemplates = onOpenTemplates,
                 onOpenCatalog = onOpenCatalog
             )
+            if (state.onboarding.reminderVisible) {
+                OverviewSectionDivider()
+                OnboardingReminderCard(
+                    checklist = state.onboarding.checklist,
+                    onContinue = onContinueOnboarding,
+                    onDismiss = onDismissOnboardingReminder
+                )
+            }
             OverviewSectionDivider()
             MuscleHeatmapCard(
                 state = state.heatmap,
                 modifier = Modifier.testTag("dashboard_heatmap")
             )
+            if (state.onboarding.showHeatmapCoach) {
+                Spacer(Modifier.height(AppDimens.itemGap))
+                OnboardingTipCard(
+                    title = stringResource(R.string.onboarding_heatmap_title),
+                    body = stringResource(R.string.onboarding_heatmap_body),
+                    onConfirm = onConfirmHeatmapCoach,
+                    testTag = ONBOARDING_HEATMAP_COACH
+                )
+            }
             OverviewSectionDivider()
             Text(
                 text = stringResource(R.string.calendar_title),
@@ -167,6 +196,15 @@ fun DashboardScreen(
                 onDayClick = onDaySelected,
                 modifier = Modifier.testTag("dashboard_calendar")
             )
+            if (state.onboarding.showCalendarCoach) {
+                Spacer(Modifier.height(AppDimens.itemGap))
+                OnboardingTipCard(
+                    title = stringResource(R.string.onboarding_calendar_title),
+                    body = stringResource(R.string.onboarding_calendar_body),
+                    onConfirm = onConfirmCalendarCoach,
+                    testTag = ONBOARDING_CALENDAR_COACH
+                )
+            }
             OverviewSectionDivider()
             CompactWeightChartSection(
                 snapshot = state.snapshot,
@@ -241,6 +279,15 @@ fun DashboardScreen(
             onDeleteRequest = onDeleteRequest,
             onDeleteDismiss = onDeleteDismiss,
             onDeleteConfirm = onDeleteConfirm
+        )
+    }
+    if (state.onboarding.showWeightPrompt) {
+        OnboardingWeightSheet(
+            weightInput = state.onboardingWeightInput,
+            weightError = state.onboardingWeightError,
+            onWeightChange = onOnboardingWeightChange,
+            onSave = onSaveOnboardingWeight,
+            onNotNow = onSkipOnboardingWeight
         )
     }
 }

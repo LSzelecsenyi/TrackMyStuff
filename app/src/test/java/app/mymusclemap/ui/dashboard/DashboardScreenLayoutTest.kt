@@ -36,7 +36,17 @@ import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.WeightMeasurement
 import app.mymusclemap.domain.musclemap.MuscleHeatmapAssembler
+import app.mymusclemap.domain.onboarding.OnboardingChecklist
+import app.mymusclemap.domain.onboarding.OnboardingFacts
+import app.mymusclemap.domain.onboarding.OnboardingFlags
+import app.mymusclemap.domain.onboarding.OnboardingGuide
+import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
 import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.ui.onboarding.ONBOARDING_CALENDAR_COACH
+import app.mymusclemap.ui.onboarding.ONBOARDING_HEATMAP_COACH
+import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER
+import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER_CONTINUE
+import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER_DISMISS
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -400,6 +410,97 @@ class DashboardScreenLayoutTest {
         composeRule.onNodeWithTag("dashboard_stat_weight_value").assertIsDisplayed()
     }
 
+    @Test
+    fun skippedOnboardingShowsContinuationCardUntilDismissed() {
+        val continued = AtomicBoolean(false)
+        val dismissed = AtomicBoolean(false)
+        render(
+            onboarding = reminderGuide(),
+            onContinueOnboarding = { continued.set(true) },
+            onDismissOnboardingReminder = { dismissed.set(true) }
+        )
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_reminder_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_step_plan), substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_step_workout), substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_plan)}").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_DISMISS).performClick()
+        assertTrue(continued.get())
+        assertTrue(dismissed.get())
+    }
+
+    @Test
+    fun reminderMarksPlanCreatedFromDomainState() {
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(started = true),
+                facts = OnboardingFacts(hasPlan = true),
+                reminderVisible = true,
+                checklist = OnboardingChecklist(planCreated = true),
+                resumeTarget = OnboardingResumeTarget.StartWorkout
+            )
+        )
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER).assertIsDisplayed()
+        composeRule.onNodeWithText("●  ${testString(R.string.onboarding_step_plan)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_workout)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_heatmap)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_weight)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_history)}").assertIsDisplayed()
+    }
+
+    @Test
+    fun existingUserStateDoesNotShowOnboardingCard() {
+        render()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_COACH).assertDoesNotExist()
+    }
+
+    @Test
+    fun heatmapCoachIsShownOnceOnTheRealHeatmap() {
+        val confirmed = AtomicBoolean(false)
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(started = true),
+                showHeatmapCoach = true,
+                showHeatmapCompletionCta = true
+            ),
+            onConfirmHeatmapCoach = { confirmed.set(true) }
+        )
+        composeRule.onNodeWithTag("dashboard_heatmap").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_heatmap_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_got_it)).performClick()
+        assertTrue(confirmed.get())
+    }
+
+    @Test
+    fun calendarCoachIsShownOnceOnTheRealCalendar() {
+        val confirmed = AtomicBoolean(false)
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(started = true, heatmapSeen = true, weightIntroduced = true),
+                showCalendarCoach = true
+            ),
+            onConfirmCalendarCoach = { confirmed.set(true) }
+        )
+        composeRule.onNodeWithTag("dashboard_calendar").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_CALENDAR_COACH).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_calendar_title)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_got_it)).performClick()
+        assertTrue(confirmed.get())
+    }
+
+    private fun reminderGuide(): OnboardingGuide {
+        return OnboardingGuide(
+            flags = OnboardingFlags(started = true),
+            reminderVisible = true,
+            checklist = OnboardingChecklist(),
+            resumeTarget = OnboardingResumeTarget.CreatePlan
+        )
+    }
+
     private fun overlaps(first: DpRect, second: DpRect): Boolean {
         return first.left < second.right - 1.dp &&
             second.left < first.right - 1.dp &&
@@ -416,7 +517,12 @@ class DashboardScreenLayoutTest {
         onOpenWeightDetails: () -> Unit = {},
         onOpenTemplates: () -> Unit = {},
         onOpenCatalog: () -> Unit = {},
-        onOpenSettings: () -> Unit = {}
+        onOpenSettings: () -> Unit = {},
+        onboarding: OnboardingGuide = OnboardingGuide.Inactive,
+        onContinueOnboarding: () -> Unit = {},
+        onDismissOnboardingReminder: () -> Unit = {},
+        onConfirmHeatmapCoach: () -> Unit = {},
+        onConfirmCalendarCoach: () -> Unit = {}
     ) {
         val measurement = WeightMeasurement(1, today, 82.4, 0, 0)
         val month = YearMonth.from(today)
@@ -457,7 +563,8 @@ class DashboardScreenLayoutTest {
                                 weeklyOverview = weeklyOverview,
                                 displayedMonth = month,
                                 monthGrid = grid,
-                                heatmap = MuscleHeatmapAssembler.assemble(emptyList(), today)
+                                heatmap = MuscleHeatmapAssembler.assemble(emptyList(), today),
+                                onboarding = onboarding
                             ),
                             onPreviousMonth = {},
                             onNextMonth = {},
@@ -479,7 +586,11 @@ class DashboardScreenLayoutTest {
                             onOpenTemplates = onOpenTemplates,
                             onOpenCatalog = onOpenCatalog,
                             onOpenWorkout = {},
-                            onOpenWeightDetails = onOpenWeightDetails
+                            onOpenWeightDetails = onOpenWeightDetails,
+                            onContinueOnboarding = onContinueOnboarding,
+                            onDismissOnboardingReminder = onDismissOnboardingReminder,
+                            onConfirmHeatmapCoach = onConfirmHeatmapCoach,
+                            onConfirmCalendarCoach = onConfirmCalendarCoach
                         )
                     }
                 }

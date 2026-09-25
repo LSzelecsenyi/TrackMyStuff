@@ -132,6 +132,10 @@ class WorkoutSessionRepository(
         }
     }
 
+    fun observeHasCompletedWorkout(): Flow<Boolean> {
+        return sessionDao.observeCompletedSessions().map { it.isNotEmpty() }
+    }
+
     fun observeHeatmapExercises(): Flow<List<MuscleTrainingExercise>> {
         return combine(
             sessionDao.observeCompletedSessions(),

@@ -2,6 +2,7 @@ package app.mymusclemap.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.mymusclemap.data.repository.OnboardingRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
@@ -15,6 +16,7 @@ import app.mymusclemap.domain.MeasurementValidationResult
 import app.mymusclemap.domain.WeeklyOverview
 import app.mymusclemap.domain.WeeklyOverviewLogic
 import app.mymusclemap.domain.MeasurementValidator
+import app.mymusclemap.domain.WeightParseError
 import app.mymusclemap.domain.calendar.MonthGrid
 import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
@@ -23,6 +25,7 @@ import app.mymusclemap.domain.musclemap.MuscleHeatmapState
 import app.mymusclemap.domain.model.ChartRange
 import app.mymusclemap.domain.model.SaveOutcome
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.domain.onboarding.OnboardingGuide
 import app.mymusclemap.domain.workout.RescheduleWorkoutResult
 import app.mymusclemap.domain.workout.ScheduleWorkoutResult
 import app.mymusclemap.domain.workout.ScheduledWorkout
@@ -79,7 +82,11 @@ data class DashboardUiState(
     val scheduleBusy: Boolean = false,
     val scheduleActionError: UserMessage? = null,
     val startedSessionId: Long? = null,
-    val journalSessionId: Long? = null
+    val journalSessionId: Long? = null,
+    val onboarding: OnboardingGuide = OnboardingGuide.Inactive,
+    val onboardingWeightInput: String = "",
+    val onboardingWeightError: WeightParseError? = null,
+    val openWeightDetailsForOnboarding: Boolean = false
 )
 
 private data class DashboardChrome(
@@ -112,12 +119,20 @@ private data class DialogChrome(
     val journalSessionId: Long?
 )
 
+private data class OnboardingChrome(
+    val guide: OnboardingGuide,
+    val weightInput: String,
+    val weightError: WeightParseError?,
+    val openWeightDetails: Boolean
+)
+
 class DashboardViewModel(
     private val repository: WeightRepository,
     private val sessionRepository: WorkoutSessionRepository,
     private val dateProvider: DateProvider,
     private val scheduledWorkoutRepository: ScheduledWorkoutRepository,
-    private val templateRepository: WorkoutTemplateRepository
+    private val templateRepository: WorkoutTemplateRepository,
+    private val onboardingRepository: OnboardingRepository? = null
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
     private val editor = MutableStateFlow<EditorUiState?>(null)
@@ -134,6 +149,10 @@ class DashboardViewModel(
     private val startedSessionId = MutableStateFlow<Long?>(null)
     private val journalSessionId = MutableStateFlow<Long?>(null)
     private val starting = MutableStateFlow(false)
+    private val onboardingWeightInput = MutableStateFlow("")
+    private val onboardingWeightError = MutableStateFlow<WeightParseError?>(null)
+    private val openWeightDetailsForOnboarding = MutableStateFlow(false)
+    private val onboardingGuide = onboardingRepository?.observe() ?: flowOf(OnboardingGuide.Inactive)
 
     private val chrome = combine(
         chartRange,
@@ -223,6 +242,15 @@ class DashboardViewModel(
         )
     }
 
+    private val onboardingChrome = combine(
+        onboardingGuide,
+        onboardingWeightInput,
+        onboardingWeightError,
+        openWeightDetailsForOnboarding
+    ) { guide, input, error, open ->
+        OnboardingChrome(guide, input, error, open)
+    }
+
     val uiState: StateFlow<DashboardUiState> = combine(
         combine(
             measurements,
@@ -268,8 +296,9 @@ class DashboardViewModel(
             )
         },
         sessionRepository.observeHeatmapExercises(),
-        dialogs
-    ) { state, exercises, dialogState ->
+        dialogs,
+        onboardingChrome
+    ) { state, exercises, dialogState, onboardingState ->
         state.copy(
             heatmap = MuscleHeatmapAssembler.assemble(exercises, state.today),
             schedulePickerVisible = dialogState.pickerVisible,
@@ -278,7 +307,11 @@ class DashboardViewModel(
             scheduleBusy = dialogState.busy,
             scheduleActionError = dialogState.actionError,
             startedSessionId = dialogState.startedSessionId,
-            journalSessionId = dialogState.journalSessionId
+            journalSessionId = dialogState.journalSessionId,
+            onboarding = onboardingState.guide,
+            onboardingWeightInput = onboardingState.weightInput,
+            onboardingWeightError = onboardingState.weightError,
+            openWeightDetailsForOnboarding = onboardingState.openWeightDetails
         )
     }.stateIn(
         scope = viewModelScope,
@@ -653,6 +686,53 @@ class DashboardViewModel(
 
     fun consumeJournalSession() {
         journalSessionId.value = null
+    }
+
+    fun consumeOpenWeightDetailsForOnboarding() {
+        openWeightDetailsForOnboarding.value = false
+    }
+
+    fun markHeatmapSeen() {
+        viewModelScope.launch { onboardingRepository?.markHeatmapSeen() }
+    }
+
+    fun markCalendarSeen() {
+        viewModelScope.launch { onboardingRepository?.markCalendarSeen() }
+    }
+
+    fun dismissOnboardingReminder() {
+        viewModelScope.launch { onboardingRepository?.dismissReminder() }
+    }
+
+    fun onOnboardingWeightChange(value: String) {
+        onboardingWeightInput.value = value
+        onboardingWeightError.value = null
+    }
+
+    fun skipOnboardingWeight() {
+        viewModelScope.launch {
+            onboardingRepository?.markWeightIntroduced()
+            onboardingWeightInput.value = ""
+            onboardingWeightError.value = null
+        }
+    }
+
+    fun saveOnboardingWeight() {
+        val input = onboardingWeightInput.value
+        when (val result = MeasurementValidator.validate(dateProvider.today(), input, dateProvider.today())) {
+            is MeasurementValidationResult.Invalid -> {
+                onboardingWeightError.value = result.weightError
+            }
+            is MeasurementValidationResult.Valid -> {
+                viewModelScope.launch {
+                    repository.save(result.date, result.weightKg)
+                    onboardingRepository?.markWeightIntroduced()
+                    onboardingWeightInput.value = ""
+                    onboardingWeightError.value = null
+                    openWeightDetailsForOnboarding.value = true
+                }
+            }
+        }
     }
 
     fun consumeMessage() {

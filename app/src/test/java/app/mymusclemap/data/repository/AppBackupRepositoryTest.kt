@@ -68,7 +68,7 @@ class AppBackupRepositoryTest {
         targetDb = openDb(context)
         themePreferences = ThemePreferences(context)
         themePreferences.replaceAppearance(AppearanceSettings.Default)
-        themePreferences.setOnboardingCompleted(false)
+        themePreferences.clearOnboardingProgress()
     }
 
     @After
@@ -222,6 +222,9 @@ class AppBackupRepositoryTest {
             .exportJson(AppBackupSource("app.mymusclemap.debug", "1.0-debug"))
         val parsed = AppBackupJson.parse(json) as AppBackupParseResult.Success
         assertFalse(parsed.snapshot.settings.containsKey("onboarding_completed"))
+        assertFalse(parsed.snapshot.settings.containsKey("onboarding_started"))
+        assertFalse(parsed.snapshot.settings.containsKey("onboarding_heatmap_seen"))
+        assertFalse(parsed.snapshot.settings.containsKey("onboarding_reminder_dismissed"))
 
         themePreferences.setOnboardingCompleted(false)
         assertEquals(AppBackupRestoreResult.Success, AppBackupRepository(targetDb, themePreferences).restoreJson(json))
@@ -231,6 +234,13 @@ class AppBackupRepositoryTest {
         assertEquals(AppBackupRestoreResult.Success, AppBackupRepository(targetDb, themePreferences).restoreJson(json))
         assertTrue(themePreferences.isOnboardingCompleted())
         assertEquals(customAppearance().mode, themePreferences.current().mode)
+
+        themePreferences.markOnboardingStarted()
+        themePreferences.setHeatmapSeen()
+        assertEquals(AppBackupRestoreResult.Success, AppBackupRepository(targetDb, themePreferences).restoreJson(json))
+        assertTrue(themePreferences.isOnboardingStarted())
+        assertTrue(themePreferences.currentOnboardingFlags().heatmapSeen)
+        assertTrue(themePreferences.isOnboardingCompleted())
     }
 
     @Test

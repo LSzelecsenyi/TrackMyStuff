@@ -6,7 +6,9 @@ import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.FakeWeightMeasurementDao
 import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.ExerciseRepository
+import app.mymusclemap.data.repository.OnboardingRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
@@ -107,7 +109,43 @@ class DashboardViewModelTest {
         assertTrue(state.snapshot.isEmpty)
         assertTrue(state.snapshot.chartPoints.isEmpty())
         assertTrue(state.snapshot.recentItems.isEmpty())
+        assertNull(state.snapshot.latest)
+        assertEquals(today, state.today)
+        assertFalse(state.snapshot.todayHasMeasurement)
+        assertFalse(state.onboarding.reminderVisible)
         assertEquals(WeeklyOverview(), state.weeklyOverview)
+    }
+
+    @Test
+    fun onboardingWeightSaveUsesNormalWeightPersistence() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val themePreferences = ThemePreferences(context)
+        themePreferences.clearOnboardingProgress()
+        themePreferences.markOnboardingStarted()
+        themePreferences.setHeatmapSeen()
+        val weights = WeightRepository(database.weightMeasurementDao(), clock)
+        val onboarding = OnboardingRepository(
+            themePreferences = themePreferences,
+            sessionRepository = sessionRepository,
+            weightRepository = weights,
+            templateRepository = templates
+        )
+        val viewModel = DashboardViewModel(
+            repository = weights,
+            sessionRepository = sessionRepository,
+            dateProvider = dateProvider,
+            scheduledWorkoutRepository = scheduled,
+            templateRepository = templates,
+            onboardingRepository = onboarding
+        )
+        viewModel.uiState.first { it.onboarding.showWeightPrompt }
+        viewModel.onOnboardingWeightChange("81.5")
+        viewModel.saveOnboardingWeight()
+        val saved = viewModel.uiState.first { it.openWeightDetailsForOnboarding }
+        assertEquals(81.5, weights.all().single().weightKg, 0.0)
+        assertEquals(today, weights.all().single().date)
+        assertTrue(saved.openWeightDetailsForOnboarding)
+        assertTrue(themePreferences.currentOnboardingFlags().weightIntroduced)
     }
 
     @Test

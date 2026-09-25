@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,12 +35,15 @@ internal const val WORKOUT_COMPLETE_SCREEN = "workout-complete-screen"
 internal const val WORKOUT_COMPLETE_TITLE = "workout-complete-title"
 internal const val WORKOUT_COMPLETE_SUMMARY = "workout-complete-summary"
 internal const val WORKOUT_COMPLETE_BACK = "workout-complete-back"
+internal const val WORKOUT_COMPLETE_HEATMAP = "workout-complete-heatmap"
 
 @Composable
 fun WorkoutCompletionScreen(
     summary: WorkoutCompletionSummary,
     onBackToOverview: () -> Unit,
-    playAnimation: Boolean = true
+    playAnimation: Boolean = true,
+    showHeatmapCta: Boolean = false,
+    onSeeWhatYouTrained: () -> Unit = onBackToOverview
 ) {
     BackHandler(onBack = onBackToOverview)
     val stats = stringResource(
@@ -94,15 +98,37 @@ fun WorkoutCompletionScreen(
                         .testTag(WORKOUT_COMPLETE_SUMMARY)
                 )
             }
-            Button(
-                onClick = onBackToOverview,
-                shape = AppShapeTokens.button,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = AppDimens.minTouch)
-                    .testTag(WORKOUT_COMPLETE_BACK)
-            ) {
-                Text(stringResource(R.string.workout_complete_back))
+            if (showHeatmapCta) {
+                Button(
+                    onClick = onSeeWhatYouTrained,
+                    shape = AppShapeTokens.button,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = AppDimens.minTouch)
+                        .testTag(WORKOUT_COMPLETE_HEATMAP)
+                ) {
+                    Text(stringResource(R.string.workout_complete_see_trained))
+                }
+                TextButton(
+                    onClick = onBackToOverview,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = AppDimens.minTouch)
+                        .testTag(WORKOUT_COMPLETE_BACK)
+                ) {
+                    Text(stringResource(R.string.workout_complete_back))
+                }
+            } else {
+                Button(
+                    onClick = onBackToOverview,
+                    shape = AppShapeTokens.button,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = AppDimens.minTouch)
+                        .testTag(WORKOUT_COMPLETE_BACK)
+                ) {
+                    Text(stringResource(R.string.workout_complete_back))
+                }
             }
         }
     }

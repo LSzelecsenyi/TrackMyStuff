@@ -35,7 +35,7 @@ class OnboardingScreenLayoutTest {
         composeRule.onNodeWithText("MY MUSCLE MAP").assertIsDisplayed()
         composeRule.onNodeWithText("Track your training").assertIsDisplayed()
         composeRule.onNodeWithText(
-            "Build workout plans, log sets, and see which muscles you train. A starter catalog of common exercises is ready to use.",
+            "Track workouts, see which muscles you trained, and follow your progress. A starter catalog of common exercises is ready to use.",
             substring = true
         ).assertIsDisplayed()
         composeRule.onNodeWithText("Continue").assertIsDisplayed()

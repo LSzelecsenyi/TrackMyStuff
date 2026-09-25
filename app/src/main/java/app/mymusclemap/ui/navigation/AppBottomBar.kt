@@ -1,6 +1,7 @@
 package app.mymusclemap.ui.navigation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -54,7 +58,9 @@ fun AppBottomBar(
     onOverview: () -> Unit,
     onJournal: () -> Unit,
     onWorkoutAction: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    highlightWorkoutAction: Boolean = false,
+    onWorkoutActionBounds: (Rect) -> Unit = {}
 ) {
     val outline = MaterialTheme.colorScheme.outlineVariant
     val workoutLabel = stringResource(
@@ -96,6 +102,8 @@ fun AppBottomBar(
             WorkoutActionButton(
                 label = workoutLabel,
                 onClick = onWorkoutAction,
+                highlight = highlightWorkoutAction,
+                onBoundsInRoot = onWorkoutActionBounds,
                 modifier = Modifier
                     .weight(1f)
                     .testTag(BOTTOM_WORKOUT_ACTION)
@@ -117,6 +125,8 @@ fun AppBottomBar(
 private fun WorkoutActionButton(
     label: String,
     onClick: () -> Unit,
+    highlight: Boolean,
+    onBoundsInRoot: (Rect) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -132,6 +142,16 @@ private fun WorkoutActionButton(
         Box(
             modifier = Modifier
                 .size(40.dp)
+                .onGloballyPositioned { coordinates ->
+                    onBoundsInRoot(coordinates.boundsInRoot())
+                }
+                .then(
+                    if (highlight) {
+                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    } else {
+                        Modifier
+                    }
+                )
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center

@@ -2,6 +2,7 @@ package app.mymusclemap.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.mymusclemap.data.repository.OnboardingRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.domain.DashboardAssembler
 import app.mymusclemap.domain.DashboardSnapshot
@@ -11,6 +12,7 @@ import app.mymusclemap.domain.MeasurementValidator
 import app.mymusclemap.domain.model.ChartRange
 import app.mymusclemap.domain.model.SaveOutcome
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.domain.onboarding.OnboardingGuide
 import app.mymusclemap.ui.components.EditorUiState
 import app.mymusclemap.ui.components.UserMessage
 import app.mymusclemap.ui.components.formatWeightInput
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -37,12 +40,14 @@ data class WeightDetailsUiState(
     val chartRange: ChartRange = ChartRange.Days30,
     val editor: EditorUiState? = null,
     val userMessage: UserMessage? = null,
-    val today: LocalDate = LocalDate.of(1970, 1, 1)
+    val today: LocalDate = LocalDate.of(1970, 1, 1),
+    val showWeightChartCoach: Boolean = false
 )
 
 class WeightDetailsViewModel(
     private val repository: WeightRepository,
-    private val dateProvider: DateProvider
+    private val dateProvider: DateProvider,
+    private val onboardingRepository: OnboardingRepository? = null
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
     private val editor = MutableStateFlow<EditorUiState?>(null)
@@ -53,15 +58,17 @@ class WeightDetailsViewModel(
         measurements,
         chartRange,
         editor,
-        userMessage
-    ) { items, range, editorState, message ->
+        userMessage,
+        onboardingRepository?.observe() ?: flowOf(OnboardingGuide.Inactive)
+    ) { items, range, editorState, message, guide ->
         val today = dateProvider.today()
         WeightDetailsUiState(
             snapshot = DashboardAssembler.assemble(items, today, range),
             chartRange = range,
             editor = editorState,
             userMessage = message,
-            today = today
+            today = today,
+            showWeightChartCoach = guide.showWeightChartCoach
         )
     }.stateIn(
         scope = viewModelScope,
@@ -156,5 +163,9 @@ class WeightDetailsViewModel(
 
     fun consumeMessage() {
         userMessage.value = null
+    }
+
+    fun markWeightChartSeen() {
+        viewModelScope.launch { onboardingRepository?.markWeightChartSeen() }
     }
 }
