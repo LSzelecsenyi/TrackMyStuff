@@ -8,14 +8,14 @@ class UiFormattersTest {
     @Test
     fun inclusiveDateRangeKeepsSameMonthCompact() {
         assertEquals(
-            "márc. 5–11.",
+            "Mar 5–11",
             UiFormatters.inclusiveDateRange(
                 LocalDate.of(2026, 3, 5),
                 LocalDate.of(2026, 3, 11)
             )
         )
         assertEquals(
-            "szept. 11–17.",
+            "Sep 11–17",
             UiFormatters.inclusiveDateRange(
                 LocalDate.of(2026, 9, 11),
                 LocalDate.of(2026, 9, 17)
@@ -26,7 +26,7 @@ class UiFormattersTest {
     @Test
     fun inclusiveDateRangeShowsBothMonthsWhenWindowCrosses() {
         assertEquals(
-            "aug. 29.–szept. 4.",
+            "Aug 29–Sep 4",
             UiFormatters.inclusiveDateRange(
                 LocalDate.of(2026, 8, 29),
                 LocalDate.of(2026, 9, 4)

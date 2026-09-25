@@ -1,5 +1,6 @@
 package app.mymusclemap.ui.history
 
+import android.content.res.Resources
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -37,7 +38,8 @@ data class WorkoutDetailUiState(
 
 class WorkoutDetailViewModel(
     savedStateHandle: SavedStateHandle,
-    private val sessionRepository: WorkoutSessionRepository
+    private val sessionRepository: WorkoutSessionRepository,
+    private val resources: Resources
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(SESSION_ID) ?: -1L
     private val confirmDelete = MutableStateFlow(false)
@@ -93,7 +95,7 @@ class WorkoutDetailViewModel(
                 setDisplays = buildMap {
                     aggregate.exercises.forEach { item ->
                         item.sets.forEach { set ->
-                            put(set.id, WorkoutSetCopy.display(set, item.exercise))
+                            put(set.id, WorkoutSetCopy.display(resources, set, item.exercise))
                         }
                     }
                 },

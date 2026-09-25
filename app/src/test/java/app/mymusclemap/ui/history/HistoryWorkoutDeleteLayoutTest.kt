@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.history
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -65,13 +67,13 @@ class HistoryWorkoutDeleteLayoutTest {
             }
         }
         composeRule.onNodeWithTag(WORKOUT_DELETE_DIALOG).assertIsDisplayed()
-        composeRule.onNodeWithText("Edzés törlése?").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.delete_workout_title)).assertIsDisplayed()
         composeRule.onNodeWithText(
-            "Az edzés, a gyakorlatok és a rögzített sorozatok véglegesen törlődnek. Ez nem vonható vissza.",
+            testString(R.string.delete_workout_body),
             substring = true
         ).assertIsDisplayed()
-        composeRule.onNodeWithText("Mégse").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Törlés").assertCountEquals(1)
+        composeRule.onNodeWithText(testString(R.string.action_cancel)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.action_delete)).assertCountEquals(1)
         composeRule.onNodeWithTag(WORKOUT_DELETE_CONFIRM).performClick()
         assertEquals(1, confirmed)
     }
@@ -105,8 +107,8 @@ class HistoryWorkoutDeleteLayoutTest {
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("További műveletek: Push A").performClick()
-        composeRule.onNodeWithText("Edzés törlése").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.workout_card_more_actions, "Push A")).performClick()
+        composeRule.onNodeWithText(testString(R.string.action_delete_workout)).assertIsDisplayed()
         composeRule.onNodeWithTag(WORKOUT_DELETE_ACTION).performClick()
         assertEquals(1, requested)
     }

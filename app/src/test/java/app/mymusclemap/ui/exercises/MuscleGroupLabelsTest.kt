@@ -8,7 +8,6 @@ import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
 import app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesCatalog
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,15 +18,21 @@ class MuscleGroupLabelsTest {
     private val resources = ApplicationProvider.getApplicationContext<Context>().resources
 
     @Test
-    fun upperAndLowerBackUseTheNewHungarianLabels() {
+    fun upperAndLowerBackUseEnglishLabels() {
         assertEquals("UPPER_BACK", MuscleGroup.UPPER_BACK.name)
         assertEquals("LOWER_BACK", MuscleGroup.LOWER_BACK.name)
         assertEquals(R.string.muscle_upper_back, MuscleGroup.UPPER_BACK.labelRes())
         assertEquals(R.string.muscle_lower_back, MuscleGroup.LOWER_BACK.labelRes())
-        assertEquals("Trapézizom", resources.getString(MuscleGroup.UPPER_BACK.labelRes()))
-        assertEquals("Derékizmok", resources.getString(MuscleGroup.LOWER_BACK.labelRes()))
-        assertFalse(resources.getString(R.string.muscle_upper_back).contains("Felső hát"))
-        assertFalse(resources.getString(R.string.muscle_lower_back).contains("Alsó hát"))
+        assertEquals(
+            resources.getString(R.string.muscle_upper_back),
+            resources.getString(MuscleGroup.UPPER_BACK.labelRes())
+        )
+        assertEquals(
+            resources.getString(R.string.muscle_lower_back),
+            resources.getString(MuscleGroup.LOWER_BACK.labelRes())
+        )
+        assertEquals("Traps", resources.getString(MuscleGroup.UPPER_BACK.labelRes()))
+        assertEquals("Lower back", resources.getString(MuscleGroup.LOWER_BACK.labelRes()))
     }
 
     @Test
@@ -49,15 +54,15 @@ class MuscleGroupLabelsTest {
         val heatmapSelection = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.UPPER_BACK.labelRes()),
-            "2 napja"
+            resources.getQuantityString(R.plurals.heatmap_days_ago, 2, 2)
         )
-        assertEquals("Trapézizom: 2 napja", heatmapSelection)
+        assertEquals("Traps: 2 days ago", heatmapSelection)
         val lower = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.LOWER_BACK.labelRes()),
-            "Ma"
+            resources.getString(R.string.heatmap_band_today)
         )
-        assertEquals("Derékizmok: Ma", lower)
+        assertEquals("Lower back: Today", lower)
     }
 
     @Test
@@ -69,10 +74,10 @@ class MuscleGroupLabelsTest {
     }
 
     @Test
-    fun neckIsDisplayedAsNyakAndIsSelectable() {
+    fun neckIsDisplayedAndIsSelectable() {
         assertEquals("NECK", MuscleGroup.NECK.name)
         assertEquals(R.string.muscle_neck, MuscleGroup.NECK.labelRes())
-        assertEquals("Nyak", resources.getString(MuscleGroup.NECK.labelRes()))
+        assertEquals("Neck", resources.getString(MuscleGroup.NECK.labelRes()))
         assertTrue(MuscleGroup.NECK in MuscleGroup.entries)
         assertEquals(MuscleGroup.NECK, ExerciseEnumCodec.muscle("NECK"))
         assertEquals("NECK", MuscleGroup.NECK.name)
@@ -80,25 +85,25 @@ class MuscleGroupLabelsTest {
         val heatmapSelection = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.NECK.labelRes()),
-            "2 napja"
+            resources.getQuantityString(R.plurals.heatmap_days_ago, 2, 2)
         )
-        assertEquals("Nyak: 2 napja", heatmapSelection)
+        assertEquals("Neck: 2 days ago", heatmapSelection)
     }
 
     @Test
-    fun hungarianAbcPlacesNyakBetweenMellAndOldalsoVall() {
+    fun englishOrderPlacesNeckBetweenLowerBackAndObliques() {
         val sorted = LocalizedLabelOrder.sorted(
             MuscleGroup.entries,
             label = { resources.getString(it.labelRes()) },
             key = { it.name }
         )
         val labels = sorted.map { resources.getString(it.labelRes()) }
-        val neckIndex = labels.indexOf("Nyak")
-        val chestIndex = labels.indexOf("Mell")
-        val sideDeltIndex = labels.indexOf("Oldalsó váll")
+        val neckIndex = labels.indexOf("Neck")
+        val lowerBackIndex = labels.indexOf("Lower back")
+        val obliquesIndex = labels.indexOf("Obliques")
         assertTrue(neckIndex >= 0)
-        assertEquals(chestIndex + 1, neckIndex)
-        assertEquals(neckIndex + 1, sideDeltIndex)
+        assertEquals(lowerBackIndex + 1, neckIndex)
+        assertEquals(neckIndex + 1, obliquesIndex)
         assertEquals(MuscleGroup.NECK, sorted[neckIndex])
         assertTrue(sorted != MuscleGroup.entries)
     }

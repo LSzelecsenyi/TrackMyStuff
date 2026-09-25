@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.settings
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -59,7 +61,7 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithTag(SETTINGS_THEME_SYSTEM).assertIsSelected()
         composeRule.onNodeWithTag(SETTINGS_THEME_LIGHT).assertIsNotSelected()
         composeRule.onNodeWithTag(SETTINGS_THEME_DARK).assertIsNotSelected()
-        composeRule.onNodeWithText("MEGJELENÉS").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.theme_title).uppercase()).assertIsDisplayed()
     }
 
     @Test
@@ -91,7 +93,7 @@ class SettingsScreenLayoutTest {
         render(state = customState())
         composeRule.onNodeWithTag(SETTINGS_PALETTE_CUSTOM).assertIsSelected()
         composeRule.onNodeWithTag(SETTINGS_PREVIEW).assertIsDisplayed()
-        composeRule.onNodeWithText("ELŐNÉZET").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.theme_preview_title).uppercase()).assertIsDisplayed()
         SeedField.entries.forEach { field ->
             composeRule.onNodeWithTag(settingsColorRowTag(field)).assertIsDisplayed()
         }
@@ -126,7 +128,7 @@ class SettingsScreenLayoutTest {
             .performTextReplacement("#8A2BE2")
         composeRule.onNodeWithTag(SETTINGS_CANCEL).performClick()
         composeRule.onNodeWithTag(settingsPreviewPrimaryTag("#2457C5")).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Vissza").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_back)).performClick()
         assertEquals(0, saves[0])
         assertEquals(1, cancels[0])
         assertEquals(1, backs[0])
@@ -154,7 +156,7 @@ class SettingsScreenLayoutTest {
             onSaveDraft = { saves[0] += 1 }
         )
         composeRule.onNodeWithTag(SETTINGS_SAVE).assertIsNotEnabled()
-        composeRule.onNodeWithText("A színkód formátuma #RRGGBB legyen, például #2457C5.")
+        composeRule.onNodeWithText(testString(R.string.error_color_hex))
             .assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SAVE).performClick()
         assertEquals(0, saves[0])
@@ -181,9 +183,9 @@ class SettingsScreenLayoutTest {
     fun givenSwatchTapThenExistingColorPickerOpensForThatField() {
         render(state = customState())
         composeRule.onNodeWithTag(settingsSwatchTag(SeedField.Background)).performClick()
-        composeRule.onNodeWithText("Élő előnézet").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Háttér").assertCountEquals(2)
-        composeRule.onNodeWithText("HEX színkód").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.color_preview_hint)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.color_background)).assertCountEquals(2)
+        composeRule.onNodeWithText(testString(R.string.color_hex_code)).assertIsDisplayed()
     }
 
     @Test
@@ -194,12 +196,12 @@ class SettingsScreenLayoutTest {
             onExportClick = { exports[0] += 1 },
             onImportClick = { imports[0] += 1 }
         )
-        composeRule.onNodeWithText("ADATOK").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.data_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_EXPORT).performClick()
         composeRule.onNodeWithTag(SETTINGS_IMPORT).performClick()
         assertEquals(1, exports[0])
         assertEquals(1, imports[0])
-        assertEquals(0, composeRule.onAllNodesWithText("Edzés CSV").fetchSemanticsNodes().size)
+        assertEquals(0, composeRule.onAllNodesWithText("Workout CSV").fetchSemanticsNodes().size)
     }
 
     @Test
@@ -248,20 +250,22 @@ class SettingsScreenLayoutTest {
     @Test
     fun givenVisibleScreenThenLegacyMaterialChromeIsGone() {
         render(state = customState())
-        composeRule.onNodeWithText("MEGJELENÉS").assertIsDisplayed()
-        composeRule.onNodeWithText("SZÍNPALETTA").assertIsDisplayed()
-        composeRule.onNodeWithText("ELŐNÉZET").assertIsDisplayed()
-        composeRule.onNodeWithText("ADATOK").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.theme_title).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.palette_title).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.theme_preview_title).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.data_title).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.privacy_title).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.privacy_body)).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PREVIEW).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_EDITOR_MODE).assertIsDisplayed()
-        composeRule.onAllNodesWithText("Mentés és visszaállítás").fetchSemanticsNodes().let { nodes ->
+        composeRule.onAllNodesWithText(testString(R.string.backup_body)).fetchSemanticsNodes().let { nodes ->
             assertEquals(0, nodes.size)
         }
-        composeRule.onAllNodesWithText("Adatok exportálása").fetchSemanticsNodes().let { nodes ->
+        composeRule.onAllNodesWithText(testString(R.string.action_export)).fetchSemanticsNodes().let { nodes ->
             assertEquals(0, nodes.size)
         }
-        composeRule.onNodeWithText("Testsúlyadatok exportálása").assertIsDisplayed()
-        composeRule.onNodeWithText("Testsúlyadatok importálása").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_export_weight)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_import_weight)).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SAVE).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_CANCEL).assertIsDisplayed()
         val save = composeRule.onNodeWithTag(SETTINGS_SAVE).getBoundsInRoot()

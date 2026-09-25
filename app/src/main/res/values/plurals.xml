@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="calendar_completed_workouts">
+        <item quantity="one">%d completed workout</item>
+        <item quantity="other">%d completed workouts</item>
+    </plurals>
+    <plurals name="calendar_planned_workouts">
+        <item quantity="one">%d planned workout</item>
+        <item quantity="other">%d planned workouts</item>
+    </plurals>
+    <plurals name="weekly_overview_workouts">
+        <item quantity="one">%d workout</item>
+        <item quantity="other">%d workouts</item>
+    </plurals>
+    <plurals name="weekly_overview_sets">
+        <item quantity="one">%d set</item>
+        <item quantity="other">%d sets</item>
+    </plurals>
+    <plurals name="heatmap_days_ago">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
+    <plurals name="finish_pending_body">
+        <item quantity="one">There is still %d unfinished set.</item>
+        <item quantity="other">There are still %d unfinished sets.</item>
+    </plurals>
+    <plurals name="workout_import_occurrences">
+        <item quantity="one">%d occurrence</item>
+        <item quantity="other">%d occurrences</item>
+    </plurals>
+</resources>

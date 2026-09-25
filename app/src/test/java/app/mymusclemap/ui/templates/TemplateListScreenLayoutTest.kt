@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.templates
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -59,10 +61,10 @@ class TemplateListScreenLayoutTest {
         val alma = composeRule.onNodeWithTag(templateRowTag(2)).getBoundsInRoot()
         val allo = composeRule.onNodeWithTag(templateRowTag(1)).getBoundsInRoot()
         val zaro = composeRule.onNodeWithTag(templateRowTag(3)).getBoundsInRoot()
-        assertTrue(comesBefore(alma, allo))
-        assertTrue(comesBefore(allo, zaro))
+        assertTrue(comesBefore(allo, alma))
+        assertTrue(comesBefore(alma, zaro))
         composeRule.onNodeWithText("Alma").assertIsDisplayed()
-        composeRule.onAllNodesWithText("2 gyakorlat · 6 sorozat").assertCountEquals(3)
+        composeRule.onAllNodesWithText(testString(R.string.template_row_meta, 2, 6)).assertCountEquals(3)
     }
 
     @Test
@@ -88,10 +90,10 @@ class TemplateListScreenLayoutTest {
             source = listOf(sample(id = 1, name = "Húzódzkodásos push")),
             query = "nincsilyen"
         )
-        composeRule.onNodeWithText("Nincs találat a(z) „nincsilyen” keresésre.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.template_empty_search_query, "nincsilyen")).assertIsDisplayed()
         composeRule.onNodeWithTag(TEMPLATE_EMPTY_CLEAR_SEARCH).assertIsDisplayed()
         composeRule.onNodeWithTag(TEMPLATE_EMPTY_CREATE).assertDoesNotExist()
-        composeRule.onNodeWithText("Új edzésterv").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.template_editor_add)).assertDoesNotExist()
         composeRule.onNodeWithTag(TEMPLATE_EMPTY_CLEAR_SEARCH).performClick()
         composeRule.onNodeWithTag(templateRowTag(1)).assertIsDisplayed()
         composeRule.onNodeWithTag(TEMPLATE_EMPTY_CLEAR_SEARCH).assertDoesNotExist()
@@ -132,12 +134,12 @@ class TemplateListScreenLayoutTest {
         )
         assertTrue(button.right - button.left >= 48.dp)
         assertTrue(button.bottom - button.top >= 48.dp)
-        composeRule.onNodeWithContentDescription("További műveletek: Húzódzkodásos push").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.template_more_actions, "Húzódzkodásos push")).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(templateOverflowMenuTag(8)).assertIsDisplayed()
-        composeRule.onNodeWithText("Szerkesztés").assertIsDisplayed()
-        composeRule.onNodeWithText("Archiválás").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Másolat készítése").assertCountEquals(0)
+        composeRule.onNodeWithText(testString(R.string.action_edit)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_archive_template)).assertIsDisplayed()
+        composeRule.onAllNodesWithText("Make a copy").assertCountEquals(0)
         val menu = composeRule.onNodeWithTag(templateOverflowMenuTag(8)).getBoundsInRoot()
         val popup = popupWindowLayoutParams().maxByOrNull { params -> params.x }
             ?: error("expected a DropdownMenu popup window")
@@ -178,7 +180,7 @@ class TemplateListScreenLayoutTest {
             fontScale = 1.3f
         )
         composeRule.onNodeWithTag(TEMPLATE_ROOT).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Új edzésterv létrehozása").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_create_template_header)).assertIsDisplayed()
         val add = composeRule.onNodeWithTag(TEMPLATE_ADD).getBoundsInRoot()
         val row = composeRule.onNodeWithTag(templateRowTag(9)).getBoundsInRoot()
         val overflow = composeRule.onNodeWithTag(templateOverflowButtonTag(9)).getBoundsInRoot()
@@ -192,17 +194,17 @@ class TemplateListScreenLayoutTest {
         assertTrue(active.bottom - active.top >= 48.dp)
         assertTrue("filter should not overflow: $active", active.right <= 360.dp + 8.dp)
         assertTrue("add and title should not overlap", add.left >= 48.dp)
-        composeRule.onAllNodesWithText("Edzéstervek", substring = false).assertCountEquals(1)
+        composeRule.onAllNodesWithText(testString(R.string.templates_title), substring = false).assertCountEquals(1)
     }
 
     @Test
     fun givenEmptyActiveListWhenShownThenCompactCreateActionOpensExistingFlow() {
         var adds = 0
         render(items = emptyList(), emptyKind = TemplateEmptyKind.Active, onAdd = { adds += 1 })
-        composeRule.onNodeWithText("Még nincs edzésterved.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.template_empty_active_title)).assertIsDisplayed()
         composeRule.onNodeWithTag(TEMPLATE_EMPTY_CREATE).assertIsDisplayed()
-        composeRule.onNodeWithText("Új edzésterv").performClick()
-        composeRule.onNodeWithText("Új edzésterv").performClick()
+        composeRule.onNodeWithText(testString(R.string.template_editor_add)).performClick()
+        composeRule.onNodeWithText(testString(R.string.template_editor_add)).performClick()
         assertEquals(1, adds)
         val create = composeRule.onNodeWithTag(TEMPLATE_EMPTY_CREATE).getBoundsInRoot()
         assertTrue(create.bottom - create.top >= 48.dp)
@@ -211,14 +213,14 @@ class TemplateListScreenLayoutTest {
     @Test
     fun givenTemplatesPageWhenShownThenHubStartRecentAndCatalogCardsAreAbsent() {
         render(items = listOf(sample(id = 1, name = "Push – Kondipark")))
-        composeRule.onAllNodesWithText("Edzés indítása").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Legutóbbi edzés").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Legutóbbi", substring = false).assertCountEquals(0)
-        composeRule.onAllNodesWithText("Gyakorlatok kezelése").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Gyakorlatok kezelőkártya").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Indíts edzést", substring = true).assertCountEquals(0)
-        composeRule.onAllNodesWithText("2 aktív gyakorlat").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("Új edzésterv létrehozása").assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.action_start_workout)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.hub_recent_title)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.weight_stat_latest_label), substring = false).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.action_manage_exercises)).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Exercise management card").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Start a workout", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("2 active exercises").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription(testString(R.string.action_create_template_header)).assertIsDisplayed()
         composeRule.onNodeWithText("Push – Kondipark").assertIsDisplayed()
     }
 

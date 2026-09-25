@@ -89,6 +89,7 @@ import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.PaletteSwatch
 import app.mymusclemap.ui.components.UserMessageEffect
+import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
@@ -839,7 +840,7 @@ private fun saveErrorText(error: PaletteSaveResult): String {
 }
 
 private fun settingsKicker(text: String): String {
-    return text.uppercase(Locale.forLanguageTag("hu-HU"))
+    return text.uppercase(AppLocale.UI)
 }
 
 private fun PaletteDraft.valueFor(field: SeedField): String {

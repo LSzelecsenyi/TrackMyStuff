@@ -72,6 +72,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -390,8 +391,9 @@ fun ActiveWorkoutScreen(
                             text = if (state.progress.pending == 0) {
                                 stringResource(R.string.active_workout_all_sets_done)
                             } else {
-                                stringResource(
-                                    R.string.finish_pending_body,
+                                pluralStringResource(
+                                    R.plurals.finish_pending_body,
+                                    state.progress.pending,
                                     state.progress.pending
                                 )
                             },
@@ -408,7 +410,7 @@ fun ActiveWorkoutScreen(
             AlertDialog(
                 onDismissRequest = { if (!state.finishing) onDismissFinish() },
                 title = { Text(stringResource(R.string.finish_pending_title)) },
-                text = { Text(stringResource(R.string.finish_pending_body, count)) },
+                text = { Text(pluralStringResource(R.plurals.finish_pending_body, count, count)) },
                 confirmButton = {
                     TextButton(
                         onClick = { onConfirmFinish(true) },
@@ -708,7 +710,7 @@ private fun ExerciseBlock(
                     style = AppTypeTokens.statSecondary,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                val load = shortLoadInfo(item)
+                val load = shortLoadInfo(item, stringResource(R.string.set_copy_bodyweight))
                 if (load.isNotBlank()) {
                     Text(
                         text = load,
@@ -807,7 +809,7 @@ private fun SetRow(
     onRemoveExtra: () -> Unit,
     onEdit: () -> Unit
 ) {
-    val planned = buildPlannedLabel(set)
+    val planned = buildPlannedLabel(set, stringResource(R.string.set_copy_bodyweight))
     val currentBadge = stringResource(R.string.active_exercise_badge)
     val statusLabel = when {
         current -> currentBadge
@@ -1385,21 +1387,21 @@ private fun CompactChoiceChips(
     }
 }
 
-private fun shortLoadInfo(item: SessionExerciseItem): String {
+private fun shortLoadInfo(item: SessionExerciseItem, bodyweightLabel: String): String {
     val set = item.sets.firstOrNull { it.status == SessionSetStatus.PENDING } ?: item.sets.firstOrNull()
-    return set?.let(::buildPlannedLabel).orEmpty().let { label ->
+    return set?.let { buildPlannedLabel(it, bodyweightLabel) }.orEmpty().let { label ->
         if (label == "—") "" else label
     }
 }
 
-private fun buildPlannedLabel(set: SessionSet): String {
+private fun buildPlannedLabel(set: SessionSet, bodyweightLabel: String): String {
     val parts = mutableListOf<String>()
     PlannedTargetDisplay.reps(set.plannedMinReps, set.plannedMaxReps)?.let { parts += it }
     val load = PlannedTargetDisplay.load(set.plannedLoadKind, set.plannedWeightKg)
     if (load.isNotBlank() && load != "BW") {
         parts += load
     } else if (load == "BW") {
-        parts += "testsúly"
+        parts += bodyweightLabel
     }
     set.plannedDurationSeconds?.let {
         val (minutes, seconds) = QuantityParser.fromSeconds(it)

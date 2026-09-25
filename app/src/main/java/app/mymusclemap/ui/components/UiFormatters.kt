@@ -1,5 +1,6 @@
 package app.mymusclemap.ui.components
 
+import app.mymusclemap.domain.locale.AppLocale
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -8,17 +9,17 @@ import java.util.Locale
 import kotlin.math.abs
 
 object UiFormatters {
-    private val locale: Locale = Locale.forLanguageTag("hu-HU")
+    private val locale: Locale = AppLocale.UI
     private val longDate: DateTimeFormatter =
         DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale)
     private val longDateWithWeekday: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("yyyy. MMMM d., EEEE", locale)
+        DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", locale)
     private val chartDate: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("MMM d.", locale)
+        DateTimeFormatter.ofPattern("MMM d", locale)
     private val compactDate: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("MM.dd.", locale)
+        DateTimeFormatter.ofPattern("MMM d", locale)
     private val monthTitle: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("yyyy. MMMM", locale)
+        DateTimeFormatter.ofPattern("MMMM yyyy", locale)
     private val monthAbbrev: DateTimeFormatter =
         DateTimeFormatter.ofPattern("MMM", locale)
 
@@ -51,7 +52,7 @@ object UiFormatters {
 
     fun inclusiveDateRange(start: LocalDate, end: LocalDate): String {
         return if (start.month == end.month && start.year == end.year) {
-            "${start.format(monthAbbrev)} ${start.dayOfMonth}–${end.dayOfMonth}."
+            "${start.format(monthAbbrev)} ${start.dayOfMonth}–${end.dayOfMonth}"
         } else {
             "${start.format(chartDate)}–${end.format(chartDate)}"
         }

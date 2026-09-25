@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.exercises
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -93,11 +95,11 @@ class ExerciseEditorScreenLayoutTest {
         )
         assertEquals(
             listOf(
-                ExerciseCategory.STRENGTH,
                 ExerciseCategory.CARDIO,
-                ExerciseCategory.SKILL,
+                ExerciseCategory.STATIC_HOLD,
                 ExerciseCategory.MOBILITY,
-                ExerciseCategory.STATIC_HOLD
+                ExerciseCategory.SKILL,
+                ExerciseCategory.STRENGTH
             ),
             categories
         )
@@ -107,18 +109,24 @@ class ExerciseEditorScreenLayoutTest {
             label = { resources.getString(it.labelRes()) },
             key = { it.name }
         )
-        assertEquals("Cipelés", resources.getString(patterns.first().labelRes()))
+        assertEquals(
+            resources.getString(R.string.exercise_pattern_cardio),
+            resources.getString(patterns.first().labelRes())
+        )
         val measurements = LocalizedLabelOrder.sorted(
             MeasurementType.entries,
             label = { resources.getString(it.labelRes()) },
             key = { it.name }
         )
-        assertEquals("Csak teljesítve", resources.getString(measurements.first().labelRes()))
+        assertEquals(
+            resources.getString(R.string.exercise_measure_completion),
+            resources.getString(measurements.first().labelRes())
+        )
         render()
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_CATEGORY).performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Készség / technika").assertIsDisplayed()
-        composeRule.onNodeWithText("Statikus tartás").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_category_skill)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_category_static)).assertIsDisplayed()
     }
 
     @Test
@@ -140,11 +148,11 @@ class ExerciseEditorScreenLayoutTest {
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_CATEGORY).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("$EXERCISE_DROPDOWN_CATEGORY-menu").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Erőgyakorlat").assertCountEquals(2)
+        composeRule.onAllNodesWithText(testString(R.string.exercise_category_strength)).assertCountEquals(2)
     }
 
     @Test
-    fun selectedSecondaryMusclesAppearInHungarianAbcOrder() {
+    fun selectedSecondaryMusclesAppearInEnglishAbcOrder() {
         render(
             state = ExerciseEditorUiState(
                 draft = ExerciseDraft(
@@ -161,8 +169,8 @@ class ExerciseEditorScreenLayoutTest {
         val forearms = composeRule.onNodeWithTag(secondaryChipTag(MuscleGroup.FOREARMS)).getBoundsInRoot()
         val biceps = composeRule.onNodeWithTag(secondaryChipTag(MuscleGroup.BICEPS)).getBoundsInRoot()
         val triceps = composeRule.onNodeWithTag(secondaryChipTag(MuscleGroup.TRICEPS)).getBoundsInRoot()
-        assertTrue(comesBefore(forearms, biceps))
-        assertTrue(comesBefore(biceps, triceps))
+        assertTrue(comesBefore(biceps, forearms))
+        assertTrue(comesBefore(forearms, triceps))
         assertTrue(forearms.right - forearms.left >= 48.dp || forearms.bottom - forearms.top >= 48.dp)
         assertTrue(biceps.bottom - biceps.top >= 48.dp)
         assertTrue(triceps.bottom - triceps.top >= 48.dp)
@@ -181,13 +189,13 @@ class ExerciseEditorScreenLayoutTest {
         )
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_ADD_SECONDARY).performClick()
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithText("Széles hátizom").assertCountEquals(1)
-        composeRule.onAllNodesWithText("Bicepsz").assertCountEquals(1)
-        composeRule.onNodeWithText("Alkar").assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.muscle_lats)).assertCountEquals(1)
+        composeRule.onAllNodesWithText(testString(R.string.muscle_biceps)).assertCountEquals(1)
+        composeRule.onNodeWithText(testString(R.string.muscle_forearms)).assertIsDisplayed()
     }
 
     @Test
-    fun neckIsOfferedAsPrimaryAndSecondaryInHungarianAbcOrder() {
+    fun neckIsOfferedAsPrimaryAndSecondaryInEnglishAbcOrder() {
         val resources = ApplicationProvider.getApplicationContext<android.content.Context>().resources
         val muscles = LocalizedLabelOrder.sorted(
             MuscleGroup.entries,
@@ -196,14 +204,14 @@ class ExerciseEditorScreenLayoutTest {
         )
         val labels = muscles.map { resources.getString(it.labelRes()) }
         assertTrue(MuscleGroup.NECK in MuscleGroup.entries)
-        assertEquals("Nyak", resources.getString(MuscleGroup.NECK.labelRes()))
-        assertEquals(labels.indexOf("Mell") + 1, labels.indexOf("Nyak"))
-        assertEquals(labels.indexOf("Nyak") + 1, labels.indexOf("Oldalsó váll"))
+        assertEquals(testString(R.string.muscle_neck), resources.getString(MuscleGroup.NECK.labelRes()))
+        assertEquals(labels.indexOf(testString(R.string.muscle_lower_back)) + 1, labels.indexOf(testString(R.string.muscle_neck)))
+        assertEquals(labels.indexOf(testString(R.string.muscle_neck)) + 1, labels.indexOf(testString(R.string.muscle_obliques)))
         render()
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY).performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Nyak").performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText("Mell").assertCountEquals(2)
+        composeRule.onNodeWithText(testString(R.string.muscle_neck)).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.muscle_chest)).assertCountEquals(2)
     }
 
     @Test
@@ -218,7 +226,7 @@ class ExerciseEditorScreenLayoutTest {
         )
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_ADD_SECONDARY).performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Nyak").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.muscle_neck)).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -230,17 +238,17 @@ class ExerciseEditorScreenLayoutTest {
             ),
             onSave = { saved += 1 }
         )
-        composeRule.onNodeWithText("Add meg a gyakorlat nevét.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.error_exercise_name_blank)).assertIsDisplayed()
         composeRule.onNodeWithTag(EXERCISE_EDITOR_SAVE).performClick()
         assertEquals(1, saved)
-        composeRule.onNodeWithText("Új gyakorlat").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_editor_add)).assertIsDisplayed()
     }
 
     @Test
     fun editorFitsNarrowPhoneAtLargeFontScale() {
         render(width = 360.dp, fontScale = 1.3f)
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsDisplayed()
-        composeRule.onNodeWithText("Alapadatok").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_section_basics)).assertIsDisplayed()
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_CATEGORY).assertIsDisplayed()
         composeRule.onNodeWithTag(EXERCISE_EDITOR_SAVE).assertIsDisplayed()
         val save = composeRule.onNodeWithTag(EXERCISE_EDITOR_SAVE).getBoundsInRoot()
@@ -250,13 +258,13 @@ class ExerciseEditorScreenLayoutTest {
         assertTrue("name field should not overflow 360dp", name.right <= 360.dp + 8.dp)
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NOTES).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Vissza").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_back)).assertIsDisplayed()
     }
 
     @Test
     fun createFlowShowsSharedEditorFields() {
         render(state = ExerciseEditorUiState(isEditing = false))
-        composeRule.onNodeWithText("Új gyakorlat").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_editor_add)).assertIsDisplayed()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsDisplayed()
         composeRule.onNodeWithTag(EXERCISE_EDITOR_SAVE).assertIsDisplayed()
     }
@@ -264,7 +272,7 @@ class ExerciseEditorScreenLayoutTest {
     @Test
     fun editFlowShowsTheSameSharedEditorFields() {
         render(state = ExerciseEditorUiState(isEditing = true, draft = ExerciseDraft(name = "Tolódzkodás")))
-        composeRule.onNodeWithText("Gyakorlat szerkesztése").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_editor_edit)).assertIsDisplayed()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assert(hasText("Tolódzkodás"))
         composeRule.onNodeWithTag(EXERCISE_EDITOR_SAVE).assertIsDisplayed()
     }
@@ -283,9 +291,9 @@ class ExerciseEditorScreenLayoutTest {
     fun givenCategorySelectedThenValueUpdatesAndNameDoesNotRegainFocus() {
         renderInteractive()
         focusNameField()
-        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Kardió")
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, testString(R.string.exercise_category_cardio))
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_CATEGORY)
-            .assert(hasContentDescription("Kategória: Kardió"))
+            .assert(hasContentDescription(testString(R.string.exercise_field_category) + ": " + testString(R.string.exercise_category_cardio)))
         assertTextFieldsDoNotHaveInputFocus()
     }
 
@@ -293,32 +301,32 @@ class ExerciseEditorScreenLayoutTest {
     fun givenOtherDropdownsSelectedThenNoneRefocusesTheNameField() {
         renderInteractive()
         focusNameField()
-        selectDropdown(EXERCISE_DROPDOWN_WEIGHT, "Oldalanként / kézenként")
+        selectDropdown(EXERCISE_DROPDOWN_WEIGHT, testString(R.string.exercise_weight_per_side))
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_WEIGHT)
-            .assert(hasContentDescription("Súly értelmezése: Oldalanként / kézenként"))
+            .assert(hasContentDescription(testString(R.string.exercise_field_weight) + ": " + testString(R.string.exercise_weight_per_side)))
         assertTextFieldsDoNotHaveInputFocus()
 
-        selectDropdown(EXERCISE_DROPDOWN_PATTERN, "Guggolás")
+        selectDropdown(EXERCISE_DROPDOWN_PATTERN, testString(R.string.exercise_pattern_squat))
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PATTERN)
-            .assert(hasContentDescription("Mozgásminta: Guggolás"))
+            .assert(hasContentDescription(testString(R.string.exercise_field_pattern) + ": " + testString(R.string.exercise_pattern_squat)))
         assertTextFieldsDoNotHaveInputFocus()
 
-        selectDropdown(EXERCISE_DROPDOWN_MEASUREMENT, "Idő")
+        selectDropdown(EXERCISE_DROPDOWN_MEASUREMENT, testString(R.string.exercise_measure_duration))
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_MEASUREMENT)
-            .assert(hasContentDescription("Mérési mód: Idő"))
+            .assert(hasContentDescription(testString(R.string.exercise_field_measurement) + ": " + testString(R.string.exercise_measure_duration)))
         assertTextFieldsDoNotHaveInputFocus()
 
-        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, "Saját testsúly")
+        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, testString(R.string.exercise_resistance_bodyweight))
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_RESISTANCE)
-            .assert(hasContentDescription("Terhelés alapja: Saját testsúly"))
+            .assert(hasContentDescription(testString(R.string.exercise_field_resistance) + ": " + testString(R.string.exercise_resistance_bodyweight)))
         assertTextFieldsDoNotHaveInputFocus()
 
-        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, "Nyak")
+        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, testString(R.string.muscle_neck))
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY)
-            .assert(hasContentDescription("Elsődleges izomcsoport: Nyak"))
+            .assert(hasContentDescription(testString(R.string.exercise_field_primary_muscle) + ": " + testString(R.string.muscle_neck)))
         assertTextFieldsDoNotHaveInputFocus()
 
-        selectDropdown(EXERCISE_DROPDOWN_ADD_SECONDARY, "Bicepsz")
+        selectDropdown(EXERCISE_DROPDOWN_ADD_SECONDARY, testString(R.string.muscle_biceps))
         composeRule.onNodeWithTag(secondaryChipTag(MuscleGroup.BICEPS)).assertIsDisplayed()
         assertTextFieldsDoNotHaveInputFocus()
     }
@@ -335,7 +343,7 @@ class ExerciseEditorScreenLayoutTest {
         )
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_WEIGHT).assertDoesNotExist()
         assertTextFieldsDoNotHaveInputFocus()
-        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, "Külső ellenállás")
+        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, testString(R.string.exercise_resistance_external))
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_WEIGHT).assertIsDisplayed()
         assertTextFieldsDoNotHaveInputFocus()
     }
@@ -346,7 +354,7 @@ class ExerciseEditorScreenLayoutTest {
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).performTextInput("abx")
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assert(hasText("Abx"))
         val cursorBefore = nameSelection()
-        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Kardió")
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, testString(R.string.exercise_category_cardio))
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assert(hasText("Abx"))
         val cursorAfter = nameSelection()
         if (cursorBefore != null) {
@@ -362,7 +370,7 @@ class ExerciseEditorScreenLayoutTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsNotDisplayed()
         val before = composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY).getBoundsInRoot()
-        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, "Nyak")
+        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, testString(R.string.muscle_neck))
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsNotDisplayed()
         val after = composeRule.onNodeWithTag(EXERCISE_DROPDOWN_PRIMARY).getBoundsInRoot()
         assertTrue(
@@ -375,7 +383,7 @@ class ExerciseEditorScreenLayoutTest {
     @Test
     fun givenLaterManualTapOnNameThenFieldIsEditableAndKeyboardCanOpen() {
         renderInteractive()
-        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Kardió")
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, testString(R.string.exercise_category_cardio))
         assertTextFieldsDoNotHaveInputFocus()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).performClick()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsFocused()
@@ -387,17 +395,17 @@ class ExerciseEditorScreenLayoutTest {
     fun givenSuccessiveDropdownSelectionsThenImeDoesNotReopenByItself() {
         renderInteractive()
         focusNameField()
-        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Mobilitás / nyújtás")
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, testString(R.string.exercise_category_mobility))
         assertTextFieldsDoNotHaveInputFocus()
-        selectDropdown(EXERCISE_DROPDOWN_PATTERN, "Izoláció")
+        selectDropdown(EXERCISE_DROPDOWN_PATTERN, testString(R.string.exercise_pattern_isolation))
         assertTextFieldsDoNotHaveInputFocus()
-        selectDropdown(EXERCISE_DROPDOWN_MEASUREMENT, "Ismétlés")
+        selectDropdown(EXERCISE_DROPDOWN_MEASUREMENT, testString(R.string.exercise_measure_reps))
         assertTextFieldsDoNotHaveInputFocus()
-        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, "Nincs külön terhelés")
+        selectDropdown(EXERCISE_DROPDOWN_RESISTANCE, testString(R.string.exercise_resistance_none))
         assertTextFieldsDoNotHaveInputFocus()
-        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, "Nyak")
+        selectDropdown(EXERCISE_DROPDOWN_PRIMARY, testString(R.string.muscle_neck))
         assertTextFieldsDoNotHaveInputFocus()
-        selectDropdown(EXERCISE_DROPDOWN_ADD_SECONDARY, "Alkar")
+        selectDropdown(EXERCISE_DROPDOWN_ADD_SECONDARY, testString(R.string.muscle_forearms))
         assertTextFieldsDoNotHaveInputFocus()
     }
 
@@ -414,16 +422,16 @@ class ExerciseEditorScreenLayoutTest {
                 )
             )
         )
-        composeRule.onNodeWithText("Gyakorlat szerkesztése").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_editor_edit)).assertIsDisplayed()
         focusNameField()
-        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Készség / technika")
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, testString(R.string.exercise_category_skill))
         composeRule.onNodeWithTag(EXERCISE_DROPDOWN_CATEGORY)
-            .assert(hasContentDescription("Kategória: Készség / technika"))
+            .assert(hasContentDescription(testString(R.string.exercise_field_category) + ": " + testString(R.string.exercise_category_skill)))
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assert(hasText("Tolódzkodás"))
         assertTextFieldsDoNotHaveInputFocus()
-        selectDropdown(EXERCISE_DROPDOWN_PATTERN, "Függőleges húzás")
+        selectDropdown(EXERCISE_DROPDOWN_PATTERN, testString(R.string.exercise_pattern_vertical_pull))
         assertTextFieldsDoNotHaveInputFocus()
-        selectDropdown(EXERCISE_DROPDOWN_WEIGHT, "Oldalanként / kézenként")
+        selectDropdown(EXERCISE_DROPDOWN_WEIGHT, testString(R.string.exercise_weight_per_side))
         assertTextFieldsDoNotHaveInputFocus()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).performClick()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsFocused()
@@ -433,7 +441,7 @@ class ExerciseEditorScreenLayoutTest {
     fun givenRecompositionThenNameIsNotAutofocusedAndHasNoRequestFocusLoop() {
         val state = renderInteractive()
         composeRule.onNodeWithTag(EXERCISE_FIELD_NAME).assertIsNotFocused()
-        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, "Kardió")
+        selectDropdown(EXERCISE_DROPDOWN_CATEGORY, testString(R.string.exercise_category_cardio))
         assertTextFieldsDoNotHaveInputFocus()
         state.value = state.value.copy(duplicateName = true)
         composeRule.waitForIdle()

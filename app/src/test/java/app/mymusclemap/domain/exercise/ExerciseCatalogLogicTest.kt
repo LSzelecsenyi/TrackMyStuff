@@ -102,7 +102,7 @@ class ExerciseCatalogLogicTest {
             muscle = null,
             archiveFilter = ArchiveFilter.ACTIVE
         )
-        assertEquals(listOf("Alma", "Álló evezés", "Zárógyakorlat"), result.map { it.name })
+        assertEquals(listOf("Álló evezés", "Alma", "Zárógyakorlat"), result.map { it.name })
     }
 
     @Test
@@ -199,7 +199,7 @@ class ExerciseCatalogLogicTest {
             ExerciseCatalogLogic.filter(source, "", null, null, ArchiveFilter.ARCHIVED).map { it.name }
         )
         assertEquals(
-            listOf("Alma", "Álló evezés", "Záró"),
+            listOf("Álló evezés", "Alma", "Záró"),
             ExerciseCatalogLogic.filter(source, "", null, null, ArchiveFilter.ALL).map { it.name }
         )
     }

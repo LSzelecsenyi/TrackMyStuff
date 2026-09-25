@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.workout
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -41,9 +43,9 @@ class WorkoutCompletionScreenLayoutTest {
             fontScale = 1.3f,
             onBack = { back += 1 }
         )
-        composeRule.onNodeWithText("Edzés teljesítve").assertIsDisplayed()
-        composeRule.onNodeWithText("4 gyakorlat · 14 sorozat · 50:20").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Edzés sikeresen teljesítve").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_complete_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_complete_summary, 4, 14, "50:20")).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.workout_complete_mark_a11y)).assertIsDisplayed()
         val title = composeRule.onNodeWithTag(WORKOUT_COMPLETE_TITLE).getBoundsInRoot()
         val stats = composeRule.onNodeWithTag(WORKOUT_COMPLETE_SUMMARY).getBoundsInRoot()
         val action = composeRule.onNodeWithTag(WORKOUT_COMPLETE_BACK).getBoundsInRoot()
@@ -68,7 +70,7 @@ class WorkoutCompletionScreenLayoutTest {
             playAnimation = false
         )
         composeRule.onNodeWithTag(WORKOUT_COMPLETE_MARK).assertIsDisplayed()
-        composeRule.onNodeWithText("1 gyakorlat · 1 sorozat · 1:20").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_complete_summary, 1, 1, "1:20")).assertIsDisplayed()
         composeRule.onNodeWithTag(WORKOUT_COMPLETE_BACK).performClick()
         assertEquals(1, back)
     }

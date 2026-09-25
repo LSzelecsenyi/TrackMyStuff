@@ -165,6 +165,7 @@ private fun WorkoutCard(
 
 @Composable
 private fun ExercisePreview(exercise: WorkoutImportResolvedExercise) {
+    val resources = LocalResources.current
     val snapshot = exercise.snapshot
     Text(
         text = snapshot?.catalogName ?: exercise.incomingName,
@@ -192,7 +193,7 @@ private fun ExercisePreview(exercise: WorkoutImportResolvedExercise) {
     val interpretation = snapshot?.weightInterpretation ?: WeightInterpretation.NOT_APPLICABLE
     exercise.sets.forEach { set ->
         Text(
-            text = WorkoutImportPreviewCopy.setLine(set, interpretation),
+            text = WorkoutImportPreviewCopy.setLine(resources, set, interpretation),
             style = MaterialTheme.typography.bodyMedium
         )
     }

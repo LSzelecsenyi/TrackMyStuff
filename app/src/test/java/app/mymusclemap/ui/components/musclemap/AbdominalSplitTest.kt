@@ -398,13 +398,13 @@ class AbdominalSplitTest {
             ),
             today
         )
-        val recency = resources.getString(R.string.heatmap_days_ago, 2)
+        val recency = resources.getQuantityString(R.plurals.heatmap_days_ago, 2, 2)
         val description = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.ABS.labelRes()),
             recency
         )
-        assertEquals("Has: 2 napja", description)
+        assertEquals("Abs: 2 days ago", description)
         assertEquals(2, state.entry(MuscleGroup.ABS).daysAgo)
         assertEquals(MuscleRecencyBand.DAYS_1_2, state.entry(MuscleGroup.ABS).band)
     }
@@ -426,13 +426,13 @@ class AbdominalSplitTest {
             ),
             today
         )
-        val recency = resources.getString(R.string.heatmap_days_ago, 2)
+        val recency = resources.getQuantityString(R.plurals.heatmap_days_ago, 2, 2)
         val description = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.OBLIQUES.labelRes()),
             recency
         )
-        assertEquals("Ferde hasizom: 2 napja", description)
+        assertEquals("Obliques: 2 days ago", description)
         assertEquals(2, state.entry(MuscleGroup.OBLIQUES).daysAgo)
         assertEquals(MuscleRecencyBand.DAYS_1_2, state.entry(MuscleGroup.OBLIQUES).band)
     }

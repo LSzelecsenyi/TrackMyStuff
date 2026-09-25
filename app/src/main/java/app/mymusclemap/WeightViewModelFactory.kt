@@ -102,9 +102,12 @@ class WeightViewModelFactory(
                 )
             }
             modelClass.isAssignableFrom(WorkoutDetailViewModel::class.java) -> {
+                val application = extras[APPLICATION_KEY]
+                    ?: throw IllegalStateException("Application is required")
                 WorkoutDetailViewModel(
                     extras.createSavedStateHandle(),
-                    workoutSessionRepository
+                    workoutSessionRepository,
+                    application.resources
                 )
             }
             modelClass.isAssignableFrom(WorkoutImportViewModel::class.java) -> {

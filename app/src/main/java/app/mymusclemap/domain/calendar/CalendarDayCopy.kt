@@ -1,14 +1,16 @@
 package app.mymusclemap.domain.calendar
 
+import android.content.res.Resources
+import app.mymusclemap.R
+import app.mymusclemap.domain.locale.AppLocale
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 object CalendarDayCopy {
-    private val locale = Locale.forLanguageTag("hu-HU")
-    private val longDate = DateTimeFormatter.ofPattern("yyyy. MMMM d.", locale)
+    private val longDate = DateTimeFormatter.ofPattern("MMMM d, yyyy", AppLocale.UI)
 
     fun description(
+        resources: Resources,
         date: LocalDate,
         hasMeasurement: Boolean,
         completedWorkoutCount: Int,
@@ -18,37 +20,53 @@ object CalendarDayCopy {
     ): String {
         val parts = mutableListOf(date.format(longDate))
         if (isToday) {
-            parts += "ma"
+            parts += resources.getString(R.string.calendar_today_label)
         }
-        parts += entryState(hasMeasurement, completedWorkoutCount, plannedWorkoutCount)
+        parts += entryState(
+            resources,
+            hasMeasurement,
+            completedWorkoutCount,
+            plannedWorkoutCount
+        )
         if (isFuture) {
-            parts += "jövőbeli nap"
+            parts += resources.getString(R.string.calendar_future_label)
         }
         return parts.joinToString(", ")
     }
 
     fun entryState(
+        resources: Resources,
         hasMeasurement: Boolean,
         completedWorkoutCount: Int,
         plannedWorkoutCount: Int = 0
     ): String {
         val parts = mutableListOf<String>()
         if (hasMeasurement) {
-            parts += "testsúlymérés"
+            parts += resources.getString(R.string.calendar_has_weight)
         }
-        when {
-            completedWorkoutCount == 1 -> parts += "1 befejezett edzés"
-            completedWorkoutCount > 1 -> parts += "$completedWorkoutCount befejezett edzés"
+        if (completedWorkoutCount > 0) {
+            parts += resources.getQuantityString(
+                R.plurals.calendar_completed_workouts,
+                completedWorkoutCount,
+                completedWorkoutCount
+            )
         }
-        when {
-            plannedWorkoutCount == 1 -> parts += "1 tervezett edzés"
-            plannedWorkoutCount > 1 -> parts += "$plannedWorkoutCount tervezett edzés"
+        if (plannedWorkoutCount > 0) {
+            parts += resources.getQuantityString(
+                R.plurals.calendar_planned_workouts,
+                plannedWorkoutCount,
+                plannedWorkoutCount
+            )
         }
         return when (parts.size) {
-            0 -> "nincs bejegyzés"
+            0 -> resources.getString(R.string.calendar_no_entry)
             1 -> parts[0]
-            2 -> "${parts[0]} és ${parts[1]}"
-            else -> parts.dropLast(1).joinToString(", ") + " és " + parts.last()
+            2 -> resources.getString(R.string.calendar_entry_two, parts[0], parts[1])
+            else -> resources.getString(
+                R.string.calendar_entry_list,
+                parts.dropLast(1).joinToString(", "),
+                parts.last()
+            )
         }
     }
 }

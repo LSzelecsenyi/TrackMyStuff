@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.components
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -48,9 +50,9 @@ class DayDetailsSheetLayoutTest {
             )
         )
         composeRule.onNodeWithTag(DAY_DETAILS_SHEET).assertIsDisplayed()
-        composeRule.onNodeWithText("Erre a napra nincs edzés ütemezve.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.day_sheet_no_scheduled)).assertIsDisplayed()
         composeRule.onNodeWithTag(DAY_SHEET_SCHEDULE_ACTION).assertIsDisplayed()
-        composeRule.onAllNodesWithText("Testsúly rögzítése").assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.action_record_weight)).assertCountEquals(0)
         val action = composeRule.onNodeWithTag(DAY_SHEET_SCHEDULE_ACTION).getBoundsInRoot()
         assertTrue(action.bottom - action.top >= 48.dp)
     }
@@ -69,9 +71,9 @@ class DayDetailsSheetLayoutTest {
         )
         composeRule.onNodeWithTag(daySheetScheduledRowTag(4)).assertIsDisplayed()
         composeRule.onNodeWithText("Push A").assertIsDisplayed()
-        composeRule.onNodeWithText("1 gyakorlat · 2 sorozat").assertIsDisplayed()
-        composeRule.onNodeWithText("Edzés indítása").performClick()
-        composeRule.onNodeWithText("Edzés indítása").performClick()
+        composeRule.onNodeWithText(testString(R.string.template_row_meta, 1, 2)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_start_workout)).performClick()
+        composeRule.onNodeWithText(testString(R.string.action_start_workout)).performClick()
         assertEquals(1, starts)
         val row = composeRule.onNodeWithTag(daySheetScheduledRowTag(4)).getBoundsInRoot()
         assertTrue(row.bottom - row.top >= 48.dp)
@@ -89,8 +91,8 @@ class DayDetailsSheetLayoutTest {
                 canRecordWeight = false
             )
         )
-        composeRule.onNodeWithText("Tervezve").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Edzés indítása").assertCountEquals(0)
+        composeRule.onNodeWithText(testString(R.string.schedule_status_planned)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.action_start_workout)).assertCountEquals(0)
     }
 
     @Test
@@ -103,8 +105,8 @@ class DayDetailsSheetLayoutTest {
                 scheduledWorkouts = listOf(scheduled(6, today.minusDays(1), "Láb"))
             )
         )
-        composeRule.onNodeWithText("Nem teljesült").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Edzés indítása").assertCountEquals(0)
+        composeRule.onNodeWithText(testString(R.string.schedule_status_missed)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.action_start_workout)).assertCountEquals(0)
     }
 
     @Test
@@ -121,8 +123,8 @@ class DayDetailsSheetLayoutTest {
             ),
             onContinue = { continues += 1 }
         )
-        composeRule.onNodeWithText("Folyamatban").assertIsDisplayed()
-        composeRule.onNodeWithText("Edzés folytatása").performClick()
+        composeRule.onNodeWithText(testString(R.string.set_status_pending)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_resume_workout)).performClick()
         assertEquals(1, continues)
     }
 
@@ -140,10 +142,10 @@ class DayDetailsSheetLayoutTest {
             ),
             onJournal = { journal = it }
         )
-        composeRule.onNodeWithText("Teljesítve").assertIsDisplayed()
-        composeRule.onNodeWithText("Megtekintés a Naplóban").performClick()
+        composeRule.onNodeWithText(testString(R.string.set_status_completed_label)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_view_in_journal)).performClick()
         assertEquals(8L, journal)
-        composeRule.onAllNodesWithText("Edzés indítása").assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.action_start_workout)).assertCountEquals(0)
     }
 
     @Test
@@ -158,8 +160,8 @@ class DayDetailsSheetLayoutTest {
             ),
             onStart = { starts += 1 }
         )
-        composeRule.onNodeWithText("Archivált edzésterv").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Edzés indítása").assertCountEquals(0)
+        composeRule.onNodeWithText(testString(R.string.schedule_status_archived)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.action_start_workout)).assertCountEquals(0)
         assertEquals(0, starts)
     }
 

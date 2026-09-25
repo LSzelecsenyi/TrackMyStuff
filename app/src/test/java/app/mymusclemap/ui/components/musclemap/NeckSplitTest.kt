@@ -241,13 +241,13 @@ class NeckSplitTest {
             ),
             today
         )
-        val recency = resources.getString(R.string.heatmap_days_ago, 2)
+        val recency = resources.getQuantityString(R.plurals.heatmap_days_ago, 2, 2)
         val description = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.NECK.labelRes()),
             recency
         )
-        assertEquals("Nyak: 2 napja", description)
+        assertEquals("Neck: 2 days ago", description)
         assertEquals(2, state.entry(MuscleGroup.NECK).daysAgo)
         assertEquals(MuscleRecencyBand.DAYS_1_2, state.entry(MuscleGroup.NECK).band)
         assertTrue(MuscleGroup.NECK in MuscleHeatmapAssembler.anatomicalGroups)

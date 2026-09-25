@@ -30,8 +30,6 @@ class WeeklyOverviewLogicTest {
         assertEquals(0, overview.workoutCount)
         assertEquals(0, overview.completedSetCount)
         assertNull(overview.weightChangeKg)
-        assertEquals("0 edzés · 0 sorozat", WeeklyOverviewLogic.activityLine(overview))
-        assertEquals("Nincs elég testsúlyadat", WeeklyOverviewLogic.weightChangeLabel(overview.weightChangeKg))
     }
 
     @Test
@@ -50,7 +48,6 @@ class WeeklyOverviewLogicTest {
         )
         assertEquals(2, overview.workoutCount)
         assertEquals(7, overview.completedSetCount)
-        assertEquals("2 edzés · 7 sorozat", WeeklyOverviewLogic.activityLine(overview))
     }
 
     @Test
@@ -64,15 +61,13 @@ class WeeklyOverviewLogicTest {
         )
         assertEquals(1, overview.workoutCount)
         assertEquals(2, overview.completedSetCount)
-        assertEquals("1 edzés · 2 sorozat", WeeklyOverviewLogic.activityLine(overview))
     }
 
     @Test
-    fun singularHungarianLabelsStayCorrect() {
-        assertEquals("1 edzés", WeeklyOverviewLogic.workoutLabel(1))
-        assertEquals("1 sorozat", WeeklyOverviewLogic.setLabel(1))
-        assertEquals("2 edzés", WeeklyOverviewLogic.workoutLabel(2))
-        assertEquals("2 sorozat", WeeklyOverviewLogic.setLabel(2))
+    fun weightChangeUsesPeriodDecimals() {
+        assertEquals("+0.5 kg", WeeklyOverviewLogic.weightChangeLabel(0.5))
+        assertEquals("−0.5 kg", WeeklyOverviewLogic.weightChangeLabel(-0.5))
+        assertEquals("0.0 kg", WeeklyOverviewLogic.weightChangeLabel(0.0))
     }
 
     @Test
@@ -89,7 +84,7 @@ class WeeklyOverviewLogicTest {
             )
         )
         assertEquals(0.5, overview.weightChangeKg!!, 0.0001)
-        assertEquals("+0,5 kg", WeeklyOverviewLogic.weightChangeLabel(overview.weightChangeKg))
+        assertEquals("+0.5 kg", WeeklyOverviewLogic.weightChangeLabel(0.5))
     }
 
     @Test
@@ -103,7 +98,7 @@ class WeeklyOverviewLogicTest {
             )
         )
         assertEquals(-0.5, overview.weightChangeKg!!, 0.0001)
-        assertEquals("−0,5 kg", WeeklyOverviewLogic.weightChangeLabel(overview.weightChangeKg))
+        assertEquals("−0.5 kg", WeeklyOverviewLogic.weightChangeLabel(-0.5))
     }
 
     @Test
@@ -117,7 +112,7 @@ class WeeklyOverviewLogicTest {
             )
         )
         assertEquals(0.0, overview.weightChangeKg!!, 0.0001)
-        assertEquals("0,0 kg", WeeklyOverviewLogic.weightChangeLabel(overview.weightChangeKg))
+        assertEquals("0.0 kg", WeeklyOverviewLogic.weightChangeLabel(0.0))
     }
 
     @Test
@@ -128,7 +123,6 @@ class WeeklyOverviewLogicTest {
             measurements = listOf(weight(1, today, 80.4))
         )
         assertNull(overview.weightChangeKg)
-        assertEquals("Nincs elég testsúlyadat", WeeklyOverviewLogic.weightChangeLabel(null))
     }
 
     @Test

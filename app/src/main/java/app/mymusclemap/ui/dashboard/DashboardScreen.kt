@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -378,8 +379,16 @@ private fun OverviewHeader(
     val description = stringResource(
         R.string.weekly_overview_description,
         dateRange,
-        overview.workoutCount,
-        overview.completedSetCount,
+        pluralStringResource(
+            R.plurals.weekly_overview_workouts,
+            overview.workoutCount,
+            overview.workoutCount
+        ),
+        pluralStringResource(
+            R.plurals.weekly_overview_sets,
+            overview.completedSetCount,
+            overview.completedSetCount
+        ),
         weightValue
     )
     Column(

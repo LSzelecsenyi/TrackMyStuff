@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.workout
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -20,7 +22,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
-import app.mymusclemap.R
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -61,9 +62,9 @@ class ActiveWorkoutScreenLayoutTest {
     @Test
     fun currentSetAccessibilityLabelsAreCorrect() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        assertEquals("Aktuális", context.getString(R.string.active_exercise_badge))
-        assertEquals("Sorozat befejezése", context.getString(R.string.action_complete_set_a11y))
-        assertEquals("Sorozat kihagyása", context.getString(R.string.action_skip_set_a11y))
+        assertEquals(testString(R.string.active_exercise_badge), context.getString(R.string.active_exercise_badge))
+        assertEquals(testString(R.string.action_complete_set_a11y), context.getString(R.string.action_complete_set_a11y))
+        assertEquals(testString(R.string.action_skip_set_a11y), context.getString(R.string.action_skip_set_a11y))
     }
 
     @Test
@@ -101,18 +102,18 @@ class ActiveWorkoutScreenLayoutTest {
     @Test
     fun exactlyOneCurrentSetAndExerciseHasNoAktualisBadge() {
         render(state = mixedSetsState(), width = 360.dp, fontScale = 1f)
-        composeRule.onAllNodesWithText("Aktuális").assertCountEquals(1)
-        composeRule.onNode(hasStateDescription("Aktuális")).assertIsDisplayed()
-        composeRule.onNode(hasStateDescription("Aktuális gyakorlat")).assertDoesNotExist()
-        composeRule.onNodeWithText("Folyamatban").assertDoesNotExist()
+        composeRule.onAllNodesWithText(testString(R.string.active_exercise_badge)).assertCountEquals(1)
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_state))).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.set_status_pending)).assertDoesNotExist()
         composeRule.onNodeWithTag(workoutExerciseKey(10L)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Sorozat befejezése").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Sorozat kihagyása").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_complete_set_a11y)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_skip_set_a11y)).assertIsDisplayed()
         composeRule.onAllNodesWithTag(SET_COMPLETE_ACTION).assertCountEquals(1)
-        composeRule.onNodeWithText("Kész").assertIsDisplayed()
-        composeRule.onNodeWithText("Kihagyva").assertIsDisplayed()
-        composeRule.onNodeWithText("Szerkesztés").assertIsDisplayed()
-        composeRule.onNodeWithText("Mentés").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.action_complete_set)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.set_status_skipped)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_edit)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_save)).assertDoesNotExist()
         composeRule.onNodeWithTag(WORKOUT_FINISH_CTA_STRONG).assertDoesNotExist()
         composeRule.onNodeWithTag(WORKOUT_FINISH_CTA).assertIsDisplayed()
     }
@@ -134,15 +135,15 @@ class ActiveWorkoutScreenLayoutTest {
         render(state = mixedSetsState(completingSetId = 2L), width = 360.dp, fontScale = 1f)
         composeRule.onNodeWithTag(SET_COMPLETE_PROGRESS).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertIsDisplayed()
-        composeRule.onNode(hasStateDescription("Aktuális")).assertIsDisplayed()
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
     }
 
     @Test
     fun skipOnDirtySetAsksForConfirmation() {
         render(state = mixedSetsState(dirtySetId = 2L), width = 360.dp, fontScale = 1f)
         composeRule.onNodeWithTag(SET_SKIP_ACTION).performClick()
-        composeRule.onNodeWithText("Kihagyod a módosított sorozatot?").assertIsDisplayed()
-        composeRule.onNode(hasStateDescription("Aktuális")).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.skip_dirty_title)).assertIsDisplayed()
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertIsDisplayed()
     }
 
@@ -150,7 +151,7 @@ class ActiveWorkoutScreenLayoutTest {
     fun skipOnCleanSetDoesNotShowConfirmation() {
         render(state = mixedSetsState(), width = 360.dp, fontScale = 1f)
         composeRule.onNodeWithTag(SET_SKIP_ACTION).performClick()
-        composeRule.onNodeWithText("Kihagyod a módosított sorozatot?").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.skip_dirty_title)).assertDoesNotExist()
     }
 
     @Test
@@ -158,16 +159,16 @@ class ActiveWorkoutScreenLayoutTest {
         render(state = completedState(), width = 360.dp, fontScale = 1f)
         composeRule.onNodeWithTag(WORKOUT_FINISH_CTA_STRONG).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertDoesNotExist()
-        composeRule.onNodeWithText("Aktuális").assertDoesNotExist()
-        composeRule.onNodeWithText("Teljesítve").assertIsDisplayed()
-        composeRule.onNodeWithText("Szerkesztés").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.set_status_completed_label)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_edit)).assertIsDisplayed()
     }
 
     @Test
     fun highlightAndActionsStayUsableAtFontScale13() {
         render(state = mixedSetsState(), width = 360.dp, fontScale = 1.3f)
         composeRule.onNodeWithTag(workoutExerciseKey(10L)).assertIsDisplayed()
-        composeRule.onNodeWithText("Aktuális").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_COMPLETE_ACTION).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SET_SKIP_ACTION).assertIsDisplayed()
         composeRule.onNodeWithText("Húzódzkodás").assertIsDisplayed()
@@ -181,7 +182,7 @@ class ActiveWorkoutScreenLayoutTest {
         render(state = mixedSetsState(), width = 360.dp, fontScale = 1.3f)
         composeRule.onNodeWithTag(WORKOUT_FINISH_CTA).assertIsDisplayed()
         composeRule.onNodeWithTag(WORKOUT_FINISH_CTA_STRONG).assertDoesNotExist()
-        composeRule.onNodeWithText("Aktuális").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertIsDisplayed()
     }
 
     @Test
@@ -194,7 +195,7 @@ class ActiveWorkoutScreenLayoutTest {
             width = 360.dp,
             fontScale = 1f
         )
-        composeRule.onNode(hasStateDescription("Aktuális")).assertIsDisplayed()
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
         composeRule.onAllNodesWithTag("set-numeric-field")[0].assertIsNotFocused()
         composeRule.onAllNodesWithTag("set-numeric-field")[1].assertIsNotFocused()
     }
@@ -207,7 +208,7 @@ class ActiveWorkoutScreenLayoutTest {
         composeRule.onAllNodesWithTag("set-numeric-field").assertCountEquals(2)
         composeRule.onAllNodesWithTag("set-numeric-field")[0].assertIsNotFocused()
         composeRule.onAllNodesWithTag("set-numeric-field")[1].assertIsNotFocused()
-        composeRule.onNode(hasStateDescription("Aktuális")).assertIsDisplayed()
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
     }
 
     @Test
@@ -217,7 +218,7 @@ class ActiveWorkoutScreenLayoutTest {
         composeRule.onNodeWithTag(SET_SKIP_ACTION).performClick()
         composeRule.onAllNodesWithTag("set-numeric-field")[0].assertIsNotFocused()
         composeRule.onAllNodesWithTag("set-numeric-field")[1].assertIsNotFocused()
-        composeRule.onNodeWithText("Kihagyod a módosított sorozatot?").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.skip_dirty_title)).assertDoesNotExist()
     }
 
     @Test
@@ -232,7 +233,7 @@ class ActiveWorkoutScreenLayoutTest {
         composeRule.onNodeWithTag(WORKOUT_FINISH_KEY).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(WORKOUT_FINISH_CTA_STRONG).assertIsDisplayed()
         composeRule.onAllNodesWithTag("set-numeric-field").assertCountEquals(0)
-        composeRule.onNodeWithText("Aktuális").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertDoesNotExist()
     }
 
     @Test
@@ -252,13 +253,13 @@ class ActiveWorkoutScreenLayoutTest {
             width = 360.dp,
             fontScale = 1f
         )
-        composeRule.onNodeWithText("Elveted az edzést?").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.abandon_title)).assertIsDisplayed()
         composeRule.onNodeWithText(
-            "Az eddig rögzített sorozatok véglegesen elvesznek, és az edzés nem kerül be a Naplóba."
+            testString(R.string.abandon_body)
         ).assertIsDisplayed()
-        composeRule.onNodeWithText("Folytatom az edzést").assertIsDisplayed()
-        composeRule.onNodeWithText("Edzés elvetése").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("További edzésműveletek").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_continue_workout)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_abandon_workout)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_workout)).assertIsDisplayed()
     }
 
     @Test
@@ -279,7 +280,7 @@ class ActiveWorkoutScreenLayoutTest {
         assertTrue("button.right=${button.right} anchor.right=${anchor.right}", button.right <= anchor.right + 1.dp)
         assertTrue("overflow button width=${button.right - button.left}", button.right - button.left >= 48.dp)
         assertTrue("overflow button height=${button.bottom - button.top}", button.bottom - button.top >= 48.dp)
-        composeRule.onNodeWithContentDescription("További edzésműveletek").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_workout)).performClick()
         composeRule.waitForIdle()
         assertMenuIsAnchoredNearOverflowIcon(headerWidth = 360.dp)
     }
@@ -296,7 +297,7 @@ class ActiveWorkoutScreenLayoutTest {
         )
         assertTrue("overflow button width=${button.right - button.left}", button.right - button.left >= 48.dp)
         assertTrue("overflow button height=${button.bottom - button.top}", button.bottom - button.top >= 48.dp)
-        composeRule.onNodeWithContentDescription("További edzésműveletek").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_workout)).performClick()
         composeRule.waitForIdle()
         assertMenuIsAnchoredNearOverflowIcon(headerWidth = 412.dp)
     }
@@ -314,8 +315,8 @@ class ActiveWorkoutScreenLayoutTest {
         assertTrue(skip.bottom - skip.top >= 48.dp)
         assertTrue(complete.right - complete.left >= 48.dp)
         assertTrue(complete.bottom - complete.top >= 48.dp)
-        composeRule.onNodeWithContentDescription("Sorozat kihagyása").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Sorozat befejezése").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_skip_set_a11y)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_complete_set_a11y)).assertIsDisplayed()
     }
 
     @Test
@@ -333,16 +334,16 @@ class ActiveWorkoutScreenLayoutTest {
         )
         composeRule.onNodeWithTag(SET_SKIP_ACTION).performClick()
         composeRule.onNodeWithTag(SET_COMPLETE_ACTION).performClick()
-        composeRule.onNodeWithContentDescription("További edzésműveletek").performClick()
-        composeRule.onNodeWithText("Edzés elvetése").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_workout)).performClick()
+        composeRule.onNodeWithText(testString(R.string.action_abandon_workout)).performClick()
         assertEquals(1, skipped)
         assertEquals(1, completed)
         assertEquals(1, abandoned)
-        composeRule.onNodeWithText("Elveted az edzést?").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.abandon_title)).assertDoesNotExist()
     }
 
     private fun assertMenuIsAnchoredNearOverflowIcon(headerWidth: Dp) {
-        composeRule.onNodeWithText("Edzés elvetése").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_abandon_workout)).assertIsDisplayed()
         val header = composeRule.onNodeWithTag(WORKOUT_TOP_BAR).getBoundsInRoot()
         val button = composeRule.onNodeWithTag(WORKOUT_OVERFLOW_BUTTON).getBoundsInRoot()
         val menu = composeRule.onNodeWithTag(WORKOUT_OVERFLOW_MENU).getBoundsInRoot()
@@ -380,8 +381,8 @@ class ActiveWorkoutScreenLayoutTest {
     @Test
     fun setHeaderShowsExerciseNameBesideIndex() {
         render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
-        composeRule.onNodeWithText("1. sorozat · Vádli").assertIsDisplayed()
-        composeRule.onNodeWithText("Aktuális").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.field_set_label_with_exercise, 1, "Vádli")).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertIsDisplayed()
         composeRule.onNodeWithText("Vádli").assertIsDisplayed()
     }
 
@@ -393,7 +394,7 @@ class ActiveWorkoutScreenLayoutTest {
         val status = composeRule.onAllNodesWithTag(SET_HEADER_STATUS)[0].getBoundsInRoot()
         val complete = composeRule.onNodeWithTag(SET_COMPLETE_ACTION).getBoundsInRoot()
         val skip = composeRule.onNodeWithTag(SET_SKIP_ACTION).getBoundsInRoot()
-        composeRule.onNodeWithText("Aktuális").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_exercise_badge)).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_SKIP_ACTION).assertIsDisplayed()
         assertTrue("title=$title status=$status", title.right <= status.left + 1.dp)
@@ -407,8 +408,8 @@ class ActiveWorkoutScreenLayoutTest {
         render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
         composeRule.onNodeWithTag(SET_REPS_MINUS).assertIsDisplayed()
         composeRule.onNodeWithTag(SET_REPS_PLUS).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Ismétlésszám csökkentése").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Ismétlésszám növelése").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_decrease_reps_a11y)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_increase_reps_a11y)).assertIsDisplayed()
         composeRule.onNode(hasStateDescription("8")).assertIsDisplayed()
     }
 

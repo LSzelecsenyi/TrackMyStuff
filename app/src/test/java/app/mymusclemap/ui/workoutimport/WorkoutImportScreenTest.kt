@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.workoutimport
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -75,12 +77,12 @@ class WorkoutImportScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("4 edzés").assertIsDisplayed()
-        composeRule.onNodeWithText("Időszak: 2026.09.13–2026.09.15").assertIsDisplayed()
-        composeRule.onNodeWithText("10 különböző gyakorlat").assertIsDisplayed()
-        composeRule.onNodeWithText("51 teljesített sorozat").assertIsDisplayed()
-        composeRule.onNodeWithText("0 kihagyott sorozat").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Az aznapi testsúlymérésből", substring = true)
+        composeRule.onNodeWithText(testString(R.string.workout_import_summary_workouts, 4)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_import_summary_range, "Sep 13, 2026–Sep 15, 2026")).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_import_summary_exercises, 10)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_import_summary_completed, 51)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_import_summary_skipped, 0)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.workout_import_bw_same_day), substring = true)
             .onFirst()
             .assertIsDisplayed()
         composeRule.onNodeWithTag("workout_import_confirm").assertIsEnabled()
@@ -120,7 +122,7 @@ class WorkoutImportScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("A „Pullup” gyakorlat archivált.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_import_warning_archived, "Pullup")).assertIsDisplayed()
         composeRule.onNodeWithTag("workout_import_confirm").assertIsEnabled()
     }
 
@@ -160,7 +162,7 @@ class WorkoutImportScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("A 14. sorban hiányzik az ismétlésszám.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.workout_import_error_missing_reps, 14)).assertIsDisplayed()
         composeRule.onNodeWithTag("workout_import_confirm").assertDoesNotExist()
     }
 

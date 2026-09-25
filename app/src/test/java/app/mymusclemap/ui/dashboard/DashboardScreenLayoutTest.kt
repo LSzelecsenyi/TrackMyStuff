@@ -1,5 +1,8 @@
 package app.mymusclemap.ui.dashboard
 
+import app.mymusclemap.R
+import app.mymusclemap.testQuantity
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -76,9 +79,9 @@ class DashboardScreenLayoutTest {
         val chart = composeRule.onNodeWithTag("dashboard_weight_chart").getUnclippedBoundsInRoot()
         assertTrue(heatmap.top.value < calendar.top.value)
         assertTrue(calendar.top.value < chart.top.value)
-        composeRule.onNodeWithText("Izomterhelés").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.heatmap_title)).assertIsDisplayed()
         composeRule.onNodeWithTag("dashboard_calendar_title").assertExists()
-        composeRule.onNodeWithText("Testsúlygörbe").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.chart_title)).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -99,7 +102,7 @@ class DashboardScreenLayoutTest {
         assertLabelAboveValue("dashboard_stat_weight")
         composeRule.onNodeWithTag("dashboard_stat_workouts_value").assertTextEquals("3")
         composeRule.onNodeWithTag("dashboard_stat_sets_value").assertTextEquals("18")
-        composeRule.onNodeWithTag("dashboard_stat_weight_value").assertTextEquals("+0,4 kg")
+        composeRule.onNodeWithTag("dashboard_stat_weight_value").assertTextEquals("+0.4 kg")
     }
 
     @Test
@@ -109,7 +112,7 @@ class DashboardScreenLayoutTest {
         val kicker = composeRule.onNodeWithTag("dashboard_weekly_kicker").getBoundsInRoot()
         val overflow = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_BUTTON).getBoundsInRoot()
         val stats = composeRule.onNodeWithTag("dashboard_weekly_stats").getBoundsInRoot()
-        composeRule.onNodeWithContentDescription("További műveletek").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).assertIsDisplayed()
         assertTrue("overflow should sit right of the title", overflow.left >= kicker.right - 1.dp)
         assertTrue("overflow should stay in the header row", overflow.top >= header.top - 1.dp)
         assertTrue("overflow should stay in the header row", overflow.bottom <= header.bottom + 1.dp)
@@ -125,9 +128,9 @@ class DashboardScreenLayoutTest {
         composeRule.onNodeWithTag("dashboard_stat_workouts_value").assertTextEquals("0")
         composeRule.onNodeWithTag("dashboard_stat_sets_value").assertTextEquals("0")
         composeRule.onNodeWithTag("dashboard_stat_weight_value").assertTextEquals("—")
-        composeRule.onAllNodesWithText("Nincs elég testsúlyadat").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Nincs elég mérés a változáshoz").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Nincs elég mérés", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Not enough body-weight data").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Not enough measurements for a change").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Not enough measurements", substring = true).assertCountEquals(0)
     }
 
     @Test
@@ -136,11 +139,11 @@ class DashboardScreenLayoutTest {
         val range = UiFormatters.inclusiveDateRange(WeeklyOverviewLogic.windowStart(today), today)
         composeRule.onNodeWithTag("dashboard_weekly_range").assertTextEquals(range)
         composeRule.onNodeWithTag("dashboard_weekly_overview")
-            .assert(hasContentDescription("Elmúlt 7 nap", substring = true))
+            .assert(hasContentDescription("Last 7 days", substring = true))
             .assert(hasContentDescription(range, substring = true))
-            .assert(hasContentDescription("3 edzés", substring = true))
-            .assert(hasContentDescription("18 sorozat", substring = true))
-            .assert(hasContentDescription("+0,4 kg", substring = true))
+            .assert(hasContentDescription(testQuantity(R.plurals.weekly_overview_workouts, 3), substring = true))
+            .assert(hasContentDescription(testQuantity(R.plurals.weekly_overview_sets, 18), substring = true))
+            .assert(hasContentDescription("+0.4 kg", substring = true))
     }
 
     @Test
@@ -156,25 +159,25 @@ class DashboardScreenLayoutTest {
         val selected = AtomicReference<LocalDate?>(null)
         render(onDaySelected = { selected.set(it) })
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
-        composeRule.onNode(hasContentDescription("2026. március 11.", substring = true)).performClick()
+        composeRule.onNode(hasContentDescription("March 11, 2026", substring = true)).performClick()
         assertEquals(today, selected.get())
         selected.set(null)
-        composeRule.onAllNodes(hasContentDescription("jövőbeli nap", substring = true))
+        composeRule.onAllNodes(hasContentDescription(testString(R.string.calendar_future_label), substring = true))
             .onFirst()
             .performClick()
         assertEquals(LocalDate.of(2026, 3, 12), selected.get())
-        composeRule.onNodeWithText("Tervezett edzés").assertExists()
+        composeRule.onNodeWithText(testString(R.string.calendar_legend_planned)).assertExists()
     }
 
     @Test
     fun fontScale13KeepsSectionsUsableWithoutClippingKeyActions() {
         render(fontScale = 1.3f)
-        composeRule.onNodeWithText("Izomterhelés").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.heatmap_title)).assertIsDisplayed()
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("dashboard_weight_details").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Részletek").assertIsDisplayed()
-        composeRule.onNodeWithText("Legutóbbi").assertExists()
-        composeRule.onNodeWithText("Időszak átlaga").assertExists()
+        composeRule.onNodeWithText(testString(R.string.action_open_details)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.weight_stat_latest_label)).assertExists()
+        composeRule.onNodeWithText(testString(R.string.weight_stat_average_label)).assertExists()
         assertWeeklyOverviewFitsWithoutClipOrOverlap()
     }
 
@@ -199,13 +202,13 @@ class DashboardScreenLayoutTest {
             "anchor should sit on the right of the header: anchor=$anchor header=$header",
             anchor.left > (header.left + header.right) / 2
         )
-        composeRule.onNodeWithContentDescription("További műveletek").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_MENU).assertIsDisplayed()
-        composeRule.onNodeWithText("Edzéstervek").assertIsDisplayed()
-        composeRule.onNodeWithText("Gyakorlatok").assertIsDisplayed()
-        composeRule.onNodeWithText("Beállítások").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Napló").assertCountEquals(0)
+        composeRule.onNodeWithText(testString(R.string.templates_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercises_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.settings_title)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.nav_journal)).assertCountEquals(0)
         val menu = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_MENU).getBoundsInRoot()
         val popup = popupWindowLayoutParams().maxByOrNull { params -> params.x }
             ?: error("expected a DropdownMenu popup window")
@@ -221,9 +224,9 @@ class DashboardScreenLayoutTest {
             popupRight > (header.left + header.right) / 2
         )
         composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_TEMPLATES).performClick()
-        composeRule.onNodeWithContentDescription("További műveletek").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
         composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_EXERCISES).performClick()
-        composeRule.onNodeWithContentDescription("További műveletek").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
         composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_SETTINGS).performClick()
         assertEquals(1, templates)
         assertEquals(1, catalog)
@@ -243,13 +246,13 @@ class DashboardScreenLayoutTest {
         )
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
         composeRule.onNodeWithTag("calendar-legend-planned").assertExists()
-        composeRule.onNodeWithText("Tervezett edzés").assertExists()
+        composeRule.onNodeWithText(testString(R.string.calendar_legend_planned)).assertExists()
         composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).onFirst().assertExists()
         composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).onFirst().assertExists()
         composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
-        val todayCell = composeRule.onNode(hasContentDescription("2026. március 11.", substring = true))
-        todayCell.assert(hasContentDescription("1 befejezett edzés", substring = true))
-        todayCell.assert(hasContentDescription("1 tervezett edzés", substring = true))
+        val todayCell = composeRule.onNode(hasContentDescription("March 11, 2026", substring = true))
+        todayCell.assert(hasContentDescription(testQuantity(R.plurals.calendar_completed_workouts, 1), substring = true))
+        todayCell.assert(hasContentDescription(testQuantity(R.plurals.calendar_planned_workouts, 1), substring = true))
         val cellBounds = todayCell.getBoundsInRoot()
         assertTrue(cellBounds.bottom - cellBounds.top <= 48.dp)
     }
@@ -290,13 +293,13 @@ class DashboardScreenLayoutTest {
         composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).assertCountEquals(5)
         composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).assertCountEquals(4)
         composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).assertCountEquals(4)
-        val crowded = composeRule.onNode(hasContentDescription("2026. március 7.", substring = true))
+        val crowded = composeRule.onNode(hasContentDescription("March 7, 2026", substring = true))
         val bounds = crowded.getBoundsInRoot()
         assertTrue(bounds.bottom - bounds.top <= 48.dp)
-        crowded.assert(hasContentDescription("1 tervezett edzés", substring = true))
-        crowded.assert(hasContentDescription("2 befejezett edzés", substring = true))
-        val many = composeRule.onNode(hasContentDescription("2026. március 8.", substring = true))
-        many.assert(hasContentDescription("3 tervezett edzés", substring = true))
+        crowded.assert(hasContentDescription(testQuantity(R.plurals.calendar_planned_workouts, 1), substring = true))
+        crowded.assert(hasContentDescription(testQuantity(R.plurals.calendar_completed_workouts, 2), substring = true))
+        val many = composeRule.onNode(hasContentDescription("March 8, 2026", substring = true))
+        many.assert(hasContentDescription(testQuantity(R.plurals.calendar_planned_workouts, 3), substring = true))
         assertNotClipped("calendar-legend")
         composeRule.onNodeWithTag("calendar-legend-planned").assertExists()
         composeRule.onNodeWithTag("calendar-legend-completed").assertExists()
@@ -319,8 +322,8 @@ class DashboardScreenLayoutTest {
         composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).onFirst().assertExists()
         composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).onFirst().assertExists()
         composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
-        composeRule.onNodeWithText("Tervezett edzés").assertExists()
-        composeRule.onNodeWithText("Edzés").assertExists()
+        composeRule.onNodeWithText(testString(R.string.calendar_legend_planned)).assertExists()
+        composeRule.onNodeWithText(testString(R.string.nav_workout)).assertExists()
     }
 
     @Test
@@ -328,13 +331,13 @@ class DashboardScreenLayoutTest {
         render()
         composeRule.onNodeWithTag("heatmap_legend").performScrollTo()
         listOf(
-            "Ma",
-            "1–2 napja",
-            "3–4 napja",
-            "5–6 napja",
-            "7–13 napja",
-            "14+ napja",
-            "Még nem volt edzve"
+            testString(R.string.heatmap_band_today),
+            testString(R.string.heatmap_band_recent),
+            testString(R.string.heatmap_band_days_3_4),
+            testString(R.string.heatmap_band_days_5_6),
+            testString(R.string.heatmap_band_old),
+            testString(R.string.heatmap_band_inactive),
+            testString(R.string.heatmap_band_never)
         ).forEach { label ->
             composeRule.onNodeWithText(label).assertExists()
         }

@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.components.musclemap
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
@@ -99,12 +101,12 @@ class MuscleHeatmapLegendTest {
     }
 
     private val legendLabels = listOf(
-        "Ma",
-        "1–2 napja",
-        "3–4 napja",
-        "5–6 napja",
-        "7–13 napja",
-        "14+ napja",
-        "Még nem volt edzve"
+        testString(R.string.heatmap_band_today),
+        testString(R.string.heatmap_band_recent),
+        testString(R.string.heatmap_band_days_3_4),
+        testString(R.string.heatmap_band_days_5_6),
+        testString(R.string.heatmap_band_old),
+        testString(R.string.heatmap_band_inactive),
+        testString(R.string.heatmap_band_never)
     )
 }

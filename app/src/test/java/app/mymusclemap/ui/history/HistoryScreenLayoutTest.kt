@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.history
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -99,16 +101,16 @@ class HistoryScreenLayoutTest {
         val workouts = composeRule.onNodeWithTag(JOURNAL_FILTER_WORKOUT).getBoundsInRoot()
         val weight = composeRule.onNodeWithTag(JOURNAL_FILTER_WEIGHT).getBoundsInRoot()
         val all = composeRule.onNodeWithTag(JOURNAL_FILTER_ALL).getBoundsInRoot()
-        assertTrue("Edzések should precede Testsúly: $workouts $weight", workouts.left < weight.left)
-        assertTrue("Testsúly should precede Összes: $weight $all", weight.left < all.left)
+        assertTrue("Workouts should precede Body weight: $workouts $weight", workouts.left < weight.left)
+        assertTrue("Body weight should precede All: $weight $all", weight.left < all.left)
         val workoutNode = composeRule.onNodeWithTag(JOURNAL_FILTER_WORKOUT).fetchSemanticsNode()
         val weightNode = composeRule.onNodeWithTag(JOURNAL_FILTER_WEIGHT).fetchSemanticsNode()
         val allNode = composeRule.onNodeWithTag(JOURNAL_FILTER_ALL).fetchSemanticsNode()
         val workoutIndex = workoutNode.config[androidx.compose.ui.semantics.SemanticsProperties.TraversalIndex]
         val weightIndex = weightNode.config[androidx.compose.ui.semantics.SemanticsProperties.TraversalIndex]
         val allIndex = allNode.config[androidx.compose.ui.semantics.SemanticsProperties.TraversalIndex]
-        assertTrue("a11y Edzések before Testsúly: $workoutIndex $weightIndex", workoutIndex < weightIndex)
-        assertTrue("a11y Testsúly before Összes: $weightIndex $allIndex", weightIndex < allIndex)
+        assertTrue("a11y Workouts before Body weight: $workoutIndex $weightIndex", workoutIndex < weightIndex)
+        assertTrue("a11y Body weight before All: $weightIndex $allIndex", weightIndex < allIndex)
         composeRule.onNodeWithTag(journalWorkoutRowTag(10)).assertIsDisplayed()
         composeRule.onAllNodesWithTag(journalWeightRowTag(1)).assertCountEquals(0)
     }
@@ -157,7 +159,7 @@ class HistoryScreenLayoutTest {
         val opened = intArrayOf(0)
         render(timeline = mixedTimeline(), onOpenWorkout = { opened[0] += 1 })
         composeRule.onNodeWithTag(journalWorkoutOverflowButtonTag(10)).performClick()
-        composeRule.onNodeWithText("Edzés törlése").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_delete_workout)).assertIsDisplayed()
         composeRule.onNodeWithTag(journalWorkoutOverflowMenuTag(10)).assertIsDisplayed()
         assertEquals(0, opened[0])
         val row = composeRule.onNodeWithTag(journalWorkoutRowTag(10)).getBoundsInRoot()
@@ -192,10 +194,10 @@ class HistoryScreenLayoutTest {
     fun givenHeaderPlusWhenTappedThenWeightFlowOpensWithoutFab() {
         val adds = intArrayOf(0)
         render(timeline = mixedTimeline(), onAdd = { adds[0] += 1 })
-        composeRule.onNodeWithContentDescription("Testsúly rögzítése").performClick()
-        composeRule.onNodeWithContentDescription("Testsúly rögzítése").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_record_weight)).performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_record_weight)).performClick()
         assertEquals(1, adds[0])
-        composeRule.onAllNodesWithContentDescription("Mérés hozzáadása").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(testString(R.string.action_add_measurement)).assertCountEquals(0)
     }
 
     @Test
@@ -219,7 +221,7 @@ class HistoryScreenLayoutTest {
                 emptyKind = JournalEmptyKind.NoEntries
             )
         )
-        composeRule.onNodeWithText("Még nincs naplóbejegyzés.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.journal_empty)).assertIsDisplayed()
     }
 
     @Test
@@ -229,7 +231,7 @@ class HistoryScreenLayoutTest {
             summaries = emptyList()
         )
         composeRule.onNodeWithTag(JOURNAL_FILTER_WORKOUT).performClick()
-        composeRule.onNodeWithText("Még nincs befejezett edzés.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.journal_empty_workout)).assertIsDisplayed()
     }
 
     @Test
@@ -239,7 +241,7 @@ class HistoryScreenLayoutTest {
             summaries = listOf(workout(10, newer, "Push A"))
         )
         composeRule.onNodeWithTag(JOURNAL_FILTER_WEIGHT).performClick()
-        composeRule.onNodeWithText("Még nincs testsúlymérés.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.journal_empty_weight)).assertIsDisplayed()
         composeRule.onNodeWithTag(JOURNAL_EMPTY_RECORD).assertIsDisplayed()
     }
 
@@ -282,7 +284,7 @@ class HistoryScreenLayoutTest {
         )
         composeRule.onNodeWithTag(journalWorkoutRowTag(20)).performClick()
         composeRule.onNodeWithTag(journalWorkoutOverflowButtonTag(20)).performClick()
-        composeRule.onNodeWithText("Edzés törlése").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_delete_workout)).assertIsDisplayed()
         composeRule.onNodeWithTag(WORKOUT_DELETE_ACTION).performClick()
         assertEquals(listOf(20L), opened)
         assertEquals(listOf(20L), deleted)
@@ -308,7 +310,7 @@ class HistoryScreenLayoutTest {
         assertTrue("row height ${row.bottom - row.top}", row.bottom - row.top >= 48.dp)
         assertTrue("row should stay in 360dp: $row", row.right <= 360.dp + 8.dp)
         assertMinTouch(workoutOverflow)
-        composeRule.onNodeWithText("Napló").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.nav_journal)).assertIsDisplayed()
     }
 
     @Test
@@ -337,14 +339,14 @@ class HistoryScreenLayoutTest {
     @Test
     fun givenVisibleScreenThenLegacyMaterialChromeIsGone() {
         render(timeline = mixedTimeline())
-        composeRule.onNodeWithText("Napló").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.nav_journal)).assertIsDisplayed()
         composeRule.onNodeWithTag(JOURNAL_ADD).assertIsDisplayed()
         composeRule.onNodeWithTag(JOURNAL_FILTER_ALL).assertIsDisplayed()
-        composeRule.onAllNodesWithText("Részletek").assertCountEquals(0)
-        composeRule.onAllNodesWithContentDescription("Beállítások megnyitása").assertCountEquals(0)
-        composeRule.onAllNodesWithContentDescription("Mérés hozzáadása").assertCountEquals(0)
-        composeRule.onAllNodesWithContentDescription("Edzések importálása").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("Testsúly rögzítése").assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.action_open_details)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(testString(R.string.action_open_settings)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(testString(R.string.action_add_measurement)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(testString(R.string.workout_import_action)).assertCountEquals(0)
+        composeRule.onNodeWithContentDescription(testString(R.string.action_record_weight)).assertIsDisplayed()
     }
 
     @Test

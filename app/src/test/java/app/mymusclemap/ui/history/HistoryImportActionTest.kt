@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.history
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -58,7 +60,7 @@ class HistoryImportActionTest {
             }
         }
         composeRule.onNodeWithTag(JOURNAL_OVERFLOW_BUTTON).performClick()
-        composeRule.onNodeWithText("Edzések importálása").performClick()
+        composeRule.onNodeWithText(testString(R.string.workout_import_action)).performClick()
         assertEquals(1, opened)
     }
 }

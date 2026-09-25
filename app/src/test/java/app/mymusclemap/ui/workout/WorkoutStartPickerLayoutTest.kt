@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.workout
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -53,10 +55,10 @@ class WorkoutStartPickerLayoutTest {
         val zaro = composeRule.onNodeWithTag(startPickerRowTag(3)).getBoundsInRoot()
         assertTrue(alma.top < allo.top)
         assertTrue(allo.top < zaro.top)
-        composeRule.onNodeWithText("4 gyakorlat · 14 sorozat").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.template_row_meta, 4, 14)).assertIsDisplayed()
         assertTrue("row height ${alma.bottom - alma.top}", alma.bottom - alma.top >= 48.dp)
         assertTrue("row width ${alma.right - alma.left}", alma.right - alma.left >= 300.dp)
-        composeRule.onNodeWithText("Edzéstervek kezelése").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_manage_templates)).assertIsDisplayed()
     }
 
     @Test
@@ -64,9 +66,7 @@ class WorkoutStartPickerLayoutTest {
         render(templates = listOf(templateItem(4, "Push – Kondipark", 3, 8)))
         composeRule.onNodeWithTag(startPickerRowTag(4)).performClick()
         composeRule.onNodeWithTag(START_PICKER_SHEET).assertIsDisplayed()
-        composeRule.onNodeWithText("Testsúly").assertDoesNotExist()
-        composeRule.onNodeWithText("A testsúly nem kötelező. Üresen hagyva az edzés testsúly nélkül indul.")
-            .assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.field_weight)).assertDoesNotExist()
         composeRule.onAllNodesWithTag("workout-hub-start-weight").assertCountEquals(0)
         composeRule.onAllNodesWithTag("workout-hub-start-sheet").assertCountEquals(0)
     }
@@ -92,12 +92,12 @@ class WorkoutStartPickerLayoutTest {
             onCreate = { created += 1 }
         )
         composeRule.onNodeWithTag(START_PICKER_EMPTY).assertIsDisplayed()
-        composeRule.onNodeWithText("Még nincs edzésterved.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.template_empty_active_title)).assertIsDisplayed()
         composeRule.onNodeWithTag(START_PICKER_CREATE).assertIsDisplayed()
-        composeRule.onNodeWithText("Edzésterv létrehozása").performClick()
-        composeRule.onNodeWithText("Edzésterv létrehozása").performClick()
+        composeRule.onNodeWithText(testString(R.string.action_create_template)).performClick()
+        composeRule.onNodeWithText(testString(R.string.action_create_template)).performClick()
         assertEquals(1, created)
-        composeRule.onAllNodesWithText("Edzéstervek kezelése").assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.action_manage_templates)).assertCountEquals(0)
     }
 
     @Test
@@ -120,15 +120,15 @@ class WorkoutStartPickerLayoutTest {
             todayInProgress = listOf(scheduled(11, "Pull A", inProgress = true))
         )
         composeRule.onNodeWithTag(START_PICKER_TODAY_SECTION).assertIsDisplayed()
-        composeRule.onNodeWithText("MÁRA TERVEZVE").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.quick_start_today_section)).assertIsDisplayed()
         val planned = composeRule.onNodeWithTag(startPickerScheduledRowTag(10)).getBoundsInRoot()
         val inProgress = composeRule.onNodeWithTag(startPickerScheduledRowTag(11)).getBoundsInRoot()
         val remaining = composeRule.onNodeWithTag(startPickerRowTag(3)).getBoundsInRoot()
         assertTrue(planned.top < inProgress.top)
         assertTrue(inProgress.top < remaining.top)
         composeRule.onNodeWithTag(startPickerScheduledRowTag(10)).assertIsDisplayed()
-        composeRule.onNodeWithText("Folyamatban").assertIsDisplayed()
-        composeRule.onNodeWithText("Folytatás").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.set_status_pending)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_continue)).assertIsDisplayed()
         composeRule.onAllNodesWithText("Push A").assertCountEquals(1)
         composeRule.onAllNodesWithTag(START_PICKER_TODAY_SECTION).assertCountEquals(1)
         assertTrue(planned.bottom - planned.top >= 48.dp)
@@ -138,7 +138,7 @@ class WorkoutStartPickerLayoutTest {
     fun givenNoTodaySchedulesWhenPickerOpensThenTodayHeaderIsAbsent() {
         render(templates = listOf(templateItem(4, "Push – Kondipark", 3, 8)))
         composeRule.onAllNodesWithTag(START_PICKER_TODAY_SECTION).assertCountEquals(0)
-        composeRule.onAllNodesWithText("MÁRA TERVEZVE").assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.quick_start_today_section)).assertCountEquals(0)
         composeRule.onNodeWithTag(startPickerRowTag(4)).assertIsDisplayed()
     }
 

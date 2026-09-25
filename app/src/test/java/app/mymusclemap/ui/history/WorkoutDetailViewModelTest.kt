@@ -184,9 +184,13 @@ class WorkoutDetailViewModelTest {
         assertEquals(2, state.progress.completed)
         assertTrue(state.progress.skipped > 0)
         val firstDisplay = state.setDisplays[sets[0].id]!!
-        assertEquals("7 ism. · +15 kg", firstDisplay.performed)
+        val resources = ApplicationProvider.getApplicationContext<Context>().resources
+        assertEquals("7 reps · +15 kg", firstDisplay.performed)
         assertTrue(firstDisplay.valuesDiffer)
-        assertEquals("8 ism. · saját testsúly", WorkoutSetCopy.display(sets.last(), state.aggregate.exercises[0].exercise).performed)
+        assertEquals(
+            "8 reps · bodyweight",
+            WorkoutSetCopy.display(resources, sets.last(), state.aggregate.exercises[0].exercise).performed
+        )
         assertFalse(WorkoutDetailViewModel::class.java.declaredMethods.map { it.name }.any { name ->
             name.contains("complete", ignoreCase = true) ||
                 name.contains("finish", ignoreCase = true) ||
@@ -265,7 +269,8 @@ class WorkoutDetailViewModelTest {
     private fun detail(sessionId: Long): WorkoutDetailViewModel {
         return WorkoutDetailViewModel(
             SavedStateHandle(mapOf(WorkoutDetailViewModel.SESSION_ID to sessionId)),
-            sessions
+            sessions,
+            ApplicationProvider.getApplicationContext<Context>().resources
         )
     }
 

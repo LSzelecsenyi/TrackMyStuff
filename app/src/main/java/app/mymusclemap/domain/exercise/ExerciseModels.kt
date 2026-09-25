@@ -1,5 +1,6 @@
 package app.mymusclemap.domain.exercise
 
+import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
 import java.util.Locale
 
@@ -59,7 +60,7 @@ sealed class ExerciseDeleteResult {
 object ExerciseNaming {
     const val NAME_MAX_LENGTH = 80
     const val NOTES_MAX_LENGTH = 500
-    private val HUNGARIAN = Locale.forLanguageTag("hu-HU")
+    private val locale = AppLocale.UI
 
     fun displayName(raw: String): String {
         return capitalizeFirstLetter(raw.trim().replace(WHITESPACE, " "))
@@ -77,7 +78,7 @@ object ExerciseNaming {
         val codePoint = raw.codePointAt(index)
         val charCount = Character.charCount(codePoint)
         val letter = String(intArrayOf(codePoint), 0, 1)
-        val upper = letter.uppercase(HUNGARIAN)
+        val upper = letter.uppercase(locale)
         if (letter == upper) {
             return raw
         }

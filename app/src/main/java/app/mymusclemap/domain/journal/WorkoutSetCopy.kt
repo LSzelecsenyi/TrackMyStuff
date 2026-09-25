@@ -1,5 +1,7 @@
 package app.mymusclemap.domain.journal
 
+import android.content.res.Resources
+import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.domain.workout.PlannedLoadKind
@@ -19,11 +21,11 @@ data class WorkoutSetDisplay(
 )
 
 object WorkoutSetCopy {
-    fun display(set: SessionSet, exercise: SessionExercise): WorkoutSetDisplay {
-        val planned = plannedValue(set, exercise.weightInterpretation)
+    fun display(resources: Resources, set: SessionSet, exercise: SessionExercise): WorkoutSetDisplay {
+        val planned = plannedValue(resources, set, exercise.weightInterpretation)
         val performed = when (set.status) {
             SessionSetStatus.SKIPPED, SessionSetStatus.PENDING -> ""
-            SessionSetStatus.COMPLETED -> performedValue(set, exercise.weightInterpretation)
+            SessionSetStatus.COMPLETED -> performedValue(resources, set, exercise.weightInterpretation)
         }
         return WorkoutSetDisplay(
             position = set.position + 1,
@@ -38,8 +40,9 @@ object WorkoutSetCopy {
         )
     }
 
-    fun plannedValue(set: SessionSet, interpretation: WeightInterpretation): String {
+    fun plannedValue(resources: Resources, set: SessionSet, interpretation: WeightInterpretation): String {
         return formatValue(
+            resources = resources,
             repsText = plannedReps(set.plannedMinReps, set.plannedMaxReps),
             loadKind = set.plannedLoadKind,
             weightKg = set.plannedWeightKg,
@@ -49,9 +52,10 @@ object WorkoutSetCopy {
         )
     }
 
-    fun performedValue(set: SessionSet, interpretation: WeightInterpretation): String {
+    fun performedValue(resources: Resources, set: SessionSet, interpretation: WeightInterpretation): String {
         return formatValue(
-            repsText = set.actualReps?.let { "$it ism." },
+            resources = resources,
+            repsText = set.actualReps?.toString(),
             loadKind = set.actualLoadKind,
             weightKg = set.actualWeightKg,
             durationSeconds = set.actualDurationSeconds,
@@ -61,23 +65,25 @@ object WorkoutSetCopy {
     }
 
     fun formatValue(
+        resources: Resources,
         repsText: String?,
         loadKind: PlannedLoadKind?,
         weightKg: Double?,
         durationSeconds: Int?,
         distanceMeters: Double?,
-        interpretation: WeightInterpretation
+        interpretation: WeightInterpretation,
+        markTotalWeight: Boolean = false
     ): String {
         val parts = mutableListOf<String>()
         if (!repsText.isNullOrBlank()) {
-            parts += if (repsText.endsWith("ism.")) repsText else "$repsText ism."
+            parts += resources.getString(R.string.set_copy_reps, repsText)
         }
-        loadLabel(loadKind, weightKg, interpretation)?.let { parts += it }
+        loadLabel(resources, loadKind, weightKg, interpretation, markTotalWeight)?.let { parts += it }
         if (distanceMeters != null) {
-            parts += distanceLabel(distanceMeters)
+            parts += distanceLabel(resources, distanceMeters)
             durationSeconds?.let { parts += clock(it) }
         } else {
-            durationSeconds?.let { parts += durationLabel(it) }
+            durationSeconds?.let { parts += durationLabel(resources, it) }
         }
         return parts.joinToString(" · ")
     }
@@ -90,27 +96,39 @@ object WorkoutSetCopy {
     }
 
     private fun loadLabel(
+        resources: Resources,
         kind: PlannedLoadKind?,
         weightKg: Double?,
-        interpretation: WeightInterpretation
+        interpretation: WeightInterpretation,
+        markTotalWeight: Boolean
     ): String? {
         val weight = weightKg?.let { QuantityParser.formatDisplay(it) }
         return when (kind) {
             null, PlannedLoadKind.NONE -> null
-            PlannedLoadKind.BODYWEIGHT_ONLY -> "saját testsúly"
-            PlannedLoadKind.ADDED_WEIGHT -> if (weight != null) "+$weight kg" else "+ kg"
-            PlannedLoadKind.ASSISTANCE -> if (weight != null) "$weight kg rásegítés" else "rásegítés"
+            PlannedLoadKind.BODYWEIGHT_ONLY -> resources.getString(R.string.set_copy_bodyweight)
+            PlannedLoadKind.ADDED_WEIGHT -> if (weight != null) {
+                resources.getString(R.string.set_copy_added_weight, weight)
+            } else {
+                resources.getString(R.string.set_copy_added_weight, "").trim()
+            }
+            PlannedLoadKind.ASSISTANCE -> if (weight != null) {
+                resources.getString(R.string.set_copy_assistance, weight)
+            } else {
+                resources.getString(R.string.set_copy_assistance_plain)
+            }
             PlannedLoadKind.EXTERNAL_WEIGHT -> when {
                 weight == null -> null
-                interpretation == WeightInterpretation.PER_SIDE -> "$weight kg kézenként"
-                else -> "$weight kg"
+                interpretation == WeightInterpretation.PER_SIDE ->
+                    resources.getString(R.string.set_copy_per_side, weight)
+                markTotalWeight -> resources.getString(R.string.set_copy_weight_total, weight)
+                else -> resources.getString(R.string.set_copy_weight, weight)
             }
         }
     }
 
-    private fun durationLabel(seconds: Int): String {
+    private fun durationLabel(resources: Resources, seconds: Int): String {
         return if (seconds < 60) {
-            "$seconds mp"
+            resources.getString(R.string.set_copy_seconds, seconds)
         } else {
             clock(seconds)
         }
@@ -123,12 +141,18 @@ object WorkoutSetCopy {
         return "$minutes:${remainder.toString().padStart(2, '0')}"
     }
 
-    private fun distanceLabel(meters: Double): String {
+    private fun distanceLabel(resources: Resources, meters: Double): String {
         return if (meters >= 1000.0) {
             val kilometers = QuantityParser.fromMeters(meters, DistanceUnit.KILOMETERS)
-            "${QuantityParser.formatDisplay(kilometers)} km"
+            resources.getString(
+                R.string.set_copy_distance_km,
+                QuantityParser.formatDisplay(kilometers)
+            )
         } else {
-            "${QuantityParser.formatDisplay(meters)} m"
+            resources.getString(
+                R.string.set_copy_distance_m,
+                QuantityParser.formatDisplay(meters)
+            )
         }
     }
 }

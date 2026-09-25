@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.components.musclemap
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -78,7 +80,7 @@ class MuscleMapPhoneLayoutTest {
             legend.top.value + 8f >= figuresBottom
         )
         composeRule.onNodeWithTag("heatmap_legend").performScrollTo()
-        composeRule.onNodeWithText("Még nem volt edzve").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.heatmap_band_never)).assertIsDisplayed()
     }
 
     @Test
@@ -106,8 +108,8 @@ class MuscleMapPhoneLayoutTest {
         assertEquals(frontWidth(front).value, frontWidth(back).value, 1.5f)
         assertEquals(front.top.value, back.top.value, 1.5f)
         assertTrue(front.right.value <= back.left.value + 1.5f)
-        composeRule.onNodeWithText("Elsődleges").assertIsDisplayed()
-        composeRule.onNodeWithText("Másodlagos").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.template_map_primary)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.template_map_secondary)).assertIsDisplayed()
     }
 
     private fun assertSideBySideMap(width: Dp, fontScale: Float) {

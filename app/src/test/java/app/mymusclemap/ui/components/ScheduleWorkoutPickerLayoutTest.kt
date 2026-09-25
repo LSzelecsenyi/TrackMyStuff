@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.components
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -46,7 +48,7 @@ class ScheduleWorkoutPickerLayoutTest {
             onSelect = { selected = it }
         )
         composeRule.onNodeWithTag(SCHEDULE_PICKER_SHEET).assertIsDisplayed()
-        composeRule.onNodeWithText("Edzés ütemezése").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.schedule_picker_title)).assertIsDisplayed()
         val alma = composeRule.onNodeWithTag(schedulePickerRowTag(2)).getBoundsInRoot()
         val zaro = composeRule.onNodeWithTag(schedulePickerRowTag(1)).getBoundsInRoot()
         assertTrue(alma.top < zaro.top)
@@ -62,7 +64,7 @@ class ScheduleWorkoutPickerLayoutTest {
         var created = 0
         render(templates = emptyList(), onCreate = { created += 1 })
         composeRule.onNodeWithTag(SCHEDULE_PICKER_EMPTY).assertIsDisplayed()
-        composeRule.onNodeWithText("Nincs ütemezhető edzésterv.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.schedule_picker_empty)).assertIsDisplayed()
         composeRule.onNodeWithTag(SCHEDULE_PICKER_CREATE).performClick()
         composeRule.onNodeWithTag(SCHEDULE_PICKER_CREATE).performClick()
         assertEquals(1, created)

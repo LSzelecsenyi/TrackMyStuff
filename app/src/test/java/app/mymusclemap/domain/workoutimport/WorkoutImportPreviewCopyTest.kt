@@ -1,24 +1,33 @@
 package app.mymusclemap.domain.workoutimport
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
 
+@RunWith(RobolectricTestRunner::class)
 class WorkoutImportPreviewCopyTest {
+    private val resources = ApplicationProvider.getApplicationContext<Context>().resources
+
     @Test
-    fun dateRangeFormatsHungarianInclusiveBounds() {
+    fun dateRangeFormatsEnglishInclusiveBounds() {
         val range = LocalDate.parse("2026-09-13")..LocalDate.parse("2026-09-15")
-        assertEquals("2026.09.13–2026.09.15", WorkoutImportPreviewCopy.dateRange(range))
+        assertEquals("Sep 13, 2026–Sep 15, 2026", WorkoutImportPreviewCopy.dateRange(range))
     }
 
     @Test
-    fun perSideWeightUsesHungarianLabel() {
+    fun perSideWeightUsesEnglishLabel() {
         val line = WorkoutImportPreviewCopy.setLine(
+            resources,
             set(
                 reps = 10,
                 loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
@@ -26,13 +35,14 @@ class WorkoutImportPreviewCopyTest {
             ),
             WeightInterpretation.PER_SIDE
         )
-        assertTrue(line.contains("kézenként"))
-        assertTrue(line.contains("17,5 kg") || line.contains("17.5 kg"))
+        assertTrue(line.contains(resources.getString(R.string.workout_import_load_per_side)))
+        assertTrue(line.contains("17.5 kg"))
     }
 
     @Test
-    fun totalWeightUsesHungarianLabel() {
+    fun totalWeightUsesEnglishLabel() {
         val line = WorkoutImportPreviewCopy.setLine(
+            resources,
             set(
                 reps = 1,
                 loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
@@ -40,13 +50,14 @@ class WorkoutImportPreviewCopyTest {
             ),
             WeightInterpretation.TOTAL
         )
-        assertTrue(line.contains("összesen"))
-        assertTrue(line.contains("7,5 kg") || line.contains("7.5 kg"))
+        assertTrue(line.contains(resources.getString(R.string.workout_import_load_total)))
+        assertTrue(line.contains("7.5 kg"))
     }
 
     @Test
     fun runningSetFormatsDistanceAndDuration() {
         val line = WorkoutImportPreviewCopy.setLine(
+            resources,
             set(
                 durationSeconds = 720,
                 distanceMeters = BigDecimal("2000"),

@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.navigation
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -42,10 +44,10 @@ class AppBottomBarLayoutTest {
     fun givenNoActiveSessionWhenBarAppearsThenMiddleActionStartsWorkout() {
         var workouts = 0
         render(hasActiveSession = false, onWorkoutAction = { workouts += 1 })
-        composeRule.onNodeWithText("Áttekintés").assertIsDisplayed()
-        composeRule.onNodeWithText("Napló").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Edzés").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("Edzés indítása").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.nav_dashboard)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.nav_journal)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.nav_workout)).assertCountEquals(0)
+        composeRule.onNodeWithContentDescription(testString(R.string.action_start_workout)).assertIsDisplayed()
         composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).assert(hasRole(Role.Button))
         composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).performClick()
         assertEquals(1, workouts)
@@ -54,8 +56,8 @@ class AppBottomBarLayoutTest {
     @Test
     fun givenActiveSessionWhenBarAppearsThenMiddleActionResumesWorkout() {
         render(hasActiveSession = true)
-        composeRule.onNodeWithContentDescription("Edzés folytatása").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Edzés indítása").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_resume_workout)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_start_workout)).assertDoesNotExist()
         composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION)
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
     }

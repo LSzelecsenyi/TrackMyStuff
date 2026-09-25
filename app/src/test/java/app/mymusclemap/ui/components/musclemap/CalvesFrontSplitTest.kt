@@ -193,13 +193,13 @@ class CalvesFrontSplitTest {
             ),
             today
         )
-        val recency = resources.getString(R.string.heatmap_days_ago, 2)
+        val recency = resources.getQuantityString(R.plurals.heatmap_days_ago, 2, 2)
         val description = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.CALVES.labelRes()),
             recency
         )
-        assertEquals("Vádli: 2 napja", description)
+        assertEquals("Calves: 2 days ago", description)
         assertEquals(2, state.entry(MuscleGroup.CALVES).daysAgo)
         assertEquals(MuscleRecencyBand.DAYS_1_2, state.entry(MuscleGroup.CALVES).band)
     }

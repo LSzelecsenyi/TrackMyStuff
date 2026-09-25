@@ -3,8 +3,8 @@ package app.mymusclemap.ui.components
 import app.mymusclemap.domain.DateValidationError
 import app.mymusclemap.domain.WeightParseError
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.domain.locale.AppLocale
 import java.time.LocalDate
-import java.util.Locale
 
 data class EditorUiState(
     val date: LocalDate,
@@ -18,8 +18,7 @@ data class EditorUiState(
 }
 
 fun formatWeightInput(weightKg: Double): String {
-    return String.format(Locale.forLanguageTag("hu-HU"), "%.1f", weightKg)
-        .replace('.', ',')
+    return String.format(AppLocale.UI, "%.1f", weightKg)
 }
 
 sealed interface UserMessage {

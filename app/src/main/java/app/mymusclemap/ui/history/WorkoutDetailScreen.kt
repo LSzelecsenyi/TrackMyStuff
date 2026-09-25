@@ -44,6 +44,7 @@ import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutSession
+import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.exercises.labelRes
@@ -52,7 +53,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -338,5 +338,5 @@ private fun formatClock(epochMillis: Long): String {
 }
 
 private fun formatMonthDay(date: LocalDate): String {
-    return date.format(DateTimeFormatter.ofPattern("MMMM d", Locale.forLanguageTag("hu-HU")))
+    return date.format(DateTimeFormatter.ofPattern("MMMM d", AppLocale.UI))
 }

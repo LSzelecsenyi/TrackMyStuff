@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.exercises
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -63,11 +65,11 @@ class ExerciseListScreenLayoutTest {
         val alma = composeRule.onNodeWithTag(catalogRowTag(2)).getBoundsInRoot()
         val allo = composeRule.onNodeWithTag(catalogRowTag(1)).getBoundsInRoot()
         val zaro = composeRule.onNodeWithTag(catalogRowTag(3)).getBoundsInRoot()
-        assertTrue(comesBefore(alma, allo))
-        assertTrue(comesBefore(allo, zaro))
+        assertTrue(comesBefore(allo, alma))
+        assertTrue(comesBefore(alma, zaro))
         composeRule.onNodeWithText("Alma").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Széles hátizom").assertCountEquals(3)
-        composeRule.onAllNodesWithText("Bicepsz").assertCountEquals(3)
+        composeRule.onAllNodesWithText(testString(R.string.muscle_lats)).assertCountEquals(3)
+        composeRule.onAllNodesWithText(testString(R.string.muscle_biceps)).assertCountEquals(3)
     }
 
     @Test
@@ -115,10 +117,10 @@ class ExerciseListScreenLayoutTest {
             source = listOf(sample(id = 1, name = "Húzódzkodás")),
             query = "nincsilyen"
         )
-        composeRule.onNodeWithText("Nincs találat a(z) „nincsilyen” keresésre.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.template_empty_search_query, "nincsilyen")).assertIsDisplayed()
         composeRule.onNodeWithTag(CATALOG_EMPTY_CLEAR_SEARCH).assertIsDisplayed()
         composeRule.onNodeWithTag(CATALOG_EMPTY_CREATE).assertDoesNotExist()
-        composeRule.onNodeWithText("Új gyakorlat").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.exercise_editor_add)).assertDoesNotExist()
         composeRule.onNodeWithTag(CATALOG_EMPTY_CLEAR_SEARCH).performClick()
         composeRule.onNodeWithTag(catalogRowTag(1)).assertIsDisplayed()
         composeRule.onNodeWithTag(CATALOG_EMPTY_CLEAR_SEARCH).assertDoesNotExist()
@@ -142,7 +144,7 @@ class ExerciseListScreenLayoutTest {
         composeRule.onNodeWithTag(CATALOG_FILTER_ARCHIVED).performClick()
         composeRule.onNodeWithTag(catalogRowTag(1)).assertIsDisplayed()
         composeRule.onNodeWithTag(catalogRowTag(2)).assertDoesNotExist()
-        composeRule.onAllNodesWithText("Archivált").assertCountEquals(2)
+        composeRule.onAllNodesWithText(testString(R.string.exercise_archived_badge)).assertCountEquals(2)
         composeRule.onNodeWithTag(CATALOG_FILTER_ALL).performClick()
         composeRule.onNodeWithTag(catalogRowTag(1)).assertIsDisplayed()
         composeRule.onNodeWithTag(catalogRowTag(2)).assertIsDisplayed()
@@ -150,8 +152,8 @@ class ExerciseListScreenLayoutTest {
         val almaAll = composeRule.onNodeWithTag(catalogRowTag(1)).getBoundsInRoot()
         val alloAll = composeRule.onNodeWithTag(catalogRowTag(2)).getBoundsInRoot()
         val zaroAll = composeRule.onNodeWithTag(catalogRowTag(3)).getBoundsInRoot()
-        assertTrue(comesBefore(almaAll, alloAll))
-        assertTrue(comesBefore(alloAll, zaroAll))
+        assertTrue(comesBefore(alloAll, almaAll))
+        assertTrue(comesBefore(almaAll, zaroAll))
     }
 
     @Test
@@ -185,11 +187,11 @@ class ExerciseListScreenLayoutTest {
         )
         assertTrue(button.right - button.left >= 48.dp)
         assertTrue(button.bottom - button.top >= 48.dp)
-        composeRule.onNodeWithContentDescription("További műveletek: Húzódzkodás").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.exercise_more_actions, "Húzódzkodás")).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(catalogOverflowMenuTag(8)).assertIsDisplayed()
-        composeRule.onNodeWithText("Szerkesztés").assertIsDisplayed()
-        composeRule.onNodeWithText("Archiválás").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_edit)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_archive_template)).assertIsDisplayed()
         val menu = composeRule.onNodeWithTag(catalogOverflowMenuTag(8)).getBoundsInRoot()
         val popup = popupWindowLayoutParams().maxByOrNull { params -> params.x }
             ?: error("expected a DropdownMenu popup window")
@@ -213,7 +215,7 @@ class ExerciseListScreenLayoutTest {
             archiveFilter = ArchiveFilter.ARCHIVED,
             emptyKind = CatalogEmptyKind.Archived
         )
-        composeRule.onNodeWithText("Nincs archivált gyakorlat.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_empty_archived_title)).assertIsDisplayed()
         composeRule.onNodeWithTag(CATALOG_EMPTY_CREATE).assertDoesNotExist()
         composeRule.onNodeWithTag(CATALOG_EMPTY_CLEAR_SEARCH).assertDoesNotExist()
     }
@@ -221,7 +223,7 @@ class ExerciseListScreenLayoutTest {
     @Test
     fun givenEmptyActiveCatalogWhenShownThenCompactCreateActionIsAvailable() {
         render(exercises = emptyList(), emptyKind = CatalogEmptyKind.Active)
-        composeRule.onNodeWithText("Még nincs gyakorlat").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.exercise_empty_active_title)).assertIsDisplayed()
         composeRule.onNodeWithTag(CATALOG_EMPTY_CREATE).assertIsDisplayed()
         val create = composeRule.onNodeWithTag(CATALOG_EMPTY_CREATE).getBoundsInRoot()
         assertTrue(create.bottom - create.top >= 48.dp)
@@ -240,7 +242,7 @@ class ExerciseListScreenLayoutTest {
             fontScale = 1.3f
         )
         composeRule.onNodeWithTag(CATALOG_ROOT).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Új gyakorlat létrehozása").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_create_exercise)).assertIsDisplayed()
         val add = composeRule.onNodeWithTag(CATALOG_ADD).getBoundsInRoot()
         val row = composeRule.onNodeWithTag(catalogRowTag(9)).getBoundsInRoot()
         val overflow = composeRule.onNodeWithTag(catalogOverflowButtonTag(9)).getBoundsInRoot()
@@ -253,7 +255,7 @@ class ExerciseListScreenLayoutTest {
         assertTrue(overflow.bottom - overflow.top >= 48.dp)
         assertTrue(active.bottom - active.top >= 48.dp)
         assertTrue("filter should not overflow: $active", active.right <= 360.dp + 8.dp)
-        composeRule.onAllNodesWithText("Gyakorlatok", substring = false).assertCountEquals(1)
+        composeRule.onAllNodesWithText(testString(R.string.exercises_title), substring = false).assertCountEquals(1)
     }
 
     private fun comesBefore(first: DpRect, second: DpRect): Boolean {

@@ -220,7 +220,7 @@ class WorkoutHubViewModelTest {
         assertEquals(WorkoutPrimaryAction.ShowPicker, first)
         assertEquals(WorkoutPrimaryAction.Ignored, second)
         val state = viewModel.uiState.first { it.pickerVisible }
-        assertEquals(listOf("Alma", "Álló evezés", "Záró"), state.templates.map { it.template.name })
+        assertEquals(listOf("Álló evezés", "Alma", "Záró"), state.templates.map { it.template.name })
         assertNull(state.activeSession)
         assertNull(state.startedSessionId)
     }

@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.templates
 
+import app.mymusclemap.R
+import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
@@ -57,8 +59,8 @@ class SetApplyActionsLayoutTest {
         fontScale: Float,
         maxActionHeight: Dp = 96.dp
     ) {
-        val remaining = "Alkalmazás a további sorozatokra"
-        val all = "Alkalmazás minden sorozatra"
+        val remaining = testString(R.string.action_apply_to_remaining)
+        val all = testString(R.string.action_apply_to_all)
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -79,7 +81,7 @@ class SetApplyActionsLayoutTest {
                                 .fillMaxWidth()
                                 .defaultMinSize(minHeight = AppDimens.minTouch)
                         ) {
-                            Text("Mentés")
+                            Text(testString(R.string.action_save))
                         }
                     }
                 }
@@ -96,7 +98,7 @@ class SetApplyActionsLayoutTest {
         assertTrue(remainingHeight <= maxActionHeight)
         assertTrue(allHeight <= maxActionHeight)
         assertTrue(remainingBounds.bottom <= allBounds.top)
-        val saveBounds = composeRule.onNodeWithText("Mentés").assertIsDisplayed().getBoundsInRoot()
+        val saveBounds = composeRule.onNodeWithText(testString(R.string.action_save)).assertIsDisplayed().getBoundsInRoot()
         assertTrue(saveBounds.bottom <= 640.dp)
         assertTrue((saveBounds.bottom - saveBounds.top) >= 48.dp)
     }

@@ -20,7 +20,7 @@ class WorkoutImportMessagesTest {
     private val resources = ApplicationProvider.getApplicationContext<Context>().resources
 
     @Test
-    fun unresolvedExerciseUsesHungarianName() {
+    fun unresolvedExerciseUsesIncomingName() {
         val text = WorkoutImportMessages.error(
             resources,
             WorkoutImportError(
@@ -30,7 +30,10 @@ class WorkoutImportMessagesTest {
                 incomingExerciseName = "Wrist roll"
             )
         )
-        assertEquals("A „Wrist roll” gyakorlathoz nincs katalógusbeli megfelelés.", text)
+        assertEquals(
+            resources.getString(R.string.workout_import_error_unresolved, "Wrist roll"),
+            text
+        )
         assertFalse(text.contains("UNRESOLVED", ignoreCase = true))
     }
 
@@ -46,7 +49,10 @@ class WorkoutImportMessagesTest {
                 incomingExerciseName = "Futás"
             )
         )
-        assertEquals("A „Futás” gyakorlat távolságot és időt igényel.", text)
+        assertEquals(
+            resources.getString(R.string.workout_import_error_needs_distance_duration, "Futás"),
+            text
+        )
         assertFalse(text.contains("DISTANCE_AND_DURATION"))
     }
 
@@ -62,7 +68,10 @@ class WorkoutImportMessagesTest {
                 incomingExerciseName = "Biceps curl"
             )
         )
-        assertEquals("A „Biceps curl” csak külső súlyos terheléssel importálható.", text)
+        assertEquals(
+            resources.getString(R.string.workout_import_error_incompatible_load, "Biceps curl"),
+            text
+        )
     }
 
     @Test
@@ -76,7 +85,10 @@ class WorkoutImportMessagesTest {
                 incomingExerciseName = "Pullup"
             )
         )
-        assertEquals("A 14. sorban hiányzik az ismétlésszám.", text)
+        assertEquals(
+            resources.getString(R.string.workout_import_error_missing_reps, 14),
+            text
+        )
     }
 
     @Test
@@ -90,6 +102,9 @@ class WorkoutImportMessagesTest {
                 incomingExerciseName = "Mystery"
             )
         )
-        assertEquals("A „Mystery” gyakorlat kézi hozzárendeléssel került a katalógusba.", text)
+        assertEquals(
+            resources.getString(R.string.workout_import_warning_manual, "Mystery"),
+            text
+        )
     }
 }

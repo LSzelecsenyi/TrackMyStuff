@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -187,7 +188,7 @@ internal fun recencyLabel(entry: MuscleHeatmapEntry): String {
         MuscleRecencyBand.TODAY -> stringResource(R.string.heatmap_band_today)
         MuscleRecencyBand.NEVER -> stringResource(R.string.heatmap_band_never)
         MuscleRecencyBand.DAYS_14_PLUS -> stringResource(R.string.heatmap_band_inactive)
-        else -> stringResource(R.string.heatmap_days_ago, entry.daysAgo ?: 0)
+        else -> pluralStringResource(R.plurals.heatmap_days_ago, entry.daysAgo ?: 0, entry.daysAgo ?: 0)
     }
 }
 

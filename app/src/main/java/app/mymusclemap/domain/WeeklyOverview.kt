@@ -3,8 +3,8 @@ package app.mymusclemap.domain
 import app.mymusclemap.domain.model.WeightMeasurement
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
+import app.mymusclemap.domain.locale.AppLocale
 import java.time.LocalDate
-import java.util.Locale
 import kotlin.math.abs
 
 data class WeeklyOverview(
@@ -15,7 +15,6 @@ data class WeeklyOverview(
 
 object WeeklyOverviewLogic {
     const val WINDOW_DAYS = 7L
-    const val INSUFFICIENT_WEIGHT = "Nincs elég testsúlyadat"
 
     fun windowStart(today: LocalDate): LocalDate = today.minusDays(WINDOW_DAYS - 1)
 
@@ -47,19 +46,8 @@ object WeeklyOverviewLogic {
         )
     }
 
-    fun workoutLabel(count: Int): String = "$count edzés"
-
-    fun setLabel(count: Int): String = "$count sorozat"
-
-    fun activityLine(overview: WeeklyOverview): String {
-        return "${workoutLabel(overview.workoutCount)} · ${setLabel(overview.completedSetCount)}"
-    }
-
-    fun weightChangeLabel(changeKg: Double?): String {
-        if (changeKg == null) {
-            return INSUFFICIENT_WEIGHT
-        }
-        val formatted = String.format(Locale.US, "%.1f", abs(changeKg)).replace('.', ',') + " kg"
+    fun weightChangeLabel(changeKg: Double): String {
+        val formatted = String.format(AppLocale.UI, "%.1f kg", abs(changeKg))
         return when {
             changeKg > 0 -> "+$formatted"
             changeKg < 0 -> "−$formatted"

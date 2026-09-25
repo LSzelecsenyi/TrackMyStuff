@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -71,7 +72,11 @@ fun WorkoutImportMappingSection(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(item.incomingName, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        text = stringResource(R.string.workout_import_occurrences, item.occurrenceCount),
+                        text = pluralStringResource(
+                            R.plurals.workout_import_occurrences,
+                            item.occurrenceCount,
+                            item.occurrenceCount
+                        ),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     item.appearances.forEach { appearance ->

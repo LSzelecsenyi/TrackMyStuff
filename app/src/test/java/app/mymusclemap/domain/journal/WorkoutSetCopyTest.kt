@@ -1,5 +1,7 @@
 package app.mymusclemap.domain.journal
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MovementPattern
@@ -14,11 +16,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class WorkoutSetCopyTest {
+    private val resources = ApplicationProvider.getApplicationContext<Context>().resources
     @Test
     fun exactRepetitionAndBodyweight() {
         val display = WorkoutSetCopy.display(
+            resources,
             set = set(
                 actualReps = 8,
                 actualLoad = PlannedLoadKind.BODYWEIGHT_ONLY,
@@ -28,13 +35,14 @@ class WorkoutSetCopyTest {
             ),
             exercise = exercise()
         )
-        assertEquals("8 ism. · saját testsúly", display.performed)
+        assertEquals("8 reps · bodyweight", display.performed)
         assertFalse(display.valuesDiffer)
     }
 
     @Test
     fun repetitionRangePlanVersusActual() {
         val display = WorkoutSetCopy.display(
+            resources,
             set = set(
                 actualReps = 7,
                 actualLoad = PlannedLoadKind.BODYWEIGHT_ONLY,
@@ -44,14 +52,15 @@ class WorkoutSetCopyTest {
             ),
             exercise = exercise()
         )
-        assertEquals("8–10 ism. · saját testsúly", display.planned)
-        assertEquals("7 ism. · saját testsúly", display.performed)
+        assertEquals("8–10 reps · bodyweight", display.planned)
+        assertEquals("7 reps · bodyweight", display.performed)
         assertTrue(display.valuesDiffer)
     }
 
     @Test
     fun addedWeightRendering() {
         val display = WorkoutSetCopy.performedValue(
+            resources,
             set = set(
                 actualReps = 7,
                 actualLoad = PlannedLoadKind.ADDED_WEIGHT,
@@ -59,12 +68,13 @@ class WorkoutSetCopyTest {
             ),
             interpretation = WeightInterpretation.TOTAL
         )
-        assertEquals("7 ism. · +15 kg", display)
+        assertEquals("7 reps · +15 kg", display)
     }
 
     @Test
     fun assistanceNeverUsesNegativeWeight() {
         val display = WorkoutSetCopy.performedValue(
+            resources,
             set = set(
                 actualReps = 6,
                 actualLoad = PlannedLoadKind.ASSISTANCE,
@@ -72,13 +82,14 @@ class WorkoutSetCopyTest {
             ),
             interpretation = WeightInterpretation.TOTAL
         )
-        assertEquals("6 ism. · 10 kg rásegítés", display)
+        assertEquals("6 reps · 10 kg assistance", display)
         assertFalse(display.contains("−") || display.contains("-10"))
     }
 
     @Test
     fun externalPerHandRendering() {
         val display = WorkoutSetCopy.performedValue(
+            resources,
             set = set(
                 actualReps = 10,
                 actualLoad = PlannedLoadKind.EXTERNAL_WEIGHT,
@@ -86,12 +97,13 @@ class WorkoutSetCopyTest {
             ),
             interpretation = WeightInterpretation.PER_SIDE
         )
-        assertEquals("10 ism. · 8,75 kg kézenként", display)
+        assertEquals("10 reps · 8.75 kg per side", display)
     }
 
     @Test
     fun durationRendering() {
         val display = WorkoutSetCopy.performedValue(
+            resources,
             set = set(
                 actualReps = null,
                 actualLoad = PlannedLoadKind.NONE,
@@ -99,12 +111,13 @@ class WorkoutSetCopyTest {
             ),
             interpretation = WeightInterpretation.NOT_APPLICABLE
         )
-        assertEquals("52 mp", display)
+        assertEquals("52 sec", display)
     }
 
     @Test
     fun distanceAndDurationRendering() {
         val display = WorkoutSetCopy.performedValue(
+            resources,
             set = set(
                 actualReps = null,
                 actualLoad = PlannedLoadKind.NONE,
@@ -113,12 +126,13 @@ class WorkoutSetCopyTest {
             ),
             interpretation = WeightInterpretation.NOT_APPLICABLE
         )
-        assertEquals("5,2 km · 28:40", display)
+        assertEquals("5.2 km · 28:40", display)
     }
 
     @Test
     fun skippedSetKeepsPlannedAndHasNoPerformedValue() {
         val display = WorkoutSetCopy.display(
+            resources,
             set = set(
                 status = SessionSetStatus.SKIPPED,
                 actualReps = null,
@@ -130,13 +144,14 @@ class WorkoutSetCopyTest {
             exercise = exercise()
         )
         assertEquals(SessionSetStatus.SKIPPED, display.status)
-        assertEquals("8 ism. · saját testsúly", display.planned)
+        assertEquals("8 reps · bodyweight", display.planned)
         assertEquals("", display.performed)
     }
 
     @Test
     fun extraSetIsLabeled() {
         val display = WorkoutSetCopy.display(
+            resources,
             set = set(addedDuringWorkout = true),
             exercise = exercise()
         )

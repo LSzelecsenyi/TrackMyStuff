@@ -3,20 +3,27 @@ package app.mymusclemap.domain.locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class LocalizedLabelOrderTest {
     @Test
-    fun sortsByHungarianAlphabetNotAscii() {
-        val items = listOf("őszibarack", "alma", "Áron", "béka", "ékezet")
+    fun usesEnglishLocale() {
+        assertEquals(Locale.ENGLISH, LocalizedLabelOrder.locale)
+        assertEquals(AppLocale.UI, LocalizedLabelOrder.locale)
+    }
+
+    @Test
+    fun sortsByEnglishCollation() {
+        val items = listOf("Zebra", "apple", "Mango")
         val sorted = LocalizedLabelOrder.sorted(items, label = { it }, key = { it })
-        assertEquals(listOf("alma", "Áron", "béka", "ékezet", "őszibarack"), sorted)
+        assertEquals(listOf("apple", "Mango", "Zebra"), sorted)
     }
 
     @Test
     fun usesStableSecondaryKeyWhenLabelsMatch() {
         data class Item(val label: String, val key: String)
         val sorted = LocalizedLabelOrder.sorted(
-            items = listOf(Item("Mell", "CHEST"), Item("Mell", "ABS")),
+            items = listOf(Item("Chest", "CHEST"), Item("Chest", "ABS")),
             label = { it.label },
             key = { it.key }
         )
@@ -24,11 +31,8 @@ class LocalizedLabelOrderTest {
     }
 
     @Test
-    fun hungarianAccentedLettersSortAfterTheirBaseLetters() {
-        assertTrue(LocalizedLabelOrder.compareLabels("a", "á") < 0)
-        assertTrue(LocalizedLabelOrder.compareLabels("e", "é") < 0)
-        assertTrue(LocalizedLabelOrder.compareLabels("o", "ö") < 0)
-        assertTrue(LocalizedLabelOrder.compareLabels("ö", "ő") < 0)
-        assertTrue(LocalizedLabelOrder.compareLabels("Alma", "Álló evezés") < 0)
+    fun englishOrderPlacesBaseLettersWithAccentsNearby() {
+        assertTrue(LocalizedLabelOrder.compareLabels("Apple", "Banana") < 0)
+        assertTrue(LocalizedLabelOrder.compareLabels("Chest", "Neck") < 0)
     }
 }

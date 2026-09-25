@@ -73,7 +73,7 @@ class TemplateListViewModelTest {
         val viewModel = TemplateListViewModel(templates)
         val state = viewModel.uiState.first { !it.loading && it.visibleItems.size == 3 }
         assertEquals(
-            listOf("Alma", "Álló evezés", "Zárógyakorlat"),
+            listOf("Álló evezés", "Alma", "Zárógyakorlat"),
             state.visibleItems.map { it.template.name }
         )
     }
@@ -122,7 +122,7 @@ class TemplateListViewModelTest {
         assertEquals(listOf("Alma"), archivedState.visibleItems.map { it.template.name })
         viewModel.onArchiveFilter(ArchiveFilter.ALL)
         val all = viewModel.uiState.first { it.archiveFilter == ArchiveFilter.ALL && it.visibleItems.size == 3 }
-        assertEquals(listOf("Alma", "Álló evezés", "Záró"), all.visibleItems.map { it.template.name })
+        assertEquals(listOf("Álló evezés", "Alma", "Záró"), all.visibleItems.map { it.template.name })
     }
 
     private suspend fun saveExercise(): Long {

@@ -1,17 +1,19 @@
 package app.mymusclemap.domain.workoutimport
 
+import android.content.res.Resources
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.journal.WorkoutSetCopy
+import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.ElapsedTime
-import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.QuantityParser
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 object WorkoutImportPreviewCopy {
-    private val dateFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
+    private val dateFormat: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.UI)
     private val timeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
     fun dateLabel(date: LocalDate): String = date.format(dateFormat)
@@ -33,24 +35,22 @@ object WorkoutImportPreviewCopy {
 
     fun duration(durationMillis: Long): String = ElapsedTime.formatMillis(durationMillis)
 
-    fun setLine(set: WorkoutImportResolvedSet, interpretation: WeightInterpretation): String {
-        val formatted = WorkoutSetCopy.formatValue(
+    fun setLine(
+        resources: Resources,
+        set: WorkoutImportResolvedSet,
+        interpretation: WeightInterpretation
+    ): String {
+        return WorkoutSetCopy.formatValue(
+            resources = resources,
             repsText = set.reps?.toString(),
             loadKind = set.loadKind,
             weightKg = set.weightKg?.toDouble(),
             durationSeconds = set.durationSeconds,
             distanceMeters = set.distanceMeters?.toDouble(),
-            interpretation = interpretation
+            interpretation = interpretation,
+            markTotalWeight = interpretation == WeightInterpretation.TOTAL &&
+                set.weightKg != null
         )
-        if (set.loadKind == PlannedLoadKind.EXTERNAL_WEIGHT &&
-            set.weightKg != null &&
-            interpretation == WeightInterpretation.TOTAL &&
-            !formatted.contains("összesen")
-        ) {
-            val weight = QuantityParser.formatDisplay(set.weightKg.toDouble())
-            return formatted.replace("$weight kg", "$weight kg összesen")
-        }
-        return formatted
     }
 
     fun bodyWeightValue(kilograms: Double?): String {

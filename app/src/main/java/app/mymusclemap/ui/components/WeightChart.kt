@@ -230,7 +230,7 @@ private data class ChartLayout(
             val yLabels = yValues.map { value ->
                 val yRatio = ((value - yMin) / yRange).toFloat()
                 AxisLabel(
-                    text = String.format(java.util.Locale.forLanguageTag("hu-HU"), "%.1f", value),
+                    text = String.format(app.mymusclemap.domain.locale.AppLocale.UI, "%.1f", value),
                     y = bottom - yRatio * (bottom - top)
                 )
             }

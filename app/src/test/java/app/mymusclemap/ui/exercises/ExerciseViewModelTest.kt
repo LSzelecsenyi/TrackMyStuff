@@ -92,7 +92,7 @@ class ExerciseViewModelTest {
         val viewModel = ExerciseListViewModel(repository)
         val state = viewModel.uiState.first { !it.loading && it.visibleExercises.size == 3 }
         assertEquals(
-            listOf("Alma", "Álló evezés", "Zárógyakorlat"),
+            listOf("Álló evezés", "Alma", "Zárógyakorlat"),
             state.visibleExercises.map { it.name }
         )
     }
@@ -135,13 +135,13 @@ class ExerciseViewModelTest {
         assertEquals(listOf("Alma"), archivedState.visibleExercises.map { it.name })
         viewModel.onArchiveFilter(ArchiveFilter.ALL)
         val all = viewModel.uiState.first { it.archiveFilter == ArchiveFilter.ALL && it.visibleExercises.size == 3 }
-        assertEquals(listOf("Alma", "Álló evezés", "Záró"), all.visibleExercises.map { it.name })
+        assertEquals(listOf("Álló evezés", "Alma", "Záró"), all.visibleExercises.map { it.name })
         viewModel.archive(activeLate.id)
         val afterArchive = viewModel.uiState.first {
             it.archiveFilter == ArchiveFilter.ALL &&
                 it.visibleExercises.any { exercise -> exercise.id == activeLate.id && exercise.archived }
         }
-        assertEquals(listOf("Alma", "Álló evezés", "Záró"), afterArchive.visibleExercises.map { it.name })
+        assertEquals(listOf("Álló evezés", "Alma", "Záró"), afterArchive.visibleExercises.map { it.name })
         viewModel.onArchiveFilter(ArchiveFilter.ACTIVE)
         val remainingActive = viewModel.uiState.first {
             it.archiveFilter == ArchiveFilter.ACTIVE && it.visibleExercises.size == 1
@@ -194,7 +194,7 @@ class ExerciseViewModelTest {
         viewModel.onToggleSecondary(MuscleGroup.FOREARMS)
         viewModel.onToggleSecondary(MuscleGroup.BICEPS)
         assertEquals(
-            listOf(MuscleGroup.FOREARMS, MuscleGroup.BICEPS, MuscleGroup.TRICEPS),
+            listOf(MuscleGroup.BICEPS, MuscleGroup.FOREARMS, MuscleGroup.TRICEPS),
             viewModel.uiState.value.draft.secondaryMuscles
         )
         viewModel.onPrimaryMuscleChange(MuscleGroup.BICEPS)

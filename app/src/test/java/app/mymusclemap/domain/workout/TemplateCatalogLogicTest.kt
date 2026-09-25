@@ -18,7 +18,7 @@ class TemplateCatalogLogicTest {
             query = "",
             archiveFilter = ArchiveFilter.ACTIVE
         )
-        assertEquals(listOf("Alma", "Álló evezés", "Zárógyakorlat"), result.map { it.template.name })
+        assertEquals(listOf("Álló evezés", "Alma", "Zárógyakorlat"), result.map { it.template.name })
     }
 
     @Test
