@@ -14,6 +14,7 @@
 *.aab
 *.keystore
 *.jks
+keystore.properties
 .DS_Store
 /app/release/
 /app/debug/
