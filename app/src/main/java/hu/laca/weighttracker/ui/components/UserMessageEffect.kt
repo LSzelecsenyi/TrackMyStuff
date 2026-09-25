@@ -16,6 +16,10 @@ fun UserMessage.stringRes(): Int {
         UserMessage.ExportSucceeded -> hu.laca.weighttracker.R.string.message_export_success
         UserMessage.ExportFailed -> hu.laca.weighttracker.R.string.message_export_failed
         UserMessage.ImportReadFailed -> hu.laca.weighttracker.R.string.message_import_read_failed
+        UserMessage.AppBackupExportSucceeded -> hu.laca.weighttracker.R.string.message_app_backup_export_success
+        UserMessage.AppBackupExportFailed -> hu.laca.weighttracker.R.string.message_app_backup_export_failed
+        UserMessage.AppBackupRestoreSucceeded -> hu.laca.weighttracker.R.string.message_app_backup_restore_success
+        UserMessage.AppBackupReadFailed -> hu.laca.weighttracker.R.string.message_app_backup_read_failed
         UserMessage.PaletteSaved -> hu.laca.weighttracker.R.string.message_palette_saved
         UserMessage.ScheduleRemoved -> hu.laca.weighttracker.R.string.message_schedule_removed
         UserMessage.ScheduleDuplicate -> hu.laca.weighttracker.R.string.message_schedule_duplicate

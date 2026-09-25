@@ -12,6 +12,7 @@ import hu.laca.weighttracker.domain.theme.PaletteType
 import hu.laca.weighttracker.domain.theme.ThemeMode
 import hu.laca.weighttracker.domain.theme.ThemeSeeds
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.themeDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -34,6 +35,25 @@ class ThemePreferences(context: Context) {
             darkSecondary = preferences[KEY_DARK_SECONDARY],
             darkTertiary = preferences[KEY_DARK_TERTIARY]
         )
+    }
+
+    suspend fun current(): AppearanceSettings = appearance.first()
+
+    suspend fun replaceAppearance(settings: AppearanceSettings) {
+        val encoded = AppearanceCodec.encode(settings)
+        dataStore.edit { prefs ->
+            prefs.clear()
+            prefs[KEY_THEME] = encoded.getValue(AppearanceCodec.KEY_THEME)
+            prefs[KEY_PALETTE_TYPE] = encoded.getValue(AppearanceCodec.KEY_PALETTE_TYPE)
+            prefs[KEY_LIGHT_BACKGROUND] = encoded.getValue(AppearanceCodec.KEY_LIGHT_BACKGROUND)
+            prefs[KEY_LIGHT_PRIMARY] = encoded.getValue(AppearanceCodec.KEY_LIGHT_PRIMARY)
+            prefs[KEY_LIGHT_SECONDARY] = encoded.getValue(AppearanceCodec.KEY_LIGHT_SECONDARY)
+            prefs[KEY_LIGHT_TERTIARY] = encoded.getValue(AppearanceCodec.KEY_LIGHT_TERTIARY)
+            prefs[KEY_DARK_BACKGROUND] = encoded.getValue(AppearanceCodec.KEY_DARK_BACKGROUND)
+            prefs[KEY_DARK_PRIMARY] = encoded.getValue(AppearanceCodec.KEY_DARK_PRIMARY)
+            prefs[KEY_DARK_SECONDARY] = encoded.getValue(AppearanceCodec.KEY_DARK_SECONDARY)
+            prefs[KEY_DARK_TERTIARY] = encoded.getValue(AppearanceCodec.KEY_DARK_TERTIARY)
+        }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {

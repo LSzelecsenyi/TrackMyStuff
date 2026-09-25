@@ -262,6 +262,11 @@ class SettingsScreenLayoutTest {
         }
         composeRule.onNodeWithText("Testsúlyadatok exportálása").assertIsDisplayed()
         composeRule.onNodeWithText("Testsúlyadatok importálása").assertIsDisplayed()
+        composeRule.onNodeWithText("ALKALMAZÁSMENTÉS").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Teljes mentés exportálása").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Teljes mentés visszaállítása").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_EXPORT).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_RESTORE).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SAVE).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_CANCEL).assertIsDisplayed()
         val save = composeRule.onNodeWithTag(SETTINGS_SAVE).getBoundsInRoot()
@@ -274,6 +279,15 @@ class SettingsScreenLayoutTest {
             "save should not be a full-width capsule",
             save.right - save.left < 200.dp
         )
+    }
+
+    @Test
+    fun givenRestoreExplanationThenReplaceWarningIsShown() {
+        render(state = SettingsUiState(showRestoreExplanation = true))
+        composeRule.onAllNodesWithText("Visszaállítás").assertCountEquals(2)
+        composeRule.onNodeWithText(
+            "A visszaállítás törli a mostani adatokat, és a fájlban lévőkkel helyettesíti őket. Ez nem vonható vissza."
+        ).assertIsDisplayed()
     }
 
     private fun ensureVisible(tag: String) {
@@ -374,9 +388,14 @@ class SettingsScreenLayoutTest {
                             },
                             onExportClick = {},
                             onImportClick = {},
+                            onAppBackupExportClick = {},
+                            onRestoreClick = {},
                             onConfirmImportExplanation = {},
                             onDismissImportExplanation = {},
                             onDismissImportErrors = {},
+                            onConfirmRestoreExplanation = {},
+                            onDismissRestoreExplanation = {},
+                            onDismissRestoreErrors = {},
                             onMessageConsumed = {},
                             onBack = onBack
                         )
@@ -423,9 +442,14 @@ class SettingsScreenLayoutTest {
                             onResetCustomDraft = {},
                             onExportClick = onExportClick,
                             onImportClick = onImportClick,
+                            onAppBackupExportClick = {},
+                            onRestoreClick = {},
                             onConfirmImportExplanation = {},
                             onDismissImportExplanation = {},
                             onDismissImportErrors = {},
+                            onConfirmRestoreExplanation = {},
+                            onDismissRestoreExplanation = {},
+                            onDismissRestoreErrors = {},
                             onMessageConsumed = {},
                             onBack = onBack
                         )

@@ -32,8 +32,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -77,6 +79,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hu.laca.weighttracker.R
 import hu.laca.weighttracker.domain.csv.WeightCsv
+import hu.laca.weighttracker.data.appbackup.AppBackupError
+import hu.laca.weighttracker.data.appbackup.AppBackupErrorCode
 import hu.laca.weighttracker.domain.theme.AppearanceSettings
 import hu.laca.weighttracker.domain.theme.PaletteDraft
 import hu.laca.weighttracker.domain.theme.PaletteDraftLogic
@@ -112,6 +116,8 @@ internal const val SETTINGS_SAVE = "settings-save"
 internal const val SETTINGS_CANCEL = "settings-cancel"
 internal const val SETTINGS_EXPORT = "settings-export"
 internal const val SETTINGS_IMPORT = "settings-import"
+internal const val SETTINGS_APP_BACKUP_EXPORT = "settings-app-backup-export"
+internal const val SETTINGS_APP_BACKUP_RESTORE = "settings-app-backup-restore"
 
 internal fun settingsColorRowTag(field: SeedField): String = "settings-color-${field.name.lowercase(Locale.US)}"
 
@@ -136,9 +142,14 @@ fun SettingsScreen(
     onResetCustomDraft: () -> Unit,
     onExportClick: () -> Unit,
     onImportClick: () -> Unit,
+    onAppBackupExportClick: () -> Unit,
+    onRestoreClick: () -> Unit,
     onConfirmImportExplanation: () -> Unit,
     onDismissImportExplanation: () -> Unit,
     onDismissImportErrors: () -> Unit,
+    onConfirmRestoreExplanation: () -> Unit,
+    onDismissRestoreExplanation: () -> Unit,
+    onDismissRestoreErrors: () -> Unit,
     onMessageConsumed: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -216,6 +227,11 @@ fun SettingsScreen(
                     onImportClick = onImportClick
                 )
                 CompactEditorDivider()
+                AppBackupSection(
+                    onExportClick = onAppBackupExportClick,
+                    onRestoreClick = onRestoreClick
+                )
+                CompactEditorDivider()
                 CompactEditorSection(title = settingsKicker(stringResource(R.string.privacy_title))) {
                     Text(
                         text = stringResource(R.string.privacy_body),
@@ -262,6 +278,41 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = onDismissImportErrors) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            }
+        )
+    }
+    if (state.showRestoreExplanation) {
+        AlertDialog(
+            onDismissRequest = onDismissRestoreExplanation,
+            title = { Text(stringResource(R.string.restore_app_backup_title)) },
+            text = { Text(stringResource(R.string.restore_app_backup_body)) },
+            confirmButton = {
+                TextButton(onClick = onConfirmRestoreExplanation) {
+                    Text(stringResource(R.string.restore_app_backup_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissRestoreExplanation) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+    if (state.restoreErrors.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = onDismissRestoreErrors,
+            title = { Text(stringResource(R.string.restore_app_backup_error_title)) },
+            text = {
+                Column {
+                    state.restoreErrors.take(8).forEach { error ->
+                        Text(text = restoreErrorText(error))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismissRestoreErrors) {
                     Text(stringResource(R.string.action_ok))
                 }
             }
@@ -761,6 +812,35 @@ private fun DataSection(
 }
 
 @Composable
+private fun AppBackupSection(
+    onExportClick: () -> Unit,
+    onRestoreClick: () -> Unit
+) {
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.app_backup_title))) {
+        Text(
+            text = stringResource(R.string.app_backup_body),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        DataActionRow(
+            icon = Icons.Outlined.Backup,
+            title = stringResource(R.string.action_export_app_backup),
+            subtitle = stringResource(R.string.action_export_app_backup_subtitle),
+            testTag = SETTINGS_APP_BACKUP_EXPORT,
+            onClick = onExportClick
+        )
+        DataActionRow(
+            icon = Icons.Outlined.SettingsBackupRestore,
+            title = stringResource(R.string.action_restore_app_backup),
+            subtitle = stringResource(R.string.action_restore_app_backup_subtitle),
+            testTag = SETTINGS_APP_BACKUP_RESTORE,
+            onClick = onRestoreClick
+        )
+    }
+}
+
+@Composable
 private fun DataActionRow(
     icon: ImageVector,
     title: String,
@@ -818,6 +898,17 @@ private fun csvErrorText(error: WeightCsv.RowError): String {
         WeightCsv.CsvErrorReason.FutureDate -> stringResource(R.string.csv_error_future)
         WeightCsv.CsvErrorReason.InvalidWeight -> stringResource(R.string.csv_error_weight)
         WeightCsv.CsvErrorReason.DuplicateDateInFile -> stringResource(R.string.csv_error_duplicate)
+    }
+    return if (error.detail.isNullOrBlank()) reason else "$reason (${error.detail})"
+}
+
+@Composable
+private fun restoreErrorText(error: AppBackupError): String {
+    val reason = when (error.code) {
+        AppBackupErrorCode.UnsupportedFormatVersion,
+        AppBackupErrorCode.UnsupportedSchemaVersion ->
+            stringResource(R.string.restore_app_backup_error_unsupported)
+        else -> stringResource(R.string.restore_app_backup_error_invalid)
     }
     return if (error.detail.isNullOrBlank()) reason else "$reason (${error.detail})"
 }
@@ -910,9 +1001,14 @@ private fun SettingsPreview() {
             onResetCustomDraft = {},
             onExportClick = {},
             onImportClick = {},
+            onAppBackupExportClick = {},
+            onRestoreClick = {},
             onConfirmImportExplanation = {},
             onDismissImportExplanation = {},
             onDismissImportErrors = {},
+            onConfirmRestoreExplanation = {},
+            onDismissRestoreExplanation = {},
+            onDismissRestoreErrors = {},
             onMessageConsumed = {},
             onBack = {}
         )

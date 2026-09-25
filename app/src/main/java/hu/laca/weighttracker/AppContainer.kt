@@ -8,6 +8,7 @@ import hu.laca.weighttracker.data.repository.ScheduledWorkoutRepository
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
+import hu.laca.weighttracker.data.repository.AppBackupRepository
 import hu.laca.weighttracker.data.workoutimport.ContentWorkoutImportFileReader
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.domain.SystemDateProvider
@@ -50,6 +51,7 @@ class AppContainer(context: Context) {
         dateProvider = dateProvider
     )
     val themePreferences = ThemePreferences(appContext)
+    val appBackupRepository = AppBackupRepository(database, themePreferences)
     val viewModelFactory = WeightViewModelFactory(
         weightRepository = weightRepository,
         exerciseRepository = exerciseRepository,
@@ -58,6 +60,7 @@ class AppContainer(context: Context) {
         scheduledWorkoutRepository = scheduledWorkoutRepository,
         dateProvider = dateProvider,
         themePreferences = themePreferences,
-        workoutImportFileReader = ContentWorkoutImportFileReader(appContext)
+        workoutImportFileReader = ContentWorkoutImportFileReader(appContext),
+        appBackupRepository = appBackupRepository
     )
 }

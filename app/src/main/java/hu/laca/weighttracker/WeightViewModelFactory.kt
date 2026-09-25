@@ -12,6 +12,7 @@ import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.data.repository.WorkoutSessionRepository
 import hu.laca.weighttracker.data.repository.WorkoutTemplateRepository
 import hu.laca.weighttracker.data.workoutimport.WorkoutImportFileReader
+import hu.laca.weighttracker.data.repository.AppBackupRepository
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.domain.exercise.MuscleGroup
 import hu.laca.weighttracker.ui.dashboard.DashboardViewModel
@@ -36,7 +37,8 @@ class WeightViewModelFactory(
     private val scheduledWorkoutRepository: ScheduledWorkoutRepository,
     private val dateProvider: DateProvider,
     private val themePreferences: ThemePreferences,
-    private val workoutImportFileReader: WorkoutImportFileReader
+    private val workoutImportFileReader: WorkoutImportFileReader,
+    private val appBackupRepository: AppBackupRepository
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -71,7 +73,7 @@ class WeightViewModelFactory(
                 )
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
-                SettingsViewModel(weightRepository, themePreferences, dateProvider)
+                SettingsViewModel(weightRepository, themePreferences, dateProvider, appBackupRepository)
             }
             modelClass.isAssignableFrom(ExerciseListViewModel::class.java) -> {
                 ExerciseListViewModel(exerciseRepository)

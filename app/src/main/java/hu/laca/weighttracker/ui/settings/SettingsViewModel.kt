@@ -3,6 +3,10 @@ package hu.laca.weighttracker.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import hu.laca.weighttracker.data.preferences.ThemePreferences
+import hu.laca.weighttracker.data.repository.AppBackupRepository
+import hu.laca.weighttracker.data.appbackup.AppBackupError
+import hu.laca.weighttracker.data.appbackup.AppBackupRestoreResult
+import hu.laca.weighttracker.data.appbackup.AppBackupSource
 import hu.laca.weighttracker.data.repository.WeightRepository
 import hu.laca.weighttracker.domain.DateProvider
 import hu.laca.weighttracker.domain.csv.WeightCsv
@@ -30,6 +34,8 @@ data class SettingsUiState(
     val saveError: PaletteSaveResult? = null,
     val showImportExplanation: Boolean = false,
     val importErrors: List<WeightCsv.RowError> = emptyList(),
+    val showRestoreExplanation: Boolean = false,
+    val restoreErrors: List<AppBackupError> = emptyList(),
     val userMessage: UserMessage? = null
 ) {
     val customEditorVisible: Boolean get() = draft != null
@@ -41,34 +47,49 @@ private data class SettingsChrome(
     val saveError: PaletteSaveResult?
 )
 
+private data class BackupChrome(
+    val showRestoreExplanation: Boolean,
+    val restoreErrors: List<AppBackupError>
+)
+
 class SettingsViewModel(
     private val repository: WeightRepository,
     private val themePreferences: ThemePreferences,
-    private val dateProvider: DateProvider
+    private val dateProvider: DateProvider,
+    private val appBackupRepository: AppBackupRepository
 ) : ViewModel() {
     private val appearance = MutableStateFlow(AppearanceSettings.Default)
     private val draft = MutableStateFlow<PaletteDraft?>(null)
     private val saveError = MutableStateFlow<PaletteSaveResult?>(null)
     private val showImportExplanation = MutableStateFlow(false)
     private val importErrors = MutableStateFlow<List<WeightCsv.RowError>>(emptyList())
+    private val showRestoreExplanation = MutableStateFlow(false)
+    private val restoreErrors = MutableStateFlow<List<AppBackupError>>(emptyList())
     private val userMessage = MutableStateFlow<UserMessage?>(null)
 
     private val chrome = combine(appearance, draft, saveError) { current, draftState, error ->
         SettingsChrome(current, draftState, error)
     }
 
+    private val backupChrome = combine(showRestoreExplanation, restoreErrors) { explanation, errors ->
+        BackupChrome(explanation, errors)
+    }
+
     val uiState: StateFlow<SettingsUiState> = combine(
         chrome,
         showImportExplanation,
         importErrors,
-        userMessage
-    ) { chromeState, explanation, errors, message ->
+        userMessage,
+        backupChrome
+    ) { chromeState, explanation, errors, message, backup ->
         SettingsUiState(
             appearance = chromeState.appearance,
             draft = chromeState.draft,
             saveError = chromeState.saveError,
             showImportExplanation = explanation,
             importErrors = errors,
+            showRestoreExplanation = backup.showRestoreExplanation,
+            restoreErrors = backup.restoreErrors,
             userMessage = message
         )
     }.stateIn(
@@ -224,5 +245,59 @@ class SettingsViewModel(
 
     fun consumeMessage() {
         userMessage.value = null
+    }
+
+    suspend fun buildAppBackupJson(source: AppBackupSource): String {
+        return appBackupRepository.exportJson(source)
+    }
+
+    fun onAppBackupExportFinished(success: Boolean) {
+        userMessage.value = if (success) {
+            UserMessage.AppBackupExportSucceeded
+        } else {
+            UserMessage.AppBackupExportFailed
+        }
+    }
+
+    fun onRestoreClicked() {
+        showRestoreExplanation.value = true
+    }
+
+    fun dismissRestoreExplanation() {
+        showRestoreExplanation.value = false
+    }
+
+    fun confirmRestoreExplanation() {
+        showRestoreExplanation.value = false
+    }
+
+    fun restoreAppBackup(content: String) {
+        restoreParsed { appBackupRepository.restoreJson(content) }
+    }
+
+    fun restoreAppBackup(bytes: ByteArray) {
+        restoreParsed { appBackupRepository.restoreBytes(bytes) }
+    }
+
+    private fun restoreParsed(restore: suspend () -> AppBackupRestoreResult) {
+        viewModelScope.launch {
+            when (val result = restore()) {
+                AppBackupRestoreResult.Success -> {
+                    restoreErrors.value = emptyList()
+                    userMessage.value = UserMessage.AppBackupRestoreSucceeded
+                }
+                is AppBackupRestoreResult.Invalid -> {
+                    restoreErrors.value = result.errors
+                }
+            }
+        }
+    }
+
+    fun onAppBackupReadFailed() {
+        userMessage.value = UserMessage.AppBackupReadFailed
+    }
+
+    fun dismissRestoreErrors() {
+        restoreErrors.value = emptyList()
     }
 }
