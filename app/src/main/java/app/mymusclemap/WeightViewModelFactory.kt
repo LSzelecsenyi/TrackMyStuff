@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
@@ -36,7 +37,8 @@ class WeightViewModelFactory(
     private val scheduledWorkoutRepository: ScheduledWorkoutRepository,
     private val dateProvider: DateProvider,
     private val themePreferences: ThemePreferences,
-    private val workoutImportFileReader: WorkoutImportFileReader
+    private val workoutImportFileReader: WorkoutImportFileReader,
+    private val appBackupRepository: AppBackupRepository
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -71,7 +73,7 @@ class WeightViewModelFactory(
                 )
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
-                SettingsViewModel(weightRepository, themePreferences, dateProvider)
+                SettingsViewModel(weightRepository, themePreferences, dateProvider, appBackupRepository)
             }
             modelClass.isAssignableFrom(ExerciseListViewModel::class.java) -> {
                 ExerciseListViewModel(exerciseRepository)

@@ -4,10 +4,13 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.FakeWeightMeasurementDao
 import app.mymusclemap.MainDispatcherRule
+import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.domain.FixedDateProvider
 import app.mymusclemap.domain.theme.HexColor
@@ -42,12 +45,16 @@ class SettingsViewModelTest {
     private val dateProvider = FixedDateProvider(LocalDate.of(2026, 3, 11), LocalTime.of(8, 0))
     private val clock = Clock.fixed(Instant.parse("2026-03-11T08:00:00Z"), ZoneOffset.UTC)
     private val viewModelStore = ViewModelStore()
+    private lateinit var database: WeightDatabase
     private lateinit var themePreferences: ThemePreferences
     private lateinit var viewModel: SettingsViewModel
 
     @Before
     fun setUp() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        database = Room.inMemoryDatabaseBuilder(context, WeightDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
         themePreferences = ThemePreferences(context)
         themePreferences.setThemeMode(ThemeMode.System)
         themePreferences.setPaletteType(PaletteType.Default)
@@ -62,7 +69,8 @@ class SettingsViewModelTest {
                 return SettingsViewModel(
                     repository = WeightRepository(FakeWeightMeasurementDao(), clock),
                     themePreferences = themePreferences,
-                    dateProvider = dateProvider
+                    dateProvider = dateProvider,
+                    appBackupRepository = AppBackupRepository(database, themePreferences)
                 ) as T
             }
         }
@@ -73,6 +81,7 @@ class SettingsViewModelTest {
     @After
     fun tearDown() {
         viewModelStore.clear()
+        database.close()
     }
 
     private suspend fun selectCustomAndAwaitDraft() {

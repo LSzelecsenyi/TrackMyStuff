@@ -30,6 +30,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.mymusclemap.WeightViewModelFactory
+import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
 import app.mymusclemap.ui.dashboard.DashboardScreen
@@ -654,6 +655,46 @@ private fun SettingsRoute(
             }
         }
     }
+    val appBackupExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val json = viewModel.buildAppBackupJson(
+                AppBackupSource(
+                    applicationId = context.packageName,
+                    versionName = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+                )
+            )
+            val success = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(json.toByteArray(StandardCharsets.UTF_8))
+                    } ?: error("missing stream")
+                }.isSuccess
+            }
+            viewModel.onAppBackupExportFinished(success)
+        }
+    }
+    val appBackupImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val bytes = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        stream.readBytes()
+                    }
+                }.getOrNull()
+            }
+            if (bytes == null) {
+                viewModel.onAppBackupReadFailed()
+            } else {
+                viewModel.restoreAppBackup(bytes)
+            }
+        }
+    }
     SettingsScreen(
         state = state,
         onThemeSelected = viewModel::setThemeMode,
@@ -670,12 +711,22 @@ private fun SettingsRoute(
             exportLauncher.launch("my_muscle_map_weight_${today}.csv")
         },
         onImportClick = viewModel::onImportClicked,
+        onAppBackupExportClick = {
+            appBackupExportLauncher.launch("my_muscle_map_backup_${today}.json")
+        },
+        onRestoreClick = viewModel::onRestoreClicked,
         onConfirmImportExplanation = {
             viewModel.confirmImportExplanation()
             importLauncher.launch(arrayOf("text/*", "text/csv", "text/comma-separated-values"))
         },
         onDismissImportExplanation = viewModel::dismissImportExplanation,
         onDismissImportErrors = viewModel::dismissImportErrors,
+        onConfirmRestoreExplanation = {
+            viewModel.confirmRestoreExplanation()
+            appBackupImportLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/*"))
+        },
+        onDismissRestoreExplanation = viewModel::dismissRestoreExplanation,
+        onDismissRestoreErrors = viewModel::dismissRestoreErrors,
         onMessageConsumed = viewModel::consumeMessage,
         onBack = onBack
     )

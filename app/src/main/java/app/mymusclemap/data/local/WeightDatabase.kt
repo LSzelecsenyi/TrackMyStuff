@@ -28,6 +28,7 @@ abstract class WeightDatabase : RoomDatabase() {
     abstract fun workoutTemplateDao(): WorkoutTemplateDao
     abstract fun scheduledWorkoutDao(): ScheduledWorkoutDao
     abstract fun workoutSessionDao(): WorkoutSessionDao
+    abstract fun appBackupDao(): AppBackupDao
 
     companion object {
         fun create(context: Context): WeightDatabase {

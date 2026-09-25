@@ -31,6 +31,10 @@ sealed interface UserMessage {
     data object ExportSucceeded : UserMessage
     data object ExportFailed : UserMessage
     data object ImportReadFailed : UserMessage
+    data object AppBackupExportSucceeded : UserMessage
+    data object AppBackupExportFailed : UserMessage
+    data object AppBackupRestoreSucceeded : UserMessage
+    data object AppBackupReadFailed : UserMessage
     data object PaletteSaved : UserMessage
     data object ScheduleRemoved : UserMessage
     data object ScheduleDuplicate : UserMessage

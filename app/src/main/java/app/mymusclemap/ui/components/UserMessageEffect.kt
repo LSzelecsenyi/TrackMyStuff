@@ -16,6 +16,10 @@ fun UserMessage.stringRes(): Int {
         UserMessage.ExportSucceeded -> app.mymusclemap.R.string.message_export_success
         UserMessage.ExportFailed -> app.mymusclemap.R.string.message_export_failed
         UserMessage.ImportReadFailed -> app.mymusclemap.R.string.message_import_read_failed
+        UserMessage.AppBackupExportSucceeded -> app.mymusclemap.R.string.message_app_backup_export_success
+        UserMessage.AppBackupExportFailed -> app.mymusclemap.R.string.message_app_backup_export_failed
+        UserMessage.AppBackupRestoreSucceeded -> app.mymusclemap.R.string.message_app_backup_restore_success
+        UserMessage.AppBackupReadFailed -> app.mymusclemap.R.string.message_app_backup_read_failed
         UserMessage.PaletteSaved -> app.mymusclemap.R.string.message_palette_saved
         UserMessage.ScheduleRemoved -> app.mymusclemap.R.string.message_schedule_removed
         UserMessage.ScheduleDuplicate -> app.mymusclemap.R.string.message_schedule_duplicate

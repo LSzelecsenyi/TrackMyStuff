@@ -3,6 +3,7 @@ package app.mymusclemap
 import android.content.Context
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
@@ -50,6 +51,7 @@ class AppContainer(context: Context) {
         dateProvider = dateProvider
     )
     val themePreferences = ThemePreferences(appContext)
+    val appBackupRepository = AppBackupRepository(database, themePreferences)
     val viewModelFactory = WeightViewModelFactory(
         weightRepository = weightRepository,
         exerciseRepository = exerciseRepository,
@@ -58,6 +60,7 @@ class AppContainer(context: Context) {
         scheduledWorkoutRepository = scheduledWorkoutRepository,
         dateProvider = dateProvider,
         themePreferences = themePreferences,
-        workoutImportFileReader = ContentWorkoutImportFileReader(appContext)
+        workoutImportFileReader = ContentWorkoutImportFileReader(appContext),
+        appBackupRepository = appBackupRepository
     )
 }
