@@ -271,6 +271,9 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.action_restore_app_backup)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_EXPORT).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_RESTORE).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SAVE).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_CANCEL).assertIsDisplayed()
         val save = composeRule.onNodeWithTag(SETTINGS_SAVE).getBoundsInRoot()
@@ -283,6 +286,51 @@ class SettingsScreenLayoutTest {
             "save should not be a full-width capsule",
             save.right - save.left < 200.dp
         )
+    }
+
+    @Test
+    fun givenAppVersionThenAboutSectionShowsDynamicVersion() {
+        render(state = SettingsUiState(appVersionName = "9.9.9-debug"))
+        composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.about_version, "9.9.9-debug")).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_APP_VERSION).assertIsDisplayed()
+    }
+
+    @Test
+    fun givenSendFeedbackWhenTappedThenCallbackRunsOnce() {
+        val feedback = intArrayOf(0)
+        render(onSendFeedback = { feedback[0] += 1 })
+        composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performClick()
+        assertEquals(1, feedback[0])
+    }
+
+    @Test
+    fun givenNullPrivacyUrlThenPrivacyRowIsDisabled() {
+        val opens = intArrayOf(0)
+        render(
+            state = SettingsUiState(privacyPolicyUrl = null),
+            onOpenPrivacyPolicy = { opens[0] += 1 }
+        )
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsNotEnabled()
+        composeRule.onNodeWithText(testString(R.string.action_privacy_policy_unavailable)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performClick()
+        assertEquals(0, opens[0])
+    }
+
+    @Test
+    fun givenPrivacyUrlThenPrivacyRowIsEnabledAndOpensOnce() {
+        val opens = intArrayOf(0)
+        render(
+            state = SettingsUiState(privacyPolicyUrl = "https://example.com/privacy"),
+            onOpenPrivacyPolicy = { opens[0] += 1 }
+        )
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsEnabled()
+        composeRule.onNodeWithText(testString(R.string.action_privacy_policy_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performClick()
+        assertEquals(1, opens[0])
     }
 
     @Test
@@ -398,6 +446,8 @@ class SettingsScreenLayoutTest {
                             onConfirmRestoreExplanation = {},
                             onDismissRestoreExplanation = {},
                             onDismissRestoreErrors = {},
+                            onSendFeedback = {},
+                            onOpenPrivacyPolicy = {},
                             onMessageConsumed = {},
                             onBack = onBack
                         )
@@ -416,6 +466,8 @@ class SettingsScreenLayoutTest {
         onSaveDraft: () -> Unit = {},
         onExportClick: () -> Unit = {},
         onImportClick: () -> Unit = {},
+        onSendFeedback: () -> Unit = {},
+        onOpenPrivacyPolicy: () -> Unit = {},
         onBack: () -> Unit = {}
     ) {
         composeRule.setContent {
@@ -452,6 +504,8 @@ class SettingsScreenLayoutTest {
                             onConfirmRestoreExplanation = {},
                             onDismissRestoreExplanation = {},
                             onDismissRestoreErrors = {},
+                            onSendFeedback = onSendFeedback,
+                            onOpenPrivacyPolicy = onOpenPrivacyPolicy,
                             onMessageConsumed = {},
                             onBack = onBack
                         )

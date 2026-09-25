@@ -29,6 +29,7 @@ fun UserMessage.stringRes(): Int {
         UserMessage.WorkoutAlreadyActive -> app.mymusclemap.R.string.message_workout_already_active
         UserMessage.WorkoutTemplateEmpty -> app.mymusclemap.R.string.message_workout_template_empty
         UserMessage.WorkoutTemplateArchived -> app.mymusclemap.R.string.message_workout_template_archived
+        UserMessage.FeedbackEmailUnavailable -> app.mymusclemap.R.string.message_feedback_email_unavailable
     }
 }
 

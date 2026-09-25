@@ -126,6 +126,16 @@
     <string name="action_import_weight_subtitle">Restore from the same CSV format</string>
     <string name="privacy_title">Privacy</string>
     <string name="privacy_body">Your data stays on this device. There is no account, no cloud, and nothing is sent anywhere. There are no ads and no analytics.</string>
+    <string name="about_title">About My Muscle Map</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="action_send_feedback">Send feedback</string>
+    <string name="action_send_feedback_subtitle">Opens in your email app</string>
+    <string name="action_privacy_policy">Privacy policy</string>
+    <string name="action_privacy_policy_subtitle">Opens in your browser</string>
+    <string name="action_privacy_policy_unavailable">Not available yet</string>
+    <string name="feedback_email_subject">My Muscle Map feedback – %1$s</string>
+    <string name="feedback_email_body">App version: %1$s\nAndroid: %2$s\nDevice: %3$s\n\nFeedback:\n</string>
+    <string name="message_feedback_email_unavailable">No email app is installed.</string>
     <string name="import_explain_title">Import data</string>
     <string name="import_explain_body">The whole file is checked first. If any row is invalid, nothing is saved. If a date already exists in the app, the file value overwrites it. Duplicate dates inside the file are errors.</string>
     <string name="import_error_title">Import did not start</string>

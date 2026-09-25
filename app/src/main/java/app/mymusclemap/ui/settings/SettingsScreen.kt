@@ -33,8 +33,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -119,6 +121,9 @@ internal const val SETTINGS_EXPORT = "settings-export"
 internal const val SETTINGS_IMPORT = "settings-import"
 internal const val SETTINGS_APP_BACKUP_EXPORT = "settings-app-backup-export"
 internal const val SETTINGS_APP_BACKUP_RESTORE = "settings-app-backup-restore"
+internal const val SETTINGS_SEND_FEEDBACK = "settings-send-feedback"
+internal const val SETTINGS_PRIVACY_POLICY = "settings-privacy-policy"
+internal const val SETTINGS_APP_VERSION = "settings-app-version"
 
 internal fun settingsColorRowTag(field: SeedField): String = "settings-color-${field.name.lowercase(Locale.US)}"
 
@@ -151,6 +156,8 @@ fun SettingsScreen(
     onConfirmRestoreExplanation: () -> Unit,
     onDismissRestoreExplanation: () -> Unit,
     onDismissRestoreErrors: () -> Unit,
+    onSendFeedback: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
     onMessageConsumed: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -240,6 +247,12 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                CompactEditorDivider()
+                AboutSection(
+                    state = state,
+                    onSendFeedback = onSendFeedback,
+                    onOpenPrivacyPolicy = onOpenPrivacyPolicy
+                )
             }
         }
     }
@@ -842,25 +855,75 @@ private fun AppBackupSection(
 }
 
 @Composable
+private fun AboutSection(
+    state: SettingsUiState,
+    onSendFeedback: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit
+) {
+    val privacyEnabled = !state.privacyPolicyUrl.isNullOrBlank()
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.about_title))) {
+        Text(
+            text = stringResource(R.string.about_version, state.appVersionName),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag(SETTINGS_APP_VERSION)
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        DataActionRow(
+            icon = Icons.Outlined.Email,
+            title = stringResource(R.string.action_send_feedback),
+            subtitle = stringResource(R.string.action_send_feedback_subtitle),
+            testTag = SETTINGS_SEND_FEEDBACK,
+            onClick = onSendFeedback
+        )
+        DataActionRow(
+            icon = Icons.Outlined.Policy,
+            title = stringResource(R.string.action_privacy_policy),
+            subtitle = stringResource(
+                if (privacyEnabled) {
+                    R.string.action_privacy_policy_subtitle
+                } else {
+                    R.string.action_privacy_policy_unavailable
+                }
+            ),
+            enabled = privacyEnabled,
+            testTag = SETTINGS_PRIVACY_POLICY,
+            onClick = onOpenPrivacyPolicy
+        )
+    }
+}
+
+@Composable
 private fun DataActionRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
     testTag: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    enabled: Boolean = true
 ) {
+    val titleColor = if (enabled) {
+        MaterialTheme.colorScheme.onBackground
+    } else {
+        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
+    }
+    val secondaryColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = AppDimens.minTouch)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = secondaryColor,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(AppDimens.itemGap))
@@ -868,14 +931,14 @@ private fun DataActionRow(
             Text(
                 text = title,
                 style = AppTypeTokens.sectionTitle,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = titleColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitle,
                 style = AppTypeTokens.statCaption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = secondaryColor,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
@@ -883,7 +946,7 @@ private fun DataActionRow(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = secondaryColor,
             modifier = Modifier.size(20.dp)
         )
     }
@@ -1010,6 +1073,8 @@ private fun SettingsPreview() {
             onConfirmRestoreExplanation = {},
             onDismissRestoreExplanation = {},
             onDismissRestoreErrors = {},
+            onSendFeedback = {},
+            onOpenPrivacyPolicy = {},
             onMessageConsumed = {},
             onBack = {}
         )

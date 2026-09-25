@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import app.mymusclemap.BuildConfig
 import app.mymusclemap.FakeWeightMeasurementDao
 import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
@@ -19,6 +20,7 @@ import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.ui.components.UserMessage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -150,5 +152,34 @@ class SettingsViewModelTest {
         assertFalse(draft.editingDark)
         assertEquals("#8A2BE2", draft.lightPrimary)
         assertEquals("#BA81EE", draft.darkPrimary)
+    }
+
+    @Test
+    fun defaultStateExposesBuildConfigVersionName() {
+        val version = viewModel.uiState.value.appVersionName
+        assertEquals(BuildConfig.VERSION_NAME, version)
+        assertTrue(version.endsWith("-debug"))
+        assertNull(viewModel.uiState.value.privacyPolicyUrl)
+    }
+
+    @Test
+    fun onFeedbackEmailUnavailableSetsUserMessage() {
+        viewModel.onFeedbackEmailUnavailable()
+        assertEquals(UserMessage.FeedbackEmailUnavailable, viewModel.uiState.value.userMessage)
+    }
+
+    @Test
+    fun injectedAboutFieldsAppearInState() = runTest {
+        val injected = SettingsViewModel(
+            repository = WeightRepository(FakeWeightMeasurementDao(), clock),
+            themePreferences = themePreferences,
+            dateProvider = dateProvider,
+            appBackupRepository = AppBackupRepository(database, themePreferences),
+            appVersionName = "9.9.9-debug",
+            privacyPolicyUrl = "https://example.com/privacy"
+        )
+        assertEquals("9.9.9-debug", injected.uiState.value.appVersionName)
+        assertEquals("https://example.com/privacy", injected.uiState.value.privacyPolicyUrl)
+        assertNull(viewModel.uiState.value.privacyPolicyUrl)
     }
 }

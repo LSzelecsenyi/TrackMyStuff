@@ -1,6 +1,9 @@
 package app.mymusclemap.ui.navigation
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,6 +32,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import app.mymusclemap.R
 import app.mymusclemap.WeightViewModelFactory
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.domain.DateProvider
@@ -45,6 +49,7 @@ import app.mymusclemap.ui.history.HistoryScreen
 import app.mymusclemap.ui.history.HistoryViewModel
 import app.mymusclemap.ui.history.WorkoutDetailScreen
 import app.mymusclemap.ui.history.WorkoutDetailViewModel
+import app.mymusclemap.ui.settings.FeedbackComposer
 import app.mymusclemap.ui.settings.SettingsScreen
 import app.mymusclemap.ui.settings.SettingsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorScreen
@@ -626,6 +631,7 @@ private fun SettingsRoute(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
@@ -734,6 +740,28 @@ private fun SettingsRoute(
         },
         onDismissRestoreExplanation = viewModel::dismissRestoreExplanation,
         onDismissRestoreErrors = viewModel::dismissRestoreErrors,
+        onSendFeedback = {
+            val subject = resources.getString(R.string.feedback_email_subject, state.appVersionName)
+            val body = resources.getString(
+                R.string.feedback_email_body,
+                state.appVersionName,
+                Build.VERSION.RELEASE,
+                "${Build.MANUFACTURER}/${Build.MODEL}"
+            )
+            val intent = FeedbackComposer.createIntent(subject = subject, body = body)
+            if (!FeedbackComposer.launch(context, intent)) {
+                viewModel.onFeedbackEmailUnavailable()
+            }
+        },
+        onOpenPrivacyPolicy = {
+            val url = state.privacyPolicyUrl
+            if (!url.isNullOrBlank()) {
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (_: ActivityNotFoundException) {
+                }
+            }
+        },
         onMessageConsumed = viewModel::consumeMessage,
         onBack = onBack
     )

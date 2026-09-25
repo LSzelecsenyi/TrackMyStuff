@@ -2,6 +2,7 @@ package app.mymusclemap.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.mymusclemap.BuildConfig
 import app.mymusclemap.data.appbackup.AppBackupError
 import app.mymusclemap.data.appbackup.AppBackupRestoreResult
 import app.mymusclemap.data.appbackup.AppBackupSource
@@ -36,7 +37,9 @@ data class SettingsUiState(
     val importErrors: List<WeightCsv.RowError> = emptyList(),
     val showRestoreExplanation: Boolean = false,
     val restoreErrors: List<AppBackupError> = emptyList(),
-    val userMessage: UserMessage? = null
+    val userMessage: UserMessage? = null,
+    val appVersionName: String = "",
+    val privacyPolicyUrl: String? = null
 ) {
     val customEditorVisible: Boolean get() = draft != null
 }
@@ -56,7 +59,9 @@ class SettingsViewModel(
     private val repository: WeightRepository,
     private val themePreferences: ThemePreferences,
     private val dateProvider: DateProvider,
-    private val appBackupRepository: AppBackupRepository
+    private val appBackupRepository: AppBackupRepository,
+    private val appVersionName: String = BuildConfig.VERSION_NAME,
+    private val privacyPolicyUrl: String? = AboutConfig.privacyPolicyUrl
 ) : ViewModel() {
     private val appearance = MutableStateFlow(AppearanceSettings.Default)
     private val draft = MutableStateFlow<PaletteDraft?>(null)
@@ -90,12 +95,17 @@ class SettingsViewModel(
             importErrors = errors,
             showRestoreExplanation = backup.showRestoreExplanation,
             restoreErrors = backup.restoreErrors,
-            userMessage = message
+            userMessage = message,
+            appVersionName = appVersionName,
+            privacyPolicyUrl = privacyPolicyUrl
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = SettingsUiState()
+        initialValue = SettingsUiState(
+            appVersionName = appVersionName,
+            privacyPolicyUrl = privacyPolicyUrl
+        )
     )
 
     init {
@@ -245,6 +255,10 @@ class SettingsViewModel(
 
     fun consumeMessage() {
         userMessage.value = null
+    }
+
+    fun onFeedbackEmailUnavailable() {
+        userMessage.value = UserMessage.FeedbackEmailUnavailable
     }
 
     suspend fun buildAppBackupJson(source: AppBackupSource): String {

@@ -44,4 +44,5 @@ sealed interface UserMessage {
     data object WorkoutAlreadyActive : UserMessage
     data object WorkoutTemplateEmpty : UserMessage
     data object WorkoutTemplateArchived : UserMessage
+    data object FeedbackEmailUnavailable : UserMessage
 }
