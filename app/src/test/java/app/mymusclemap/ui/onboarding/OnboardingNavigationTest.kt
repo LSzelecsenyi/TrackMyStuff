@@ -310,15 +310,107 @@ class OnboardingNavigationTest {
     }
 
     @Test
-    fun completedWorkoutStillAdvancesToHeatmapDiscovery() {
+    fun continueSetupAfterCompletedWorkoutRevealsHeatmapSpotlightOnDashboard() {
         startProgressiveOnboarding()
         completeFirstWorkout()
         composeApp()
+        waitForTag(ONBOARDING_REMINDER)
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_COACH).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("●  Start your first workout").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Your muscle map is alive").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("●  Create your workout plan").assertIsDisplayed()
+        composeRule.onNodeWithText("●  Start your first workout").assertIsDisplayed()
+        composeRule.onNodeWithText("○  Discover your muscle map").assertIsDisplayed()
+        composeRule.onNodeWithText("○  Track your body weight").assertIsDisplayed()
+        composeRule.onNodeWithText("○  See your training history").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_WORKOUT_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertIsDisplayed()
+        composeRule.onNodeWithText("Discover your muscle map").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Here you can see which muscles you've worked and how recently."
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("dashboard_heatmap").assertIsDisplayed()
+        composeRule.onNodeWithText("Muscle heatmap").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_WORKOUT_SPOTLIGHT).assertDoesNotExist()
+    }
+
+    @Test
+    fun acknowledgingHeatmapSpotlightPersistsAndDoesNotShowAgain() {
+        startProgressiveOnboarding()
+        completeFirstWorkout()
+        composeApp()
+        waitForTag(ONBOARDING_REMINDER)
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Got it").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_WEIGHT_SHEET).fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithText("●  Discover your muscle map").fetchSemanticsNodes().isNotEmpty()
+        }
+        if (composeRule.onAllNodesWithTag(ONBOARDING_WEIGHT_SHEET).fetchSemanticsNodes().isNotEmpty()) {
+            composeRule.onNodeWithTag(ONBOARDING_WEIGHT_SKIP).performClick()
+            composeRule.waitForIdle()
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("●  Discover your muscle map").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("●  Discover your muscle map").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertDoesNotExist()
+    }
+
+    @Test
+    fun systemBackDismissesHeatmapSpotlightWithoutMarkingItSeen() {
+        startProgressiveOnboarding()
+        completeFirstWorkout()
+        composeApp()
+        waitForTag(ONBOARDING_REMINDER)
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.runOnIdle {
+            backDispatcher.get()!!.onBackPressed()
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("○  Discover your muscle map").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_REMINDER_CONTINUE).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithText("○  Discover your muscle map").assertExists()
+    }
+
+    @Test
+    fun completedWorkoutDoesNotAutoShowHeatmapSpotlight() {
+        startProgressiveOnboarding()
+        completeFirstWorkout()
+        composeApp()
+        waitForTag(ONBOARDING_REMINDER)
+        composeRule.onNodeWithText("○  Discover your muscle map").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertDoesNotExist()
         composeRule.onNodeWithTag("dashboard_heatmap").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(ONBOARDING_WORKOUT_SPOTLIGHT).assertDoesNotExist()
         composeRule.onNodeWithTag(ONBOARDING_WORKOUT_COACH).assertDoesNotExist()

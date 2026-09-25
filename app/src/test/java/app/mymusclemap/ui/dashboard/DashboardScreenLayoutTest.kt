@@ -50,6 +50,7 @@ import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER_DISMISS
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -92,6 +93,14 @@ class DashboardScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.heatmap_title)).assertIsDisplayed()
         composeRule.onNodeWithTag("dashboard_calendar_title").assertExists()
         composeRule.onNodeWithText(testString(R.string.chart_title)).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Muscle load").assertCountEquals(0)
+    }
+
+    @Test
+    fun muscleHeatmapSectionUsesRenamedTitle() {
+        render()
+        composeRule.onNodeWithText("Muscle heatmap").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Muscle load").assertCountEquals(0)
     }
 
     @Test
@@ -450,6 +459,47 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
+    fun reminderMarksCompletedWorkoutBeforeHeatmapDiscovery() {
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(started = true),
+                facts = OnboardingFacts(hasPlan = true, hasCompletedWorkout = true),
+                reminderVisible = true,
+                checklist = OnboardingChecklist(planCreated = true, firstWorkoutDone = true),
+                resumeTarget = OnboardingResumeTarget.Heatmap,
+                showHeatmapCoach = true
+            )
+        )
+        composeRule.onNodeWithText("●  ${testString(R.string.onboarding_step_plan)}").assertIsDisplayed()
+        composeRule.onNodeWithText("●  ${testString(R.string.onboarding_step_workout)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_heatmap)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_weight)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_history)}").assertIsDisplayed()
+    }
+
+    @Test
+    fun reminderMarksHeatmapDoneAfterAcknowledgement() {
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(started = true, heatmapSeen = true),
+                facts = OnboardingFacts(hasPlan = true, hasCompletedWorkout = true),
+                reminderVisible = true,
+                checklist = OnboardingChecklist(
+                    planCreated = true,
+                    firstWorkoutDone = true,
+                    heatmapDone = true
+                ),
+                resumeTarget = OnboardingResumeTarget.WeightPrompt
+            )
+        )
+        composeRule.onNodeWithText("●  ${testString(R.string.onboarding_step_plan)}").assertIsDisplayed()
+        composeRule.onNodeWithText("●  ${testString(R.string.onboarding_step_workout)}").assertIsDisplayed()
+        composeRule.onNodeWithText("●  ${testString(R.string.onboarding_step_heatmap)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_weight)}").assertIsDisplayed()
+        composeRule.onNodeWithText("○  ${testString(R.string.onboarding_step_history)}").assertIsDisplayed()
+    }
+
+    @Test
     fun existingUserStateDoesNotShowOnboardingCard() {
         render()
         composeRule.onNodeWithTag(ONBOARDING_REMINDER).assertDoesNotExist()
@@ -458,21 +508,48 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun heatmapCoachIsShownOnceOnTheRealHeatmap() {
-        val confirmed = AtomicBoolean(false)
+    fun heatmapCoachDoesNotAutoAppearOnTheRealHeatmap() {
         render(
             onboarding = OnboardingGuide(
                 flags = OnboardingFlags(started = true),
+                facts = OnboardingFacts(hasPlan = true, hasCompletedWorkout = true),
+                reminderVisible = true,
+                checklist = OnboardingChecklist(planCreated = true, firstWorkoutDone = true),
+                resumeTarget = OnboardingResumeTarget.Heatmap,
                 showHeatmapCoach = true,
                 showHeatmapCompletionCta = true
-            ),
-            onConfirmHeatmapCoach = { confirmed.set(true) }
+            )
         )
         composeRule.onNodeWithTag("dashboard_heatmap").assertIsDisplayed()
-        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.onboarding_heatmap_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.onboarding_got_it)).performClick()
-        assertTrue(confirmed.get())
+        composeRule.onNodeWithText(testString(R.string.heatmap_title)).assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertDoesNotExist()
+    }
+
+    @Test
+    fun heatmapRevealRequestScrollsToTheRealHeatmapAndReportsBounds() {
+        val revealed = AtomicBoolean(false)
+        val bounds = AtomicReference<androidx.compose.ui.geometry.Rect?>(null)
+        render(
+            onboarding = OnboardingGuide(
+                flags = OnboardingFlags(started = true),
+                facts = OnboardingFacts(hasPlan = true, hasCompletedWorkout = true),
+                reminderVisible = true,
+                checklist = OnboardingChecklist(planCreated = true, firstWorkoutDone = true),
+                resumeTarget = OnboardingResumeTarget.Heatmap,
+                showHeatmapCoach = true,
+                heatmapRevealRequested = true
+            ),
+            heatmapRevealRequested = true,
+            onHeatmapBounds = { bounds.set(it) },
+            onHeatmapRevealed = { revealed.set(true) }
+        )
+        composeRule.waitUntil(timeoutMillis = 5_000) { revealed.get() }
+        composeRule.onNodeWithTag("dashboard_heatmap").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.heatmap_title)).assertIsDisplayed()
+        val rect = bounds.get()
+        assertNotNull(rect)
+        assertTrue(rect!!.width > 1f)
+        assertTrue(rect.height > 1f)
     }
 
     @Test
@@ -521,8 +598,10 @@ class DashboardScreenLayoutTest {
         onboarding: OnboardingGuide = OnboardingGuide.Inactive,
         onContinueOnboarding: () -> Unit = {},
         onDismissOnboardingReminder: () -> Unit = {},
-        onConfirmHeatmapCoach: () -> Unit = {},
-        onConfirmCalendarCoach: () -> Unit = {}
+        onConfirmCalendarCoach: () -> Unit = {},
+        heatmapRevealRequested: Boolean = false,
+        onHeatmapBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
+        onHeatmapRevealed: () -> Unit = {}
     ) {
         val measurement = WeightMeasurement(1, today, 82.4, 0, 0)
         val month = YearMonth.from(today)
@@ -589,8 +668,10 @@ class DashboardScreenLayoutTest {
                             onOpenWeightDetails = onOpenWeightDetails,
                             onContinueOnboarding = onContinueOnboarding,
                             onDismissOnboardingReminder = onDismissOnboardingReminder,
-                            onConfirmHeatmapCoach = onConfirmHeatmapCoach,
-                            onConfirmCalendarCoach = onConfirmCalendarCoach
+                            onConfirmCalendarCoach = onConfirmCalendarCoach,
+                            heatmapRevealRequested = heatmapRevealRequested,
+                            onHeatmapBounds = onHeatmapBounds,
+                            onHeatmapRevealed = onHeatmapRevealed
                         )
                     }
                 }

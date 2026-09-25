@@ -47,7 +47,9 @@ data class OnboardingGuide(
     val showWeightChartCoach: Boolean = false,
     val showCalendarCoach: Boolean = false,
     val showHeatmapCompletionCta: Boolean = false,
-    val showWorkoutActionCoach: Boolean = false
+    val showWorkoutActionCoach: Boolean = false,
+    val heatmapRevealRequested: Boolean = false,
+    val showHeatmapSpotlight: Boolean = false
 ) {
     companion object {
         val Inactive = OnboardingGuide()

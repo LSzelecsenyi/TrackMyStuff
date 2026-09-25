@@ -6,12 +6,14 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -41,6 +44,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -53,10 +57,37 @@ import kotlin.math.roundToInt
 private val CalloutMaxWidth = 280.dp
 private val CalloutPadding = 16.dp
 private val SpotlightExtraRadius = 10.dp
+private val SpotlightRectPadding = 10.dp
 private val CaretWidth = 14.dp
 private val CaretHeight = 8.dp
 private val CalloutToHoleGap = 6.dp
 private const val ScrimAlpha = 0.62f
+
+sealed interface OnboardingSpotlightShape {
+    data class Circle(val extraRadius: Dp = SpotlightExtraRadius) : OnboardingSpotlightShape
+    data class RoundedRect(
+        val extraPadding: Dp = SpotlightRectPadding,
+        val cornerRadius: Dp = AppDimens.cornerSurface
+    ) : OnboardingSpotlightShape
+}
+
+private sealed interface SpotlightHole {
+    val top: Float
+    val centerX: Float
+    fun contains(point: Offset): Boolean
+
+    data class Circle(val center: Offset, val radius: Float) : SpotlightHole {
+        override val top: Float get() = center.y - radius
+        override val centerX: Float get() = center.x
+        override fun contains(point: Offset): Boolean = point.inCircle(center, radius)
+    }
+
+    data class RoundedRect(val rect: Rect, val cornerRadius: Float) : SpotlightHole {
+        override val top: Float get() = rect.top
+        override val centerX: Float get() = rect.center.x
+        override fun contains(point: Offset): Boolean = rect.contains(point)
+    }
+}
 
 @Composable
 fun OnboardingWorkoutSpotlight(
@@ -65,14 +96,70 @@ fun OnboardingWorkoutSpotlight(
     onTargetClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    OnboardingSpotlight(
+        targetInRoot = targetInRoot,
+        shape = OnboardingSpotlightShape.Circle(),
+        title = stringResource(R.string.onboarding_start_workout_title),
+        body = stringResource(R.string.onboarding_start_workout_body),
+        onDismiss = onDismiss,
+        onTargetClick = onTargetClick,
+        overlayTestTag = ONBOARDING_WORKOUT_SPOTLIGHT,
+        calloutTestTag = ONBOARDING_WORKOUT_COACH,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun OnboardingHeatmapSpotlight(
+    targetInRoot: Rect,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OnboardingSpotlight(
+        targetInRoot = targetInRoot,
+        shape = OnboardingSpotlightShape.RoundedRect(),
+        title = stringResource(R.string.onboarding_heatmap_title),
+        body = stringResource(R.string.onboarding_heatmap_body),
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        overlayTestTag = ONBOARDING_HEATMAP_SPOTLIGHT,
+        calloutTestTag = ONBOARDING_HEATMAP_COACH,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun OnboardingSpotlight(
+    targetInRoot: Rect,
+    shape: OnboardingSpotlightShape,
+    title: String,
+    body: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    onTargetClick: (() -> Unit)? = null,
+    onConfirm: (() -> Unit)? = null,
+    overlayTestTag: String = ONBOARDING_WORKOUT_SPOTLIGHT,
+    calloutTestTag: String = ONBOARDING_WORKOUT_COACH
+) {
     BackHandler(onBack = onDismiss)
     val density = LocalDensity.current
-    val extraRadius = with(density) { SpotlightExtraRadius.toPx() }
+    val extraPx = with(density) {
+        when (shape) {
+            is OnboardingSpotlightShape.Circle -> shape.extraRadius.toPx()
+            is OnboardingSpotlightShape.RoundedRect -> shape.extraPadding.toPx()
+        }
+    }
+    val cornerPx = with(density) {
+        when (shape) {
+            is OnboardingSpotlightShape.Circle -> AppDimens.cornerSurface.toPx()
+            is OnboardingSpotlightShape.RoundedRect -> shape.cornerRadius.toPx()
+        }
+    }
     val edgePadding = with(density) { AppDimens.screenPadding.toPx() }
     val caretHeightPx = with(density) { CaretHeight.toPx() }
     val caretWidthPx = with(density) { CaretWidth.toPx() }
     val gapPx = with(density) { CalloutToHoleGap.toPx() }
-    val cornerPx = with(density) { AppDimens.cornerSurface.toPx() }
     val calloutFill = MaterialTheme.colorScheme.surface
     val scrim = MaterialTheme.colorScheme.scrim.copy(alpha = ScrimAlpha)
     val currentTargetClick by rememberUpdatedState(onTargetClick)
@@ -90,13 +177,23 @@ fun OnboardingWorkoutSpotlight(
     } else {
         Rect.Zero
     }
-    val holeRadius = if (hasTarget) localTarget.maxDimension / 2f + extraRadius else 0f
-    val holeCenter = localTarget.center
-    val calloutOffset = if (hasTarget && calloutSize.width > 0 && overlaySize.width > 0f) {
+    val hole = if (hasTarget) {
+        when (shape) {
+            is OnboardingSpotlightShape.Circle -> {
+                val radius = localTarget.maxDimension / 2f + extraPx
+                SpotlightHole.Circle(localTarget.center, radius)
+            }
+            is OnboardingSpotlightShape.RoundedRect -> {
+                SpotlightHole.RoundedRect(localTarget.inflate(extraPx), cornerPx)
+            }
+        }
+    } else {
+        null
+    }
+    val calloutOffset = if (hole != null && calloutSize.width > 0 && overlaySize.width > 0f) {
         val maxX = (overlaySize.width - edgePadding - calloutSize.width).coerceAtLeast(edgePadding)
-        val x = (holeCenter.x - calloutSize.width / 2f).coerceIn(edgePadding, maxX)
-        val holeTop = holeCenter.y - holeRadius
-        val y = (holeTop - gapPx - calloutSize.height).coerceAtLeast(edgePadding)
+        val x = (hole.centerX - calloutSize.width / 2f).coerceIn(edgePadding, maxX)
+        val y = (hole.top - gapPx - calloutSize.height).coerceAtLeast(edgePadding)
         IntOffset(x.roundToInt(), y.roundToInt())
     } else {
         IntOffset.Zero
@@ -105,7 +202,7 @@ fun OnboardingWorkoutSpotlight(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .testTag(ONBOARDING_WORKOUT_SPOTLIGHT)
+            .testTag(overlayTestTag)
             .onGloballyPositioned { coordinates ->
                 overlayOrigin = coordinates.positionInRoot()
                 overlaySize = Size(
@@ -113,10 +210,11 @@ fun OnboardingWorkoutSpotlight(
                     coordinates.size.height.toFloat()
                 )
             }
-            .pointerInput(localTarget, holeRadius, hasTarget) {
+            .pointerInput(hole, hasTarget, currentTargetClick) {
                 detectTapGestures { tap ->
-                    if (hasTarget && tap.inCircle(holeCenter, holeRadius)) {
-                        currentTargetClick()
+                    val clickTarget = currentTargetClick
+                    if (clickTarget != null && hole != null && hole.contains(tap)) {
+                        clickTarget()
                     }
                 }
             }
@@ -125,17 +223,24 @@ fun OnboardingWorkoutSpotlight(
             val path = Path().apply {
                 fillType = PathFillType.EvenOdd
                 addRect(Rect(Offset.Zero, size))
-                if (hasTarget) {
-                    addOval(
+                when (val spotlight = hole) {
+                    is SpotlightHole.Circle -> addOval(
                         Rect(
-                            left = holeCenter.x - holeRadius,
-                            top = holeCenter.y - holeRadius,
-                            right = holeCenter.x + holeRadius,
-                            bottom = holeCenter.y + holeRadius
+                            left = spotlight.center.x - spotlight.radius,
+                            top = spotlight.center.y - spotlight.radius,
+                            right = spotlight.center.x + spotlight.radius,
+                            bottom = spotlight.center.y + spotlight.radius
                         )
                     )
+                    is SpotlightHole.RoundedRect -> addRoundRect(
+                        RoundRect(
+                            rect = spotlight.rect,
+                            cornerRadius = CornerRadius(spotlight.cornerRadius, spotlight.cornerRadius)
+                        )
+                    )
+                    null -> Unit
                 }
-                if (hasTarget && calloutSize.width > 0) {
+                if (hole != null && calloutSize.width > 0) {
                     val cardHeight = calloutSize.height - caretHeightPx
                     addRoundRect(
                         RoundRect(
@@ -155,27 +260,43 @@ fun OnboardingWorkoutSpotlight(
                 }
             }
             drawPath(path, scrim)
-            if (hasTarget) {
-                val glowRadius = holeRadius * 1.7f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        0.00f to Color.Transparent,
-                        0.58f to Color.Transparent,
-                        0.72f to Color.White.copy(alpha = 0.42f),
-                        1.00f to Color.Transparent,
-                        center = holeCenter,
-                        radius = glowRadius
-                    ),
-                    radius = glowRadius,
-                    center = holeCenter
-                )
+            when (val spotlight = hole) {
+                is SpotlightHole.Circle -> {
+                    val glowRadius = spotlight.radius * 1.7f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            0.00f to Color.Transparent,
+                            0.58f to Color.Transparent,
+                            0.72f to Color.White.copy(alpha = 0.42f),
+                            1.00f to Color.Transparent,
+                            center = spotlight.center,
+                            radius = glowRadius
+                        ),
+                        radius = glowRadius,
+                        center = spotlight.center
+                    )
+                }
+                is SpotlightHole.RoundedRect -> {
+                    val glow = spotlight.rect.inflate(6f)
+                    drawRoundRect(
+                        color = Color.White.copy(alpha = 0.28f),
+                        topLeft = Offset(glow.left, glow.top),
+                        size = Size(glow.width, glow.height),
+                        cornerRadius = CornerRadius(
+                            spotlight.cornerRadius + 4f,
+                            spotlight.cornerRadius + 4f
+                        ),
+                        style = Stroke(width = 3.dp.toPx())
+                    )
+                }
+                null -> Unit
             }
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .then(
-                    if (hasTarget && calloutSize.width > 0) {
+                    if (hole != null && calloutSize.width > 0) {
                         Modifier.offset { calloutOffset }
                     } else {
                         Modifier
@@ -188,7 +309,7 @@ fun OnboardingWorkoutSpotlight(
                 .onSizeChanged { calloutSize = it }
         ) {
             Surface(
-                modifier = Modifier.testTag(ONBOARDING_WORKOUT_COACH),
+                modifier = Modifier.testTag(calloutTestTag),
                 shape = AppShapeTokens.surface,
                 color = calloutFill,
                 tonalElevation = 2.dp,
@@ -196,17 +317,27 @@ fun OnboardingWorkoutSpotlight(
             ) {
                 Column(modifier = Modifier.padding(CalloutPadding)) {
                     Text(
-                        text = stringResource(R.string.onboarding_start_workout_title),
+                        text = title,
                         style = AppTypeTokens.sectionTitle,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.semantics { heading() }
                     )
                     Spacer(Modifier.height(AppDimens.headerStackGap))
                     Text(
-                        text = stringResource(R.string.onboarding_start_workout_body),
+                        text = body,
                         style = AppTypeTokens.statSecondary,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (onConfirm != null) {
+                        Spacer(Modifier.height(AppDimens.itemGap))
+                        Button(
+                            onClick = onConfirm,
+                            shape = AppShapeTokens.button,
+                            modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
+                        ) {
+                            Text(stringResource(R.string.onboarding_got_it))
+                        }
+                    }
                 }
             }
             Canvas(modifier = Modifier.size(width = CaretWidth, height = CaretHeight)) {

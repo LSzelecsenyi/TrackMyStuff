@@ -24,8 +24,10 @@ import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
+import app.mymusclemap.domain.workout.FinishWorkoutResult
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedSetDraft
+import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
 import app.mymusclemap.domain.workout.TemplateSaveResult
@@ -58,6 +60,8 @@ class OnboardingGuideViewModelTest {
     private lateinit var repository: OnboardingRepository
     private lateinit var exerciseRepository: ExerciseRepository
     private lateinit var templateRepository: WorkoutTemplateRepository
+    private lateinit var sessionRepository: WorkoutSessionRepository
+    private var lastTemplateId: Long = 0L
 
     @Before
     fun setUp() = runTest {
@@ -75,7 +79,7 @@ class OnboardingGuideViewModelTest {
             templateDao = database.workoutTemplateDao(),
             sessionDao = database.workoutSessionDao()
         )
-        val sessions = WorkoutSessionRepository(
+        sessionRepository = WorkoutSessionRepository(
             sessionDao = database.workoutSessionDao(),
             templateDao = database.workoutTemplateDao(),
             exerciseDao = database.exerciseDao(),
@@ -90,7 +94,7 @@ class OnboardingGuideViewModelTest {
             sessionDao = database.workoutSessionDao(),
             scheduledWorkoutDao = database.scheduledWorkoutDao()
         )
-        repository = OnboardingRepository(themePreferences, sessions, weightRepository, templateRepository)
+        repository = OnboardingRepository(themePreferences, sessionRepository, weightRepository, templateRepository)
         themePreferences.clearOnboardingProgress()
     }
 
@@ -127,7 +131,76 @@ class OnboardingGuideViewModelTest {
         assertFalse(viewModel.guide.value.showWorkoutActionCoach)
     }
 
-    private suspend fun insertPlan() {
+    @Test
+    fun heatmapSpotlightIsRequestedOnlyAfterACompletedWorkout() = runTest {
+        repository.markStarted()
+        val viewModel = guideViewModel()
+        viewModel.guide.first { it.flags.started }
+        viewModel.requestHeatmapCoach()
+        assertFalse(viewModel.guide.value.heatmapRevealRequested)
+        assertFalse(viewModel.guide.value.showHeatmapSpotlight)
+
+        insertPlan()
+        viewModel.guide.first { it.resumeTarget == OnboardingResumeTarget.StartWorkout }
+        viewModel.requestHeatmapCoach()
+        assertFalse(viewModel.guide.value.heatmapRevealRequested)
+        assertFalse(viewModel.guide.value.showHeatmapSpotlight)
+        assertFalse(viewModel.guide.value.showHeatmapCoach)
+
+        finishLatestPlan()
+        viewModel.guide.first { it.resumeTarget == OnboardingResumeTarget.Heatmap }
+        assertTrue(viewModel.guide.value.showHeatmapCoach)
+        viewModel.requestHeatmapCoach()
+        assertTrue(viewModel.guide.value.heatmapRevealRequested)
+        assertFalse(viewModel.guide.value.showHeatmapSpotlight)
+        viewModel.markHeatmapReady()
+        assertFalse(viewModel.guide.value.heatmapRevealRequested)
+        assertTrue(viewModel.guide.value.showHeatmapSpotlight)
+    }
+
+    @Test
+    fun confirmingHeatmapCoachPersistsSeenStateAndDismissDoesNot() = runTest {
+        repository.markStarted()
+        completeFirstWorkout()
+        val viewModel = guideViewModel()
+        viewModel.guide.first { it.resumeTarget == OnboardingResumeTarget.Heatmap }
+        viewModel.requestHeatmapCoach()
+        viewModel.markHeatmapReady()
+        assertTrue(viewModel.guide.value.showHeatmapSpotlight)
+        viewModel.dismissHeatmapCoach()
+        assertFalse(viewModel.guide.value.showHeatmapSpotlight)
+        assertFalse(viewModel.guide.value.flags.heatmapSeen)
+        assertFalse(viewModel.guide.value.checklist.heatmapDone)
+        assertTrue(viewModel.guide.value.showHeatmapCoach)
+
+        viewModel.requestHeatmapCoach()
+        viewModel.markHeatmapReady()
+        viewModel.confirmHeatmapCoach()
+        viewModel.guide.first { it.flags.heatmapSeen }
+        assertTrue(viewModel.guide.value.checklist.heatmapDone)
+        assertFalse(viewModel.guide.value.showHeatmapCoach)
+        assertFalse(viewModel.guide.value.showHeatmapSpotlight)
+        assertEquals(OnboardingResumeTarget.WeightPrompt, viewModel.guide.value.resumeTarget)
+
+        viewModel.requestHeatmapCoach()
+        viewModel.markHeatmapReady()
+        assertFalse(viewModel.guide.value.heatmapRevealRequested)
+        assertFalse(viewModel.guide.value.showHeatmapSpotlight)
+    }
+
+    private fun guideViewModel(): OnboardingGuideViewModel {
+        return ViewModelProvider(
+            viewModelStore,
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return OnboardingGuideViewModel(repository) as T
+                }
+            }
+        )[OnboardingGuideViewModel::class.java]
+    }
+
+    private suspend fun insertPlan(): Long {
         val exerciseId = (exerciseRepository.save(
             ExerciseDraft(
                 name = "Pull-up",
@@ -158,5 +231,22 @@ class OnboardingGuideViewModelTest {
             )
         )
         assertTrue(saved is TemplateSaveResult.Created)
+        lastTemplateId = (saved as TemplateSaveResult.Created).id
+        return lastTemplateId
+    }
+
+    private suspend fun finishLatestPlan() {
+        val started = sessionRepository.start(lastTemplateId)
+        assertTrue(started is StartWorkoutResult.Started)
+        val finished = sessionRepository.finish(
+            (started as StartWorkoutResult.Started).sessionId,
+            skipRemaining = true
+        )
+        assertEquals(FinishWorkoutResult.Finished, finished)
+    }
+
+    private suspend fun completeFirstWorkout() {
+        insertPlan()
+        finishLatestPlan()
     }
 }

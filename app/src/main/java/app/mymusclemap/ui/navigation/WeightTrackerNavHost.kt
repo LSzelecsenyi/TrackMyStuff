@@ -56,6 +56,7 @@ import app.mymusclemap.ui.history.WorkoutDetailScreen
 import app.mymusclemap.ui.history.WorkoutDetailViewModel
 import app.mymusclemap.ui.settings.FeedbackComposer
 import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
+import app.mymusclemap.ui.onboarding.OnboardingHeatmapSpotlight
 import app.mymusclemap.ui.onboarding.OnboardingWorkoutSpotlight
 import app.mymusclemap.ui.settings.SettingsScreen
 import app.mymusclemap.ui.settings.SettingsViewModel
@@ -129,6 +130,7 @@ fun WeightTrackerNavHost(
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
     var workoutActionBounds by remember { mutableStateOf(Rect.Zero) }
+    var heatmapBounds by remember { mutableStateOf(Rect.Zero) }
     val onPrimaryWorkoutClick = {
         onboardingGuideViewModel.dismissStartWorkoutCoach()
         when (val action = workoutHubViewModel.onPrimaryWorkoutAction()) {
@@ -241,21 +243,29 @@ fun WeightTrackerNavHost(
                             OnboardingResumeTarget.StartWorkout -> {
                                 onboardingGuideViewModel.requestStartWorkoutCoach()
                             }
+                            OnboardingResumeTarget.Heatmap -> {
+                                onboardingGuideViewModel.requestHeatmapCoach()
+                            }
                             OnboardingResumeTarget.WeightChart -> {
                                 navController.navigateInternal(AppRoutes.WEIGHT_DETAILS)
                             }
                             OnboardingResumeTarget.None,
-                            OnboardingResumeTarget.Heatmap,
                             OnboardingResumeTarget.WeightPrompt,
                             OnboardingResumeTarget.Calendar -> Unit
                         }
                     },
                     onDismissOnboardingReminder = viewModel::dismissOnboardingReminder,
-                    onConfirmHeatmapCoach = viewModel::markHeatmapSeen,
                     onConfirmCalendarCoach = viewModel::markCalendarSeen,
                     onOnboardingWeightChange = viewModel::onOnboardingWeightChange,
                     onSaveOnboardingWeight = viewModel::saveOnboardingWeight,
-                    onSkipOnboardingWeight = viewModel::skipOnboardingWeight
+                    onSkipOnboardingWeight = viewModel::skipOnboardingWeight,
+                    heatmapRevealRequested = onboardingGuide.heatmapRevealRequested,
+                    onHeatmapBounds = { bounds ->
+                        if (bounds != heatmapBounds) {
+                            heatmapBounds = bounds
+                        }
+                    },
+                    onHeatmapRevealed = onboardingGuideViewModel::markHeatmapReady
                 )
                 LaunchedEffect(state.startedSessionId) {
                     val sessionId = state.startedSessionId ?: return@LaunchedEffect
@@ -660,6 +670,15 @@ fun WeightTrackerNavHost(
             targetInRoot = workoutActionBounds,
             onDismiss = onboardingGuideViewModel::dismissStartWorkoutCoach,
             onTargetClick = onPrimaryWorkoutClick
+        )
+    }
+    if (onboardingGuide.showHeatmapSpotlight &&
+        AppNavigation.canonicalRoute(currentRoute) == AppRoutes.OVERVIEW
+    ) {
+        OnboardingHeatmapSpotlight(
+            targetInRoot = heatmapBounds,
+            onDismiss = onboardingGuideViewModel::dismissHeatmapCoach,
+            onConfirm = onboardingGuideViewModel::confirmHeatmapCoach
         )
     }
     }

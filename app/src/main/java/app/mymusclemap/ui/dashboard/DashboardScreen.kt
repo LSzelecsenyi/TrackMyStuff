@@ -34,12 +34,20 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -50,6 +58,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.domain.DashboardSnapshot
@@ -72,7 +81,6 @@ import app.mymusclemap.ui.components.stringRes
 import app.mymusclemap.ui.components.WeightChart
 import app.mymusclemap.ui.components.musclemap.MuscleHeatmapCard
 import app.mymusclemap.ui.onboarding.ONBOARDING_CALENDAR_COACH
-import app.mymusclemap.ui.onboarding.ONBOARDING_HEATMAP_COACH
 import app.mymusclemap.ui.onboarding.OnboardingReminderCard
 import app.mymusclemap.ui.onboarding.OnboardingTipCard
 import app.mymusclemap.ui.onboarding.OnboardingWeightSheet
@@ -81,6 +89,8 @@ import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
 
 internal const val OVERVIEW_OVERFLOW_ANCHOR = "overview-overflow-anchor"
 internal const val OVERVIEW_OVERFLOW_BUTTON = "overview-overflow-button"
@@ -88,6 +98,7 @@ internal const val OVERVIEW_OVERFLOW_MENU = "overview-overflow-menu"
 internal const val OVERVIEW_OVERFLOW_TEMPLATES = "overview-overflow-templates"
 internal const val OVERVIEW_OVERFLOW_EXERCISES = "overview-overflow-exercises"
 internal const val OVERVIEW_OVERFLOW_SETTINGS = "overview-overflow-settings"
+private val HeatmapCoachCalloutSpace = 176.dp
 
 @Composable
 fun DashboardScreen(
@@ -128,14 +139,30 @@ fun DashboardScreen(
     onCreateTemplateFromSchedule: () -> Unit = {},
     onContinueOnboarding: () -> Unit = {},
     onDismissOnboardingReminder: () -> Unit = {},
-    onConfirmHeatmapCoach: () -> Unit = {},
     onConfirmCalendarCoach: () -> Unit = {},
     onOnboardingWeightChange: (String) -> Unit = {},
     onSaveOnboardingWeight: () -> Unit = {},
-    onSkipOnboardingWeight: () -> Unit = {}
+    onSkipOnboardingWeight: () -> Unit = {},
+    heatmapRevealRequested: Boolean = false,
+    onHeatmapBounds: (Rect) -> Unit = {},
+    onHeatmapRevealed: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
+    val density = LocalDensity.current
+    val scrollState = rememberScrollState()
+    var heatmapSize by remember { mutableStateOf(IntSize.Zero) }
+    var heatmapYInContent by remember { mutableStateOf(0) }
+    val revealHeatmap by rememberUpdatedState(onHeatmapRevealed)
+    val reportHeatmapBounds by rememberUpdatedState(onHeatmapBounds)
+    LaunchedEffect(heatmapRevealRequested) {
+        if (!heatmapRevealRequested) return@LaunchedEffect
+        snapshotFlow { heatmapSize }.first { it != IntSize.Zero }
+        val extra = with(density) { HeatmapCoachCalloutSpace.roundToPx() }
+        val target = (heatmapYInContent - extra).coerceAtLeast(0)
+        scrollState.animateScrollTo(target)
+        revealHeatmap()
+    }
     UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -147,7 +174,7 @@ fun DashboardScreen(
                 .padding(innerPadding)
                 .statusBarsPadding()
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = AppDimens.screenPadding)
                 .padding(top = 8.dp, bottom = 24.dp)
         ) {
@@ -169,17 +196,14 @@ fun DashboardScreen(
             OverviewSectionDivider()
             MuscleHeatmapCard(
                 state = state.heatmap,
-                modifier = Modifier.testTag("dashboard_heatmap")
+                modifier = Modifier
+                    .testTag("dashboard_heatmap")
+                    .onGloballyPositioned { coordinates ->
+                        heatmapSize = coordinates.size
+                        heatmapYInContent = coordinates.positionInParent().y.roundToInt()
+                        reportHeatmapBounds(coordinates.boundsInRoot())
+                    }
             )
-            if (state.onboarding.showHeatmapCoach) {
-                Spacer(Modifier.height(AppDimens.itemGap))
-                OnboardingTipCard(
-                    title = stringResource(R.string.onboarding_heatmap_title),
-                    body = stringResource(R.string.onboarding_heatmap_body),
-                    onConfirm = onConfirmHeatmapCoach,
-                    testTag = ONBOARDING_HEATMAP_COACH
-                )
-            }
             OverviewSectionDivider()
             Text(
                 text = stringResource(R.string.calendar_title),

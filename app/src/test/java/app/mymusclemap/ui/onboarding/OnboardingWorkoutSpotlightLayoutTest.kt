@@ -7,6 +7,9 @@ import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -15,9 +18,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
@@ -116,6 +122,48 @@ class OnboardingWorkoutSpotlightLayoutTest {
         composeRule.onAllNodesWithTag(BOTTOM_WORKOUT_ACTION).assertCountEquals(1)
     }
 
+    @Test
+    fun heatmapSpotlightKeepsCalloutAboveRoundedTargetAndGotItConfirms() {
+        val confirmed = AtomicInteger(0)
+        val dismissed = AtomicInteger(0)
+        renderHeatmap(
+            onConfirm = { confirmed.incrementAndGet() },
+            onDismiss = { dismissed.incrementAndGet() }
+        )
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_heatmap_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_heatmap_body)).assertIsDisplayed()
+        val callout = composeRule.onNodeWithTag(ONBOARDING_HEATMAP_COACH).getBoundsInRoot()
+        val target = composeRule.onNodeWithTag("heatmap-target").getBoundsInRoot()
+        assertTrue("callout should sit above the heatmap", callout.bottom <= target.top + 12.dp)
+        assertTrue("callout stays on 360dp", callout.right <= 360.dp + 1.dp)
+        assertEquals(0, confirmed.get())
+        composeRule.onNodeWithText(testString(R.string.onboarding_got_it)).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        assertEquals(1, confirmed.get())
+        assertEquals(0, dismissed.get())
+    }
+
+    @Test
+    fun heatmapSpotlightBackDismissesWithoutConfirming() {
+        val confirmed = AtomicInteger(0)
+        val dismissed = AtomicInteger(0)
+        val dispatcher = AtomicReference<OnBackPressedDispatcher?>(null)
+        renderHeatmap(
+            onConfirm = { confirmed.incrementAndGet() },
+            onDismiss = { dismissed.incrementAndGet() },
+            dispatcherOut = dispatcher
+        )
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertIsDisplayed()
+        composeRule.runOnIdle { dispatcher.get()!!.onBackPressed() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ONBOARDING_HEATMAP_SPOTLIGHT).assertDoesNotExist()
+        assertEquals(1, dismissed.get())
+        assertEquals(0, confirmed.get())
+    }
+
     private fun render(
         darkTheme: Boolean = false,
         onWorkout: () -> Unit = {},
@@ -175,6 +223,57 @@ class OnboardingWorkoutSpotlightLayoutTest {
                                 onTargetClick = {
                                     showSpotlight = false
                                     onWorkout()
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    private fun renderHeatmap(
+        onConfirm: () -> Unit = {},
+        onDismiss: () -> Unit = {},
+        dispatcherOut: AtomicReference<OnBackPressedDispatcher?>? = null
+    ) {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            var hole by remember { mutableStateOf(Rect.Zero) }
+            var showSpotlight by remember { mutableStateOf(true) }
+            dispatcherOut?.set(LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher)
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = density.density, fontScale = 1f)
+            ) {
+                WeightTrackerThemeForPreview {
+                    Box(
+                        modifier = Modifier
+                            .width(360.dp)
+                            .fillMaxSize()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 96.dp)
+                                .fillMaxWidth()
+                                .height(280.dp)
+                                .testTag("heatmap-target")
+                                .onGloballyPositioned { coordinates ->
+                                    val bounds = coordinates.boundsInRoot()
+                                    if (bounds != hole) hole = bounds
+                                }
+                        )
+                        if (showSpotlight) {
+                            OnboardingHeatmapSpotlight(
+                                targetInRoot = hole,
+                                onDismiss = {
+                                    showSpotlight = false
+                                    onDismiss()
+                                },
+                                onConfirm = {
+                                    showSpotlight = false
+                                    onConfirm()
                                 }
                             )
                         }

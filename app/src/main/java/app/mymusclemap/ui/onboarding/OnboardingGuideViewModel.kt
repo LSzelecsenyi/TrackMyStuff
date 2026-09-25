@@ -16,14 +16,21 @@ class OnboardingGuideViewModel(
     private val onboardingRepository: OnboardingRepository
 ) : ViewModel() {
     private val startWorkoutCoachRequested = MutableStateFlow(false)
+    private val heatmapCoachRequested = MutableStateFlow(false)
+    private val heatmapSpotlightReady = MutableStateFlow(false)
 
     val guide: StateFlow<OnboardingGuide> = combine(
         onboardingRepository.observe(),
-        startWorkoutCoachRequested
-    ) { base, requested ->
+        startWorkoutCoachRequested,
+        heatmapCoachRequested,
+        heatmapSpotlightReady
+    ) { base, workoutRequested, heatmapRequested, heatmapReady ->
+        val heatmapStep = base.resumeTarget == OnboardingResumeTarget.Heatmap
         base.copy(
-            showWorkoutActionCoach = requested &&
-                base.resumeTarget == OnboardingResumeTarget.StartWorkout
+            showWorkoutActionCoach = workoutRequested &&
+                base.resumeTarget == OnboardingResumeTarget.StartWorkout,
+            heatmapRevealRequested = heatmapRequested && !heatmapReady && heatmapStep,
+            showHeatmapSpotlight = heatmapRequested && heatmapReady && heatmapStep
         )
     }.stateIn(
         scope = viewModelScope,
@@ -37,6 +44,27 @@ class OnboardingGuideViewModel(
 
     fun dismissStartWorkoutCoach() {
         startWorkoutCoachRequested.value = false
+    }
+
+    fun requestHeatmapCoach() {
+        heatmapSpotlightReady.value = false
+        heatmapCoachRequested.value = true
+    }
+
+    fun markHeatmapReady() {
+        if (heatmapCoachRequested.value) {
+            heatmapSpotlightReady.value = true
+        }
+    }
+
+    fun dismissHeatmapCoach() {
+        heatmapCoachRequested.value = false
+        heatmapSpotlightReady.value = false
+    }
+
+    fun confirmHeatmapCoach() {
+        dismissHeatmapCoach()
+        viewModelScope.launch { onboardingRepository.markHeatmapSeen() }
     }
 
     fun markHeatmapSeen() {

@@ -188,8 +188,8 @@
     <string name="onboarding_step_heatmap">Discover your muscle map</string>
     <string name="onboarding_step_weight">Track your body weight</string>
     <string name="onboarding_step_history">See your training history</string>
-    <string name="onboarding_heatmap_title">Your muscle map is alive</string>
-    <string name="onboarding_heatmap_body">The highlighted muscles show what you\'ve trained. The map updates as you complete workouts.</string>
+    <string name="onboarding_heatmap_title">Discover your muscle map</string>
+    <string name="onboarding_heatmap_body">Here you can see which muscles you\'ve worked and how recently.</string>
     <string name="onboarding_got_it">Got it</string>
     <string name="onboarding_weight_title">Track your progress</string>
     <string name="onboarding_weight_body">Add your current weight to start building your trend.</string>
@@ -561,9 +561,9 @@
     <string name="hub_recent_empty">You have no completed workouts yet.</string>
     <string name="set_status_completed_label">Completed</string>
     <string name="set_status_skipped_label">Skipped</string>
-    <string name="heatmap_title">Muscle load</string>
+    <string name="heatmap_title">Muscle heatmap</string>
     <string name="heatmap_subtitle">Based on recent completed workouts</string>
-    <string name="heatmap_empty">There are no completed workouts yet, so muscle load is empty.</string>
+    <string name="heatmap_empty">There are no completed workouts yet, so the heatmap is empty.</string>
     <string name="heatmap_empty_trained">Completed workouts do not yet have finished sets assigned to a muscle group.</string>
     <string name="heatmap_selection">%1$s: %2$s</string>
     <string name="heatmap_band_today">Today</string>

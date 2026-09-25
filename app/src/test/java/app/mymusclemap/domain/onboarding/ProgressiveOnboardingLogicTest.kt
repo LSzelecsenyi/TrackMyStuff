@@ -19,6 +19,8 @@ class ProgressiveOnboardingLogicTest {
         assertFalse(guide.checklist.planCreated)
         assertFalse(guide.checklist.firstWorkoutDone)
         assertFalse(guide.showWorkoutActionCoach)
+        assertFalse(guide.heatmapRevealRequested)
+        assertFalse(guide.showHeatmapSpotlight)
     }
 
     @Test
@@ -58,6 +60,8 @@ class ProgressiveOnboardingLogicTest {
         assertTrue(guide.checklist.firstWorkoutDone)
         assertFalse(guide.checklist.heatmapDone)
         assertFalse(guide.showWorkoutActionCoach)
+        assertFalse(guide.heatmapRevealRequested)
+        assertFalse(guide.showHeatmapSpotlight)
     }
 
     @Test
@@ -148,5 +152,7 @@ class ProgressiveOnboardingLogicTest {
         )
         assertFalse(guide.showHeatmapCoach)
         assertFalse(guide.showHeatmapCompletionCta)
+        assertFalse(guide.heatmapRevealRequested)
+        assertFalse(guide.showHeatmapSpotlight)
     }
 }
