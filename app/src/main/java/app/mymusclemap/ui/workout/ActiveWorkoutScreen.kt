@@ -1,8 +1,8 @@
 package app.mymusclemap.ui.workout
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,8 +29,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -56,18 +54,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -105,8 +106,6 @@ import app.mymusclemap.ui.templates.labelRes
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
-import kotlinx.coroutines.flow.first
-
 internal const val WORKOUT_HEADER_KEY = "workout-header"
 internal const val WORKOUT_FINISH_KEY = "workout-finish"
 internal const val WORKOUT_FINISH_CTA = "workout-finish-cta"
@@ -167,6 +166,15 @@ internal fun shouldApplyScrollEvent(eventGeneration: Long, latestGeneration: Lon
     return latestGeneration != null && latestGeneration == eventGeneration
 }
 
+internal fun currentSetTopInViewport(
+    listCoordinates: LayoutCoordinates?,
+    setCoordinates: LayoutCoordinates?
+): Float {
+    if (listCoordinates == null || setCoordinates == null) return 0f
+    if (!listCoordinates.isAttached || !setCoordinates.isAttached) return 0f
+    return listCoordinates.localPositionOf(setCoordinates, Offset.Zero).y
+}
+
 internal fun workoutTargetIsVisible(
     target: WorkoutFocusTarget,
     visibleKeys: Collection<Any>
@@ -174,7 +182,30 @@ internal fun workoutTargetIsVisible(
     return workoutScrollKey(target) in visibleKeys
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * Scroll delta that places a newly current set around the vertical center of the
+ * workout list viewport. The viewport already ends above the persistent finish bar.
+ * A set taller than the viewport is pinned to the top so its editable controls stay
+ * visible. A small tolerance avoids nudging a set that is already comfortable.
+ * The lazy list clamps the result when the set is near either end of the content.
+ */
+internal fun currentSetScrollDeltaPx(
+    setTopInViewport: Float,
+    setHeight: Float,
+    viewportHeight: Float
+): Float {
+    if (viewportHeight <= 0f || setHeight <= 0f) return 0f
+    val desiredTop = if (setHeight >= viewportHeight) {
+        0f
+    } else {
+        (viewportHeight - setHeight) / 2f
+    }
+    val delta = setTopInViewport - desiredTop
+    val tolerance = viewportHeight * 0.1f
+    if (kotlin.math.abs(delta) <= tolerance) return 0f
+    return delta
+}
+
 @Composable
 fun ActiveWorkoutScreen(
     state: ActiveWorkoutUiState,
@@ -233,6 +264,8 @@ fun ActiveWorkoutScreen(
     val exercises = aggregate?.exercises.orEmpty()
     val exerciseIds = remember(exercises) { exercises.map { it.exercise.id } }
     val focusGeneration = state.focusEvent?.generation
+    val listCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val currentSetCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
     LaunchedEffect(
         focusGeneration,
         state.currentSetId,
@@ -259,6 +292,30 @@ fun ActiveWorkoutScreen(
         }
         withFrameNanos { }
         withFrameNanos { }
+        if (!shouldApplyScrollEvent(generation, focusGeneration)) {
+            return@LaunchedEffect
+        }
+        if (event.target is WorkoutFocusTarget.Set) {
+            var delta = 0f
+            for (attempt in 0 until 3) {
+                val setCoordinates = currentSetCoordinates.value
+                val viewport = listCoordinates.value
+                val setHeight = setCoordinates?.size?.height?.toFloat() ?: 0f
+                val viewportHeight = viewport?.size?.height?.toFloat() ?: 0f
+                if (setHeight > 0f && viewportHeight > 0f) {
+                    delta = currentSetScrollDeltaPx(
+                        setTopInViewport = currentSetTopInViewport(viewport, setCoordinates),
+                        setHeight = setHeight,
+                        viewportHeight = viewportHeight
+                    )
+                    break
+                }
+                if (attempt < 2) withFrameNanos { }
+            }
+            if (delta != 0f && shouldApplyScrollEvent(generation, focusGeneration)) {
+                listState.animateScrollBy(delta)
+            }
+        }
         if (shouldApplyScrollEvent(generation, focusGeneration)) {
             onFocusConsumed()
         }
@@ -327,6 +384,7 @@ fun ActiveWorkoutScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = AppDimens.screenPadding)
+                    .onGloballyPositioned { listCoordinates.value = it }
             ) {
                 item(key = WORKOUT_HEADER_KEY) {
                     Spacer(Modifier.height(AppDimens.headerStackGap))
@@ -341,8 +399,7 @@ fun ActiveWorkoutScreen(
                         expanded = expanded,
                         state = state,
                         currentSetId = state.currentSetId,
-                        focusGeneration = state.focusEvent?.generation,
-                        listState = listState,
+                        currentSetCoordinates = currentSetCoordinates,
                         discarding = state.discarding,
                         onToggle = { onToggleExercise(item.exercise.id) },
                         onReps = onReps,
@@ -632,15 +689,13 @@ private fun ThinProgressBar(fraction: Float) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ExerciseBlock(
     item: SessionExerciseItem,
     expanded: Boolean,
     state: ActiveWorkoutUiState,
     currentSetId: Long?,
-    focusGeneration: Long?,
-    listState: LazyListState,
+    currentSetCoordinates: MutableState<LayoutCoordinates?>,
     discarding: Boolean,
     onToggle: () -> Unit,
     onReps: (Long, String) -> Unit,
@@ -740,8 +795,7 @@ private fun ExerciseBlock(
                     completing = discarding || set.id in state.completingSetIds,
                     current = set.id == currentSetId,
                     editing = set.id in editingIds,
-                    focusGeneration = focusGeneration,
-                    listState = listState,
+                    currentSetCoordinates = currentSetCoordinates,
                     onReps = { onReps(set.id, it) },
                     onStepReps = { onStepReps(set.id, it) },
                     onLoadKind = { onLoadKind(set.id, it) },
@@ -781,7 +835,6 @@ private fun ExerciseBlock(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SetRow(
     exerciseName: String,
@@ -793,8 +846,7 @@ private fun SetRow(
     completing: Boolean,
     current: Boolean,
     editing: Boolean,
-    focusGeneration: Long?,
-    listState: LazyListState,
+    currentSetCoordinates: MutableState<LayoutCoordinates?>,
     onReps: (String) -> Unit,
     onStepReps: (Int) -> Unit,
     onLoadKind: (PlannedLoadKind) -> Unit,
@@ -826,17 +878,6 @@ private fun SetRow(
         actualLabel,
         statusLabel.ifBlank { stringResource(R.string.set_status_pending) }
     )
-    val requester = remember(set.id) { BringIntoViewRequester() }
-    LaunchedEffect(focusGeneration, current) {
-        if (!current || focusGeneration == null) {
-            return@LaunchedEffect
-        }
-        withFrameNanos { }
-        withFrameNanos { }
-        snapshotFlow { listState.isScrollInProgress }.first { scrolling -> !scrolling }
-        withFrameNanos { }
-        requester.bringIntoView()
-    }
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val currentGreen = if (dark) Color(0xFF81C784) else Color(0xFF2E7D32)
     val glow = if (dark) Color(0x2281C784) else Color(0x182E7D32)
@@ -869,11 +910,16 @@ private fun SetRow(
                 }
             }
             .padding(horizontal = if (current) 10.dp else 0.dp, vertical = if (current) 8.dp else 4.dp)
+            .then(
+                if (current) {
+                    Modifier.onGloballyPositioned { currentSetCoordinates.value = it }
+                } else {
+                    Modifier
+                }
+            )
     ) {
         Column(
-            modifier = Modifier
-                .bringIntoViewRequester(requester)
-                .semantics { isTraversalGroup = true }
+            modifier = Modifier.semantics { isTraversalGroup = true }
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
             if (current) {

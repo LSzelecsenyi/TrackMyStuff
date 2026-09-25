@@ -4,6 +4,7 @@ import app.mymusclemap.R
 import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -90,6 +91,42 @@ class ActiveWorkoutScreenLayoutTest {
         assertEquals(true, workoutTargetIsVisible(next, listOf("exercise-10", "exercise-11")))
         assertEquals(false, workoutTargetIsVisible(next, listOf("exercise-10")))
         assertEquals(true, workoutTargetIsVisible(WorkoutFocusTarget.Finish, listOf(WORKOUT_FINISH_KEY)))
+    }
+
+    @Test
+    fun currentSetScrollDeltaCentersTheSetInTheViewport() {
+        assertEquals(300f, currentSetScrollDeltaPx(setTopInViewport = 600f, setHeight = 200f, viewportHeight = 800f))
+        val centeredTop = (800f - 200f) / 2f
+        assertEquals(0f, currentSetScrollDeltaPx(centeredTop, setHeight = 200f, viewportHeight = 800f))
+        assertEquals(0f, currentSetScrollDeltaPx(centeredTop + 40f, setHeight = 200f, viewportHeight = 800f))
+    }
+
+    @Test
+    fun currentSetScrollDeltaPinsASetTallerThanTheViewport() {
+        assertEquals(120f, currentSetScrollDeltaPx(setTopInViewport = 120f, setHeight = 900f, viewportHeight = 800f))
+        assertEquals(0f, currentSetScrollDeltaPx(setTopInViewport = 0f, setHeight = 900f, viewportHeight = 800f))
+        assertEquals(0f, currentSetScrollDeltaPx(setTopInViewport = 40f, setHeight = 0f, viewportHeight = 800f))
+        assertEquals(0f, currentSetScrollDeltaPx(setTopInViewport = 40f, setHeight = 200f, viewportHeight = 0f))
+    }
+
+    @Test
+    fun focusScrollPlacesTheCurrentSetAboveTheFinishBar() {
+        render(
+            state = stackedSetsState(),
+            width = 360.dp,
+            fontScale = 1f,
+            height = 640.dp
+        )
+        val setBounds = composeRule.onNode(
+            hasStateDescription(testString(R.string.active_exercise_badge))
+        ).getBoundsInRoot()
+        val finish = composeRule.onNodeWithTag(WORKOUT_FINISH_CTA).getBoundsInRoot()
+        val setCenter = (setBounds.top + setBounds.bottom) / 2
+        assertTrue(setBounds.bottom <= finish.top)
+        assertTrue(
+            "current set center $setCenter should sit comfortably above the finish bar at ${finish.top}",
+            setCenter < finish.top * 0.72f
+        )
     }
 
     @Test
@@ -518,6 +555,7 @@ class ActiveWorkoutScreenLayoutTest {
         state: ActiveWorkoutUiState,
         width: Dp,
         fontScale: Float,
+        height: Dp? = null,
         onRequestAbandon: () -> Unit = {},
         onComplete: (Long) -> Unit = {},
         onSkip: (Long) -> Unit = {}
@@ -531,7 +569,7 @@ class ActiveWorkoutScreenLayoutTest {
                     Box(
                         modifier = Modifier
                             .width(width)
-                            .fillMaxSize()
+                            .then(if (height != null) Modifier.height(height) else Modifier.fillMaxSize())
                     ) {
                         ActiveWorkoutScreen(
                             state = state,
@@ -593,6 +631,32 @@ class ActiveWorkoutScreenLayoutTest {
                 later.id to ActualSetLogic.draftFromSet(later),
                 skipped.id to ActualSetLogic.draftFromSet(skipped)
             )
+        )
+    }
+
+    private fun stackedSetsState(): ActiveWorkoutUiState {
+        val sets = (0 until 8).map { index ->
+            val id = index + 1L
+            val status = if (index < 4) SessionSetStatus.COMPLETED else SessionSetStatus.PENDING
+            set(id, 10L, index, status)
+        }
+        val current = sets[4]
+        val first = item(10L, "Húzódzkodás", 0, sets)
+        return ActiveWorkoutUiState(
+            loading = false,
+            aggregate = WorkoutSessionAggregate(session(), listOf(first)),
+            currentExerciseId = 10L,
+            currentSetId = current.id,
+            focusedSetId = current.id,
+            expandedExerciseIds = setOf(10L),
+            focusEvent = WorkoutFocusEvent(1L, WorkoutFocusTarget.Set(current.id, 10L)),
+            drafts = sets.associate { item ->
+                item.id to if (item.status == SessionSetStatus.COMPLETED) {
+                    ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+                } else {
+                    ActualSetLogic.draftFromSet(item)
+                }
+            }
         )
     }
 
