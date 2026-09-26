@@ -272,6 +272,7 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_EXPORT).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_RESTORE).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_HELP_TIPS).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SAVE).assertIsDisplayed()
@@ -286,6 +287,16 @@ class SettingsScreenLayoutTest {
             "save should not be a full-width capsule",
             save.right - save.left < 200.dp
         )
+    }
+
+    @Test
+    fun givenHelpAndTipsWhenTappedThenCallbackRunsOnce() {
+        val opens = intArrayOf(0)
+        render(onOpenHelp = { opens[0] += 1 })
+        composeRule.onNodeWithTag(SETTINGS_HELP_TIPS).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_help_tips)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_HELP_TIPS).performClick()
+        assertEquals(1, opens[0])
     }
 
     @Test
@@ -306,17 +317,17 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
-    fun givenNullPrivacyUrlThenPrivacyRowIsDisabled() {
+    fun givenNullPrivacyUrlThenPrivacyRowOpensInAppPolicy() {
         val opens = intArrayOf(0)
         render(
             state = SettingsUiState(privacyPolicyUrl = null),
             onOpenPrivacyPolicy = { opens[0] += 1 }
         )
         composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsDisplayed()
-        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsNotEnabled()
-        composeRule.onNodeWithText(testString(R.string.action_privacy_policy_unavailable)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsEnabled()
+        composeRule.onNodeWithText(testString(R.string.action_privacy_policy_in_app_subtitle)).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performClick()
-        assertEquals(0, opens[0])
+        assertEquals(1, opens[0])
     }
 
     @Test
@@ -448,6 +459,7 @@ class SettingsScreenLayoutTest {
                             onDismissRestoreErrors = {},
                             onSendFeedback = {},
                             onOpenPrivacyPolicy = {},
+                            onOpenHelp = {},
                             onMessageConsumed = {},
                             onBack = onBack
                         )
@@ -468,6 +480,7 @@ class SettingsScreenLayoutTest {
         onImportClick: () -> Unit = {},
         onSendFeedback: () -> Unit = {},
         onOpenPrivacyPolicy: () -> Unit = {},
+        onOpenHelp: () -> Unit = {},
         onBack: () -> Unit = {}
     ) {
         composeRule.setContent {
@@ -506,6 +519,7 @@ class SettingsScreenLayoutTest {
                             onDismissRestoreErrors = {},
                             onSendFeedback = onSendFeedback,
                             onOpenPrivacyPolicy = onOpenPrivacyPolicy,
+                            onOpenHelp = onOpenHelp,
                             onMessageConsumed = {},
                             onBack = onBack
                         )

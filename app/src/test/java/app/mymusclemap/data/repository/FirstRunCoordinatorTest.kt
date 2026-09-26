@@ -69,6 +69,7 @@ class FirstRunCoordinatorTest {
         )
         assertTrue(catalog.all { !it.archived })
         assertFalse(themePreferences.isOnboardingCompleted())
+        assertTrue(themePreferences.isWelcomePending())
         catalog.forEach { exercise ->
             val draft = StarterCatalog.drafts.single { it.name == exercise.name }
             assertEquals(draft.measurementType, exercise.measurementType)
@@ -119,13 +120,33 @@ class FirstRunCoordinatorTest {
     }
 
     @Test
+    fun secondPrepareAfterSeedStillShowsOnboarding() = runTest {
+        assertEquals(FirstRunDecision.ShowOnboarding, coordinator.prepare())
+        assertEquals(FirstRunDecision.ShowOnboarding, coordinator.prepare())
+        assertFalse(themePreferences.isOnboardingCompleted())
+        assertFalse(themePreferences.isOnboardingStarted())
+        assertTrue(themePreferences.isWelcomePending())
+        assertEquals(StarterCatalog.drafts.size, exerciseRepository.observeAll().first().size)
+    }
+
+    @Test
     fun startedOnboardingSkipsWelcomeOnRestartWithoutCompleting() = runTest {
         assertEquals(FirstRunDecision.ShowOnboarding, coordinator.prepare())
         coordinator.markOnboardingStarted()
         assertTrue(themePreferences.isOnboardingStarted())
         assertFalse(themePreferences.isOnboardingCompleted())
+        assertFalse(themePreferences.isWelcomePending())
         assertEquals(FirstRunDecision.Ready, coordinator.prepare())
         assertEquals(StarterCatalog.drafts.size, exerciseRepository.observeAll().first().size)
+    }
+
+    @Test
+    fun appearanceRestoreKeepsWelcomePending() = runTest {
+        assertEquals(FirstRunDecision.ShowOnboarding, coordinator.prepare())
+        themePreferences.replaceAppearance(AppearanceSettings.Default)
+        assertTrue(themePreferences.isWelcomePending())
+        assertEquals(FirstRunDecision.ShowOnboarding, coordinator.prepare())
+        assertFalse(themePreferences.isOnboardingCompleted())
     }
 
     @Test

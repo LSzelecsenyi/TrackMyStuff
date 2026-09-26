@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Email
@@ -121,6 +122,7 @@ internal const val SETTINGS_EXPORT = "settings-export"
 internal const val SETTINGS_IMPORT = "settings-import"
 internal const val SETTINGS_APP_BACKUP_EXPORT = "settings-app-backup-export"
 internal const val SETTINGS_APP_BACKUP_RESTORE = "settings-app-backup-restore"
+internal const val SETTINGS_HELP_TIPS = "settings-help-tips"
 internal const val SETTINGS_SEND_FEEDBACK = "settings-send-feedback"
 internal const val SETTINGS_PRIVACY_POLICY = "settings-privacy-policy"
 internal const val SETTINGS_APP_VERSION = "settings-app-version"
@@ -158,6 +160,7 @@ fun SettingsScreen(
     onDismissRestoreErrors: () -> Unit,
     onSendFeedback: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
+    onOpenHelp: () -> Unit,
     onMessageConsumed: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -251,7 +254,8 @@ fun SettingsScreen(
                 AboutSection(
                     state = state,
                     onSendFeedback = onSendFeedback,
-                    onOpenPrivacyPolicy = onOpenPrivacyPolicy
+                    onOpenPrivacyPolicy = onOpenPrivacyPolicy,
+                    onOpenHelp = onOpenHelp
                 )
             }
         }
@@ -858,9 +862,10 @@ private fun AppBackupSection(
 private fun AboutSection(
     state: SettingsUiState,
     onSendFeedback: () -> Unit,
-    onOpenPrivacyPolicy: () -> Unit
+    onOpenPrivacyPolicy: () -> Unit,
+    onOpenHelp: () -> Unit
 ) {
-    val privacyEnabled = !state.privacyPolicyUrl.isNullOrBlank()
+    val usesExternalPrivacyPolicy = !state.privacyPolicyUrl.isNullOrBlank()
     CompactEditorSection(title = settingsKicker(stringResource(R.string.about_title))) {
         Text(
             text = stringResource(R.string.about_version, state.appVersionName),
@@ -869,6 +874,13 @@ private fun AboutSection(
             modifier = Modifier.testTag(SETTINGS_APP_VERSION)
         )
         Spacer(Modifier.height(AppDimens.itemGap))
+        DataActionRow(
+            icon = Icons.AutoMirrored.Outlined.HelpOutline,
+            title = stringResource(R.string.action_help_tips),
+            subtitle = stringResource(R.string.action_help_tips_subtitle),
+            testTag = SETTINGS_HELP_TIPS,
+            onClick = onOpenHelp
+        )
         DataActionRow(
             icon = Icons.Outlined.Email,
             title = stringResource(R.string.action_send_feedback),
@@ -880,13 +892,12 @@ private fun AboutSection(
             icon = Icons.Outlined.Policy,
             title = stringResource(R.string.action_privacy_policy),
             subtitle = stringResource(
-                if (privacyEnabled) {
+                if (usesExternalPrivacyPolicy) {
                     R.string.action_privacy_policy_subtitle
                 } else {
-                    R.string.action_privacy_policy_unavailable
+                    R.string.action_privacy_policy_in_app_subtitle
                 }
             ),
-            enabled = privacyEnabled,
             testTag = SETTINGS_PRIVACY_POLICY,
             onClick = onOpenPrivacyPolicy
         )
@@ -1075,6 +1086,7 @@ private fun SettingsPreview() {
             onDismissRestoreErrors = {},
             onSendFeedback = {},
             onOpenPrivacyPolicy = {},
+            onOpenHelp = {},
             onMessageConsumed = {},
             onBack = {}
         )

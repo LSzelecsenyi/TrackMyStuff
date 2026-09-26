@@ -86,4 +86,10 @@ class FeedbackComposerTest {
             body
         )
     }
+
+    @Test
+    fun alphaUsesInAppPrivacyPolicyUntilPublicUrlIsConfigured() {
+        assertEquals(null, AboutConfig.privacyPolicyUrl)
+        assertFalse(AboutConfig.usesExternalPrivacyPolicy())
+    }
 }

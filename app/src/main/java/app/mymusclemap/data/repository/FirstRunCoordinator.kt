@@ -14,7 +14,9 @@ import app.mymusclemap.domain.exercise.StarterCatalog
  * reopen first-run or reset discoveries. Starter exercises are inserted only when
  * the catalog is empty and onboarding has not started or completed. A restored,
  * upgraded, or already-used catalog is left untouched, and existing users are
- * migrated to completed onboarding instead of the progressive journey.
+ * migrated to completed onboarding instead of the progressive journey. Successful
+ * first-run seed sets a welcome-pending flag so rotation or process death on the
+ * welcome screens cannot be mistaken for an existing-user upgrade.
  */
 class FirstRunCoordinator(
     private val database: WeightDatabase,
@@ -28,11 +30,16 @@ class FirstRunCoordinator(
         if (themePreferences.isOnboardingStarted()) {
             return FirstRunDecision.Ready
         }
-        val seeded = seedStarterCatalogIfEmpty()
-        if (!seeded) {
+        if (themePreferences.isWelcomePending()) {
+            seedStarterCatalogIfEmpty()
+            return FirstRunDecision.ShowOnboarding
+        }
+        if (database.exerciseDao().countAll() > 0) {
             themePreferences.markOnboardingCompleted()
             return FirstRunDecision.Ready
         }
+        themePreferences.setWelcomePending(true)
+        seedStarterCatalogIfEmpty()
         return FirstRunDecision.ShowOnboarding
     }
 

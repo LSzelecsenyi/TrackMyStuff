@@ -165,6 +165,50 @@ class AppRootNavigationTest {
         assertEquals(AppRoutes.OVERVIEW, nav.currentDestination?.route)
     }
 
+    @Test
+    fun givenHelpWhenBackThenSettingsRemains() {
+        val nav = host()
+        composeRule.runOnIdle {
+            nav.navigateInternal(AppRoutes.SETTINGS)
+            nav.navigateInternal(AppRoutes.HELP)
+            nav.navigateInternal(AppRoutes.HELP)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.HELP, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.SETTINGS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.OVERVIEW, nav.currentDestination?.route)
+    }
+
+    @Test
+    fun givenPrivacyWhenBackThenSettingsRemains() {
+        val nav = host()
+        composeRule.runOnIdle {
+            nav.navigateInternal(AppRoutes.SETTINGS)
+            nav.navigateInternal(AppRoutes.PRIVACY)
+            nav.navigateInternal(AppRoutes.PRIVACY)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.PRIVACY, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.SETTINGS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.OVERVIEW, nav.currentDestination?.route)
+    }
+
     private fun host(): NavHostController {
         lateinit var navController: NavHostController
         composeRule.setContent {
@@ -179,6 +223,8 @@ class AppRootNavigationTest {
                     composable(AppRoutes.TEMPLATES) { Text("templates") }
                     composable(AppRoutes.EXERCISES) { Text("exercises") }
                     composable(AppRoutes.SETTINGS) { Text("settings") }
+                    composable(AppRoutes.HELP) { Text("help") }
+                    composable(AppRoutes.PRIVACY) { Text("privacy") }
                     composable(
                         route = AppRoutes.ACTIVE_WORKOUT_PATTERN,
                         arguments = listOf(

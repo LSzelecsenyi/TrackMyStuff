@@ -50,6 +50,30 @@ class AppNavigationTest {
     }
 
     @Test
+    fun helpOpensFromSettingsWithoutDuplicatingAndHidesBottomBar() {
+        val navigation = AppNavigation.openHelp(AppRoutes.SETTINGS)
+        assertEquals(AppRoutes.HELP, navigation.targetRoute)
+        assertEquals(AppRoutes.SETTINGS, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.openHelp(AppRoutes.HELP).shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.HELP))
+        assertFalse(AppNavigation.shouldNavigate(AppRoutes.HELP, AppRoutes.HELP))
+        assertTrue(AppNavigation.shouldNavigate(AppRoutes.SETTINGS, AppRoutes.HELP))
+    }
+
+    @Test
+    fun privacyOpensFromSettingsWithoutDuplicatingAndHidesBottomBar() {
+        val navigation = AppNavigation.openPrivacy(AppRoutes.SETTINGS)
+        assertEquals(AppRoutes.PRIVACY, navigation.targetRoute)
+        assertEquals(AppRoutes.SETTINGS, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.openPrivacy(AppRoutes.PRIVACY).shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRIVACY))
+        assertFalse(AppNavigation.shouldNavigate(AppRoutes.PRIVACY, AppRoutes.PRIVACY))
+        assertTrue(AppNavigation.shouldNavigate(AppRoutes.SETTINGS, AppRoutes.PRIVACY))
+    }
+
+    @Test
     fun exerciseCatalogAndTemplatesOpenFromOverviewWithoutDuplicating() {
         val catalog = AppNavigation.openCatalog(AppRoutes.OVERVIEW)
         assertEquals(AppRoutes.EXERCISES, catalog.targetRoute)
@@ -97,6 +121,8 @@ class AppNavigationTest {
     @Test
     fun bottomBarIsHiddenOnActiveEditorsDetailsAndImport() {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.SETTINGS))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.HELP))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRIVACY))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.EXERCISE_EDITOR_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("exercise_editor?exerciseId=12"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.TEMPLATE_EDITOR_PATTERN))

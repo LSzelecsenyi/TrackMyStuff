@@ -484,7 +484,11 @@ private fun ExerciseCard(
                 }
             }
             TextButton(onClick = onToggle) {
-                Text(if (item.expanded) "Kevesebb" else "Sorozatok")
+                Text(
+                    stringResource(
+                        if (item.expanded) R.string.action_hide_sets else R.string.action_show_sets
+                    )
+                )
             }
             if (item.expanded) {
                 if (exercise.measurementType != MeasurementType.COMPLETION_ONLY) {

@@ -223,6 +223,7 @@ class AppBackupRepositoryTest {
         val parsed = AppBackupJson.parse(json) as AppBackupParseResult.Success
         assertFalse(parsed.snapshot.settings.containsKey("onboarding_completed"))
         assertFalse(parsed.snapshot.settings.containsKey("onboarding_started"))
+        assertFalse(parsed.snapshot.settings.containsKey("onboarding_welcome_pending"))
         assertFalse(parsed.snapshot.settings.containsKey("onboarding_heatmap_seen"))
         assertFalse(parsed.snapshot.settings.containsKey("onboarding_reminder_dismissed"))
 

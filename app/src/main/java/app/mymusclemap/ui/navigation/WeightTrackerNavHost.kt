@@ -61,6 +61,8 @@ import app.mymusclemap.ui.onboarding.OnboardingChartSpotlight
 import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingHeatmapSpotlight
 import app.mymusclemap.ui.onboarding.OnboardingWorkoutSpotlight
+import app.mymusclemap.ui.settings.HelpTipsScreen
+import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.settings.SettingsScreen
 import app.mymusclemap.ui.settings.SettingsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorScreen
@@ -393,8 +395,16 @@ fun WeightTrackerNavHost(
                     viewModel = viewModel,
                     state = state,
                     today = dateProvider.today(),
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onOpenHelp = { navController.navigateInternal(AppRoutes.HELP) },
+                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) }
                 )
+            }
+            composable(AppRoutes.HELP) {
+                HelpTipsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(AppRoutes.PRIVACY) {
+                PrivacyPolicyScreen(onBack = { navController.popBackStack() })
             }
             composable(AppRoutes.WEIGHT_DETAILS) {
                 val viewModel: WeightDetailsViewModel = viewModel(factory = factory)
@@ -761,7 +771,9 @@ private fun SettingsRoute(
     viewModel: SettingsViewModel,
     state: app.mymusclemap.ui.settings.SettingsUiState,
     today: LocalDate,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenHelp: () -> Unit,
+    onOpenPrivacy: () -> Unit
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -893,8 +905,11 @@ private fun SettingsRoute(
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                 } catch (_: ActivityNotFoundException) {
                 }
+            } else {
+                onOpenPrivacy()
             }
         },
+        onOpenHelp = onOpenHelp,
         onMessageConsumed = viewModel::consumeMessage,
         onBack = onBack
     )

@@ -72,16 +72,34 @@ class ThemePreferences(context: Context) {
         setOnboardingCompleted(true)
     }
 
+    suspend fun isWelcomePending(): Boolean {
+        return dataStore.data.first()[KEY_ONBOARDING_WELCOME_PENDING] == true
+    }
+
+    suspend fun setWelcomePending(pending: Boolean) {
+        dataStore.edit { prefs ->
+            if (pending) {
+                prefs[KEY_ONBOARDING_WELCOME_PENDING] = true
+            } else {
+                prefs -= KEY_ONBOARDING_WELCOME_PENDING
+            }
+        }
+    }
+
     suspend fun markOnboardingStarted() {
-        dataStore.edit { it[KEY_ONBOARDING_STARTED] = true }
+        dataStore.edit { prefs ->
+            prefs[KEY_ONBOARDING_STARTED] = true
+            prefs -= KEY_ONBOARDING_WELCOME_PENDING
+        }
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { prefs ->
             if (completed) {
                 prefs[KEY_ONBOARDING_COMPLETED] = true
+                prefs -= KEY_ONBOARDING_WELCOME_PENDING
             } else {
-                prefs.remove(KEY_ONBOARDING_COMPLETED)
+                prefs -= KEY_ONBOARDING_COMPLETED
             }
         }
     }
@@ -180,6 +198,7 @@ class ThemePreferences(context: Context) {
         val KEY_DARK_TERTIARY = stringPreferencesKey(AppearanceCodec.KEY_DARK_TERTIARY)
         val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val KEY_ONBOARDING_STARTED = booleanPreferencesKey("onboarding_started")
+        val KEY_ONBOARDING_WELCOME_PENDING = booleanPreferencesKey("onboarding_welcome_pending")
         val KEY_ONBOARDING_HEATMAP_SEEN = booleanPreferencesKey("onboarding_heatmap_seen")
         val KEY_ONBOARDING_WEIGHT_INTRODUCED = booleanPreferencesKey("onboarding_weight_introduced")
         val KEY_ONBOARDING_WEIGHT_CHART_SEEN = booleanPreferencesKey("onboarding_weight_chart_seen")
@@ -188,6 +207,7 @@ class ThemePreferences(context: Context) {
         val ONBOARDING_KEYS = listOf(
             KEY_ONBOARDING_COMPLETED,
             KEY_ONBOARDING_STARTED,
+            KEY_ONBOARDING_WELCOME_PENDING,
             KEY_ONBOARDING_HEATMAP_SEEN,
             KEY_ONBOARDING_WEIGHT_INTRODUCED,
             KEY_ONBOARDING_WEIGHT_CHART_SEEN,

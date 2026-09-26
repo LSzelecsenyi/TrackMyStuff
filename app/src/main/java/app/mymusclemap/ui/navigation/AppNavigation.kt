@@ -6,6 +6,8 @@ object AppRoutes {
     const val OVERVIEW = "dashboard"
     const val JOURNAL = "history"
     const val SETTINGS = "settings"
+    const val HELP = "help"
+    const val PRIVACY = "privacy"
     const val EXERCISES = "exercises"
     const val EXERCISE_EDITOR = "exercise_editor"
     const val EXERCISE_EDITOR_PATTERN = "exercise_editor?exerciseId={exerciseId}"
@@ -78,6 +80,22 @@ object AppNavigation {
             targetRoute = AppRoutes.SETTINGS,
             backTarget = canonicalRoute(fromRoute) ?: AppRoutes.OVERVIEW,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.SETTINGS)
+        )
+    }
+
+    fun openHelp(currentRoute: String?): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.HELP,
+            backTarget = AppRoutes.SETTINGS,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.HELP)
+        )
+    }
+
+    fun openPrivacy(currentRoute: String?): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.PRIVACY,
+            backTarget = AppRoutes.SETTINGS,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.PRIVACY)
         )
     }
 

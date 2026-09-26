@@ -6,8 +6,13 @@ import android.content.Intent
 import android.net.Uri
 
 object AboutConfig {
-    /** Public privacy-policy URL. Null until a real Play-ready page exists. Set this to enable the Settings row. */
+    /**
+     * Public HTTPS privacy-policy URL for Play Store listing and in-app browser open.
+     * Null uses the in-app Privacy Policy screen until a hosted page exists.
+     */
     val privacyPolicyUrl: String? = null
+
+    fun usesExternalPrivacyPolicy(): Boolean = !privacyPolicyUrl.isNullOrBlank()
 }
 
 object FeedbackComposer {
