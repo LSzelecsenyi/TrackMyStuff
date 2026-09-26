@@ -7,7 +7,6 @@ import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.model.SeriesPoint
 import app.mymusclemap.domain.workout.ElapsedTime
 import app.mymusclemap.domain.workout.ScheduledWorkout
-import app.mymusclemap.domain.workout.ScheduledWorkoutStatus
 import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.SessionSet
@@ -74,14 +73,18 @@ object TrainingStatisticsLogic {
         today: LocalDate,
         range: StatisticsRange
     ): PlanAdherence {
-        val due = scheduled.filter { range.contains(it.scheduledDate, today) }
+        val due = scheduled.filter { occurrence ->
+            !occurrence.isCancelled && range.contains(occurrence.scheduledDate, today)
+        }
         return PlanAdherence(
             plannedCount = due.size,
-            completedCount = due.count { it.status == ScheduledWorkoutStatus.COMPLETED },
+            completedCount = due.count { it.sessionStatus == SessionStatus.COMPLETED },
             missedCount = due.count { item ->
-                item.status == ScheduledWorkoutStatus.PLANNED && item.scheduledDate.isBefore(today)
+                item.sessionStatus != SessionStatus.COMPLETED &&
+                    item.sessionStatus != SessionStatus.IN_PROGRESS &&
+                    item.scheduledDate.isBefore(today)
             },
-            inProgressCount = due.count { it.status == ScheduledWorkoutStatus.IN_PROGRESS }
+            inProgressCount = due.count { it.sessionStatus == SessionStatus.IN_PROGRESS }
         )
     }
 

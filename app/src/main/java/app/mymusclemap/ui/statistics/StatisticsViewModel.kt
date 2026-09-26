@@ -39,7 +39,7 @@ class StatisticsViewModel(
 
     val uiState: StateFlow<StatisticsUiState> = combine(
         sessionRepository.observeCompletedAggregates(),
-        scheduledWorkoutRepository.observeAll(),
+        scheduledWorkoutRepository.observeHistorical(),
         dateProvider.observeToday(),
         selectedRange,
         lockedFeature

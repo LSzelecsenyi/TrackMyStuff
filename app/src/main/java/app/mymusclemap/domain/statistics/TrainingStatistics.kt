@@ -30,14 +30,15 @@ data class TrainingActivity(
 )
 
 /**
- * Plan adherence uses the explicit `scheduledWorkoutId` link.
+ * Plan adherence uses durable scheduled occurrences and the explicit
+ * `scheduledWorkoutId` link.
  *
- * A due plan is a [app.mymusclemap.domain.workout.ScheduledWorkout] whose
- * `scheduledDate` falls in the selected range (and not after today).
- * It is completed only when that row is linked to a COMPLETED session.
- * Unlinked completed workouts, including same-name/same-day sessions started
- * from the hub, are not inferred as completing a plan.
- * Deleted or unscheduled plans disappear from history and cannot be counted.
+ * Membership is the occurrence's current [app.mymusclemap.domain.workout.ScheduledWorkout.scheduledDate]
+ * in the selected range (and not after today). `originalScheduledDate` is not a
+ * second obligation. Cancelled occurrences are excluded entirely.
+ * An occurrence is completed only when it is linked to a COMPLETED session,
+ * including completions after the scheduled date or after the selected range.
+ * Unlinked hub workouts are not inferred as completing a plan.
  */
 data class PlanAdherence(
     val plannedCount: Int = 0,

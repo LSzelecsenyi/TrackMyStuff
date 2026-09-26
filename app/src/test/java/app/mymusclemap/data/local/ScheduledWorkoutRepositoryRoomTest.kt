@@ -376,6 +376,8 @@ class ScheduledWorkoutRepositoryRoomTest {
         assertNull(scheduled.getById(id))
         assertTrue(scheduled.observeUpcoming(today).first().none { it.id == id })
         assertTrue(scheduled.observeAll().first().none { it.id == id })
+        val historical = scheduled.observeHistorical().first().single { it.id == id }
+        assertEquals(1_000L, historical.cancelledAt)
         val retained = database.scheduledWorkoutDao().getEntity(id)!!
         assertEquals(future.toString(), retained.scheduledDate)
         assertEquals(future.toString(), retained.originalScheduledDate)

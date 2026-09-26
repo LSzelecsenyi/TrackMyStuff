@@ -45,6 +45,10 @@ class ScheduledWorkoutRepository(
         return scheduledWorkoutDao.observeAll().map { rows -> rows.map { it.toModel() } }
     }
 
+    fun observeHistorical(): Flow<List<ScheduledWorkout>> {
+        return scheduledWorkoutDao.observeHistorical().map { rows -> rows.map { it.toModel() } }
+    }
+
     fun observeById(id: Long): Flow<ScheduledWorkout?> {
         return scheduledWorkoutDao.observeById(id).map { it?.toModel() }
     }

@@ -188,6 +188,57 @@ class StatisticsViewModelTest {
     }
 
     @Test
+    fun givenLateScheduledCompletionThenAdherenceCountsItAsCompleted() = runTest {
+        val templateId = saveTemplate()
+        val scheduleId = (scheduled.schedule(templateId, today.minusDays(2)) as ScheduleWorkoutResult.Scheduled).id
+        completeScheduled(templateId, scheduleId)
+        val viewModel = viewModel()
+        val state = viewModel.uiState.first { !it.loading && it.dashboard.hasCompletedWorkouts }
+        assertEquals(1, state.dashboard.adherence.plannedCount)
+        assertEquals(1, state.dashboard.adherence.completedCount)
+        assertEquals(100, state.dashboard.adherence.percent)
+        assertEquals(0, state.dashboard.adherence.missedCount)
+        val occurrence = scheduled.getById(scheduleId)!!
+        assertEquals(today.minusDays(2), occurrence.scheduledDate)
+        assertEquals(today.minusDays(2), occurrence.originalScheduledDate)
+    }
+
+    @Test
+    fun givenCancelledOccurrenceThenAdherenceIgnoresIt() = runTest {
+        val templateId = saveTemplate()
+        val kept = (scheduled.schedule(templateId, today.minusDays(1)) as ScheduleWorkoutResult.Scheduled).id
+        completeScheduled(templateId, kept)
+        val cancelledId = (
+            scheduled.schedule(saveTemplate("Other"), today) as ScheduleWorkoutResult.Scheduled
+        ).id
+        scheduled.unschedule(cancelledId)
+        val viewModel = viewModel()
+        val state = viewModel.uiState.first { !it.loading && it.dashboard.hasCompletedWorkouts }
+        assertEquals(1, state.dashboard.adherence.plannedCount)
+        assertEquals(1, state.dashboard.adherence.completedCount)
+        assertEquals(100, state.dashboard.adherence.percent)
+        assertTrue(scheduled.observeHistorical().first().any { it.id == cancelledId && it.isCancelled })
+    }
+
+    @Test
+    fun givenDeletedTemplateThenPastOccurrenceStillCounts() = runTest {
+        val templateId = saveTemplate()
+        scheduled.schedule(templateId, today.minusDays(2))
+        assertEquals(
+            app.mymusclemap.domain.workout.TemplateDeleteResult.Deleted,
+            templates.deletePermanently(templateId)
+        )
+        val viewModel = viewModel()
+        val state = viewModel.uiState.first { !it.loading }
+        assertEquals(1, state.dashboard.adherence.plannedCount)
+        assertEquals(0, state.dashboard.adherence.completedCount)
+        assertEquals(0, state.dashboard.adherence.percent)
+        val historical = scheduled.observeHistorical().first().single()
+        assertNull(historical.templateId)
+        assertNull(historical.cancelledAt)
+    }
+
+    @Test
     fun givenFreeEntitlementsWhenProRangeSelectedThenRangeStaysThirtyDays() = runTest {
         val viewModel = viewModel(SelectiveFeatureEntitlements(emptySet()))
         viewModel.uiState.first { !it.loading }
@@ -232,10 +283,20 @@ class StatisticsViewModelTest {
         )
     }
 
-    private suspend fun saveTemplate(): Long {
+    private suspend fun completeScheduled(templateId: Long, scheduleId: Long) {
+        val started = sessions.start(templateId, scheduleId) as StartWorkoutResult.Started
+        val aggregate = sessions.getAggregate(started.sessionId)!!
+        sessions.completeSet(
+            aggregate.exercises.single().sets.first().id,
+            ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+        )
+        sessions.finish(started.sessionId, skipRemaining = true)
+    }
+
+    private suspend fun saveTemplate(name: String = "Pull"): Long {
         val exerciseId = (exercises.save(
             ExerciseDraft(
-                name = "Pull-up",
+                name = if (name == "Pull") "Pull-up" else "Pull-up $name",
                 category = ExerciseCategory.STRENGTH,
                 movementPattern = MovementPattern.VERTICAL_PULL,
                 measurementType = MeasurementType.REPETITIONS,
@@ -246,7 +307,7 @@ class StatisticsViewModelTest {
         ) as ExerciseSaveResult.Created).id
         return (templates.save(
             TemplateDraft(
-                name = "Pull",
+                name = name,
                 exercises = listOf(
                     TemplateExerciseDraft(
                         localId = -1L,

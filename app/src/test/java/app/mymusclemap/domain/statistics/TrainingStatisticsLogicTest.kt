@@ -532,6 +532,189 @@ class TrainingStatisticsLogicTest {
     }
 
     @Test
+    fun lateCompletionCountsAsFullyCompletedWithoutAMiss() {
+        val monday = plan(1L, today.minusDays(4), SessionStatus.COMPLETED)
+        val wednesday = plan(
+            id = 2L,
+            date = today.minusDays(2),
+            sessionStatus = SessionStatus.COMPLETED,
+            originalScheduledDate = today.minusDays(2)
+        )
+        val friday = plan(3L, today, null)
+        val stats = stats(scheduled = listOf(monday, wednesday, friday))
+        assertEquals(3, stats.adherence.plannedCount)
+        assertEquals(2, stats.adherence.completedCount)
+        assertEquals(0, stats.adherence.missedCount)
+        assertEquals(67, stats.adherence.percent)
+    }
+
+    @Test
+    fun completionAfterTheSelectedRangeStillCompletesAnInRangeOccurrence() {
+        val start = StatisticsRange.Days30.startInclusive(today)!!
+        val stats = stats(
+            scheduled = listOf(plan(1L, start, SessionStatus.COMPLETED))
+        )
+        assertEquals(1, stats.adherence.plannedCount)
+        assertEquals(1, stats.adherence.completedCount)
+        assertEquals(100, stats.adherence.percent)
+        assertEquals(0, stats.adherence.missedCount)
+    }
+
+    @Test
+    fun inProgressAndPastPendingArePlannedButNotCompleted() {
+        val pending = plan(1L, today.minusDays(1), null)
+        val inProgress = plan(2L, today, SessionStatus.IN_PROGRESS)
+        val stats = stats(scheduled = listOf(pending, inProgress))
+        assertEquals(2, stats.adherence.plannedCount)
+        assertEquals(0, stats.adherence.completedCount)
+        assertEquals(1, stats.adherence.missedCount)
+        assertEquals(1, stats.adherence.inProgressCount)
+        assertEquals(0, stats.adherence.percent)
+    }
+
+    @Test
+    fun cancelledOccurrenceIsExcludedFromNumeratorAndDenominator() {
+        val kept = plan(1L, today.minusDays(1), SessionStatus.COMPLETED)
+        val cancelled = plan(2L, today.minusDays(1), null, cancelledAt = 99L)
+        val stats = stats(scheduled = listOf(kept, cancelled))
+        assertEquals(1, stats.adherence.plannedCount)
+        assertEquals(1, stats.adherence.completedCount)
+        assertEquals(100, stats.adherence.percent)
+        assertEquals(0, stats.adherence.missedCount)
+    }
+
+    @Test
+    fun rescheduleUsesCurrentScheduledDateOnce() {
+        val movedToThursday = plan(
+            id = 1L,
+            date = today.minusDays(1),
+            sessionStatus = null,
+            originalScheduledDate = today.minusDays(2)
+        )
+        val stats = stats(scheduled = listOf(movedToThursday))
+        assertEquals(1, stats.adherence.plannedCount)
+        assertEquals(0, stats.adherence.completedCount)
+        assertEquals(1, stats.adherence.missedCount)
+    }
+
+    @Test
+    fun originalDateInsideRangeDoesNotCountWhenCurrentDateIsOutside() {
+        val start = StatisticsRange.Days30.startInclusive(today)!!
+        val movedOut = plan(
+            id = 1L,
+            date = start.minusDays(1),
+            sessionStatus = SessionStatus.COMPLETED,
+            originalScheduledDate = start
+        )
+        val stats = stats(scheduled = listOf(movedOut))
+        assertEquals(0, stats.adherence.plannedCount)
+        assertNull(stats.adherence.percent)
+    }
+
+    @Test
+    fun originalDateOutsideRangeCountsWhenCurrentDateIsInside() {
+        val start = StatisticsRange.Days30.startInclusive(today)!!
+        val movedIn = plan(
+            id = 1L,
+            date = start,
+            sessionStatus = SessionStatus.COMPLETED,
+            originalScheduledDate = start.minusDays(3)
+        )
+        val stats = stats(scheduled = listOf(movedIn))
+        assertEquals(1, stats.adherence.plannedCount)
+        assertEquals(1, stats.adherence.completedCount)
+        assertEquals(100, stats.adherence.percent)
+    }
+
+    @Test
+    fun deletedTemplateOccurrenceStillCounts() {
+        val orphan = plan(
+            id = 1L,
+            date = today.minusDays(1),
+            sessionStatus = SessionStatus.COMPLETED,
+            templateId = null
+        )
+        val stats = stats(scheduled = listOf(orphan))
+        assertEquals(1, stats.adherence.plannedCount)
+        assertEquals(1, stats.adherence.completedCount)
+        assertEquals(100, stats.adherence.percent)
+    }
+
+    @Test
+    fun multipleOccurrencesOfTheSameTemplateAreIndependent() {
+        val first = plan(1L, today.minusDays(2), SessionStatus.COMPLETED, templateId = 8L)
+        val second = plan(2L, today.minusDays(1), null, templateId = 8L)
+        val stats = stats(scheduled = listOf(first, second))
+        assertEquals(2, stats.adherence.plannedCount)
+        assertEquals(1, stats.adherence.completedCount)
+        assertEquals(50, stats.adherence.percent)
+    }
+
+    @Test
+    fun futureOccurrenceIsExcludedFromAllRanges() {
+        val future = plan(1L, today.plusDays(1), null)
+        assertEquals(0, stats(scheduled = listOf(future)).adherence.plannedCount)
+        assertEquals(
+            0,
+            stats(scheduled = listOf(future), range = StatisticsRange.All).adherence.plannedCount
+        )
+        assertNull(stats(scheduled = listOf(future)).adherence.percent)
+    }
+
+    @Test
+    fun allRangeIncludesOlderDueOccurrencesAndStillExcludesFuture() {
+        val old = plan(1L, today.minusDays(40), SessionStatus.COMPLETED)
+        val recent = plan(2L, today, null)
+        val future = plan(3L, today.plusDays(2), null)
+        val thirty = stats(scheduled = listOf(old, recent, future))
+        assertEquals(1, thirty.adherence.plannedCount)
+        val all = stats(scheduled = listOf(old, recent, future), range = StatisticsRange.All)
+        assertEquals(2, all.adherence.plannedCount)
+        assertEquals(1, all.adherence.completedCount)
+        assertEquals(50, all.adherence.percent)
+    }
+
+    @Test
+    fun adherenceBoundariesFollowEachStatisticsRange() {
+        val start30 = StatisticsRange.Days30.startInclusive(today)!!
+        val start3m = StatisticsRange.Months3.startInclusive(today)!!
+        val start6m = StatisticsRange.Months6.startInclusive(today)!!
+        val start1y = StatisticsRange.Year1.startInclusive(today)!!
+        val at30 = plan(1L, start30, SessionStatus.COMPLETED)
+        val before30 = plan(2L, start30.minusDays(1), SessionStatus.COMPLETED)
+        assertEquals(1, stats(scheduled = listOf(at30, before30)).adherence.plannedCount)
+        assertEquals(
+            1,
+            stats(scheduled = listOf(plan(1L, start3m, null)), range = StatisticsRange.Months3)
+                .adherence.plannedCount
+        )
+        assertEquals(
+            0,
+            stats(
+                scheduled = listOf(plan(1L, start3m.minusDays(1), null)),
+                range = StatisticsRange.Months3
+            ).adherence.plannedCount
+        )
+        assertEquals(
+            1,
+            stats(scheduled = listOf(plan(1L, start6m, null)), range = StatisticsRange.Months6)
+                .adherence.plannedCount
+        )
+        assertEquals(
+            1,
+            stats(scheduled = listOf(plan(1L, start1y, null)), range = StatisticsRange.Year1)
+                .adherence.plannedCount
+        )
+        assertEquals(
+            0,
+            stats(
+                scheduled = listOf(plan(1L, start1y.minusDays(1), null)),
+                range = StatisticsRange.Year1
+            ).adherence.plannedCount
+        )
+    }
+
+    @Test
     fun abandonedLinkedSessionCountsAsPlannedNotCompleted() {
         val stats = stats(scheduled = listOf(plan(1L, today.minusDays(1), SessionStatus.ABANDONED)))
         assertEquals(1, stats.adherence.plannedCount)
@@ -630,19 +813,24 @@ class TrainingStatisticsLogicTest {
     private fun plan(
         id: Long,
         date: LocalDate,
-        sessionStatus: SessionStatus?
+        sessionStatus: SessionStatus?,
+        originalScheduledDate: LocalDate = date,
+        cancelledAt: Long? = null,
+        templateId: Long? = 1L
     ): ScheduledWorkout {
         return ScheduledWorkout(
             id = id,
             scheduledDate = date,
-            templateId = 1L,
+            templateId = templateId,
             templateName = "Plan $id",
             exerciseCount = 1,
             plannedSetCount = 1,
-            templateArchived = false,
+            templateArchived = templateId == null,
             sessionId = sessionStatus?.let { id * 100 },
             sessionStatus = sessionStatus,
-            createdAt = 1L
+            createdAt = 1L,
+            originalScheduledDate = originalScheduledDate,
+            cancelledAt = cancelledAt
         )
     }
 
