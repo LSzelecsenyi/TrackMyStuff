@@ -107,6 +107,12 @@ android {
     }
 }
 
+// Forwards the development-only demo backup writer flag into unit tests.
+// Production builds never read this property.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("demo.backup.write", (findProperty("demo.backup.write") ?: "false").toString())
+}
+
 kotlin {
     jvmToolchain(21)
 }
