@@ -242,22 +242,45 @@ class StatisticsViewModelTest {
     fun givenFreeEntitlementsWhenProRangeSelectedThenRangeStaysThirtyDays() = runTest {
         val viewModel = viewModel(SelectiveFeatureEntitlements(emptySet()))
         viewModel.uiState.first { !it.loading }
-        viewModel.onRangeSelected(StatisticsRange.Months3)
-        val state = viewModel.uiState.first { it.lockedFeature == AppFeature.AdvancedStatistics }
+        listOf(
+            StatisticsRange.Months3,
+            StatisticsRange.Months6,
+            StatisticsRange.Year1,
+            StatisticsRange.All
+        ).forEach { range ->
+            viewModel.onRangeSelected(range)
+            val state = viewModel.uiState.first { it.lockedFeature == AppFeature.AdvancedStatistics }
+            assertEquals(StatisticsRange.Days30, state.range)
+            viewModel.consumeLockedFeature()
+            viewModel.uiState.first { it.lockedFeature == null }
+        }
+    }
+
+    @Test
+    fun givenThirtyDayRangeWhenSelectedThenNoProLockIsShown() = runTest {
+        val viewModel = viewModel(SelectiveFeatureEntitlements(emptySet()))
+        viewModel.uiState.first { !it.loading }
+        viewModel.onRangeSelected(StatisticsRange.Days30)
+        val state = viewModel.uiState.value
         assertEquals(StatisticsRange.Days30, state.range)
-        viewModel.consumeLockedFeature()
-        val cleared = viewModel.uiState.first { it.lockedFeature == null }
-        assertEquals(StatisticsRange.Days30, cleared.range)
+        assertNull(state.lockedFeature)
     }
 
     @Test
     fun givenOpenEntitlementsWhenProRangeSelectedThenDashboardUsesThatRange() = runTest {
         val viewModel = viewModel(OpenFeatureEntitlements)
         viewModel.uiState.first { !it.loading }
-        viewModel.onRangeSelected(StatisticsRange.All)
-        val state = viewModel.uiState.first { it.range == StatisticsRange.All }
-        assertEquals(StatisticsRange.All, state.range)
-        assertNull(state.lockedFeature)
+        listOf(
+            StatisticsRange.Months3,
+            StatisticsRange.Months6,
+            StatisticsRange.Year1,
+            StatisticsRange.All
+        ).forEach { range ->
+            viewModel.onRangeSelected(range)
+            val state = viewModel.uiState.first { it.range == range }
+            assertEquals(range, state.range)
+            assertNull(state.lockedFeature)
+        }
     }
 
     @Test

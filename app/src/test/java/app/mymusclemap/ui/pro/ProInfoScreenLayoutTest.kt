@@ -44,17 +44,38 @@ class ProInfoScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.pro_info_body)).assertIsDisplayed()
         composeRule.onNodeWithTag(PRO_BADGE).assertIsDisplayed()
         composeRule.onNodeWithTag(PRO_INFO_DISMISS).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_body)).assertDoesNotExist()
+        composeRule.onNodeWithTag(PRO_INFO_HIGHLIGHTS).assertDoesNotExist()
     }
 
     @Test
     fun givenFeatureThenBodyNamesTheCapability() {
         renderScreen(feature = AppFeature.AdvancedMuscleAnalytics)
+        composeRule.onNodeWithText(testString(R.string.pro_info_title)).assertIsDisplayed()
         composeRule.onNodeWithText(
             testString(
                 R.string.pro_info_feature_body,
                 testString(R.string.pro_feature_advanced_muscle_analytics)
             )
         ).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_body)).assertDoesNotExist()
+        composeRule.onNodeWithTag(PRO_INFO_HIGHLIGHTS).assertDoesNotExist()
+    }
+
+    @Test
+    fun givenAdvancedStatisticsThenTrainingHistoryCopyIsShown() {
+        renderScreen(feature = AppFeature.AdvancedStatistics)
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_INFO_HIGHLIGHTS).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_range_3m)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_range_6m)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_range_1y)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_range_all)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_info_body)).assertDoesNotExist()
     }
 
     @Test
@@ -100,12 +121,16 @@ class ProInfoScreenLayoutTest {
         composeRule.waitForIdle()
         assertEquals(0, allowed[0])
         composeRule.onNodeWithTag(PRO_INFO_TITLE).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_title)).assertIsDisplayed()
         composeRule.onNodeWithText(
             testString(
                 R.string.pro_info_feature_body,
                 testString(R.string.pro_feature_advanced_planning)
             )
         ).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_body)).assertDoesNotExist()
+        composeRule.onNodeWithTag(PRO_INFO_HIGHLIGHTS).assertDoesNotExist()
         composeRule.onNodeWithTag(PRO_INFO_DISMISS).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
@@ -136,6 +161,45 @@ class ProInfoScreenLayoutTest {
         composeRule.waitForIdle()
         assertEquals(1, allowed[0])
         composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
+    }
+
+    @Test
+    fun givenLockedStatisticsHostWhenGatedRowTappedThenTrainingHistoryCopyIsShown() {
+        val allowed = intArrayOf(0)
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = density.density, fontScale = 1f),
+                LocalFeatureEntitlements provides SelectiveFeatureEntitlements(emptySet())
+            ) {
+                WeightTrackerThemeForPreview {
+                    Box(
+                        modifier = Modifier
+                            .width(360.dp)
+                            .height(2000.dp)
+                            .fillMaxSize()
+                    ) {
+                        ProAccessHost { gate ->
+                            GatedFeatureRow(
+                                title = testString(R.string.pro_feature_advanced_statistics),
+                                subtitle = "Longer statistics history",
+                                feature = AppFeature.AdvancedStatistics,
+                                onUnlockedClick = { allowed[0] += 1 },
+                                onLockedClick = { feature -> gate(feature) {} }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(PRO_GATED_ROW).performClick()
+        composeRule.waitForIdle()
+        assertEquals(0, allowed[0])
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_INFO_HIGHLIGHTS).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_title)).assertDoesNotExist()
     }
 
     private fun renderScreen(

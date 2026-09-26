@@ -771,6 +771,12 @@
     <string name="pro_info_title">My Muscle Map Pro</string>
     <string name="pro_info_body">This capability is part of My Muscle Map Pro.</string>
     <string name="pro_info_feature_body">%1$s is part of My Muscle Map Pro.</string>
+    <string name="pro_info_statistics_title">Unlock your full training history</string>
+    <string name="pro_info_statistics_body">Your existing workout history is already there. Go Pro to explore your progress beyond the last 30 days.</string>
+    <string name="pro_info_statistics_range_3m">3-month history</string>
+    <string name="pro_info_statistics_range_6m">6-month history</string>
+    <string name="pro_info_statistics_range_1y">1-year history</string>
+    <string name="pro_info_statistics_range_all">all-time history</string>
     <string name="pro_feature_advanced_statistics">Longer statistics history</string>
     <string name="pro_feature_advanced_muscle_analytics">Advanced muscle analytics</string>
     <string name="pro_feature_unlimited_workout_plans">Unlimited workout plans</string>

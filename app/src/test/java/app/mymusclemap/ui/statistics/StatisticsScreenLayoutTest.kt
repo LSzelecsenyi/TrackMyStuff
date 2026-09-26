@@ -8,6 +8,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -36,6 +38,9 @@ import app.mymusclemap.domain.statistics.TrainingStatistics
 import app.mymusclemap.domain.statistics.TrainingVolume
 import app.mymusclemap.testQuantity
 import app.mymusclemap.testString
+import app.mymusclemap.ui.pro.PRO_INFO_BODY
+import app.mymusclemap.ui.pro.PRO_INFO_HIGHLIGHTS
+import app.mymusclemap.ui.pro.PRO_INFO_SHEET
 import app.mymusclemap.ui.pro.PRO_INFO_TITLE
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -147,17 +152,51 @@ class StatisticsScreenLayoutTest {
     }
 
     @Test
-    fun givenLockedProRangeThenProInfoIsShown() {
+    fun givenThirtyDayRangeThenProInfoIsNotShown() {
+        render(populated())
+        composeRule.onNodeWithTag(STATISTICS_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag("statistics-range-30d").assertIsSelected()
+        composeRule.onNodeWithTag(PRO_INFO_SHEET).assertDoesNotExist()
+        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertDoesNotExist()
+    }
+
+    @Test
+    fun givenLockedProRangeThenProInfoShowsExistingTrainingHistoryCopy() {
         render(
             populated().copy(lockedFeature = AppFeature.AdvancedStatistics)
         )
+        composeRule.onNodeWithTag("statistics-range-30d").assertIsSelected()
+        composeRule.onNodeWithTag("statistics-range-3m").assertIsNotSelected()
+        composeRule.onNodeWithTag("statistics-range-6m").assertIsNotSelected()
+        composeRule.onNodeWithTag("statistics-range-1y").assertIsNotSelected()
+        composeRule.onNodeWithTag("statistics-range-all").assertIsNotSelected()
         composeRule.onNodeWithTag(PRO_INFO_TITLE).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_INFO_BODY).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_INFO_HIGHLIGHTS).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_range_3m)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_range_6m)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_range_1y)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_range_all)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_title)).assertDoesNotExist()
         composeRule.onNodeWithText(
             testString(
                 R.string.pro_info_feature_body,
                 testString(R.string.pro_feature_advanced_statistics)
             )
-        ).assertIsDisplayed()
+        ).assertDoesNotExist()
+    }
+
+    @Test
+    fun givenEntitledLongerRangeThenProInfoIsNotShown() {
+        render(populated().copy(range = StatisticsRange.All))
+        composeRule.onNodeWithTag("statistics-range-all").assertIsSelected()
+        composeRule.onNodeWithTag("statistics-range-30d").assertIsNotSelected()
+        composeRule.onNodeWithTag(PRO_INFO_SHEET).assertDoesNotExist()
+        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertDoesNotExist()
     }
 
     @Test

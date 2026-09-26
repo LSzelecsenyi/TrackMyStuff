@@ -1,6 +1,7 @@
 package app.mymusclemap.ui.pro
 
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,6 +54,7 @@ internal const val PRO_INFO_TITLE = "pro-info-title"
 internal const val PRO_INFO_BODY = "pro-info-body"
 internal const val PRO_INFO_DISMISS = "pro-info-dismiss"
 internal const val PRO_INFO_SHEET = "pro-info-sheet"
+internal const val PRO_INFO_HIGHLIGHTS = "pro-info-highlights"
 
 @Composable
 fun ProInfoContent(
@@ -61,10 +63,11 @@ fun ProInfoContent(
     onDismiss: (() -> Unit)? = null,
     showHeading: Boolean = true
 ) {
-    val body = if (feature == null) {
-        stringResource(R.string.pro_info_body)
+    val copy = feature.proInfoCopy()
+    val body = if (copy.bodyArgRes == null) {
+        stringResource(copy.bodyRes)
     } else {
-        stringResource(R.string.pro_info_feature_body, stringResource(feature.titleRes()))
+        stringResource(copy.bodyRes, stringResource(copy.bodyArgRes))
     }
     Column(modifier = modifier.fillMaxWidth()) {
         if (showHeading) {
@@ -79,7 +82,7 @@ fun ProInfoContent(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = stringResource(R.string.pro_info_title),
+                    text = stringResource(copy.titleRes),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier
                         .weight(1f)
@@ -98,6 +101,21 @@ fun ProInfoContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag(PRO_INFO_BODY)
         )
+        if (copy.highlights.isNotEmpty()) {
+            Spacer(Modifier.height(AppDimens.itemGap))
+            Column(
+                modifier = Modifier.testTag(PRO_INFO_HIGHLIGHTS),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.statSecondaryGap)
+            ) {
+                copy.highlights.forEach { highlightRes ->
+                    Text(
+                        text = stringResource(highlightRes),
+                        style = AppTypeTokens.statCaption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
         if (onDismiss != null) {
             Spacer(Modifier.height(AppDimens.sectionGap))
             Button(
@@ -132,7 +150,7 @@ fun ProInfoScreen(
                 .padding(innerPadding)
                 .statusBarsPadding()
         ) {
-            ProInfoHeader(onBack = onBack)
+            ProInfoHeader(onBack = onBack, feature = feature)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -196,7 +214,7 @@ fun ProAccessHost(
 }
 
 @Composable
-private fun ProInfoHeader(onBack: () -> Unit) {
+private fun ProInfoHeader(onBack: () -> Unit, feature: AppFeature? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -214,7 +232,7 @@ private fun ProInfoHeader(onBack: () -> Unit) {
             )
         }
         Text(
-            text = stringResource(R.string.pro_info_title),
+            text = stringResource(feature.proInfoCopy().titleRes),
             style = AppTypeTokens.sectionTitle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
