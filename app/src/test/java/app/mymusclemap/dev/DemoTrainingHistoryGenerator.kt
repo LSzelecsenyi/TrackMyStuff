@@ -24,6 +24,7 @@ import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MuscleRole
 import app.mymusclemap.domain.exercise.StarterCatalog
 import app.mymusclemap.domain.statistics.StatisticsRange
+import app.mymusclemap.domain.statistics.TrainingStatistics
 import app.mymusclemap.domain.statistics.TrainingStatisticsLogic
 import app.mymusclemap.domain.statistics.WorkoutSetVolume
 import app.mymusclemap.domain.theme.AppearanceCodec
@@ -134,6 +135,16 @@ object DemoTrainingHistoryGenerator {
         target.parentFile?.mkdirs()
         target.writeText(encode(referenceDate))
         return target
+    }
+
+    internal fun statistics(snapshot: AppBackupSnapshot, range: StatisticsRange): TrainingStatistics {
+        val today = snapshot.exportedAt.atZone(zone).toLocalDate()
+        return TrainingStatisticsLogic.assemble(
+            aggregates(snapshot.tables),
+            scheduledModels(snapshot.tables),
+            today,
+            range
+        )
     }
 
     fun analyze(snapshot: AppBackupSnapshot): DemoHistoryAnalysis {

@@ -806,9 +806,11 @@
     <string name="statistics_volume_scope">Kilogram volume uses completed reps with recorded external or added weight. Bodyweight-only and assistance sets are not counted.</string>
     <string name="statistics_volume_unavailable">No weighted sets with recorded load in this period. Volume is only calculated for completed reps-and-weight sets using external or added weight.</string>
     <string name="statistics_volume_total">Selected range</string>
+    <string name="statistics_volume_trend_daily">Daily volume</string>
     <string name="statistics_volume_trend">Weekly volume</string>
-    <string name="statistics_volume_chart_description">Weekly training volume, %1$d weeks, from %2$s to %3$s</string>
-    <string name="statistics_trend_insufficient">Not enough weighted history for a weekly trend yet.</string>
+    <string name="statistics_volume_trend_monthly">Monthly volume</string>
+    <string name="statistics_volume_chart_description">Training volume, %1$d points, from %2$s to %3$s</string>
+    <string name="statistics_trend_insufficient">Not enough weighted history for a volume trend yet.</string>
     <string name="statistics_muscles_title">Muscle distribution</string>
     <string name="statistics_muscles_scope">Completed sets on each exercise’s primary muscle. This does not replace the muscle heatmap.</string>
     <string name="statistics_muscles_empty">No completed sets to summarize yet.</string>

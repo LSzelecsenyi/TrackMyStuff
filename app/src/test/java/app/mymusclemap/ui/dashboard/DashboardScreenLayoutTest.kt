@@ -116,14 +116,16 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun sectionOrderIsHeatmapThenCalendarThenWeightChart() {
+    fun sectionOrderIsHeatmapThenStatisticsThenCalendarThenWeightChart() {
         render()
+        val weekly = composeRule.onNodeWithTag("dashboard_weekly_overview").getUnclippedBoundsInRoot()
         val heatmap = composeRule.onNodeWithTag("dashboard_heatmap").getUnclippedBoundsInRoot()
-        composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
+        val statistics = composeRule.onNodeWithTag(OVERVIEW_STATISTICS).getUnclippedBoundsInRoot()
         val calendar = composeRule.onNodeWithTag("dashboard_calendar").getUnclippedBoundsInRoot()
-        composeRule.onNodeWithTag("dashboard_weight_chart").performScrollTo()
         val chart = composeRule.onNodeWithTag("dashboard_weight_chart").getUnclippedBoundsInRoot()
-        assertTrue(heatmap.top.value < calendar.top.value)
+        assertTrue(weekly.top.value < heatmap.top.value)
+        assertTrue(heatmap.top.value < statistics.top.value)
+        assertTrue(statistics.top.value < calendar.top.value)
         assertTrue(calendar.top.value < chart.top.value)
         composeRule.onNodeWithText(testString(R.string.heatmap_title)).assertIsDisplayed()
         composeRule.onNodeWithTag("dashboard_calendar_title").assertExists()

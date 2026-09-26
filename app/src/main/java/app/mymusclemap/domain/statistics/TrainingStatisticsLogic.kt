@@ -1,6 +1,5 @@
 package app.mymusclemap.domain.statistics
 
-import app.mymusclemap.domain.WeeklyAverageCalculator
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.WeightInterpretation
@@ -12,14 +11,15 @@ import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 
 object TrainingStatisticsLogic {
     const val SUMMARY_MUSCLES = 3
     const val SUMMARY_REST = 3
     const val SUMMARY_EXERCISES = 5
-    const val TREND_MAX_POINTS = 12
 
     fun assemble(
         aggregates: List<WorkoutSessionAggregate>,
@@ -35,7 +35,7 @@ object TrainingStatisticsLogic {
             range = range,
             activity = activity(completed),
             adherence = adherence(scheduled, today, range),
-            volume = volume(completed, today),
+            volume = volume(completed, today, range),
             muscleDistribution = muscleDistribution(completed),
             restBetweenSessions = restBetweenSessions(completed),
             exercises = exerciseProgress(completed)
@@ -90,7 +90,8 @@ object TrainingStatisticsLogic {
 
     private fun volume(
         completed: List<WorkoutSessionAggregate>,
-        today: LocalDate
+        today: LocalDate,
+        range: StatisticsRange
     ): TrainingVolume {
         val volumeSets = completed.flatMap { aggregate ->
             aggregate.exercises.flatMap { item ->
@@ -107,26 +108,61 @@ object TrainingStatisticsLogic {
         return TrainingVolume(
             totalKg = volumeSets.sumOf { it.volumeKg },
             completedSetCount = volumeSets.size,
-            trend = volumeTrend(volumeSets, today)
+            trend = volumeTrend(volumeSets, today, range)
         )
     }
 
+    /**
+     * Bucket size follows the selected range. Fixed ranges keep every bucket from
+     * the range start through today, including zeros, so a break stays on the axis.
+     * ALL starts at the first bucket that actually has volume and still continues
+     * through today.
+     */
     private fun volumeTrend(
         volumeSets: List<VolumeEligibleSet>,
-        today: LocalDate
+        today: LocalDate,
+        range: StatisticsRange
     ): List<SeriesPoint> {
-        val byWeek = volumeSets.groupBy { WeeklyAverageCalculator.isoWeekKey(it.date) }
-        val points = byWeek.entries
-            .map { (key, sets) ->
-                val start = WeeklyAverageCalculator.weekStart(key.year, key.week)
-                SeriesPoint(date = start, value = sets.sumOf { it.volumeKg })
-            }
-            .filter { it.value > 0.0 && !it.date.isAfter(today) }
-            .sortedBy { it.date }
-        if (points.size < 2) {
+        val resolution = VolumeTrendResolution.forRange(range)
+        val end = bucketStart(today, resolution)
+        val start = when (range) {
+            StatisticsRange.All -> bucketStart(volumeSets.minOf { it.date }, resolution)
+            else -> bucketStart(range.startInclusive(today) ?: today, resolution)
+        }
+        if (start.isAfter(end)) {
             return emptyList()
         }
-        return points.takeLast(TREND_MAX_POINTS)
+        val sums = HashMap<LocalDate, Double>()
+        volumeSets.forEach { set ->
+            val key = bucketStart(set.date, resolution)
+            if (!key.isBefore(start) && !key.isAfter(end)) {
+                sums[key] = (sums[key] ?: 0.0) + set.volumeKg
+            }
+        }
+        val points = ArrayList<SeriesPoint>()
+        var cursor = start
+        while (!cursor.isAfter(end)) {
+            points += SeriesPoint(date = cursor, value = sums[cursor] ?: 0.0)
+            cursor = nextBucket(cursor, resolution)
+        }
+        return if (points.size < 2) emptyList() else points
+    }
+
+    private fun bucketStart(date: LocalDate, resolution: VolumeTrendResolution): LocalDate {
+        return when (resolution) {
+            VolumeTrendResolution.Daily -> date
+            VolumeTrendResolution.Weekly ->
+                date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            VolumeTrendResolution.Monthly -> date.withDayOfMonth(1)
+        }
+    }
+
+    private fun nextBucket(date: LocalDate, resolution: VolumeTrendResolution): LocalDate {
+        return when (resolution) {
+            VolumeTrendResolution.Daily -> date.plusDays(1)
+            VolumeTrendResolution.Weekly -> date.plusWeeks(1)
+            VolumeTrendResolution.Monthly -> date.plusMonths(1)
+        }
     }
 
     private fun muscleDistribution(completed: List<WorkoutSessionAggregate>): List<MuscleTrainingCount> {

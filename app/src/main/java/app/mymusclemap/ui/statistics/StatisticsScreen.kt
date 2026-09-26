@@ -37,6 +37,8 @@ import app.mymusclemap.domain.statistics.MuscleTrainingCount
 import app.mymusclemap.domain.statistics.PlanAdherence
 import app.mymusclemap.domain.statistics.StatisticsRange
 import app.mymusclemap.domain.statistics.TrainingActivity
+import app.mymusclemap.domain.statistics.VolumeTrendAxis
+import app.mymusclemap.domain.statistics.VolumeTrendResolution
 import app.mymusclemap.domain.statistics.TrainingStatistics
 import app.mymusclemap.domain.statistics.TrainingStatisticsLogic
 import app.mymusclemap.domain.statistics.TrainingVolume
@@ -111,7 +113,7 @@ fun StatisticsScreen(
                     CompactEditorDivider()
                     AdherenceSection(state.dashboard.adherence)
                     CompactEditorDivider()
-                    VolumeSection(state.dashboard.volume)
+                    VolumeSection(state.dashboard.volume, state.dashboard.range)
                     CompactEditorDivider()
                     MuscleSection(
                         muscles = state.dashboard.muscleDistribution,
@@ -214,7 +216,8 @@ private fun AdherenceSection(adherence: PlanAdherence) {
 }
 
 @Composable
-private fun VolumeSection(volume: TrainingVolume) {
+private fun VolumeSection(volume: TrainingVolume, range: StatisticsRange) {
+    val resolution = VolumeTrendResolution.forRange(range)
     CompactEditorSection(
         title = stringResource(R.string.statistics_volume_title).uppercase(AppLocale.UI),
         modifier = Modifier.testTag(STATISTICS_VOLUME)
@@ -240,7 +243,7 @@ private fun VolumeSection(volume: TrainingVolume) {
                 if (volume.hasTrend) {
                     Spacer(Modifier.height(AppDimens.itemGap))
                     Text(
-                        text = stringResource(R.string.statistics_volume_trend),
+                        text = stringResource(volumeTrendTitle(resolution)),
                         style = AppTypeTokens.statCaption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -250,7 +253,16 @@ private fun VolumeSection(volume: TrainingVolume) {
                         contentDescription = volumeChartDescription(volume.trend),
                         subdued = true,
                         chartHeight = 180.dp,
-                        valueDomain = ChartValueDomain.NonNegative
+                        valueDomain = ChartValueDomain.NonNegative,
+                        snapXAxisToPoints = true,
+                        xAxisLabel = { date ->
+                            VolumeTrendAxis.label(
+                                date = date,
+                                resolution = resolution,
+                                seriesFirst = volume.trend.first().date,
+                                seriesLast = volume.trend.last().date
+                            )
+                        }
                     )
                 } else {
                     Spacer(Modifier.height(AppDimens.itemGap))
@@ -396,6 +408,14 @@ private fun latestSubtitle(summary: ExerciseProgressSummary): String? {
         bestLabel(recent)
     } else {
         bestLabel(recent)
+    }
+}
+
+private fun volumeTrendTitle(resolution: VolumeTrendResolution): Int {
+    return when (resolution) {
+        VolumeTrendResolution.Daily -> R.string.statistics_volume_trend_daily
+        VolumeTrendResolution.Weekly -> R.string.statistics_volume_trend
+        VolumeTrendResolution.Monthly -> R.string.statistics_volume_trend_monthly
     }
 }
 

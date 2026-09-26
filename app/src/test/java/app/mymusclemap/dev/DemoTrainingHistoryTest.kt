@@ -27,6 +27,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -227,6 +228,53 @@ class DemoTrainingHistoryTest {
     }
 
     @Test
+    fun demoVolumeTrendResolutionMatchesEachStatisticsRange() {
+        val today = DemoTrainingHistoryGenerator.referenceDate
+        val trends = StatisticsRange.entries.associateWith { range ->
+            DemoTrainingHistoryGenerator.statistics(snapshot, range).volume
+        }
+        val daily = trends.getValue(StatisticsRange.Days30)
+        assertEquals(30, daily.trend.size)
+        assertEquals(today.minusDays(29), daily.trend.first().date)
+        assertEquals(today, daily.trend.last().date)
+        assertTrue(daily.trend.zipWithNext().all { (earlier, later) -> later.date == earlier.date.plusDays(1) })
+        assertEquals(daily.totalKg!!, daily.trend.sumOf { it.value }, 0.001)
+        assertTrue(daily.trend.all { it.value >= 0.0 })
+
+        val three = trends.getValue(StatisticsRange.Months3)
+        assertEquals(14, three.trend.size)
+        assertTrue(three.trend.all { it.date.dayOfWeek == DayOfWeek.MONDAY })
+        assertEquals(0.0, three.trend.single { it.date == LocalDate.of(2026, 7, 13) }.value, 0.0)
+        assertEquals(0.0, three.trend.single { it.date == LocalDate.of(2026, 7, 20) }.value, 0.0)
+        assertEquals(three.totalKg!!, three.trend.sumOf { it.value }, 0.001)
+        assertTrue(three.trend.all { it.value >= 0.0 })
+
+        val six = trends.getValue(StatisticsRange.Months6)
+        assertEquals(27, six.trend.size)
+        assertTrue(six.trend.all { it.date.dayOfWeek == DayOfWeek.MONDAY })
+        assertEquals(0.0, six.trend.single { it.date == LocalDate.of(2026, 7, 13) }.value, 0.0)
+        assertEquals(0.0, six.trend.single { it.date == LocalDate.of(2026, 7, 20) }.value, 0.0)
+        assertEquals(six.totalKg!!, six.trend.sumOf { it.value }, 0.001)
+
+        val year = trends.getValue(StatisticsRange.Year1)
+        assertEquals(13, year.trend.size)
+        assertEquals(today.minusYears(1).withDayOfMonth(1), year.trend.first().date)
+        assertEquals(today.withDayOfMonth(1), year.trend.last().date)
+        assertTrue(year.trend.all { it.date.dayOfMonth == 1 })
+        assertEquals(year.totalKg!!, year.trend.sumOf { it.value }, 0.001)
+        assertTrue(year.trend.all { it.value >= 0.0 })
+
+        val all = trends.getValue(StatisticsRange.All)
+        assertEquals(19, all.trend.size)
+        assertEquals(LocalDate.of(2025, 3, 1), all.trend.first().date)
+        assertTrue(all.trend.first().value > 0.0)
+        assertEquals(today.withDayOfMonth(1), all.trend.last().date)
+        assertTrue(all.trend.all { it.date.dayOfMonth == 1 })
+        assertEquals(all.totalKg!!, all.trend.sumOf { it.value }, 0.001)
+        assertTrue(all.trend.all { it.value >= 0.0 })
+    }
+
+    @Test
     fun checkedInDemoBackupMatchesGenerator() {
         val file = DemoTrainingHistoryPaths.backupFile()
         assertTrue(
@@ -304,7 +352,7 @@ class DemoTrainingHistoryTest {
     private fun summary(analysis: DemoHistoryAnalysis): String {
         val ranges = analysis.ranges.joinToString(separator = "\n") { range ->
             "  ${range.range}: workouts=${range.workouts} volume=${range.volumeKg} " +
-                "weeks=${range.volumeWeeks} adherence=${range.adherencePercent} " +
+                "points=${range.volumeWeeks} adherence=${range.adherencePercent} " +
                 "benchPoints=${range.benchHistoryPoints} muscles=${range.muscles}"
         }
         val examples = analysis.examples.joinToString(separator = "\n") { example ->

@@ -65,7 +65,9 @@ fun SeriesChart(
     onPointSelected: (SeriesPoint?) -> Unit = {},
     subdued: Boolean = false,
     chartHeight: Dp = 240.dp,
-    valueDomain: ChartValueDomain = ChartValueDomain.Padded
+    valueDomain: ChartValueDomain = ChartValueDomain.Padded,
+    xAxisLabel: (LocalDate) -> String = { UiFormatters.compactDate(it) },
+    snapXAxisToPoints: Boolean = false
 ) {
     val lineColor = MaterialTheme.colorScheme.primary
     val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = if (subdued) 0.08f else 0.16f)
@@ -115,7 +117,9 @@ fun SeriesChart(
                 rightInset = 16.dp.toPx(),
                 top = 12.dp.toPx(),
                 bottomInset = 40.dp.toPx(),
-                valueDomain = valueDomain
+                valueDomain = valueDomain,
+                xAxisLabel = xAxisLabel,
+                snapXAxisToPoints = snapXAxisToPoints
             )
             layout.yLabels.forEach { label ->
                 drawLine(
@@ -229,7 +233,9 @@ private data class ChartLayout(
             rightInset: Float,
             top: Float,
             bottomInset: Float,
-            valueDomain: ChartValueDomain
+            valueDomain: ChartValueDomain,
+            xAxisLabel: (LocalDate) -> String = { UiFormatters.compactDate(it) },
+            snapXAxisToPoints: Boolean = false
         ): ChartLayout {
             val right = width - rightInset
             val bottom = height - bottomInset
@@ -259,7 +265,11 @@ private data class ChartLayout(
                     y = bottom - yRatio * (bottom - top)
                 )
             }
-            val xDates = xAxisDates(minDate, maxDate, points.size)
+            val xDates = if (snapXAxisToPoints) {
+                tickDates(points)
+            } else {
+                xAxisDates(minDate, maxDate, points.size)
+            }
             val xLabels = xDates.map { date ->
                 val x = if (points.size == 1 || minDate == maxDate) {
                     (left + right) / 2f
@@ -267,7 +277,7 @@ private data class ChartLayout(
                     val day = ChronoUnit.DAYS.between(minDate, date).toFloat()
                     left + (day / daySpan) * (right - left)
                 }
-                AxisLabel(text = UiFormatters.compactDate(date), x = x)
+                AxisLabel(text = xAxisLabel(date), x = x)
             }
             return ChartLayout(
                 mapped = mapped,
@@ -277,6 +287,14 @@ private data class ChartLayout(
                 plotRight = right,
                 plotBottom = bottom
             )
+        }
+
+        private fun tickDates(points: List<SeriesPoint>): List<LocalDate> {
+            val dates = points.map { it.date }.sorted()
+            return when {
+                dates.size <= 2 -> dates
+                else -> listOf(dates.first(), dates[dates.size / 2], dates.last()).distinct()
+            }
         }
 
         private fun xAxisDates(minDate: LocalDate, maxDate: LocalDate, count: Int): List<LocalDate> {

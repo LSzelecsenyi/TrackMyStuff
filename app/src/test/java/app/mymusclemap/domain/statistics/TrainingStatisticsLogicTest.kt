@@ -1,6 +1,5 @@
 package app.mymusclemap.domain.statistics
 
-import app.mymusclemap.domain.WeeklyAverageCalculator
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MovementPattern
@@ -130,7 +129,10 @@ class TrainingStatisticsLogicTest {
         assertEquals(1, stats.activity.completedSetCount)
         assertEquals(400.0, stats.volume.totalKg!!, 0.0)
         assertEquals(1, stats.volume.completedSetCount)
-        assertFalse(stats.volume.hasTrend)
+        assertEquals(30, stats.volume.trend.size)
+        assertEquals(400.0, stats.volume.trend.sumOf { it.value }, 0.001)
+        assertEquals(400.0, stats.volume.trend.single { it.date == today }.value, 0.0)
+        assertTrue(stats.volume.trend.all { it.value >= 0.0 })
         val progress = stats.exercises.single()
         val best = progress.best as ExerciseBest.WeightedSet
         assertEquals(80.0, best.effectiveKg, 0.0)
@@ -244,7 +246,7 @@ class TrainingStatisticsLogicTest {
     }
 
     @Test
-    fun volumeTrendUsesPositiveIsoWeeksAndDoesNotPadZeros() {
+    fun volumeTrendKeepsDailyZerosAndMonthlyGaps() {
         val thisMonday = LocalDate.of(2026, 9, 14)
         val lastMonday = LocalDate.of(2026, 9, 7)
         val older = LocalDate.of(2026, 7, 1)
@@ -256,11 +258,13 @@ class TrainingStatisticsLogicTest {
             )
         )
         assertEquals(250.0, thirtyDay.volume.totalKg!!, 0.0)
-        assertEquals(2, thirtyDay.volume.trend.size)
-        assertEquals(listOf(200.0, 50.0), thirtyDay.volume.trend.map { it.value })
-        assertFalse(thirtyDay.volume.trend.any { it.value == 0.0 })
-        assertEquals(lastMonday, thirtyDay.volume.trend.first().date)
-        assertEquals(thisMonday, thirtyDay.volume.trend.last().date)
+        assertEquals(30, thirtyDay.volume.trend.size)
+        assertEquals(today.minusDays(29), thirtyDay.volume.trend.first().date)
+        assertEquals(today, thirtyDay.volume.trend.last().date)
+        assertEquals(200.0, thirtyDay.volume.trend.single { it.date == lastMonday }.value, 0.0)
+        assertEquals(50.0, thirtyDay.volume.trend.single { it.date == thisMonday }.value, 0.0)
+        assertTrue(thirtyDay.volume.trend.any { it.value == 0.0 })
+        assertEquals(250.0, thirtyDay.volume.trend.sumOf { it.value }, 0.001)
 
         val allTime = stats(
             listOf(
@@ -271,20 +275,25 @@ class TrainingStatisticsLogicTest {
             range = StatisticsRange.All
         )
         assertEquals(350.0, allTime.volume.totalKg!!, 0.0)
-        assertEquals(3, allTime.volume.trend.size)
-        val olderWeek = WeeklyAverageCalculator.isoWeekKey(older)
-        assertEquals(
-            WeeklyAverageCalculator.weekStart(olderWeek.year, olderWeek.week),
-            allTime.volume.trend.first().date
-        )
+        assertEquals(LocalDate.of(2026, 7, 1), allTime.volume.trend.first().date)
+        assertEquals(100.0, allTime.volume.trend.first().value, 0.0)
+        assertEquals(0.0, allTime.volume.trend.single { it.date == LocalDate.of(2026, 8, 1) }.value, 0.0)
+        assertEquals(250.0, allTime.volume.trend.single { it.date == LocalDate.of(2026, 9, 1) }.value, 0.0)
+        assertEquals(350.0, allTime.volume.trend.sumOf { it.value }, 0.001)
     }
 
     @Test
-    fun onePositiveVolumeWeekIsNotATrend() {
-        val stats = stats(listOf(weightedWorkout(1L, today, 80.0)))
-        assertEquals(80.0, stats.volume.totalKg!!, 0.0)
-        assertFalse(stats.volume.hasTrend)
-        assertTrue(stats.volume.trend.isEmpty())
+    fun oneVolumeMonthDoesNotInventEarlierAllTimeHistory() {
+        val thirty = stats(listOf(weightedWorkout(1L, today, 80.0)))
+        assertEquals(80.0, thirty.volume.totalKg!!, 0.0)
+        assertEquals(30, thirty.volume.trend.size)
+        assertEquals(80.0, thirty.volume.trend.sumOf { it.value }, 0.001)
+        assertTrue(thirty.volume.trend.all { it.value >= 0.0 })
+
+        val allTime = stats(listOf(weightedWorkout(1L, today, 80.0)), range = StatisticsRange.All)
+        assertEquals(80.0, allTime.volume.totalKg!!, 0.0)
+        assertFalse(allTime.volume.hasTrend)
+        assertTrue(allTime.volume.trend.isEmpty())
     }
 
     @Test

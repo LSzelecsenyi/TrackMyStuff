@@ -225,13 +225,6 @@ fun DashboardScreen(
                 onOpenTemplates = onOpenTemplates,
                 onOpenCatalog = onOpenCatalog
             )
-            OverviewSectionDivider()
-            OverviewDestinationRow(
-                title = stringResource(R.string.statistics_title),
-                subtitle = stringResource(R.string.statistics_entry_subtitle),
-                onClick = onOpenStatistics,
-                testTag = OVERVIEW_STATISTICS
-            )
             if (state.onboarding.reminderVisible) {
                 OverviewSectionDivider()
                 OnboardingReminderCard(
@@ -250,6 +243,13 @@ fun DashboardScreen(
                         heatmapYInContent = coordinates.positionInParent().y.roundToInt()
                         reportHeatmapBounds(coordinates.boundsInRoot())
                     }
+            )
+            OverviewSectionDivider()
+            OverviewDestinationRow(
+                title = stringResource(R.string.statistics_title),
+                subtitle = stringResource(R.string.statistics_entry_subtitle),
+                onClick = onOpenStatistics,
+                testTag = OVERVIEW_STATISTICS
             )
             OverviewSectionDivider()
             Column(
