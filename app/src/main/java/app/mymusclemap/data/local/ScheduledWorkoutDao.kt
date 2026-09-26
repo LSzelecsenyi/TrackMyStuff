@@ -88,6 +88,13 @@ interface ScheduledWorkoutDao {
     )
     fun observeUpcoming(fromInclusive: String): Flow<List<ScheduledWorkoutQueryRow>>
 
+    @Query(
+        SCHEDULED_WORKOUT_SELECT + """
+        ORDER BY sw.scheduledDate ASC, sw.createdAt ASC, sw.id ASC
+        """
+    )
+    fun observeAll(): Flow<List<ScheduledWorkoutQueryRow>>
+
     @Query("SELECT COUNT(*) FROM scheduled_workouts WHERE templateId = :templateId")
     suspend fun countByTemplate(templateId: Long): Int
 

@@ -8,7 +8,7 @@ import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionSetStatus
 
 /**
- * Conservative kilogram-volume rules for Advanced Statistics.
+ * Conservative kilogram-volume rules for Statistics.
  *
  * Volume is [effectiveLoadKg] × [SessionSet.actualReps] only when:
  * - the set is [SessionSetStatus.COMPLETED]

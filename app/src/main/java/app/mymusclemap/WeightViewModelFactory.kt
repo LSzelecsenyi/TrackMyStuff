@@ -16,6 +16,8 @@ import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.WorkoutImportFileReader
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.ui.dashboard.DashboardViewModel
 import app.mymusclemap.ui.dashboard.WeightDetailsViewModel
@@ -45,7 +47,8 @@ class WeightViewModelFactory(
     private val workoutImportFileReader: WorkoutImportFileReader,
     private val appBackupRepository: AppBackupRepository,
     private val firstRunCoordinator: FirstRunCoordinator,
-    private val onboardingRepository: OnboardingRepository
+    private val onboardingRepository: OnboardingRepository,
+    private val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -136,7 +139,13 @@ class WeightViewModelFactory(
                 )
             }
             modelClass.isAssignableFrom(StatisticsViewModel::class.java) -> {
-                StatisticsViewModel(workoutSessionRepository, dateProvider)
+                StatisticsViewModel(
+                    workoutSessionRepository,
+                    scheduledWorkoutRepository,
+                    dateProvider,
+                    featureEntitlements,
+                    extras.createSavedStateHandle()
+                )
             }
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         } as T

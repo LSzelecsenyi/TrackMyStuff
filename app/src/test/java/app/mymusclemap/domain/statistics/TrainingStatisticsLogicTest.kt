@@ -1,5 +1,6 @@
 package app.mymusclemap.domain.statistics
 
+import app.mymusclemap.domain.WeeklyAverageCalculator
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MovementPattern
@@ -8,6 +9,7 @@ import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.PlannedLoadKind
+import app.mymusclemap.domain.workout.ScheduledWorkout
 import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.SessionSet
@@ -26,63 +28,79 @@ class TrainingStatisticsLogicTest {
     private val today = LocalDate.of(2026, 9, 16)
 
     @Test
-    fun emptyHistoryIsEmptyDashboard() {
-        val stats = TrainingStatisticsLogic.assemble(emptyList(), today)
+    fun emptyHistoryIsEmptyDashboardWithNoAdherence() {
+        val stats = stats()
         assertFalse(stats.hasCompletedWorkouts)
-        assertEquals(0, stats.completedWorkoutCount)
-        assertNull(stats.weightedLoad)
-        assertTrue(stats.weeklyVolume.isEmpty())
-        assertTrue(stats.exerciseProgress.isEmpty())
-        assertTrue(stats.recentlyTrainedMuscles.isEmpty())
+        assertEquals(0, stats.activity.workoutCount)
+        assertNull(stats.volume.totalKg)
+        assertTrue(stats.volume.trend.isEmpty())
+        assertTrue(stats.exercises.isEmpty())
+        assertTrue(stats.muscleDistribution.isEmpty())
+        assertTrue(stats.restBetweenSessions.isEmpty())
+        assertNull(stats.adherence.percent)
+        assertEquals(0, stats.adherence.plannedCount)
     }
 
     @Test
-    fun oneCompletedWorkoutCountsInWindows() {
-        val stats = TrainingStatisticsLogic.assemble(
-            listOf(workout(1L, today, listOf(repsItem(1L, "Pull-up", MuscleGroup.LATS, completedReps = 8)))),
-            today
+    fun oneCompletedWorkoutCountsActivityWithoutTrendOrRest() {
+        val stats = stats(
+            listOf(
+                workout(
+                    1L,
+                    today,
+                    listOf(repsItem(1L, "Pull-up", MuscleGroup.LATS, 8)),
+                    startedAt = 0L,
+                    finishedAt = 3_600_000L
+                )
+            )
         )
-        assertEquals(1, stats.completedWorkoutCount)
-        assertEquals(1, stats.workoutsLast7Days)
-        assertEquals(1, stats.trainingDaysLast7Days)
-        assertEquals(1, stats.workoutsLast30Days)
-        assertEquals(0.25, stats.recentWeeklyFrequency!!, 0.0)
-        assertNull(stats.weightedLoad)
-        assertEquals(MuscleGroup.LATS, stats.recentlyTrainedMuscles.single().muscle)
-        assertEquals(1, stats.recentlyTrainedMuscles.single().completedSetCount)
+        assertEquals(1, stats.activity.workoutCount)
+        assertEquals(1, stats.activity.completedSetCount)
+        assertEquals(1, stats.activity.trainingDayCount)
+        assertEquals(3_600_000L, stats.activity.durationMillis)
+        assertNull(stats.volume.totalKg)
+        assertFalse(stats.volume.hasTrend)
+        assertEquals(MuscleGroup.LATS, stats.muscleDistribution.single().muscle)
+        assertEquals(1, stats.muscleDistribution.single().completedSetCount)
+        assertTrue(stats.restBetweenSessions.isEmpty())
+        assertEquals(1, stats.exercises.size)
+        assertFalse(stats.exercises.single().showsBestSeparately)
+        assertFalse(stats.exercises.single().hasProgression)
+    }
+
+    @Test
+    fun subSecondSessionDurationIsOmitted() {
+        val stats = stats(listOf(workout(1L, today, listOf(repsItem(1L, "Pull-up", MuscleGroup.LATS, 8)))))
+        assertNull(stats.activity.durationMillis)
     }
 
     @Test
     fun multipleWorkoutsAcrossDatesCountDistinctTrainingDays() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(1L, today.minusDays(8), listOf(repsItem(1L, "Pull-up", MuscleGroup.LATS, 5))),
                 workout(2L, today.minusDays(2), listOf(repsItem(1L, "Pull-up", MuscleGroup.LATS, 6))),
                 workout(3L, today.minusDays(2), listOf(repsItem(2L, "Squat", MuscleGroup.QUADRICEPS, 8))),
                 workout(4L, today, listOf(repsItem(1L, "Pull-up", MuscleGroup.LATS, 7)))
-            ),
-            today
+            )
         )
-        assertEquals(4, stats.completedWorkoutCount)
-        assertEquals(3, stats.workoutsLast7Days)
-        assertEquals(2, stats.trainingDaysLast7Days)
-        assertEquals(4, stats.workoutsLast30Days)
-        assertEquals(3, stats.trainingDaysLast30Days)
+        assertEquals(4, stats.activity.workoutCount)
+        assertEquals(4, stats.activity.completedSetCount)
+        assertEquals(3, stats.activity.trainingDayCount)
     }
 
     @Test
     fun abandonedInProgressAndFutureSessionsAreExcluded() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(1L, today, listOf(repsItem(1L, "A", MuscleGroup.CHEST, 8)), SessionStatus.ABANDONED),
                 workout(2L, today, listOf(repsItem(1L, "A", MuscleGroup.CHEST, 8)), SessionStatus.IN_PROGRESS),
                 workout(3L, today.plusDays(1), listOf(repsItem(1L, "A", MuscleGroup.CHEST, 8))),
                 workout(4L, today, listOf(repsItem(1L, "A", MuscleGroup.CHEST, 8)))
-            ),
-            today
+            )
         )
-        assertEquals(1, stats.completedWorkoutCount)
-        assertEquals(1, stats.workoutsLast7Days)
+        assertEquals(1, stats.activity.workoutCount)
+        assertEquals(1, stats.activity.trainingDayCount)
     }
 
     @Test
@@ -90,7 +108,7 @@ class TrainingStatisticsLogicTest {
         val completed = set(1L, SessionSetStatus.COMPLETED, reps = 5, load = PlannedLoadKind.EXTERNAL_WEIGHT, weight = 80.0)
         val skipped = set(2L, SessionSetStatus.SKIPPED, reps = 5, load = PlannedLoadKind.EXTERNAL_WEIGHT, weight = 120.0)
         val pending = set(3L, SessionSetStatus.PENDING, reps = 5, load = PlannedLoadKind.EXTERNAL_WEIGHT, weight = 100.0)
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(
                     1L,
@@ -106,22 +124,24 @@ class TrainingStatisticsLogicTest {
                         )
                     )
                 )
-            ),
-            today
+            )
         )
-        assertEquals(1, stats.completedWorkoutCount)
-        assertEquals(400.0, stats.weightedLoad!!.last7DaysKg, 0.0)
-        assertEquals(1, stats.weightedLoad!!.completedSetCountLast7Days)
-        val progress = stats.exerciseProgress.single()
+        assertEquals(1, stats.activity.workoutCount)
+        assertEquals(1, stats.activity.completedSetCount)
+        assertEquals(400.0, stats.volume.totalKg!!, 0.0)
+        assertEquals(1, stats.volume.completedSetCount)
+        assertFalse(stats.volume.hasTrend)
+        val progress = stats.exercises.single()
         val best = progress.best as ExerciseBest.WeightedSet
         assertEquals(80.0, best.effectiveKg, 0.0)
         assertEquals(5, best.reps)
-        assertEquals(1, stats.recentlyTrainedMuscles.single().completedSetCount)
+        assertFalse(progress.showsBestSeparately)
+        assertEquals(1, stats.muscleDistribution.single().completedSetCount)
     }
 
     @Test
     fun bodyweightAndAssistanceSetsAreNotKilogramVolume() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(
                     1L,
@@ -140,19 +160,18 @@ class TrainingStatisticsLogicTest {
                         )
                     )
                 )
-            ),
-            today
+            )
         )
-        assertNull(stats.weightedLoad)
-        assertTrue(stats.weeklyVolume.isEmpty())
-        val progress = stats.exerciseProgress.single()
+        assertNull(stats.volume.totalKg)
+        assertTrue(stats.volume.trend.isEmpty())
+        val progress = stats.exercises.single()
         assertTrue(progress.best is ExerciseBest.Reps)
         assertEquals(8, (progress.best as ExerciseBest.Reps).reps)
     }
 
     @Test
     fun durationAndWeightIsNotKilogramVolume() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(
                     1L,
@@ -168,16 +187,15 @@ class TrainingStatisticsLogicTest {
                         )
                     )
                 )
-            ),
-            today
+            )
         )
-        assertNull(stats.weightedLoad)
-        assertEquals(40, (stats.exerciseProgress.single().best as ExerciseBest.Duration).seconds)
+        assertNull(stats.volume.totalKg)
+        assertEquals(40, (stats.exercises.single().best as ExerciseBest.Duration).seconds)
     }
 
     @Test
     fun perSideExternalWeightIsDoubledForVolumeAndBest() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(
                     1L,
@@ -193,11 +211,10 @@ class TrainingStatisticsLogicTest {
                         )
                     )
                 )
-            ),
-            today
+            )
         )
-        assertEquals(400.0, stats.weightedLoad!!.last7DaysKg, 0.0)
-        val best = stats.exerciseProgress.single().best as ExerciseBest.WeightedSet
+        assertEquals(400.0, stats.volume.totalKg!!, 0.0)
+        val best = stats.exercises.single().best as ExerciseBest.WeightedSet
         assertEquals(40.0, best.effectiveKg, 0.0)
         assertEquals(20.0, best.recordedKg, 0.0)
         assertTrue(best.perSide)
@@ -205,7 +222,7 @@ class TrainingStatisticsLogicTest {
 
     @Test
     fun addedWeightVolumeUsesRecordedLoadNotBodyMass() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(
                     1L,
@@ -221,38 +238,66 @@ class TrainingStatisticsLogicTest {
                         )
                     )
                 )
-            ),
-            today
+            )
         )
-        assertEquals(50.0, stats.weightedLoad!!.last7DaysKg, 0.0)
+        assertEquals(50.0, stats.volume.totalKg!!, 0.0)
     }
 
     @Test
-    fun weeklyVolumeUsesIsoWeeksAndOmitsWeeksOutsideTheTrendWindow() {
+    fun volumeTrendUsesPositiveIsoWeeksAndDoesNotPadZeros() {
         val thisMonday = LocalDate.of(2026, 9, 14)
         val lastMonday = LocalDate.of(2026, 9, 7)
         val older = LocalDate.of(2026, 7, 1)
-        val stats = TrainingStatisticsLogic.assemble(
+        val thirtyDay = stats(
+            listOf(
+                weightedWorkout(1L, older, 100.0),
+                weightedWorkout(2L, lastMonday, 200.0),
+                weightedWorkout(3L, thisMonday, 50.0)
+            )
+        )
+        assertEquals(250.0, thirtyDay.volume.totalKg!!, 0.0)
+        assertEquals(2, thirtyDay.volume.trend.size)
+        assertEquals(listOf(200.0, 50.0), thirtyDay.volume.trend.map { it.value })
+        assertFalse(thirtyDay.volume.trend.any { it.value == 0.0 })
+        assertEquals(lastMonday, thirtyDay.volume.trend.first().date)
+        assertEquals(thisMonday, thirtyDay.volume.trend.last().date)
+
+        val allTime = stats(
             listOf(
                 weightedWorkout(1L, older, 100.0),
                 weightedWorkout(2L, lastMonday, 200.0),
                 weightedWorkout(3L, thisMonday, 50.0)
             ),
-            today
+            range = StatisticsRange.All
         )
-        assertEquals(250.0, stats.weightedLoad!!.last30DaysKg, 0.0)
-        assertEquals(50.0, stats.weightedLoad!!.last7DaysKg, 0.0)
-        assertEquals(TrainingStatisticsLogic.VOLUME_TREND_WEEKS, stats.weeklyVolume.size)
-        assertEquals(thisMonday, stats.weeklyVolume.last().weekStart)
-        assertEquals(50.0, stats.weeklyVolume.last().volumeKg, 0.0)
-        assertEquals(200.0, stats.weeklyVolume[stats.weeklyVolume.lastIndex - 1].volumeKg, 0.0)
-        assertFalse(stats.weeklyVolume.any { it.weekStart == older.with(java.time.DayOfWeek.MONDAY) && it.volumeKg == 100.0 })
-        assertEquals(0.0, stats.weeklyVolume.first().volumeKg, 0.0)
+        assertEquals(350.0, allTime.volume.totalKg!!, 0.0)
+        assertEquals(3, allTime.volume.trend.size)
+        val olderWeek = WeeklyAverageCalculator.isoWeekKey(older)
+        assertEquals(
+            WeeklyAverageCalculator.weekStart(olderWeek.year, olderWeek.week),
+            allTime.volume.trend.first().date
+        )
+    }
+
+    @Test
+    fun onePositiveVolumeWeekIsNotATrend() {
+        val stats = stats(listOf(weightedWorkout(1L, today, 80.0)))
+        assertEquals(80.0, stats.volume.totalKg!!, 0.0)
+        assertFalse(stats.volume.hasTrend)
+        assertTrue(stats.volume.trend.isEmpty())
+    }
+
+    @Test
+    fun rangeFiltersVolumeToTheSelectedWindow() {
+        val old = weightedWorkout(1L, today.minusDays(40), 100.0)
+        val recent = weightedWorkout(2L, today, 50.0)
+        assertEquals(50.0, stats(listOf(old, recent)).volume.totalKg!!, 0.0)
+        assertEquals(150.0, stats(listOf(old, recent), range = StatisticsRange.All).volume.totalKg!!, 0.0)
     }
 
     @Test
     fun bestWeightedSetPrefersHeavierLoadThenMoreReps() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(
                     1L,
@@ -285,10 +330,9 @@ class TrainingStatisticsLogicTest {
                         )
                     )
                 )
-            ),
-            today
+            )
         )
-        val progress = stats.exerciseProgress.single()
+        val progress = stats.exercises.single()
         val best = progress.best as ExerciseBest.WeightedSet
         val recent = progress.recent as ExerciseBest.WeightedSet
         assertEquals(120.0, best.effectiveKg, 0.0)
@@ -296,12 +340,13 @@ class TrainingStatisticsLogicTest {
         assertEquals(120.0, recent.effectiveKg, 0.0)
         assertEquals(5, recent.reps)
         assertTrue(progress.hasProgression)
+        assertFalse(progress.showsBestSeparately)
         assertEquals(listOf(100.0, 120.0), progress.history.map { it.value })
     }
 
     @Test
     fun durationAndDistanceUseLongestCompletedSet() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(
                     1L,
@@ -347,13 +392,13 @@ class TrainingStatisticsLogicTest {
                         )
                     )
                 )
-            ),
-            today
+            )
         )
-        val plank = stats.exerciseProgress.first { it.name == "Plank" }
-        val run = stats.exerciseProgress.first { it.name == "Run" }
+        val plank = stats.exercises.first { it.name == "Plank" }
+        val run = stats.exercises.first { it.name == "Run" }
         assertEquals(45, (plank.best as ExerciseBest.Duration).seconds)
         assertEquals(40, (plank.recent as ExerciseBest.Duration).seconds)
+        assertTrue(plank.showsBestSeparately)
         assertEquals(2500.0, (run.best as ExerciseBest.Distance).meters, 0.0)
         assertEquals(700, (run.best as ExerciseBest.Distance).durationSeconds)
         assertEquals(2500.0, (run.recent as ExerciseBest.Distance).meters, 0.0)
@@ -361,7 +406,7 @@ class TrainingStatisticsLogicTest {
 
     @Test
     fun completionOnlyCountsTrainingDaysNotANumericBestLoad() {
-        val stats = TrainingStatisticsLogic.assemble(
+        val stats = stats(
             listOf(
                 workout(
                     1L,
@@ -391,43 +436,214 @@ class TrainingStatisticsLogicTest {
                         )
                     )
                 )
-            ),
-            today
+            )
         )
-        val progress = stats.exerciseProgress.single()
+        val progress = stats.exercises.single()
         assertEquals(2, (progress.best as ExerciseBest.Completions).count)
         assertEquals(ExerciseHistoryKind.COMPLETIONS, progress.historyKind)
         assertEquals(2, progress.history.size)
     }
 
     @Test
-    fun muscleSummaryUsesPrimaryMusclesOnlyAndWindows() {
-        val stats = TrainingStatisticsLogic.assemble(
+    fun muscleDistributionUsesPrimaryMusclesOnlyAndRanksTiesDeterministically() {
+        val stats = stats(
             listOf(
                 workout(1L, today.minusDays(20), listOf(repsItem(1L, "Row", MuscleGroup.LATS, 10))),
                 workout(2L, today, listOf(repsItem(2L, "Bench", MuscleGroup.CHEST, 8))),
                 workout(3L, today, listOf(repsItem(3L, "Press", MuscleGroup.CHEST, 6)))
-            ),
-            today
+            )
         )
-        assertEquals(listOf(MuscleGroup.CHEST), stats.recentlyTrainedMuscles.map { it.muscle })
-        assertEquals(2, stats.recentlyTrainedMuscles.single().completedSetCount)
-        assertEquals(2, stats.recentlyTrainedMuscles.single().workoutCount)
-        assertEquals(listOf(MuscleGroup.CHEST, MuscleGroup.LATS), stats.mostTrainedMuscles.map { it.muscle })
+        assertEquals(listOf(MuscleGroup.CHEST, MuscleGroup.LATS), stats.muscleDistribution.map { it.muscle })
+        assertEquals(2, stats.muscleDistribution.first().completedSetCount)
+        assertEquals(2, stats.muscleDistribution.first().workoutCount)
+        val tied = stats(
+            listOf(
+                workout(1L, today.minusDays(1), listOf(repsItem(1L, "Curl", MuscleGroup.BICEPS, 8))),
+                workout(2L, today, listOf(repsItem(2L, "Pushdown", MuscleGroup.TRICEPS, 8)))
+            )
+        )
+        assertEquals(1, tied.muscleDistribution[0].completedSetCount)
+        assertEquals(1, tied.muscleDistribution[1].completedSetCount)
+        assertEquals(MuscleGroup.TRICEPS, tied.muscleDistribution.first().muscle)
+        assertEquals(today, tied.muscleDistribution.first().lastTrained)
     }
 
     @Test
-    fun workoutsOlderThanThirtyDaysStillCountAllTimeButNotRecentWindows() {
-        val stats = TrainingStatisticsLogic.assemble(
-            listOf(workout(1L, today.minusDays(40), listOf(repsItem(1L, "Pull-up", MuscleGroup.LATS, 8)))),
-            today
+    fun workoutsOlderThanTheSelectedRangeAreExcluded() {
+        val old = workout(1L, today.minusDays(40), listOf(repsItem(1L, "Pull-up", MuscleGroup.LATS, 8)))
+        val thirty = stats(listOf(old))
+        assertEquals(0, thirty.activity.workoutCount)
+        assertTrue(thirty.muscleDistribution.isEmpty())
+        val all = stats(listOf(old), range = StatisticsRange.All)
+        assertEquals(1, all.activity.workoutCount)
+        assertEquals(MuscleGroup.LATS, all.muscleDistribution.single().muscle)
+    }
+
+    @Test
+    fun planAdherenceUsesScheduledLinkNotWorkoutName() {
+        val completedPlan = plan(1L, today.minusDays(2), SessionStatus.COMPLETED)
+        val missed = plan(2L, today.minusDays(1), null)
+        val todayPlanned = plan(3L, today, null)
+        val inProgress = plan(4L, today, SessionStatus.IN_PROGRESS)
+        val future = plan(5L, today.plusDays(1), null)
+        val outside = plan(6L, today.minusDays(40), SessionStatus.COMPLETED)
+        val stats = stats(
+            aggregates = listOf(
+                workout(10L, today, listOf(repsItem(1L, "Push A", MuscleGroup.CHEST, 8)))
+            ),
+            scheduled = listOf(completedPlan, missed, todayPlanned, inProgress, future, outside)
         )
-        assertEquals(1, stats.completedWorkoutCount)
-        assertEquals(0, stats.workoutsLast7Days)
-        assertEquals(0, stats.workoutsLast30Days)
-        assertEquals(0.0, stats.recentWeeklyFrequency!!, 0.0)
-        assertTrue(stats.recentlyTrainedMuscles.isEmpty())
-        assertTrue(stats.mostTrainedMuscles.isEmpty())
+        assertEquals(4, stats.adherence.plannedCount)
+        assertEquals(1, stats.adherence.completedCount)
+        assertEquals(1, stats.adherence.missedCount)
+        assertEquals(1, stats.adherence.inProgressCount)
+        assertEquals(25, stats.adherence.percent)
+        assertEquals(1, stats.activity.workoutCount)
+    }
+
+    @Test
+    fun planAdherencePercentRoundsAndIgnoresUnlinkedCompletions() {
+        val scheduled = listOf(
+            plan(1L, today.minusDays(11), SessionStatus.COMPLETED),
+            plan(2L, today.minusDays(10), SessionStatus.COMPLETED),
+            plan(3L, today.minusDays(9), SessionStatus.COMPLETED),
+            plan(4L, today.minusDays(8), SessionStatus.COMPLETED),
+            plan(5L, today.minusDays(7), SessionStatus.COMPLETED),
+            plan(6L, today.minusDays(6), SessionStatus.COMPLETED),
+            plan(7L, today.minusDays(5), SessionStatus.COMPLETED),
+            plan(8L, today.minusDays(4), SessionStatus.COMPLETED),
+            plan(9L, today.minusDays(3), SessionStatus.COMPLETED),
+            plan(10L, today.minusDays(2), SessionStatus.COMPLETED),
+            plan(11L, today.minusDays(1), null),
+            plan(12L, today, null)
+        )
+        val stats = stats(scheduled = scheduled)
+        assertEquals(12, stats.adherence.plannedCount)
+        assertEquals(10, stats.adherence.completedCount)
+        assertEquals(83, stats.adherence.percent)
+        val twoThirds = stats(
+            scheduled = listOf(
+                plan(1L, today.minusDays(2), SessionStatus.COMPLETED),
+                plan(2L, today.minusDays(1), SessionStatus.COMPLETED),
+                plan(3L, today, null)
+            )
+        )
+        assertEquals(67, twoThirds.adherence.percent)
+    }
+
+    @Test
+    fun abandonedLinkedSessionCountsAsPlannedNotCompleted() {
+        val stats = stats(scheduled = listOf(plan(1L, today.minusDays(1), SessionStatus.ABANDONED)))
+        assertEquals(1, stats.adherence.plannedCount)
+        assertEquals(0, stats.adherence.completedCount)
+        assertEquals(1, stats.adherence.missedCount)
+        assertEquals(0, stats.adherence.percent)
+    }
+
+    @Test
+    fun restBetweenSessionsUsesDistinctDatesAndNeedsTwoObservations() {
+        val sameDay = stats(
+            listOf(
+                workout(1L, today, listOf(repsItem(1L, "Curl", MuscleGroup.BICEPS, 8))),
+                workout(2L, today, listOf(repsItem(2L, "Hammer curl", MuscleGroup.BICEPS, 8)))
+            )
+        )
+        assertTrue(sameDay.restBetweenSessions.isEmpty())
+
+        val spaced = stats(
+            listOf(
+                workout(1L, today.minusDays(6), listOf(repsItem(1L, "Curl", MuscleGroup.BICEPS, 8))),
+                workout(2L, today.minusDays(4), listOf(repsItem(1L, "Curl", MuscleGroup.BICEPS, 8))),
+                workout(3L, today, listOf(repsItem(1L, "Curl", MuscleGroup.BICEPS, 8)))
+            )
+        )
+        val rest = spaced.restBetweenSessions.single()
+        assertEquals(MuscleGroup.BICEPS, rest.muscle)
+        assertEquals(3, rest.sessionDates)
+        assertEquals(3.0, rest.averageDays, 0.0)
+        assertEquals(2, rest.shortestDays)
+        assertEquals(4, rest.longestDays)
+        assertEquals(today, rest.lastTrained)
+    }
+
+    @Test
+    fun restBetweenSessionsRespectsTheSelectedRange() {
+        val workouts = listOf(
+            workout(1L, today.minusDays(40), listOf(repsItem(1L, "Curl", MuscleGroup.BICEPS, 8))),
+            workout(2L, today, listOf(repsItem(1L, "Curl", MuscleGroup.BICEPS, 8)))
+        )
+        assertTrue(stats(workouts).restBetweenSessions.isEmpty())
+        val all = stats(workouts, range = StatisticsRange.All).restBetweenSessions.single()
+        assertEquals(2, all.sessionDates)
+        assertEquals(40, all.shortestDays)
+        assertEquals(40, all.longestDays)
+        assertEquals(40.0, all.averageDays, 0.0)
+    }
+
+    @Test
+    fun exercisePerformanceRespectsRangeAndOneObservation() {
+        val old = workout(
+            1L,
+            today.minusDays(40),
+            listOf(
+                item(
+                    1L,
+                    "Bench press",
+                    MeasurementType.REPETITIONS_AND_WEIGHT,
+                    MuscleGroup.CHEST,
+                    listOf(set(1L, reps = 5, load = PlannedLoadKind.EXTERNAL_WEIGHT, weight = 80.0)),
+                    WeightInterpretation.TOTAL
+                )
+            )
+        )
+        val recent = workout(
+            2L,
+            today,
+            listOf(
+                item(
+                    1L,
+                    "Bench press",
+                    MeasurementType.REPETITIONS_AND_WEIGHT,
+                    MuscleGroup.CHEST,
+                    listOf(set(2L, reps = 4, load = PlannedLoadKind.EXTERNAL_WEIGHT, weight = 75.0)),
+                    WeightInterpretation.TOTAL
+                )
+            )
+        )
+        val thirty = stats(listOf(old, recent)).exercises.single()
+        assertFalse(thirty.showsBestSeparately)
+        assertEquals(75.0, (thirty.best as ExerciseBest.WeightedSet).effectiveKg, 0.0)
+        val all = stats(listOf(old, recent), range = StatisticsRange.All).exercises.single()
+        assertTrue(all.showsBestSeparately)
+        assertEquals(80.0, (all.best as ExerciseBest.WeightedSet).effectiveKg, 0.0)
+        assertEquals(75.0, (all.recent as ExerciseBest.WeightedSet).effectiveKg, 0.0)
+    }
+
+    private fun stats(
+        aggregates: List<WorkoutSessionAggregate> = emptyList(),
+        scheduled: List<ScheduledWorkout> = emptyList(),
+        range: StatisticsRange = StatisticsRange.Days30
+    ): TrainingStatistics {
+        return TrainingStatisticsLogic.assemble(aggregates, scheduled, today, range)
+    }
+
+    private fun plan(
+        id: Long,
+        date: LocalDate,
+        sessionStatus: SessionStatus?
+    ): ScheduledWorkout {
+        return ScheduledWorkout(
+            id = id,
+            scheduledDate = date,
+            templateId = 1L,
+            templateName = "Plan $id",
+            exerciseCount = 1,
+            plannedSetCount = 1,
+            templateArchived = false,
+            sessionId = sessionStatus?.let { id * 100 },
+            sessionStatus = sessionStatus,
+            createdAt = 1L
+        )
     }
 
     private fun weightedWorkout(id: Long, date: LocalDate, weightKg: Double): WorkoutSessionAggregate {
@@ -451,7 +667,9 @@ class TrainingStatisticsLogicTest {
         id: Long,
         date: LocalDate,
         items: List<SessionExerciseItem>,
-        status: SessionStatus = SessionStatus.COMPLETED
+        status: SessionStatus = SessionStatus.COMPLETED,
+        startedAt: Long = 1L,
+        finishedAt: Long? = if (status == SessionStatus.COMPLETED) 2L else null
     ): WorkoutSessionAggregate {
         return WorkoutSessionAggregate(
             session = WorkoutSession(
@@ -460,8 +678,8 @@ class TrainingStatisticsLogicTest {
                 templateName = "Session $id",
                 status = status,
                 workoutDate = date,
-                startedAt = 1L,
-                finishedAt = if (status == SessionStatus.COMPLETED) 2L else null,
+                startedAt = startedAt,
+                finishedAt = finishedAt,
                 abandonedAt = if (status == SessionStatus.ABANDONED) 2L else null,
                 notes = null,
                 bodyWeightKg = 80.0,

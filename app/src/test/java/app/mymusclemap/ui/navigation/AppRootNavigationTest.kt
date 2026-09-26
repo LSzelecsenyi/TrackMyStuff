@@ -6,6 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
@@ -235,8 +236,32 @@ class AppRootNavigationTest {
     fun givenStatisticsWhenBackThenOverviewRemains() {
         val nav = host()
         composeRule.runOnIdle {
-            nav.navigateInternal(AppRoutes.STATISTICS)
-            nav.navigateInternal(AppRoutes.STATISTICS)
+            nav.navigateInternal(AppRoutes.STATISTICS_GRAPH)
+            nav.navigateInternal(AppRoutes.STATISTICS_GRAPH)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.STATISTICS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.OVERVIEW, nav.currentDestination?.route)
+    }
+
+    @Test
+    fun givenStatisticsDetailsWhenBackThenStatisticsThenOverviewRemain() {
+        val nav = host()
+        composeRule.runOnIdle {
+            nav.navigateInternal(AppRoutes.STATISTICS_GRAPH)
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            nav.navigateInternal(AppRoutes.STATISTICS_MUSCLES)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.STATISTICS_MUSCLES, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
         }
         composeRule.waitForIdle()
         assertEquals(AppRoutes.STATISTICS, nav.currentDestination?.route)
@@ -264,7 +289,15 @@ class AppRootNavigationTest {
                     composable(AppRoutes.HELP) { Text("help") }
                     composable(AppRoutes.PRIVACY) { Text("privacy") }
                     composable(AppRoutes.PRO_INFO) { Text("pro-info") }
-                    composable(AppRoutes.STATISTICS) { Text("statistics") }
+                    navigation(
+                        route = AppRoutes.STATISTICS_GRAPH,
+                        startDestination = AppRoutes.STATISTICS
+                    ) {
+                        composable(AppRoutes.STATISTICS) { Text("statistics") }
+                        composable(AppRoutes.STATISTICS_MUSCLES) { Text("muscles") }
+                        composable(AppRoutes.STATISTICS_REST) { Text("rest") }
+                        composable(AppRoutes.STATISTICS_EXERCISES) { Text("exercises") }
+                    }
                     composable(
                         route = AppRoutes.ACTIVE_WORKOUT_PATTERN,
                         arguments = listOf(

@@ -1,16 +1,22 @@
 package app.mymusclemap.ui.statistics
 
 import android.content.Context
+import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.FakeWeightMeasurementDao
 import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.repository.ExerciseRepository
+import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.FixedDateProvider
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.SelectiveFeatureEntitlements
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.ExerciseDraft
 import app.mymusclemap.domain.exercise.ExerciseSaveResult
@@ -19,9 +25,11 @@ import app.mymusclemap.domain.exercise.MovementPattern
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
+import app.mymusclemap.domain.statistics.StatisticsRange
 import app.mymusclemap.domain.workout.ActualSetDraft
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedSetDraft
+import app.mymusclemap.domain.workout.ScheduleWorkoutResult
 import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
@@ -56,6 +64,7 @@ class StatisticsViewModelTest {
     private lateinit var exercises: ExerciseRepository
     private lateinit var templates: WorkoutTemplateRepository
     private lateinit var sessions: WorkoutSessionRepository
+    private lateinit var scheduled: ScheduledWorkoutRepository
 
     @Before
     fun setUp() {
@@ -73,7 +82,8 @@ class StatisticsViewModelTest {
             database.workoutTemplateDao(),
             database.exerciseDao(),
             clock,
-            database.workoutSessionDao()
+            database.workoutSessionDao(),
+            database.scheduledWorkoutDao()
         )
         sessions = WorkoutSessionRepository(
             database.workoutSessionDao(),
@@ -82,6 +92,12 @@ class StatisticsViewModelTest {
             WeightRepository(FakeWeightMeasurementDao(), clock),
             clock,
             dateProvider
+        )
+        scheduled = ScheduledWorkoutRepository(
+            database.scheduledWorkoutDao(),
+            database.workoutTemplateDao(),
+            database.workoutSessionDao(),
+            clock
         )
     }
 
@@ -92,24 +108,26 @@ class StatisticsViewModelTest {
 
     @Test
     fun givenNoWorkoutsThenDashboardIsEmpty() = runTest {
-        val viewModel = StatisticsViewModel(sessions, dateProvider)
+        val viewModel = viewModel()
         val state = viewModel.uiState.first { !it.loading }
         assertFalse(state.dashboard.hasCompletedWorkouts)
-        assertEquals(0, state.dashboard.completedWorkoutCount)
+        assertEquals(0, state.dashboard.activity.workoutCount)
+        assertEquals(StatisticsRange.Days30, state.range)
+        assertNull(state.dashboard.adherence.percent)
     }
 
     @Test
     fun givenInProgressWorkoutThenStatisticsStayEmpty() = runTest {
         val templateId = saveTemplate()
         assertTrue(sessions.start(templateId) is StartWorkoutResult.Started)
-        val viewModel = StatisticsViewModel(sessions, dateProvider)
+        val viewModel = viewModel()
         val state = viewModel.uiState.first { !it.loading }
-        assertEquals(0, state.dashboard.completedWorkoutCount)
+        assertEquals(0, state.dashboard.activity.workoutCount)
         assertTrue(sessions.observeCompletedAggregates().first().isEmpty())
     }
 
     @Test
-    fun givenCompletedWorkoutThenConsistencyUsesPersistedSession() = runTest {
+    fun givenCompletedWorkoutThenActivityUsesPersistedSession() = runTest {
         val templateId = saveTemplate()
         val started = sessions.start(templateId) as StartWorkoutResult.Started
         val aggregate = sessions.getAggregate(started.sessionId)!!
@@ -119,14 +137,99 @@ class StatisticsViewModelTest {
             ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
         )
         sessions.finish(started.sessionId, skipRemaining = true)
-        val viewModel = StatisticsViewModel(sessions, dateProvider)
+        val viewModel = viewModel()
         val state = viewModel.uiState.first { !it.loading && it.dashboard.hasCompletedWorkouts }
-        assertEquals(1, state.dashboard.completedWorkoutCount)
-        assertEquals(1, state.dashboard.workoutsLast7Days)
-        assertNull(state.dashboard.weightedLoad)
-        assertEquals(MuscleGroup.LATS, state.dashboard.recentlyTrainedMuscles.single().muscle)
-        assertEquals(1, state.dashboard.recentlyTrainedMuscles.single().completedSetCount)
+        assertEquals(1, state.dashboard.activity.workoutCount)
+        assertEquals(1, state.dashboard.activity.completedSetCount)
+        assertEquals(1, state.dashboard.activity.trainingDayCount)
+        assertNull(state.dashboard.volume.totalKg)
+        assertEquals(MuscleGroup.LATS, state.dashboard.muscleDistribution.single().muscle)
+        assertEquals(1, state.dashboard.muscleDistribution.single().completedSetCount)
+        assertTrue(state.dashboard.restBetweenSessions.isEmpty())
         assertEquals(1, sessions.observeCompletedAggregates().first().size)
+        assertEquals("Pull-up", viewModel.exercise(state.dashboard.exercises.single().exerciseId)?.name)
+    }
+
+    @Test
+    fun givenScheduledCompletionThenAdherenceCountsTheLinkedPlan() = runTest {
+        val templateId = saveTemplate()
+        val scheduleId = (scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled).id
+        val started = sessions.start(templateId, scheduleId) as StartWorkoutResult.Started
+        val aggregate = sessions.getAggregate(started.sessionId)!!
+        sessions.completeSet(
+            aggregate.exercises.single().sets.first().id,
+            ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+        )
+        sessions.finish(started.sessionId, skipRemaining = true)
+        val viewModel = viewModel()
+        val state = viewModel.uiState.first { !it.loading && it.dashboard.hasCompletedWorkouts }
+        assertEquals(1, state.dashboard.adherence.plannedCount)
+        assertEquals(1, state.dashboard.adherence.completedCount)
+        assertEquals(100, state.dashboard.adherence.percent)
+    }
+
+    @Test
+    fun givenUnlinkedHubWorkoutThenAdherenceDoesNotInferCompletion() = runTest {
+        val templateId = saveTemplate()
+        scheduled.schedule(templateId, today)
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        val aggregate = sessions.getAggregate(started.sessionId)!!
+        sessions.completeSet(
+            aggregate.exercises.single().sets.first().id,
+            ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+        )
+        sessions.finish(started.sessionId, skipRemaining = true)
+        val viewModel = viewModel()
+        val state = viewModel.uiState.first { !it.loading && it.dashboard.hasCompletedWorkouts }
+        assertEquals(1, state.dashboard.activity.workoutCount)
+        assertEquals(1, state.dashboard.adherence.plannedCount)
+        assertEquals(0, state.dashboard.adherence.completedCount)
+        assertEquals(0, state.dashboard.adherence.percent)
+    }
+
+    @Test
+    fun givenFreeEntitlementsWhenProRangeSelectedThenRangeStaysThirtyDays() = runTest {
+        val viewModel = viewModel(SelectiveFeatureEntitlements(emptySet()))
+        viewModel.uiState.first { !it.loading }
+        viewModel.onRangeSelected(StatisticsRange.Months3)
+        val state = viewModel.uiState.first { it.lockedFeature == AppFeature.AdvancedStatistics }
+        assertEquals(StatisticsRange.Days30, state.range)
+        viewModel.consumeLockedFeature()
+        val cleared = viewModel.uiState.first { it.lockedFeature == null }
+        assertEquals(StatisticsRange.Days30, cleared.range)
+    }
+
+    @Test
+    fun givenOpenEntitlementsWhenProRangeSelectedThenDashboardUsesThatRange() = runTest {
+        val viewModel = viewModel(OpenFeatureEntitlements)
+        viewModel.uiState.first { !it.loading }
+        viewModel.onRangeSelected(StatisticsRange.All)
+        val state = viewModel.uiState.first { it.range == StatisticsRange.All }
+        assertEquals(StatisticsRange.All, state.range)
+        assertNull(state.lockedFeature)
+    }
+
+    @Test
+    fun givenLockedEntitlementsThenSavedProRangeIsCoercedToThirtyDays() = runTest {
+        val viewModel = viewModel(
+            entitlements = SelectiveFeatureEntitlements(emptySet()),
+            savedStateHandle = SavedStateHandle(mapOf("statistics_range" to StatisticsRange.Year1.name))
+        )
+        val state = viewModel.uiState.first { !it.loading }
+        assertEquals(StatisticsRange.Days30, state.range)
+    }
+
+    private fun viewModel(
+        entitlements: FeatureEntitlements = OpenFeatureEntitlements,
+        savedStateHandle: SavedStateHandle = SavedStateHandle()
+    ): StatisticsViewModel {
+        return StatisticsViewModel(
+            sessions,
+            scheduled,
+            dateProvider,
+            entitlements,
+            savedStateHandle
+        )
     }
 
     private suspend fun saveTemplate(): Long {

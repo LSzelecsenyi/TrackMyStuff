@@ -1,121 +1,192 @@
 package app.mymusclemap.domain.statistics
 
 import app.mymusclemap.domain.WeeklyAverageCalculator
-import app.mymusclemap.domain.WeeklyOverviewLogic
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.WeightInterpretation
+import app.mymusclemap.domain.model.SeriesPoint
+import app.mymusclemap.domain.workout.ElapsedTime
+import app.mymusclemap.domain.workout.ScheduledWorkout
+import app.mymusclemap.domain.workout.ScheduledWorkoutStatus
 import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 object TrainingStatisticsLogic {
-    const val DAYS_30 = 30L
-    const val VOLUME_TREND_WEEKS = 8
-    const val FREQUENCY_WEEKS = 4
-    const val MAX_EXERCISE_PROGRESS = 5
-    const val MAX_RECENT_MUSCLES = 6
-    const val MAX_FREQUENT_MUSCLES = 3
+    const val SUMMARY_MUSCLES = 3
+    const val SUMMARY_REST = 3
+    const val SUMMARY_EXERCISES = 5
+    const val TREND_MAX_POINTS = 12
 
     fun assemble(
         aggregates: List<WorkoutSessionAggregate>,
-        today: LocalDate
+        scheduled: List<ScheduledWorkout>,
+        today: LocalDate,
+        range: StatisticsRange
     ): TrainingStatistics {
         val completed = aggregates
             .filter { it.session.status == SessionStatus.COMPLETED }
-            .filter { !it.session.workoutDate.isAfter(today) }
+            .filter { range.contains(it.session.workoutDate, today) }
             .sortedWith(compareBy({ it.session.workoutDate }, { it.session.id }))
-        if (completed.isEmpty()) {
-            return TrainingStatistics()
-        }
-        val last7Start = WeeklyOverviewLogic.windowStart(today)
-        val last30Start = today.minusDays(DAYS_30 - 1)
-        val last7 = completed.filter { WeeklyOverviewLogic.inWindow(it.session.workoutDate, today) }
-        val last30 = completed.filter { inInclusiveWindow(it.session.workoutDate, last30Start, today) }
-        val volumeSets = volumeSets(completed)
-        val weightedLoad = weightedLoad(volumeSets, last7Start, last30Start, today)
         return TrainingStatistics(
-            completedWorkoutCount = completed.size,
-            workoutsLast7Days = last7.size,
-            trainingDaysLast7Days = last7.map { it.session.workoutDate }.distinct().size,
-            workoutsLast30Days = last30.size,
-            trainingDaysLast30Days = last30.map { it.session.workoutDate }.distinct().size,
-            recentWeeklyFrequency = weeklyFrequency(completed, today),
-            weightedLoad = weightedLoad,
-            weeklyVolume = weeklyVolumeTrend(volumeSets, today, includeTrend = weightedLoad != null),
-            exerciseProgress = exerciseProgress(completed),
-            recentlyTrainedMuscles = muscleSummary(completed, last7Start, today, MAX_RECENT_MUSCLES),
-            mostTrainedMuscles = muscleSummary(completed, last30Start, today, MAX_FREQUENT_MUSCLES)
+            range = range,
+            activity = activity(completed),
+            adherence = adherence(scheduled, today, range),
+            volume = volume(completed, today),
+            muscleDistribution = muscleDistribution(completed),
+            restBetweenSessions = restBetweenSessions(completed),
+            exercises = exerciseProgress(completed)
         )
     }
 
-    private fun inInclusiveWindow(date: LocalDate, start: LocalDate, end: LocalDate): Boolean {
-        return !date.isBefore(start) && !date.isAfter(end)
+    fun summaryMuscles(all: List<MuscleTrainingCount>): List<MuscleTrainingCount> {
+        return all.take(SUMMARY_MUSCLES)
     }
 
-    private fun weeklyFrequency(
+    fun summaryRest(all: List<MuscleRestSummary>): List<MuscleRestSummary> {
+        return all.take(SUMMARY_REST)
+    }
+
+    fun summaryExercises(all: List<ExerciseProgressSummary>): List<ExerciseProgressSummary> {
+        return all.take(SUMMARY_EXERCISES)
+    }
+
+    private fun activity(completed: List<WorkoutSessionAggregate>): TrainingActivity {
+        val durations = completed
+            .map { ElapsedTime.forSession(it.session) }
+            .filter { it >= 1_000L }
+        return TrainingActivity(
+            workoutCount = completed.size,
+            completedSetCount = completed.sumOf { aggregate ->
+                aggregate.exercises.sumOf { item -> item.sets.count { WorkoutSetVolume.isCompleted(it) } }
+            },
+            trainingDayCount = completed.map { it.session.workoutDate }.distinct().size,
+            durationMillis = durations.takeIf { it.isNotEmpty() }?.sum()
+        )
+    }
+
+    private fun adherence(
+        scheduled: List<ScheduledWorkout>,
+        today: LocalDate,
+        range: StatisticsRange
+    ): PlanAdherence {
+        val due = scheduled.filter { range.contains(it.scheduledDate, today) }
+        return PlanAdherence(
+            plannedCount = due.size,
+            completedCount = due.count { it.status == ScheduledWorkoutStatus.COMPLETED },
+            missedCount = due.count { item ->
+                item.status == ScheduledWorkoutStatus.PLANNED && item.scheduledDate.isBefore(today)
+            },
+            inProgressCount = due.count { it.status == ScheduledWorkoutStatus.IN_PROGRESS }
+        )
+    }
+
+    private fun volume(
         completed: List<WorkoutSessionAggregate>,
         today: LocalDate
-    ): Double {
-        val currentWeekStart = WeeklyAverageCalculator.weekStart(
-            WeeklyAverageCalculator.isoWeekKey(today).year,
-            WeeklyAverageCalculator.isoWeekKey(today).week
-        )
-        val windowStart = currentWeekStart.minusWeeks((FREQUENCY_WEEKS - 1).toLong())
-        val count = completed.count { inInclusiveWindow(it.session.workoutDate, windowStart, today) }
-        return count.toDouble() / FREQUENCY_WEEKS.toDouble()
-    }
-
-    private fun volumeSets(completed: List<WorkoutSessionAggregate>): List<VolumeEligibleSet> {
-        return completed.flatMap { aggregate ->
+    ): TrainingVolume {
+        val volumeSets = completed.flatMap { aggregate ->
             aggregate.exercises.flatMap { item ->
                 item.sets.mapNotNull { set ->
-                    WorkoutSetVolume.volumeKg(item.exercise, set)?.let { volume ->
-                        VolumeEligibleSet(aggregate.session.workoutDate, volume)
+                    WorkoutSetVolume.volumeKg(item.exercise, set)?.let { kg ->
+                        VolumeEligibleSet(aggregate.session.workoutDate, kg)
                     }
                 }
             }
         }
-    }
-
-    private fun weightedLoad(
-        volumeSets: List<VolumeEligibleSet>,
-        last7Start: LocalDate,
-        last30Start: LocalDate,
-        today: LocalDate
-    ): WeightedLoadVolume? {
-        if (volumeSets.isEmpty()) return null
-        val last7 = volumeSets.filter { inInclusiveWindow(it.date, last7Start, today) }
-        val last30 = volumeSets.filter { inInclusiveWindow(it.date, last30Start, today) }
-        return WeightedLoadVolume(
-            last7DaysKg = last7.sumOf { it.volumeKg },
-            last30DaysKg = last30.sumOf { it.volumeKg },
-            completedSetCountLast7Days = last7.size,
-            completedSetCountLast30Days = last30.size
+        if (volumeSets.isEmpty()) {
+            return TrainingVolume()
+        }
+        return TrainingVolume(
+            totalKg = volumeSets.sumOf { it.volumeKg },
+            completedSetCount = volumeSets.size,
+            trend = volumeTrend(volumeSets, today)
         )
     }
 
-    private fun weeklyVolumeTrend(
+    private fun volumeTrend(
         volumeSets: List<VolumeEligibleSet>,
-        today: LocalDate,
-        includeTrend: Boolean
-    ): List<WeeklyVolumePoint> {
-        if (!includeTrend) return emptyList()
-        val currentKey = WeeklyAverageCalculator.isoWeekKey(today)
-        val currentStart = WeeklyAverageCalculator.weekStart(currentKey.year, currentKey.week)
+        today: LocalDate
+    ): List<SeriesPoint> {
         val byWeek = volumeSets.groupBy { WeeklyAverageCalculator.isoWeekKey(it.date) }
-        val weeks = (VOLUME_TREND_WEEKS - 1 downTo 0).map { offset ->
-            val start = currentStart.minusWeeks(offset.toLong())
-            val key = WeeklyAverageCalculator.isoWeekKey(start)
-            WeeklyVolumePoint(
-                weekStart = start,
-                volumeKg = byWeek[key].orEmpty().sumOf { it.volumeKg }
-            )
+        val points = byWeek.entries
+            .map { (key, sets) ->
+                val start = WeeklyAverageCalculator.weekStart(key.year, key.week)
+                SeriesPoint(date = start, value = sets.sumOf { it.volumeKg })
+            }
+            .filter { it.value > 0.0 && !it.date.isAfter(today) }
+            .sortedBy { it.date }
+        if (points.size < 2) {
+            return emptyList()
         }
-        return if (weeks.any { it.volumeKg > 0.0 }) weeks else emptyList()
+        return points.takeLast(TREND_MAX_POINTS)
+    }
+
+    private fun muscleDistribution(completed: List<WorkoutSessionAggregate>): List<MuscleTrainingCount> {
+        data class Acc(var sets: Int, val sessionIds: MutableSet<Long>, var last: LocalDate)
+        val acc = mutableMapOf<MuscleGroup, Acc>()
+        completed.forEach { aggregate ->
+            aggregate.exercises.forEach { item ->
+                val completedSets = item.sets.count { WorkoutSetVolume.isCompleted(it) }
+                if (completedSets == 0) return@forEach
+                val current = acc.getOrPut(item.exercise.primaryMuscle) {
+                    Acc(0, mutableSetOf(), aggregate.session.workoutDate)
+                }
+                current.sets += completedSets
+                current.sessionIds += aggregate.session.id
+                if (aggregate.session.workoutDate.isAfter(current.last)) {
+                    current.last = aggregate.session.workoutDate
+                }
+            }
+        }
+        return acc.map { (muscle, value) ->
+            MuscleTrainingCount(
+                muscle = muscle,
+                completedSetCount = value.sets,
+                workoutCount = value.sessionIds.size,
+                lastTrained = value.last
+            )
+        }.sortedWith(
+            compareByDescending<MuscleTrainingCount> { it.completedSetCount }
+                .thenByDescending { it.lastTrained }
+                .thenBy { it.muscle.name }
+        )
+    }
+
+    private fun restBetweenSessions(completed: List<WorkoutSessionAggregate>): List<MuscleRestSummary> {
+        val datesByMuscle = mutableMapOf<MuscleGroup, MutableSet<LocalDate>>()
+        completed.forEach { aggregate ->
+            aggregate.exercises.forEach { item ->
+                if (item.sets.none { WorkoutSetVolume.isCompleted(it) }) return@forEach
+                datesByMuscle.getOrPut(item.exercise.primaryMuscle) { mutableSetOf() }
+                    .add(aggregate.session.workoutDate)
+            }
+        }
+        return datesByMuscle.mapNotNull { (muscle, dates) ->
+            val ordered = dates.sorted()
+            if (ordered.size < 2) {
+                return@mapNotNull null
+            }
+            val gaps = ordered.zipWithNext { first, second ->
+                ChronoUnit.DAYS.between(first, second).toInt()
+            }
+            MuscleRestSummary(
+                muscle = muscle,
+                sessionDates = ordered.size,
+                averageDays = gaps.map { it.toDouble() }.average(),
+                shortestDays = gaps.min(),
+                longestDays = gaps.max(),
+                lastTrained = ordered.last()
+            )
+        }.sortedWith(
+            compareByDescending<MuscleRestSummary> { it.sessionDates }
+                .thenBy { it.averageDays }
+                .thenBy { it.muscle.name }
+        )
     }
 
     private fun exerciseProgress(
@@ -135,7 +206,6 @@ object TrainingStatisticsLogic {
                 compareByDescending<ExerciseProgressSummary> { it.lastTrained }
                     .thenBy { it.name.lowercase() }
             )
-            .take(MAX_EXERCISE_PROGRESS)
     }
 
     private fun summarizeExercise(
@@ -315,42 +385,6 @@ object TrainingStatisticsLogic {
         return byDate.entries
             .sortedBy { it.key }
             .map { ExerciseHistoryPoint(it.key, value(it.value)) }
-    }
-
-    private fun muscleSummary(
-        completed: List<WorkoutSessionAggregate>,
-        start: LocalDate,
-        today: LocalDate,
-        limit: Int
-    ): List<MuscleTrainingCount> {
-        data class Acc(var sets: Int, val sessionIds: MutableSet<Long>, var last: LocalDate)
-        val acc = mutableMapOf<MuscleGroup, Acc>()
-        completed.filter { inInclusiveWindow(it.session.workoutDate, start, today) }.forEach { aggregate ->
-            aggregate.exercises.forEach { item ->
-                val completedSets = item.sets.count { WorkoutSetVolume.isCompleted(it) }
-                if (completedSets == 0) return@forEach
-                val current = acc.getOrPut(item.exercise.primaryMuscle) {
-                    Acc(0, mutableSetOf(), aggregate.session.workoutDate)
-                }
-                current.sets += completedSets
-                current.sessionIds += aggregate.session.id
-                if (aggregate.session.workoutDate.isAfter(current.last)) {
-                    current.last = aggregate.session.workoutDate
-                }
-            }
-        }
-        return acc.map { (muscle, value) ->
-            MuscleTrainingCount(
-                muscle = muscle,
-                completedSetCount = value.sets,
-                workoutCount = value.sessionIds.size,
-                lastTrained = value.last
-            )
-        }.sortedWith(
-            compareByDescending<MuscleTrainingCount> { it.completedSetCount }
-                .thenByDescending { it.lastTrained }
-                .thenBy { it.muscle.name }
-        ).take(limit)
     }
 
     private val weightedComparator = compareBy<WeightedCandidate> { it.effectiveKg }

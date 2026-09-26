@@ -1,76 +1,67 @@
 package app.mymusclemap.ui.statistics
 
 import android.content.res.Configuration
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.locale.AppLocale
-import app.mymusclemap.domain.model.ChartPoint
+import app.mymusclemap.domain.model.ChartValueDomain
+import app.mymusclemap.domain.model.SeriesPoint
 import app.mymusclemap.domain.statistics.ExerciseBest
 import app.mymusclemap.domain.statistics.ExerciseHistoryKind
+import app.mymusclemap.domain.statistics.ExerciseHistoryPoint
 import app.mymusclemap.domain.statistics.ExerciseProgressSummary
+import app.mymusclemap.domain.statistics.MuscleRestSummary
 import app.mymusclemap.domain.statistics.MuscleTrainingCount
+import app.mymusclemap.domain.statistics.PlanAdherence
+import app.mymusclemap.domain.statistics.StatisticsRange
+import app.mymusclemap.domain.statistics.TrainingActivity
 import app.mymusclemap.domain.statistics.TrainingStatistics
-import app.mymusclemap.domain.statistics.WeightedLoadVolume
-import app.mymusclemap.domain.statistics.WeeklyVolumePoint
-import app.mymusclemap.domain.workout.DistanceUnit
+import app.mymusclemap.domain.statistics.TrainingStatisticsLogic
+import app.mymusclemap.domain.statistics.TrainingVolume
 import app.mymusclemap.domain.workout.ElapsedTime
-import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.CompactEditorSection
+import app.mymusclemap.ui.components.SeriesChart
 import app.mymusclemap.ui.components.UiFormatters
-import app.mymusclemap.ui.components.WeightChart
 import app.mymusclemap.ui.exercises.labelRes
+import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.ui.theme.AppDimens
-import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
 
-internal const val STATISTICS_ROOT = "statistics-root"
-internal const val STATISTICS_EMPTY = "statistics-empty"
-internal const val STATISTICS_CONSISTENCY = "statistics-consistency"
-internal const val STATISTICS_VOLUME = "statistics-volume"
-internal const val STATISTICS_PROGRESS = "statistics-progress"
-internal const val STATISTICS_MUSCLES = "statistics-muscles"
-
 @Composable
 fun StatisticsScreen(
     state: StatisticsUiState,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onRangeSelected: (StatisticsRange) -> Unit = {},
+    onDismissLocked: () -> Unit = {},
+    onOpenMuscleDistribution: () -> Unit = {},
+    onOpenRest: () -> Unit = {},
+    onOpenExercises: () -> Unit = {},
+    onOpenExercise: (Long) -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier
@@ -85,7 +76,7 @@ fun StatisticsScreen(
                 .padding(innerPadding)
                 .statusBarsPadding()
         ) {
-            StatisticsHeader(onBack = onBack)
+            StatisticsHeader(title = stringResource(R.string.statistics_title), onBack = onBack)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -98,6 +89,8 @@ fun StatisticsScreen(
                         bottom = AppDimens.scrollEndPadding
                     )
             ) {
+                StatisticsRangeSelector(selected = state.range, onSelected = onRangeSelected)
+                Spacer(Modifier.height(AppDimens.sectionGap))
                 if (!state.loading && !state.dashboard.hasCompletedWorkouts) {
                     Text(
                         text = stringResource(R.string.statistics_empty_title),
@@ -111,83 +104,74 @@ fun StatisticsScreen(
                         style = AppTypeTokens.statSecondary,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    CompactEditorDivider()
+                    AdherenceSection(state.dashboard.adherence)
                 } else if (!state.loading) {
-                    ConsistencySection(state.dashboard)
+                    ActivitySection(state.dashboard.activity)
                     CompactEditorDivider()
-                    VolumeSection(state.dashboard)
+                    AdherenceSection(state.dashboard.adherence)
                     CompactEditorDivider()
-                    ProgressSection(state.dashboard)
+                    VolumeSection(state.dashboard.volume)
                     CompactEditorDivider()
-                    MuscleSection(state.dashboard)
+                    MuscleSection(
+                        muscles = state.dashboard.muscleDistribution,
+                        onSeeDetails = onOpenMuscleDistribution
+                    )
+                    CompactEditorDivider()
+                    RestSection(
+                        rest = state.dashboard.restBetweenSessions,
+                        onSeeDetails = onOpenRest
+                    )
+                    CompactEditorDivider()
+                    ExerciseSection(
+                        exercises = state.dashboard.exercises,
+                        onSeeAll = onOpenExercises,
+                        onOpenExercise = onOpenExercise
+                    )
                 }
             }
         }
     }
-}
-
-@Composable
-private fun StatisticsHeader(onBack: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = AppDimens.screenPadding)
-            .defaultMinSize(minHeight = AppDimens.minTouch),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.size(AppDimens.minTouch)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.action_back)
-            )
-        }
-        Text(
-            text = stringResource(R.string.statistics_title),
-            style = AppTypeTokens.sectionTitle,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
+    state.lockedFeature?.let { feature ->
+        ProInfoSheet(feature = feature, onDismiss = onDismissLocked)
     }
 }
 
 @Composable
-private fun ConsistencySection(dashboard: TrainingStatistics) {
+private fun ActivitySection(activity: TrainingActivity) {
     CompactEditorSection(
-        title = stringResource(R.string.statistics_consistency_title).uppercase(AppLocale.UI),
-        modifier = Modifier.testTag(STATISTICS_CONSISTENCY)
+        title = stringResource(R.string.statistics_activity_title).uppercase(AppLocale.UI),
+        modifier = Modifier.testTag(STATISTICS_ACTIVITY)
     ) {
         StatisticsCard {
             StatRow(
-                label = stringResource(R.string.statistics_last_7_days),
+                label = stringResource(R.string.statistics_activity_workouts),
                 value = pluralStringResource(
                     R.plurals.statistics_workouts,
-                    dashboard.workoutsLast7Days,
-                    dashboard.workoutsLast7Days
+                    activity.workoutCount,
+                    activity.workoutCount
                 )
             )
             StatRow(
-                label = stringResource(R.string.statistics_training_days_7),
+                label = stringResource(R.string.statistics_activity_sets),
+                value = pluralStringResource(
+                    R.plurals.weekly_overview_sets,
+                    activity.completedSetCount,
+                    activity.completedSetCount
+                )
+            )
+            StatRow(
+                label = stringResource(R.string.statistics_activity_days),
                 value = pluralStringResource(
                     R.plurals.statistics_training_days,
-                    dashboard.trainingDaysLast7Days,
-                    dashboard.trainingDaysLast7Days
+                    activity.trainingDayCount,
+                    activity.trainingDayCount
                 )
             )
-            StatRow(
-                label = stringResource(R.string.statistics_last_30_days),
-                value = pluralStringResource(
-                    R.plurals.statistics_workouts,
-                    dashboard.workoutsLast30Days,
-                    dashboard.workoutsLast30Days
-                )
-            )
-            dashboard.recentWeeklyFrequency?.let { frequency ->
+            activity.durationMillis?.let { duration ->
                 StatRow(
-                    label = stringResource(R.string.statistics_weekly_frequency),
-                    value = stringResource(R.string.statistics_frequency_value, frequency)
+                    label = stringResource(R.string.statistics_activity_duration),
+                    value = ElapsedTime.formatMillis(duration)
                 )
             }
         }
@@ -195,13 +179,47 @@ private fun ConsistencySection(dashboard: TrainingStatistics) {
 }
 
 @Composable
-private fun VolumeSection(dashboard: TrainingStatistics) {
+private fun AdherenceSection(adherence: PlanAdherence) {
+    CompactEditorSection(
+        title = stringResource(R.string.statistics_adherence_title).uppercase(AppLocale.UI),
+        modifier = Modifier.testTag(STATISTICS_ADHERENCE)
+    ) {
+        val percent = adherence.percent
+        if (percent == null) {
+            Text(
+                text = stringResource(R.string.statistics_adherence_empty),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            StatisticsCard {
+                Text(
+                    text = stringResource(R.string.statistics_adherence_percent, percent),
+                    style = AppTypeTokens.statHero,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(Modifier.height(AppDimens.headerStackGap))
+                Text(
+                    text = stringResource(
+                        R.string.statistics_adherence_summary,
+                        adherence.completedCount,
+                        adherence.plannedCount
+                    ),
+                    style = AppTypeTokens.statSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolumeSection(volume: TrainingVolume) {
     CompactEditorSection(
         title = stringResource(R.string.statistics_volume_title).uppercase(AppLocale.UI),
         modifier = Modifier.testTag(STATISTICS_VOLUME)
     ) {
-        val load = dashboard.weightedLoad
-        if (load == null) {
+        if (!volume.hasTotal) {
             Text(
                 text = stringResource(R.string.statistics_volume_unavailable),
                 style = AppTypeTokens.statSecondary,
@@ -216,14 +234,10 @@ private fun VolumeSection(dashboard: TrainingStatistics) {
                 )
                 Spacer(Modifier.height(AppDimens.itemGap))
                 StatRow(
-                    label = stringResource(R.string.statistics_volume_7_days),
-                    value = UiFormatters.weightKg(load.last7DaysKg)
+                    label = stringResource(R.string.statistics_volume_total),
+                    value = UiFormatters.weightKg(volume.totalKg ?: 0.0)
                 )
-                StatRow(
-                    label = stringResource(R.string.statistics_volume_30_days),
-                    value = UiFormatters.weightKg(load.last30DaysKg)
-                )
-                if (dashboard.hasVolumeTrend) {
+                if (volume.hasTrend) {
                     Spacer(Modifier.height(AppDimens.itemGap))
                     Text(
                         text = stringResource(R.string.statistics_volume_trend),
@@ -231,11 +245,12 @@ private fun VolumeSection(dashboard: TrainingStatistics) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(AppDimens.headerStackGap))
-                    WeightChart(
-                        points = dashboard.weeklyVolume.map { ChartPoint(it.weekStart, it.volumeKg) },
-                        contentDescription = volumeChartDescription(dashboard.weeklyVolume),
+                    SeriesChart(
+                        points = volume.trend,
+                        contentDescription = volumeChartDescription(volume.trend),
                         subdued = true,
-                        chartHeight = 180.dp
+                        chartHeight = 180.dp,
+                        valueDomain = ChartValueDomain.NonNegative
                     )
                 } else {
                     Spacer(Modifier.height(AppDimens.itemGap))
@@ -251,81 +266,10 @@ private fun VolumeSection(dashboard: TrainingStatistics) {
 }
 
 @Composable
-private fun ProgressSection(dashboard: TrainingStatistics) {
-    CompactEditorSection(
-        title = stringResource(R.string.statistics_progress_title).uppercase(AppLocale.UI),
-        modifier = Modifier.testTag(STATISTICS_PROGRESS)
-    ) {
-        if (dashboard.exerciseProgress.isEmpty()) {
-            Text(
-                text = stringResource(R.string.statistics_progress_empty),
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            dashboard.exerciseProgress.forEachIndexed { index, summary ->
-                if (index > 0) {
-                    Spacer(Modifier.height(AppDimens.itemGap))
-                }
-                ExerciseProgressCard(summary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExerciseProgressCard(summary: ExerciseProgressSummary) {
-    StatisticsCard {
-        Text(
-            text = summary.name,
-            style = AppTypeTokens.sectionTitle,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = stringResource(summary.measurementType.labelRes()),
-            style = AppTypeTokens.statCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(AppDimens.itemGap))
-        summary.best?.let { best ->
-            StatRow(
-                label = stringResource(R.string.statistics_best),
-                value = bestLabel(best)
-            )
-        }
-        summary.recent?.let { recent ->
-            StatRow(
-                label = stringResource(R.string.statistics_latest),
-                value = bestLabel(recent)
-            )
-        }
-        if (summary.hasProgression) {
-            Spacer(Modifier.height(AppDimens.itemGap))
-            WeightChart(
-                points = summary.history.map { ChartPoint(it.date, it.value) },
-                contentDescription = stringResource(
-                    R.string.statistics_progress_chart_description,
-                    summary.name,
-                    summary.history.size
-                ),
-                subdued = true,
-                chartHeight = 140.dp
-            )
-        } else {
-            Spacer(Modifier.height(AppDimens.headerStackGap))
-            Text(
-                text = stringResource(R.string.statistics_progress_insufficient),
-                style = AppTypeTokens.statCaption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun MuscleSection(dashboard: TrainingStatistics) {
+private fun MuscleSection(
+    muscles: List<MuscleTrainingCount>,
+    onSeeDetails: () -> Unit
+) {
     CompactEditorSection(
         title = stringResource(R.string.statistics_muscles_title).uppercase(AppLocale.UI),
         modifier = Modifier.testTag(STATISTICS_MUSCLES)
@@ -336,7 +280,7 @@ private fun MuscleSection(dashboard: TrainingStatistics) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(AppDimens.itemGap))
-        if (dashboard.recentlyTrainedMuscles.isEmpty() && dashboard.mostTrainedMuscles.isEmpty()) {
+        if (muscles.isEmpty()) {
             Text(
                 text = stringResource(R.string.statistics_muscles_empty),
                 style = AppTypeTokens.statSecondary,
@@ -344,143 +288,120 @@ private fun MuscleSection(dashboard: TrainingStatistics) {
             )
         } else {
             StatisticsCard {
-                if (dashboard.recentlyTrainedMuscles.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.statistics_muscles_recent),
-                        style = AppTypeTokens.statCaption,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                TrainingStatisticsLogic.summaryMuscles(muscles).forEach { count ->
+                    StatRow(
+                        label = stringResource(count.muscle.labelRes()),
+                        value = pluralStringResource(
+                            R.plurals.statistics_muscle_sets,
+                            count.completedSetCount,
+                            count.completedSetCount
+                        )
                     )
-                    Spacer(Modifier.height(AppDimens.headerStackGap))
-                    dashboard.recentlyTrainedMuscles.forEach { count ->
-                        MuscleRow(count)
-                    }
                 }
-                if (dashboard.mostTrainedMuscles.isNotEmpty()) {
-                    if (dashboard.recentlyTrainedMuscles.isNotEmpty()) {
-                        Spacer(Modifier.height(AppDimens.itemGap))
-                    }
-                    Text(
-                        text = stringResource(R.string.statistics_muscles_frequent),
-                        style = AppTypeTokens.statCaption,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(AppDimens.headerStackGap))
-                    dashboard.mostTrainedMuscles.forEach { count ->
-                        MuscleRow(count)
-                    }
-                }
+            }
+            if (muscles.size > TrainingStatisticsLogic.SUMMARY_MUSCLES) {
+                SeeMoreRow(
+                    label = stringResource(R.string.statistics_see_details),
+                    onClick = onSeeDetails,
+                    testTag = STATISTICS_SEE_MUSCLES
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MuscleRow(count: MuscleTrainingCount) {
-    StatRow(
-        label = stringResource(count.muscle.labelRes()),
-        value = pluralStringResource(
-            R.plurals.statistics_muscle_sets,
-            count.completedSetCount,
-            count.completedSetCount
-        )
-    )
-}
-
-@Composable
-private fun StatisticsCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = AppShapeTokens.surface,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(AppDimens.heroPadding),
-            content = content
-        )
-    }
-}
-
-@Composable
-private fun StatRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+private fun RestSection(
+    rest: List<MuscleRestSummary>,
+    onSeeDetails: () -> Unit
+) {
+    CompactEditorSection(
+        title = stringResource(R.string.statistics_rest_title).uppercase(AppLocale.UI),
+        modifier = Modifier.testTag(STATISTICS_REST)
     ) {
         Text(
-            text = label,
-            style = AppTypeTokens.statSecondary,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
+            text = stringResource(R.string.statistics_rest_scope),
+            style = AppTypeTokens.statCaption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-            text = value,
-            style = AppTypeTokens.statValue,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = AppDimens.itemGap)
-        )
-    }
-}
-
-@Composable
-private fun bestLabel(best: ExerciseBest): String {
-    return when (best) {
-        is ExerciseBest.Reps -> stringResource(R.string.statistics_best_reps, best.reps)
-        is ExerciseBest.WeightedSet -> if (best.perSide) {
-            stringResource(
-                R.string.statistics_best_weight_per_side,
-                UiFormatters.weightValue(best.recordedKg),
-                best.reps,
-                UiFormatters.weightKg(best.effectiveKg)
+        Spacer(Modifier.height(AppDimens.itemGap))
+        if (rest.isEmpty()) {
+            Text(
+                text = stringResource(R.string.statistics_rest_empty),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            stringResource(
-                R.string.statistics_best_weight,
-                UiFormatters.weightKg(best.effectiveKg),
-                best.reps
-            )
+            StatisticsCard {
+                TrainingStatisticsLogic.summaryRest(rest).forEach { summary ->
+                    StatRow(
+                        label = stringResource(summary.muscle.labelRes()),
+                        value = stringResource(R.string.statistics_rest_days_value, summary.averageDays)
+                    )
+                }
+            }
+            if (rest.size > TrainingStatisticsLogic.SUMMARY_REST) {
+                SeeMoreRow(
+                    label = stringResource(R.string.statistics_see_details),
+                    onClick = onSeeDetails,
+                    testTag = STATISTICS_SEE_REST
+                )
+            }
         }
-        is ExerciseBest.Duration -> ElapsedTime.formatMillis(best.seconds * 1000L)
-        is ExerciseBest.Distance -> distanceLabel(best)
-        is ExerciseBest.Completions -> pluralStringResource(
-            R.plurals.statistics_completions,
-            best.count,
-            best.count
-        )
     }
 }
 
 @Composable
-private fun distanceLabel(best: ExerciseBest.Distance): String {
-    val distance = if (best.meters >= 1000.0) {
-        stringResource(
-            R.string.set_copy_distance_km,
-            QuantityParser.formatDisplay(QuantityParser.fromMeters(best.meters, DistanceUnit.KILOMETERS))
-        )
-    } else {
-        stringResource(
-            R.string.set_copy_distance_m,
-            QuantityParser.formatDisplay(best.meters)
-        )
-    }
-    val duration = best.durationSeconds?.let { ElapsedTime.formatMillis(it * 1000L) }
-    return if (duration == null) {
-        distance
-    } else {
-        stringResource(R.string.statistics_best_distance_duration, distance, duration)
+private fun ExerciseSection(
+    exercises: List<ExerciseProgressSummary>,
+    onSeeAll: () -> Unit,
+    onOpenExercise: (Long) -> Unit
+) {
+    CompactEditorSection(
+        title = stringResource(R.string.statistics_exercises_title).uppercase(AppLocale.UI),
+        modifier = Modifier.testTag(STATISTICS_EXERCISES)
+    ) {
+        if (exercises.isEmpty()) {
+            Text(
+                text = stringResource(R.string.statistics_exercises_empty),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            StatisticsCard {
+                TrainingStatisticsLogic.summaryExercises(exercises).forEach { summary ->
+                    DestinationRow(
+                        title = summary.name,
+                        subtitle = latestSubtitle(summary),
+                        onClick = { onOpenExercise(summary.exerciseId) },
+                        testTag = "statistics-exercise-${summary.exerciseId}"
+                    )
+                }
+            }
+            if (exercises.size > TrainingStatisticsLogic.SUMMARY_EXERCISES) {
+                SeeMoreRow(
+                    label = stringResource(R.string.statistics_see_all),
+                    onClick = onSeeAll,
+                    testTag = STATISTICS_SEE_EXERCISES
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun volumeChartDescription(points: List<WeeklyVolumePoint>): String {
-    val values = points.map { it.volumeKg }
+private fun latestSubtitle(summary: ExerciseProgressSummary): String? {
+    val recent = summary.recent ?: return null
+    return if (summary.historyKind == ExerciseHistoryKind.COMPLETIONS) {
+        bestLabel(recent)
+    } else {
+        bestLabel(recent)
+    }
+}
+
+@Composable
+private fun volumeChartDescription(points: List<SeriesPoint>): String {
+    val values = points.map { it.value }
     return stringResource(
         R.string.statistics_volume_chart_description,
         points.size,
@@ -498,20 +419,26 @@ private fun StatisticsPreview() {
         StatisticsScreen(
             state = StatisticsUiState(
                 loading = false,
+                range = StatisticsRange.Days30,
                 dashboard = TrainingStatistics(
-                    completedWorkoutCount = 4,
-                    workoutsLast7Days = 2,
-                    trainingDaysLast7Days = 2,
-                    workoutsLast30Days = 4,
-                    trainingDaysLast30Days = 4,
-                    recentWeeklyFrequency = 1.0,
-                    weightedLoad = WeightedLoadVolume(800.0, 2400.0, 6, 18),
-                    weeklyVolume = listOf(
-                        WeeklyVolumePoint(today.minusWeeks(2), 400.0),
-                        WeeklyVolumePoint(today.minusWeeks(1), 800.0),
-                        WeeklyVolumePoint(today.minusWeeks(0), 800.0)
+                    range = StatisticsRange.Days30,
+                    activity = TrainingActivity(4, 18, 4, 3_600_000L),
+                    adherence = PlanAdherence(plannedCount = 12, completedCount = 10, missedCount = 2),
+                    volume = TrainingVolume(
+                        totalKg = 2400.0,
+                        completedSetCount = 12,
+                        trend = listOf(
+                            SeriesPoint(today.minusWeeks(2), 400.0),
+                            SeriesPoint(today.minusWeeks(1), 800.0)
+                        )
                     ),
-                    exerciseProgress = listOf(
+                    muscleDistribution = listOf(
+                        MuscleTrainingCount(MuscleGroup.CHEST, 18, 4, today)
+                    ),
+                    restBetweenSessions = listOf(
+                        MuscleRestSummary(MuscleGroup.CHEST, 4, 2.8, 1, 6, today)
+                    ),
+                    exercises = listOf(
                         ExerciseProgressSummary(
                             exerciseId = 1L,
                             name = "Bench press",
@@ -520,17 +447,11 @@ private fun StatisticsPreview() {
                             best = ExerciseBest.WeightedSet(80.0, 80.0, 5, false),
                             recent = ExerciseBest.WeightedSet(80.0, 80.0, 5, false),
                             history = listOf(
-                                app.mymusclemap.domain.statistics.ExerciseHistoryPoint(today.minusWeeks(2), 70.0),
-                                app.mymusclemap.domain.statistics.ExerciseHistoryPoint(today, 80.0)
+                                ExerciseHistoryPoint(today.minusWeeks(2), 70.0),
+                                ExerciseHistoryPoint(today, 80.0)
                             ),
                             historyKind = ExerciseHistoryKind.EFFECTIVE_KG
                         )
-                    ),
-                    recentlyTrainedMuscles = listOf(
-                        MuscleTrainingCount(MuscleGroup.CHEST, 6, 2, today)
-                    ),
-                    mostTrainedMuscles = listOf(
-                        MuscleTrainingCount(MuscleGroup.CHEST, 18, 4, today)
                     )
                 )
             ),

@@ -19,18 +19,24 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MuscleGroup
+import app.mymusclemap.domain.model.SeriesPoint
 import app.mymusclemap.domain.statistics.ExerciseBest
 import app.mymusclemap.domain.statistics.ExerciseHistoryKind
 import app.mymusclemap.domain.statistics.ExerciseHistoryPoint
 import app.mymusclemap.domain.statistics.ExerciseProgressSummary
+import app.mymusclemap.domain.statistics.MuscleRestSummary
 import app.mymusclemap.domain.statistics.MuscleTrainingCount
+import app.mymusclemap.domain.statistics.PlanAdherence
+import app.mymusclemap.domain.statistics.StatisticsRange
+import app.mymusclemap.domain.statistics.TrainingActivity
 import app.mymusclemap.domain.statistics.TrainingStatistics
-import app.mymusclemap.domain.statistics.WeightedLoadVolume
-import app.mymusclemap.domain.statistics.WeeklyVolumePoint
+import app.mymusclemap.domain.statistics.TrainingVolume
 import app.mymusclemap.testQuantity
 import app.mymusclemap.testString
+import app.mymusclemap.ui.pro.PRO_INFO_TITLE
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -49,33 +55,56 @@ class StatisticsScreenLayoutTest {
     private val today = LocalDate.of(2026, 9, 16)
 
     @Test
-    fun givenNoCompletedWorkoutsThenEmptyStateIsShown() {
+    fun givenNoCompletedWorkoutsThenEmptyStateStillShowsAdherenceAndRange() {
         render(StatisticsUiState(loading = false, dashboard = TrainingStatistics()))
         composeRule.onNodeWithTag(STATISTICS_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_RANGE).assertIsDisplayed()
         composeRule.onNodeWithTag(STATISTICS_EMPTY).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.statistics_empty_body)).assertIsDisplayed()
-        composeRule.onNodeWithTag(STATISTICS_CONSISTENCY).assertDoesNotExist()
+        composeRule.onNodeWithTag(STATISTICS_ACTIVITY).assertDoesNotExist()
         composeRule.onNodeWithTag(STATISTICS_VOLUME).assertDoesNotExist()
+        composeRule.onNodeWithTag(STATISTICS_ADHERENCE).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.statistics_adherence_empty)).assertIsDisplayed()
+    }
+
+    @Test
+    fun givenOneWorkoutThenSummarySectionsAreShownWithoutTrends() {
+        render(
+            StatisticsUiState(
+                loading = false,
+                dashboard = TrainingStatistics(
+                    activity = TrainingActivity(1, 2, 1, 3_600_000L),
+                    volume = TrainingVolume(totalKg = 400.0, completedSetCount = 1),
+                    muscleDistribution = listOf(MuscleTrainingCount(MuscleGroup.CHEST, 2, 1, today)),
+                    exercises = listOf(exercise("Bench press", 80.0, 80.0, historySize = 1))
+                )
+            )
+        )
+        composeRule.onNodeWithTag(STATISTICS_ACTIVITY).assertIsDisplayed()
+        composeRule.onNodeWithText(testQuantity(R.plurals.statistics_workouts, 1)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.statistics_trend_insufficient))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.statistics_rest_empty))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Bench press").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_SEE_MUSCLES).assertDoesNotExist()
     }
 
     @Test
     fun givenCompletedWorkoutsThenDashboardSectionsAreShown() {
         render(populated())
-        composeRule.onNodeWithTag(STATISTICS_CONSISTENCY).assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_ACTIVITY).assertIsDisplayed()
         composeRule.onNodeWithText(testQuantity(R.plurals.statistics_workouts, 2)).assertIsDisplayed()
-        composeRule.onNodeWithText(testQuantity(R.plurals.statistics_workouts, 4)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.statistics_frequency_value, 1.0)).assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_ADHERENCE).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.statistics_adherence_percent, 83)).assertIsDisplayed()
         composeRule.onNodeWithTag(STATISTICS_VOLUME).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.statistics_volume_scope)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Bench press").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.statistics_best_weight, "80.0 kg", 5))
-            .performScrollTo()
-            .assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.statistics_best_weight, "75.0 kg", 4))
-            .performScrollTo()
-            .assertIsDisplayed()
         composeRule.onNodeWithTag(STATISTICS_MUSCLES).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.muscle_chest)).onFirst().assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_REST).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -83,15 +112,60 @@ class StatisticsScreenLayoutTest {
         render(
             StatisticsUiState(
                 loading = false,
-                dashboard = TrainingStatistics(completedWorkoutCount = 1, workoutsLast7Days = 1)
+                dashboard = TrainingStatistics(activity = TrainingActivity(1, 1, 1))
             )
         )
         composeRule.onNodeWithText(testString(R.string.statistics_volume_unavailable))
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.statistics_progress_empty))
-            .performScrollTo()
-            .assertIsDisplayed()
+    }
+
+    @Test
+    fun givenMoreMusclesThanSummaryThenSeeDetailsFiresOnce() {
+        val opened = intArrayOf(0)
+        render(
+            populated(
+                muscles = listOf(
+                    MuscleTrainingCount(MuscleGroup.CHEST, 8, 2, today),
+                    MuscleTrainingCount(MuscleGroup.LATS, 6, 2, today),
+                    MuscleTrainingCount(MuscleGroup.BICEPS, 4, 2, today),
+                    MuscleTrainingCount(MuscleGroup.TRICEPS, 2, 1, today)
+                )
+            ),
+            onOpenMuscles = { opened[0] += 1 }
+        )
+        composeRule.onNodeWithTag(STATISTICS_SEE_MUSCLES).performScrollTo().performClick()
+        assertEquals(1, opened[0])
+    }
+
+    @Test
+    fun givenExerciseRowWhenTappedThenCallbackRunsOnce() {
+        val opened = longArrayOf(0L)
+        render(populated(), onOpenExercise = { opened[0] = it })
+        composeRule.onNodeWithTag("statistics-exercise-1").performScrollTo().performClick()
+        assertEquals(1L, opened[0])
+    }
+
+    @Test
+    fun givenLockedProRangeThenProInfoIsShown() {
+        render(
+            populated().copy(lockedFeature = AppFeature.AdvancedStatistics)
+        )
+        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testString(
+                R.string.pro_info_feature_body,
+                testString(R.string.pro_feature_advanced_statistics)
+            )
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun givenRangeChipWhenTappedThenCallbackReceivesThatRange() {
+        val selected = arrayOfNulls<StatisticsRange>(1)
+        render(populated(), onRangeSelected = { selected[0] = it })
+        composeRule.onNodeWithTag("statistics-range-3m").performClick()
+        assertEquals(StatisticsRange.Months3, selected[0])
     }
 
     @Test
@@ -102,47 +176,63 @@ class StatisticsScreenLayoutTest {
         assertEquals(1, backs[0])
     }
 
-    private fun populated(): StatisticsUiState {
+    private fun populated(
+        muscles: List<MuscleTrainingCount> = listOf(MuscleTrainingCount(MuscleGroup.CHEST, 4, 2, today))
+    ): StatisticsUiState {
         return StatisticsUiState(
             loading = false,
+            range = StatisticsRange.Days30,
             dashboard = TrainingStatistics(
-                completedWorkoutCount = 2,
-                workoutsLast7Days = 2,
-                trainingDaysLast7Days = 2,
-                workoutsLast30Days = 4,
-                trainingDaysLast30Days = 4,
-                recentWeeklyFrequency = 1.0,
-                weightedLoad = WeightedLoadVolume(800.0, 800.0, 4, 4),
-                weeklyVolume = listOf(
-                    WeeklyVolumePoint(today.minusWeeks(1), 400.0),
-                    WeeklyVolumePoint(today, 400.0)
-                ),
-                exerciseProgress = listOf(
-                    ExerciseProgressSummary(
-                        exerciseId = 1L,
-                        name = "Bench press",
-                        measurementType = MeasurementType.REPETITIONS_AND_WEIGHT,
-                        lastTrained = today,
-                        best = ExerciseBest.WeightedSet(80.0, 80.0, 5, false),
-                        recent = ExerciseBest.WeightedSet(75.0, 75.0, 4, false),
-                        history = listOf(
-                            ExerciseHistoryPoint(today.minusWeeks(1), 70.0),
-                            ExerciseHistoryPoint(today, 80.0)
-                        ),
-                        historyKind = ExerciseHistoryKind.EFFECTIVE_KG
+                range = StatisticsRange.Days30,
+                activity = TrainingActivity(2, 8, 2, 3_600_000L),
+                adherence = PlanAdherence(plannedCount = 12, completedCount = 10, missedCount = 2),
+                volume = TrainingVolume(
+                    totalKg = 800.0,
+                    completedSetCount = 4,
+                    trend = listOf(
+                        SeriesPoint(today.minusWeeks(1), 400.0),
+                        SeriesPoint(today, 400.0)
                     )
                 ),
-                recentlyTrainedMuscles = listOf(
-                    MuscleTrainingCount(MuscleGroup.CHEST, 4, 2, today)
+                muscleDistribution = muscles,
+                restBetweenSessions = listOf(
+                    MuscleRestSummary(MuscleGroup.CHEST, 4, 2.8, 1, 6, today)
                 ),
-                mostTrainedMuscles = listOf(
-                    MuscleTrainingCount(MuscleGroup.CHEST, 4, 2, today)
+                exercises = listOf(
+                    exercise("Bench press", 80.0, 75.0, historySize = 2)
                 )
             )
         )
     }
 
-    private fun render(state: StatisticsUiState, onBack: () -> Unit = {}) {
+    private fun exercise(
+        name: String,
+        bestKg: Double,
+        recentKg: Double,
+        historySize: Int
+    ): ExerciseProgressSummary {
+        val history = List(historySize) { index ->
+            ExerciseHistoryPoint(today.minusWeeks((historySize - 1 - index).toLong()), recentKg)
+        }
+        return ExerciseProgressSummary(
+            exerciseId = 1L,
+            name = name,
+            measurementType = MeasurementType.REPETITIONS_AND_WEIGHT,
+            lastTrained = today,
+            best = ExerciseBest.WeightedSet(bestKg, bestKg, 5, false),
+            recent = ExerciseBest.WeightedSet(recentKg, recentKg, 4, false),
+            history = history,
+            historyKind = ExerciseHistoryKind.EFFECTIVE_KG
+        )
+    }
+
+    private fun render(
+        state: StatisticsUiState,
+        onBack: () -> Unit = {},
+        onRangeSelected: (StatisticsRange) -> Unit = {},
+        onOpenMuscles: () -> Unit = {},
+        onOpenExercise: (Long) -> Unit = {}
+    ) {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -155,7 +245,13 @@ class StatisticsScreenLayoutTest {
                             .height(2000.dp)
                             .fillMaxSize()
                     ) {
-                        StatisticsScreen(state = state, onBack = onBack)
+                        StatisticsScreen(
+                            state = state,
+                            onBack = onBack,
+                            onRangeSelected = onRangeSelected,
+                            onOpenMuscleDistribution = onOpenMuscles,
+                            onOpenExercise = onOpenExercise
+                        )
                     }
                 }
             }

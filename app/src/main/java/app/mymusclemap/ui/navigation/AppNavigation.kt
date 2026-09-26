@@ -9,7 +9,13 @@ object AppRoutes {
     const val HELP = "help"
     const val PRIVACY = "privacy"
     const val PRO_INFO = "pro_info"
+    const val STATISTICS_GRAPH = "statistics_graph"
     const val STATISTICS = "statistics"
+    const val STATISTICS_MUSCLES = "statistics_muscles"
+    const val STATISTICS_REST = "statistics_rest"
+    const val STATISTICS_EXERCISES = "statistics_exercises"
+    const val STATISTICS_EXERCISE = "statistics_exercise"
+    const val STATISTICS_EXERCISE_PATTERN = "statistics_exercise?exerciseId={exerciseId}"
     const val EXERCISES = "exercises"
     const val EXERCISE_EDITOR = "exercise_editor"
     const val EXERCISE_EDITOR_PATTERN = "exercise_editor?exerciseId={exerciseId}"
@@ -111,9 +117,9 @@ object AppNavigation {
 
     fun openStatistics(currentRoute: String?): InternalNavigation {
         return InternalNavigation(
-            targetRoute = AppRoutes.STATISTICS,
+            targetRoute = AppRoutes.STATISTICS_GRAPH,
             backTarget = AppRoutes.OVERVIEW,
-            shouldPush = shouldNavigate(currentRoute, AppRoutes.STATISTICS)
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.STATISTICS_GRAPH)
         )
     }
 

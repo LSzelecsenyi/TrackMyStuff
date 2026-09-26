@@ -10,7 +10,9 @@ data class MeasurementListItem(
 data class ChartPoint(
     val date: LocalDate,
     val weightKg: Double
-)
+) {
+    fun toSeriesPoint(): SeriesPoint = SeriesPoint(date = date, value = weightKg)
+}
 
 enum class ChartRange {
     Days30,

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,7 +71,6 @@ import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.WeightMeasurement
 import app.mymusclemap.domain.workout.ScheduledWorkout
-import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.ui.components.DayDetailsSheet
 import app.mymusclemap.ui.components.DeleteMeasurementDialog
 import app.mymusclemap.ui.components.MeasurementEditorSheet
@@ -83,9 +84,8 @@ import app.mymusclemap.ui.components.stringRes
 import app.mymusclemap.ui.components.WeightChart
 import app.mymusclemap.ui.components.musclemap.MuscleHeatmapCard
 import app.mymusclemap.ui.onboarding.OnboardingReminderCard
-import app.mymusclemap.ui.pro.GatedFeatureRow
-import app.mymusclemap.ui.pro.ProAccessHost
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
@@ -226,16 +226,12 @@ fun DashboardScreen(
                 onOpenCatalog = onOpenCatalog
             )
             OverviewSectionDivider()
-            ProAccessHost { gate ->
-                GatedFeatureRow(
-                    title = stringResource(R.string.statistics_title),
-                    subtitle = stringResource(R.string.statistics_entry_subtitle),
-                    feature = AppFeature.AdvancedStatistics,
-                    onUnlockedClick = onOpenStatistics,
-                    onLockedClick = { feature -> gate(feature) {} },
-                    testTag = OVERVIEW_STATISTICS
-                )
-            }
+            OverviewDestinationRow(
+                title = stringResource(R.string.statistics_title),
+                subtitle = stringResource(R.string.statistics_entry_subtitle),
+                onClick = onOpenStatistics,
+                testTag = OVERVIEW_STATISTICS
+            )
             if (state.onboarding.reminderVisible) {
                 OverviewSectionDivider()
                 OnboardingReminderCard(
@@ -362,6 +358,54 @@ fun DashboardScreen(
             onDeleteDismiss = onDeleteDismiss,
             onDeleteConfirm = onDeleteConfirm
         )
+    }
+}
+
+@Composable
+private fun OverviewDestinationRow(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppShapeTokens.surface,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = AppDimens.minTouch)
+                .clickable(onClick = onClick)
+                .testTag(testTag)
+                .padding(AppDimens.heroPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = AppTypeTokens.sectionTitle,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    style = AppTypeTokens.statCaption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

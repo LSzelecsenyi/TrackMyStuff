@@ -79,20 +79,20 @@ class DashboardScreenLayoutTest {
     private val today = LocalDate.of(2026, 3, 11)
 
     @Test
-    fun statisticsRowIsVisibleWithProBadgeAndOpensWhenUnlocked() {
+    fun statisticsRowIsVisibleWithoutProBadgeAndOpensForEveryone() {
         val opened = intArrayOf(0)
         render(onOpenStatistics = { opened[0] += 1 })
         composeRule.onNodeWithTag(OVERVIEW_STATISTICS).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.statistics_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.statistics_entry_subtitle)).assertIsDisplayed()
-        composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag(OVERVIEW_STATISTICS).performClick()
         assertEquals(1, opened[0])
         composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
     }
 
     @Test
-    fun lockedStatisticsShowsProInfoInsteadOfOpeningTheScreen() {
+    fun lockedEntitlementsStillOpenStatisticsFromOverview() {
         val opened = intArrayOf(0)
         render(
             entitlements = SelectiveFeatureEntitlements(emptySet()),
@@ -100,14 +100,9 @@ class DashboardScreenLayoutTest {
         )
         composeRule.onNodeWithTag(OVERVIEW_STATISTICS).performClick()
         composeRule.waitForIdle()
-        assertEquals(0, opened[0])
-        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertIsDisplayed()
-        composeRule.onNodeWithText(
-            testString(
-                R.string.pro_info_feature_body,
-                testString(R.string.pro_feature_advanced_statistics)
-            )
-        ).assertIsDisplayed()
+        assertEquals(1, opened[0])
+        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
+        composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test

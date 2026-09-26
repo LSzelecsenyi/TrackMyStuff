@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.mymusclemap.domain.model.ChartPoint
+import app.mymusclemap.domain.model.ChartScale
+import app.mymusclemap.domain.model.ChartValueDomain
+import app.mymusclemap.domain.model.SeriesPoint
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.hypot
@@ -40,6 +43,29 @@ fun WeightChart(
     onPointSelected: (ChartPoint?) -> Unit = {},
     subdued: Boolean = false,
     chartHeight: Dp = 240.dp
+) {
+    SeriesChart(
+        points = points.map { it.toSeriesPoint() },
+        contentDescription = contentDescription,
+        onPointSelected = { selected ->
+            onPointSelected(selected?.let { point -> points.firstOrNull { it.date == point.date } })
+        },
+        subdued = subdued,
+        chartHeight = chartHeight,
+        valueDomain = ChartValueDomain.Padded,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun SeriesChart(
+    points: List<SeriesPoint>,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    onPointSelected: (SeriesPoint?) -> Unit = {},
+    subdued: Boolean = false,
+    chartHeight: Dp = 240.dp,
+    valueDomain: ChartValueDomain = ChartValueDomain.Padded
 ) {
     val lineColor = MaterialTheme.colorScheme.primary
     val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = if (subdued) 0.08f else 0.16f)
@@ -63,7 +89,7 @@ fun WeightChart(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(points) {
+                .pointerInput(points, valueDomain) {
                     detectTapGestures { tap ->
                         val layout = ChartLayout.from(
                             width = size.width.toFloat(),
@@ -72,7 +98,8 @@ fun WeightChart(
                             left = 52.dp.toPx(),
                             rightInset = 16.dp.toPx(),
                             top = 12.dp.toPx(),
-                            bottomInset = 40.dp.toPx()
+                            bottomInset = 40.dp.toPx(),
+                            valueDomain = valueDomain
                         )
                         val hit = layout.hitTest(tap)
                         selectedDate = hit?.date?.toString()
@@ -87,7 +114,8 @@ fun WeightChart(
                 left = 52.dp.toPx(),
                 rightInset = 16.dp.toPx(),
                 top = 12.dp.toPx(),
-                bottomInset = 40.dp.toPx()
+                bottomInset = 40.dp.toPx(),
+                valueDomain = valueDomain
             )
             layout.yLabels.forEach { label ->
                 drawLine(
@@ -167,7 +195,7 @@ fun WeightChart(
 }
 
 private data class MappedPoint(
-    val point: ChartPoint,
+    val point: SeriesPoint,
     val offset: Offset
 )
 
@@ -185,7 +213,7 @@ private data class ChartLayout(
     val plotRight: Float,
     val plotBottom: Float
 ) {
-    fun hitTest(tap: Offset): ChartPoint? {
+    fun hitTest(tap: Offset): SeriesPoint? {
         val threshold = 28f
         return mapped.minByOrNull { hypot(it.offset.x - tap.x, it.offset.y - tap.y) }
             ?.takeIf { hypot(it.offset.x - tap.x, it.offset.y - tap.y) <= threshold }
@@ -196,21 +224,18 @@ private data class ChartLayout(
         fun from(
             width: Float,
             height: Float,
-            points: List<ChartPoint>,
+            points: List<SeriesPoint>,
             left: Float,
             rightInset: Float,
             top: Float,
-            bottomInset: Float
+            bottomInset: Float,
+            valueDomain: ChartValueDomain
         ): ChartLayout {
             val right = width - rightInset
             val bottom = height - bottomInset
-            val weights = points.map { it.weightKg }
-            val minWeight = weights.minOrNull() ?: 0.0
-            val maxWeight = weights.maxOrNull() ?: 0.0
-            val span = maxOf(maxWeight - minWeight, 0.0)
-            val padding = if (span == 0.0) 1.0 else maxOf(span * 0.12, 0.3)
-            val yMin = minWeight - padding
-            val yMax = maxWeight + padding
+            val bounds = ChartScale.yBounds(points.map { it.value }, valueDomain)
+            val yMin = bounds.min
+            val yMax = bounds.max
             val yRange = (yMax - yMin).coerceAtLeast(0.001)
             val minDate = points.minOf { it.date }
             val maxDate = points.maxOf { it.date }
@@ -222,7 +247,7 @@ private data class ChartLayout(
                     val day = ChronoUnit.DAYS.between(minDate, point.date).toFloat()
                     left + (day / daySpan) * (right - left)
                 }
-                val yRatio = ((point.weightKg - yMin) / yRange).toFloat()
+                val yRatio = ((point.value - yMin) / yRange).toFloat()
                 val y = bottom - yRatio * (bottom - top)
                 MappedPoint(point, Offset(x, y))
             }

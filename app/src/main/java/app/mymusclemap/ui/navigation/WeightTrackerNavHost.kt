@@ -28,12 +28,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.mymusclemap.R
@@ -66,6 +68,10 @@ import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.pro.ProInfoScreen
 import app.mymusclemap.ui.settings.SettingsScreen
 import app.mymusclemap.ui.settings.SettingsViewModel
+import app.mymusclemap.ui.statistics.StatisticsExerciseDetailScreen
+import app.mymusclemap.ui.statistics.StatisticsExerciseListScreen
+import app.mymusclemap.ui.statistics.StatisticsMuscleDistributionScreen
+import app.mymusclemap.ui.statistics.StatisticsRestScreen
 import app.mymusclemap.ui.statistics.StatisticsScreen
 import app.mymusclemap.ui.statistics.StatisticsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorScreen
@@ -93,6 +99,7 @@ private const val ARG_SESSION_ID = "sessionId"
 private const val ARG_EXERCISES = "exercises"
 private const val ARG_COMPLETED_SETS = "completedSets"
 private const val ARG_DURATION_MILLIS = "durationMillis"
+private const val ARG_STATISTICS_EXERCISE_ID = "exerciseId"
 private const val KEY_CATALOG_SAVED = "catalog_saved"
 private const val KEY_TEMPLATE_SAVED = "template_saved"
 private const val KEY_WORKOUT_DELETED = "workout_deleted"
@@ -103,6 +110,22 @@ private fun editorRoute(exerciseId: Long?): String {
 
 private fun templateEditorRoute(templateId: Long?): String {
     return "${AppRoutes.TEMPLATE_EDITOR}?$ARG_TEMPLATE_ID=${templateId ?: -1L}"
+}
+
+private fun statisticsExerciseRoute(exerciseId: Long): String {
+    return "${AppRoutes.STATISTICS_EXERCISE}?$ARG_STATISTICS_EXERCISE_ID=$exerciseId"
+}
+
+@Composable
+private fun statisticsViewModel(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    entry: NavBackStackEntry
+): StatisticsViewModel {
+    val parent = remember(entry) {
+        navController.getBackStackEntry(AppRoutes.STATISTICS_GRAPH)
+    }
+    return viewModel(parent, factory = factory)
 }
 
 internal fun activeWorkoutRoute(sessionId: Long): String {
@@ -228,7 +251,7 @@ fun WeightTrackerNavHost(
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
                     onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
                     onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
-                    onOpenStatistics = { navController.navigateInternal(AppRoutes.STATISTICS) },
+                    onOpenStatistics = { navController.navigateInternal(AppRoutes.STATISTICS_GRAPH) },
                     onOpenWorkout = { id ->
                         viewModel.dismissDaySheet()
                         navController.navigate(workoutDetailRoute(id)) {
@@ -413,13 +436,73 @@ fun WeightTrackerNavHost(
             composable(AppRoutes.PRO_INFO) {
                 ProInfoScreen(onBack = { navController.popBackStack() })
             }
-            composable(AppRoutes.STATISTICS) {
-                val viewModel: StatisticsViewModel = viewModel(factory = factory)
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-                StatisticsScreen(
-                    state = state,
-                    onBack = { navController.popBackStack() }
-                )
+            navigation(
+                route = AppRoutes.STATISTICS_GRAPH,
+                startDestination = AppRoutes.STATISTICS
+            ) {
+                composable(AppRoutes.STATISTICS) { entry ->
+                    val viewModel = statisticsViewModel(navController, factory, entry)
+                    val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    StatisticsScreen(
+                        state = state,
+                        onBack = { navController.popBackStack() },
+                        onRangeSelected = viewModel::onRangeSelected,
+                        onDismissLocked = viewModel::consumeLockedFeature,
+                        onOpenMuscleDistribution = {
+                            navController.navigateInternal(AppRoutes.STATISTICS_MUSCLES)
+                        },
+                        onOpenRest = { navController.navigateInternal(AppRoutes.STATISTICS_REST) },
+                        onOpenExercises = {
+                            navController.navigateInternal(AppRoutes.STATISTICS_EXERCISES)
+                        },
+                        onOpenExercise = { id ->
+                            navController.navigateInternal(statisticsExerciseRoute(id))
+                        }
+                    )
+                }
+                composable(AppRoutes.STATISTICS_MUSCLES) { entry ->
+                    val viewModel = statisticsViewModel(navController, factory, entry)
+                    val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    StatisticsMuscleDistributionScreen(
+                        muscles = state.dashboard.muscleDistribution,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(AppRoutes.STATISTICS_REST) { entry ->
+                    val viewModel = statisticsViewModel(navController, factory, entry)
+                    val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    StatisticsRestScreen(
+                        rest = state.dashboard.restBetweenSessions,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(AppRoutes.STATISTICS_EXERCISES) { entry ->
+                    val viewModel = statisticsViewModel(navController, factory, entry)
+                    val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    StatisticsExerciseListScreen(
+                        exercises = state.dashboard.exercises,
+                        onBack = { navController.popBackStack() },
+                        onOpenExercise = { id ->
+                            navController.navigateInternal(statisticsExerciseRoute(id))
+                        }
+                    )
+                }
+                composable(
+                    route = AppRoutes.STATISTICS_EXERCISE_PATTERN,
+                    arguments = listOf(
+                        navArgument(ARG_STATISTICS_EXERCISE_ID) {
+                            type = NavType.LongType
+                            defaultValue = -1L
+                        }
+                    )
+                ) { entry ->
+                    val viewModel = statisticsViewModel(navController, factory, entry)
+                    val exerciseId = entry.arguments?.getLong(ARG_STATISTICS_EXERCISE_ID) ?: -1L
+                    StatisticsExerciseDetailScreen(
+                        summary = viewModel.exercise(exerciseId),
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
             composable(AppRoutes.WEIGHT_DETAILS) {
                 val viewModel: WeightDetailsViewModel = viewModel(factory = factory)

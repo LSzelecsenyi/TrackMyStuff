@@ -75,6 +75,7 @@ class AppContainer(context: Context) {
         workoutImportFileReader = ContentWorkoutImportFileReader(appContext),
         appBackupRepository = appBackupRepository,
         firstRunCoordinator = firstRunCoordinator,
-        onboardingRepository = onboardingRepository
+        onboardingRepository = onboardingRepository,
+        featureEntitlements = featureEntitlements
     )
 }
