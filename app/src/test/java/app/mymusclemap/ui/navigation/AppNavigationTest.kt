@@ -74,6 +74,33 @@ class AppNavigationTest {
     }
 
     @Test
+    fun statisticsOpensFromOverviewWithoutDuplicatingAndHidesBottomBar() {
+        val navigation = AppNavigation.openStatistics(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.STATISTICS, navigation.targetRoute)
+        assertEquals(AppRoutes.OVERVIEW, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.openStatistics(AppRoutes.STATISTICS).shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS))
+        assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.STATISTICS })
+        assertFalse(AppNavigation.shouldNavigate(AppRoutes.STATISTICS, AppRoutes.STATISTICS))
+        assertTrue(AppNavigation.shouldNavigate(AppRoutes.OVERVIEW, AppRoutes.STATISTICS))
+    }
+
+    @Test
+    fun proInfoOpensWithoutDuplicatingAndHidesBottomBar() {
+        val fromSettings = AppNavigation.openProInfo(AppRoutes.SETTINGS)
+        assertEquals(AppRoutes.PRO_INFO, fromSettings.targetRoute)
+        assertEquals(AppRoutes.SETTINGS, fromSettings.backTarget)
+        assertTrue(fromSettings.shouldPush)
+        val fromOverview = AppNavigation.openProInfo(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.OVERVIEW, fromOverview.backTarget)
+        assertFalse(AppNavigation.openProInfo(AppRoutes.PRO_INFO).shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRO_INFO))
+        assertFalse(AppNavigation.shouldNavigate(AppRoutes.PRO_INFO, AppRoutes.PRO_INFO))
+        assertTrue(AppNavigation.shouldNavigate(AppRoutes.SETTINGS, AppRoutes.PRO_INFO))
+    }
+
+    @Test
     fun exerciseCatalogAndTemplatesOpenFromOverviewWithoutDuplicating() {
         val catalog = AppNavigation.openCatalog(AppRoutes.OVERVIEW)
         assertEquals(AppRoutes.EXERCISES, catalog.targetRoute)
@@ -123,6 +150,8 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.SETTINGS))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.HELP))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRIVACY))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRO_INFO))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.EXERCISE_EDITOR_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("exercise_editor?exerciseId=12"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.TEMPLATE_EDITOR_PATTERN))

@@ -136,6 +136,19 @@ class WorkoutSessionRepository(
         return sessionDao.observeCompletedSessions().map { it.isNotEmpty() }
     }
 
+    fun observeCompletedAggregates(): Flow<List<WorkoutSessionAggregate>> {
+        return combine(
+            sessionDao.observeCompletedSessions(),
+            sessionDao.observeCompletedExercises(),
+            sessionDao.observeCompletedSets(),
+            sessionDao.observeCompletedMuscles()
+        ) { sessions, exercises, sets, muscles ->
+            sessions.map { session ->
+                toAggregate(session, exercises, sets, muscles)
+            }
+        }
+    }
+
     fun observeHeatmapExercises(): Flow<List<MuscleTrainingExercise>> {
         return combine(
             sessionDao.observeCompletedSessions(),

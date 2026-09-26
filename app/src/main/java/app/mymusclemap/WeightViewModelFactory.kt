@@ -27,6 +27,7 @@ import app.mymusclemap.ui.history.WorkoutDetailViewModel
 import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingViewModel
 import app.mymusclemap.ui.settings.SettingsViewModel
+import app.mymusclemap.ui.statistics.StatisticsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
 import app.mymusclemap.ui.templates.TemplateListViewModel
 import app.mymusclemap.ui.workout.ActiveWorkoutViewModel
@@ -133,6 +134,9 @@ class WeightViewModelFactory(
                     sessionRepository = workoutSessionRepository,
                     dateProvider = dateProvider
                 )
+            }
+            modelClass.isAssignableFrom(StatisticsViewModel::class.java) -> {
+                StatisticsViewModel(workoutSessionRepository, dateProvider)
             }
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         } as T

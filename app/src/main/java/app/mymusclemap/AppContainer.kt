@@ -14,6 +14,8 @@ import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.ContentWorkoutImportFileReader
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.SystemDateProvider
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import java.time.Clock
 
 class AppContainer(context: Context) {
@@ -55,6 +57,7 @@ class AppContainer(context: Context) {
     val themePreferences = ThemePreferences(appContext)
     val appBackupRepository = AppBackupRepository(database, themePreferences)
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
+    val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
     val onboardingRepository = OnboardingRepository(
         themePreferences = themePreferences,
         sessionRepository = workoutSessionRepository,

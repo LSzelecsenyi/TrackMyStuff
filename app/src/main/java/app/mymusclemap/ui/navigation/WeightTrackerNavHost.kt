@@ -63,8 +63,11 @@ import app.mymusclemap.ui.onboarding.OnboardingHeatmapSpotlight
 import app.mymusclemap.ui.onboarding.OnboardingWorkoutSpotlight
 import app.mymusclemap.ui.settings.HelpTipsScreen
 import app.mymusclemap.ui.settings.PrivacyPolicyScreen
+import app.mymusclemap.ui.pro.ProInfoScreen
 import app.mymusclemap.ui.settings.SettingsScreen
 import app.mymusclemap.ui.settings.SettingsViewModel
+import app.mymusclemap.ui.statistics.StatisticsScreen
+import app.mymusclemap.ui.statistics.StatisticsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorScreen
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
 import app.mymusclemap.ui.templates.TemplateListScreen
@@ -225,6 +228,7 @@ fun WeightTrackerNavHost(
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
                     onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
                     onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
+                    onOpenStatistics = { navController.navigateInternal(AppRoutes.STATISTICS) },
                     onOpenWorkout = { id ->
                         viewModel.dismissDaySheet()
                         navController.navigate(workoutDetailRoute(id)) {
@@ -405,6 +409,17 @@ fun WeightTrackerNavHost(
             }
             composable(AppRoutes.PRIVACY) {
                 PrivacyPolicyScreen(onBack = { navController.popBackStack() })
+            }
+            composable(AppRoutes.PRO_INFO) {
+                ProInfoScreen(onBack = { navController.popBackStack() })
+            }
+            composable(AppRoutes.STATISTICS) {
+                val viewModel: StatisticsViewModel = viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                StatisticsScreen(
+                    state = state,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(AppRoutes.WEIGHT_DETAILS) {
                 val viewModel: WeightDetailsViewModel = viewModel(factory = factory)

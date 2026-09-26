@@ -69,6 +69,7 @@ import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.WeightMeasurement
 import app.mymusclemap.domain.workout.ScheduledWorkout
+import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.ui.components.DayDetailsSheet
 import app.mymusclemap.ui.components.DeleteMeasurementDialog
 import app.mymusclemap.ui.components.MeasurementEditorSheet
@@ -82,6 +83,8 @@ import app.mymusclemap.ui.components.stringRes
 import app.mymusclemap.ui.components.WeightChart
 import app.mymusclemap.ui.components.musclemap.MuscleHeatmapCard
 import app.mymusclemap.ui.onboarding.OnboardingReminderCard
+import app.mymusclemap.ui.pro.GatedFeatureRow
+import app.mymusclemap.ui.pro.ProAccessHost
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
@@ -96,6 +99,7 @@ internal const val OVERVIEW_OVERFLOW_MENU = "overview-overflow-menu"
 internal const val OVERVIEW_OVERFLOW_TEMPLATES = "overview-overflow-templates"
 internal const val OVERVIEW_OVERFLOW_EXERCISES = "overview-overflow-exercises"
 internal const val OVERVIEW_OVERFLOW_SETTINGS = "overview-overflow-settings"
+internal const val OVERVIEW_STATISTICS = "overview-statistics"
 private val HeatmapCoachCalloutSpace = 176.dp
 
 @Composable
@@ -120,6 +124,7 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit,
     onOpenTemplates: () -> Unit,
     onOpenCatalog: () -> Unit,
+    onOpenStatistics: () -> Unit = {},
     onOpenWorkout: (Long) -> Unit,
     onOpenWeightDetails: () -> Unit,
     onOpenSchedulePicker: () -> Unit = {},
@@ -220,6 +225,17 @@ fun DashboardScreen(
                 onOpenTemplates = onOpenTemplates,
                 onOpenCatalog = onOpenCatalog
             )
+            OverviewSectionDivider()
+            ProAccessHost { gate ->
+                GatedFeatureRow(
+                    title = stringResource(R.string.statistics_title),
+                    subtitle = stringResource(R.string.statistics_entry_subtitle),
+                    feature = AppFeature.AdvancedStatistics,
+                    onUnlockedClick = onOpenStatistics,
+                    onLockedClick = { feature -> gate(feature) {} },
+                    testTag = OVERVIEW_STATISTICS
+                )
+            }
             if (state.onboarding.reminderVisible) {
                 OverviewSectionDivider()
                 OnboardingReminderCard(

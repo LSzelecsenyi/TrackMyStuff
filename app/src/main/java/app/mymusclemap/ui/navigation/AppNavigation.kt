@@ -8,6 +8,8 @@ object AppRoutes {
     const val SETTINGS = "settings"
     const val HELP = "help"
     const val PRIVACY = "privacy"
+    const val PRO_INFO = "pro_info"
+    const val STATISTICS = "statistics"
     const val EXERCISES = "exercises"
     const val EXERCISE_EDITOR = "exercise_editor"
     const val EXERCISE_EDITOR_PATTERN = "exercise_editor?exerciseId={exerciseId}"
@@ -96,6 +98,22 @@ object AppNavigation {
             targetRoute = AppRoutes.PRIVACY,
             backTarget = AppRoutes.SETTINGS,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.PRIVACY)
+        )
+    }
+
+    fun openProInfo(fromRoute: String, currentRoute: String? = fromRoute): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.PRO_INFO,
+            backTarget = canonicalRoute(fromRoute) ?: AppRoutes.OVERVIEW,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.PRO_INFO)
+        )
+    }
+
+    fun openStatistics(currentRoute: String?): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.STATISTICS,
+            backTarget = AppRoutes.OVERVIEW,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.STATISTICS)
         )
     }
 

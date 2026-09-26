@@ -41,6 +41,9 @@ import app.mymusclemap.domain.onboarding.OnboardingFacts
 import app.mymusclemap.domain.onboarding.OnboardingFlags
 import app.mymusclemap.domain.onboarding.OnboardingGuide
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.SelectiveFeatureEntitlements
 import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.ui.onboarding.ONBOARDING_CALENDAR_COACH
 import app.mymusclemap.ui.onboarding.ONBOARDING_CHART_COACH
@@ -50,6 +53,9 @@ import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER_CONTINUE
 import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER_DISMISS
 import app.mymusclemap.ui.onboarding.ONBOARDING_WEIGHT_SHEET
 import app.mymusclemap.ui.components.UiFormatters
+import app.mymusclemap.ui.pro.LocalFeatureEntitlements
+import app.mymusclemap.ui.pro.PRO_BADGE
+import app.mymusclemap.ui.pro.PRO_INFO_TITLE
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -71,6 +77,38 @@ class DashboardScreenLayoutTest {
     val composeRule = createComposeRule()
 
     private val today = LocalDate.of(2026, 3, 11)
+
+    @Test
+    fun statisticsRowIsVisibleWithProBadgeAndOpensWhenUnlocked() {
+        val opened = intArrayOf(0)
+        render(onOpenStatistics = { opened[0] += 1 })
+        composeRule.onNodeWithTag(OVERVIEW_STATISTICS).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.statistics_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.statistics_entry_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(OVERVIEW_STATISTICS).performClick()
+        assertEquals(1, opened[0])
+        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
+    }
+
+    @Test
+    fun lockedStatisticsShowsProInfoInsteadOfOpeningTheScreen() {
+        val opened = intArrayOf(0)
+        render(
+            entitlements = SelectiveFeatureEntitlements(emptySet()),
+            onOpenStatistics = { opened[0] += 1 }
+        )
+        composeRule.onNodeWithTag(OVERVIEW_STATISTICS).performClick()
+        composeRule.waitForIdle()
+        assertEquals(0, opened[0])
+        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testString(
+                R.string.pro_info_feature_body,
+                testString(R.string.pro_feature_advanced_statistics)
+            )
+        ).assertIsDisplayed()
+    }
 
     @Test
     fun frontAndBackStaySideBySideOnNarrowPhone() {
@@ -679,6 +717,8 @@ class DashboardScreenLayoutTest {
         onOpenTemplates: () -> Unit = {},
         onOpenCatalog: () -> Unit = {},
         onOpenSettings: () -> Unit = {},
+        onOpenStatistics: () -> Unit = {},
+        entitlements: FeatureEntitlements = OpenFeatureEntitlements,
         onboarding: OnboardingGuide = OnboardingGuide.Inactive,
         onContinueOnboarding: () -> Unit = {},
         onDismissOnboardingReminder: () -> Unit = {},
@@ -696,7 +736,8 @@ class DashboardScreenLayoutTest {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
-                LocalDensity provides Density(density = density.density, fontScale = fontScale)
+                LocalDensity provides Density(density = density.density, fontScale = fontScale),
+                LocalFeatureEntitlements provides entitlements
             ) {
                 WeightTrackerThemeForPreview(
                     seeds = if (darkTheme) ThemeSeeds.DefaultDark else ThemeSeeds.DefaultLight,
@@ -751,6 +792,7 @@ class DashboardScreenLayoutTest {
                             onOpenSettings = onOpenSettings,
                             onOpenTemplates = onOpenTemplates,
                             onOpenCatalog = onOpenCatalog,
+                            onOpenStatistics = onOpenStatistics,
                             onOpenWorkout = {},
                             onOpenWeightDetails = onOpenWeightDetails,
                             onContinueOnboarding = onContinueOnboarding,
