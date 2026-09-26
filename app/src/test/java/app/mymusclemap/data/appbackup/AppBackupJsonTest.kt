@@ -95,6 +95,8 @@ class AppBackupJsonTest {
         root.put("formatVersion", AppBackupFormat.FORMAT_VERSION)
         root.put("schemaVersion", 5)
         assertHasCode(AppBackupJson.parse(root.toString()), AppBackupErrorCode.UnsupportedSchemaVersion)
+        root.put("schemaVersion", 6)
+        assertTrue(AppBackupJson.parse(root.toString()) is AppBackupParseResult.Success)
     }
 
     @Test

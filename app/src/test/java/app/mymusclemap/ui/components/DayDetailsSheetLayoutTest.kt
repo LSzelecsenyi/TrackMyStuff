@@ -106,7 +106,7 @@ class DayDetailsSheetLayoutTest {
             )
         )
         composeRule.onNodeWithText(testString(R.string.schedule_status_missed)).assertIsDisplayed()
-        composeRule.onAllNodesWithText(testString(R.string.action_start_workout)).assertCountEquals(0)
+        composeRule.onNodeWithText(testString(R.string.action_start_workout)).assertIsDisplayed()
     }
 
     @Test

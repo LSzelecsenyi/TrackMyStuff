@@ -48,7 +48,9 @@ object AppBackupValidator {
         )
         requireUnique(tables.scheduledWorkouts.map { it.id }, "scheduled_workouts.id", errors)
         requireUnique(
-            tables.scheduledWorkouts.map { it.scheduledDate to it.templateId },
+            tables.scheduledWorkouts
+                .filter { it.cancelledAt == null && it.templateId != null }
+                .map { it.scheduledDate to it.templateId },
             "scheduled_workouts.date_template",
             errors
         )
@@ -84,6 +86,10 @@ object AppBackupValidator {
         tables.weightMeasurements.forEach { requireIsoDate(it.date, "weight_measurements.date", errors) }
         tables.scheduledWorkouts.forEach {
             requireIsoDate(it.scheduledDate, "scheduled_workouts.scheduledDate", errors)
+            requireIsoDate(it.originalScheduledDate, "scheduled_workouts.originalScheduledDate", errors)
+            if (it.templateName.isBlank()) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "scheduled_workouts.templateName")
+            }
         }
         tables.workoutSessions.forEach {
             requireIsoDate(it.workoutDate, "workout_sessions.workoutDate", errors)
@@ -199,7 +205,8 @@ object AppBackupValidator {
             }
         }
         tables.scheduledWorkouts.forEach { row ->
-            if (row.templateId !in templateIds) {
+            val templateId = row.templateId
+            if (templateId != null && templateId !in templateIds) {
                 errors += AppBackupError(AppBackupErrorCode.MissingRelation, "scheduled_workouts.templateId")
             }
         }

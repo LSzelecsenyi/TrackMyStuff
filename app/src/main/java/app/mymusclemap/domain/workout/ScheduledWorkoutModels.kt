@@ -11,17 +11,21 @@ enum class ScheduledWorkoutStatus {
 data class ScheduledWorkout(
     val id: Long,
     val scheduledDate: LocalDate,
-    val templateId: Long,
+    val templateId: Long?,
     val templateName: String,
     val exerciseCount: Int,
     val plannedSetCount: Int,
     val templateArchived: Boolean,
     val sessionId: Long?,
     val sessionStatus: SessionStatus?,
-    val createdAt: Long
+    val createdAt: Long,
+    val originalScheduledDate: LocalDate = scheduledDate,
+    val cancelledAt: Long? = null
 ) {
     val status: ScheduledWorkoutStatus
         get() = statusFromSession(sessionStatus)
+
+    val isCancelled: Boolean get() = cancelledAt != null
 }
 
 fun statusFromSession(sessionStatus: SessionStatus?): ScheduledWorkoutStatus {

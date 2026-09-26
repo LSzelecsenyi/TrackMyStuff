@@ -417,3 +417,66 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         )
     }
 }
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `scheduled_workouts_new` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `scheduledDate` TEXT NOT NULL,
+                `originalScheduledDate` TEXT NOT NULL,
+                `templateId` INTEGER,
+                `templateName` TEXT NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                `cancelledAt` INTEGER,
+                FOREIGN KEY(`templateId`) REFERENCES `workout_templates`(`id`) ON UPDATE CASCADE ON DELETE SET NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO `scheduled_workouts_new` (
+                `id`, `scheduledDate`, `originalScheduledDate`, `templateId`, `templateName`, `createdAt`, `cancelledAt`
+            )
+            SELECT
+                sw.`id`,
+                sw.`scheduledDate`,
+                sw.`scheduledDate`,
+                sw.`templateId`,
+                t.`name`,
+                sw.`createdAt`,
+                NULL
+            FROM `scheduled_workouts` sw
+            INNER JOIN `workout_templates` t ON t.`id` = sw.`templateId`
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE `scheduled_workouts`")
+        db.execSQL("ALTER TABLE `scheduled_workouts_new` RENAME TO `scheduled_workouts`")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_scheduled_workouts_scheduledDate` ON `scheduled_workouts` (`scheduledDate`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_scheduled_workouts_templateId` ON `scheduled_workouts` (`templateId`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_scheduled_workouts_cancelledAt` ON `scheduled_workouts` (`cancelledAt`)"
+        )
+        db.execSQL(
+            """
+            UPDATE sqlite_sequence
+            SET seq = (SELECT IFNULL(MAX(id), 0) FROM `scheduled_workouts`)
+            WHERE name = 'scheduled_workouts'
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO sqlite_sequence(name, seq)
+            SELECT 'scheduled_workouts', IFNULL(MAX(id), 0) FROM `scheduled_workouts`
+            WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'scheduled_workouts')
+              AND EXISTS (SELECT 1 FROM `scheduled_workouts`)
+            """.trimIndent()
+        )
+    }
+}
+

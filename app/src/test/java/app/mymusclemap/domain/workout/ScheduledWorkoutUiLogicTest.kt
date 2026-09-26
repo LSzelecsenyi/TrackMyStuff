@@ -28,11 +28,12 @@ class ScheduledWorkoutUiLogicTest {
     }
 
     @Test
-    fun givenPastPlannedWhenPresentedThenItIsMissedAndCannotStart() {
+    fun givenPastPlannedWhenPresentedThenItIsMissedAndCanStartLater() {
         val actions = ScheduledWorkoutUiLogic.actions(item(today.minusDays(1)), today)
-        assertFalse(actions.canStart)
+        assertTrue(actions.canStart)
         assertEquals(ScheduledStatusLabel.MISSED, actions.status)
         assertTrue(actions.canUnschedule)
+        assertTrue(actions.canReschedule)
     }
 
     @Test

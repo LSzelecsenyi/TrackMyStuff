@@ -242,7 +242,10 @@ abstract class WorkoutSessionDao {
             if (scheduled.templateId != expectedTemplateId) {
                 return InsertStartedSessionResult.ScheduleTemplateMismatch
             }
-            if (scheduled.scheduledDate != todayIso) {
+            if (scheduled.cancelledAt != null) {
+                return InsertStartedSessionResult.ScheduleNotFound
+            }
+            if (scheduled.scheduledDate > todayIso) {
                 return InsertStartedSessionResult.ScheduleNotOnToday
             }
             if (getSessionIdByScheduledWorkoutId(scheduledWorkoutId) != null) {

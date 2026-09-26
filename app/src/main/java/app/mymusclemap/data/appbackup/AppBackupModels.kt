@@ -16,7 +16,8 @@ import java.time.Instant
 object AppBackupFormat {
     const val FORMAT = "my-muscle-map-backup"
     const val FORMAT_VERSION = 1
-    const val SCHEMA_VERSION = 6
+    const val SCHEMA_VERSION = 7
+    const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024
 
     const val TABLE_WEIGHT_MEASUREMENTS = "weight_measurements"

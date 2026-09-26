@@ -9,6 +9,8 @@ import app.mymusclemap.data.local.WorkoutTemplateEntity
 import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
 import app.mymusclemap.data.local.toModel
+import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.SystemDateProvider
 import app.mymusclemap.domain.exercise.Exercise
 import app.mymusclemap.domain.workout.PlannedSetLogic
 import app.mymusclemap.domain.workout.TemplateDeleteResult
@@ -30,7 +32,8 @@ class WorkoutTemplateRepository(
     private val exerciseDao: ExerciseDao,
     private val clock: Clock,
     private val sessionDao: WorkoutSessionDao? = null,
-    private val scheduledWorkoutDao: ScheduledWorkoutDao? = null
+    private val scheduledWorkoutDao: ScheduledWorkoutDao? = null,
+    private val dateProvider: DateProvider = SystemDateProvider(clock)
 ) {
     fun observeActiveCount(): Flow<Int> = templateDao.observeActiveCount()
 
@@ -197,6 +200,11 @@ class WorkoutTemplateRepository(
         if (!canDeletePermanently(id)) {
             return TemplateDeleteResult.BlockedByReferences
         }
+        scheduledWorkoutDao?.cancelUnlinkedFrom(
+            templateId = id,
+            fromDate = dateProvider.today().toString(),
+            cancelledAt = clock.millis()
+        )
         templateDao.deleteTemplate(id)
         return TemplateDeleteResult.Deleted
     }
@@ -206,17 +214,13 @@ class WorkoutTemplateRepository(
     }
 
     fun observeReferencedTemplateIds(): Flow<Set<Long>> {
-        val sessionIds = sessionDao?.observeReferencedTemplateIds() ?: MutableStateFlow(emptyList())
-        val scheduledIds = scheduledWorkoutDao?.observeTemplateIds() ?: MutableStateFlow(emptyList())
-        return combine(sessionIds, scheduledIds) { sessions, scheduled ->
-            (sessions + scheduled).toSet()
-        }
+        return sessionDao?.observeReferencedTemplateIds()?.map { it.toSet() }
+            ?: MutableStateFlow(emptySet())
     }
 
     private suspend fun hasPerformedSessionReferences(templateId: Long): Boolean {
         val sessionRefs = sessionDao?.countTemplateReferences(templateId) ?: 0
-        val scheduledRefs = scheduledWorkoutDao?.countByTemplate(templateId) ?: 0
-        return sessionRefs > 0 || scheduledRefs > 0
+        return sessionRefs > 0
     }
 
     private suspend fun catalogMap(ids: List<Long>): Map<Long, Exercise> {

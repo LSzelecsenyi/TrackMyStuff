@@ -77,7 +77,8 @@ class ScheduledWorkoutRepositoryRoomTest {
             database.exerciseDao(),
             clock,
             database.workoutSessionDao(),
-            database.scheduledWorkoutDao()
+            database.scheduledWorkoutDao(),
+            FixedDateProvider(today)
         )
         val weights = WeightRepository(database.weightMeasurementDao(), clock)
         sessions = WorkoutSessionRepository(
@@ -102,6 +103,8 @@ class ScheduledWorkoutRepositoryRoomTest {
         val result = scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled
         val stored = scheduled.getById(result.id)!!
         assertEquals(today, stored.scheduledDate)
+        assertEquals(today, stored.originalScheduledDate)
+        assertNull(stored.cancelledAt)
         assertEquals(templateId, stored.templateId)
         assertEquals("Push A", stored.templateName)
         assertEquals(1, stored.exerciseCount)
@@ -172,6 +175,7 @@ class ScheduledWorkoutRepositoryRoomTest {
         assertEquals(RescheduleWorkoutResult.Moved, scheduled.reschedule(id, today.minusDays(3)))
         val stored = scheduled.getById(id)!!
         assertEquals(today.minusDays(3), stored.scheduledDate)
+        assertEquals(today, stored.originalScheduledDate)
         assertTrue(scheduled.observeOnDate(today).first().isEmpty())
         assertEquals(listOf(id), scheduled.observeOnDate(today.minusDays(3)).first().map { it.id })
     }
@@ -193,6 +197,9 @@ class ScheduledWorkoutRepositoryRoomTest {
         assertEquals(UnscheduleWorkoutResult.Removed, scheduled.unschedule(id))
         assertNull(scheduled.getById(id))
         assertTrue(scheduled.observeOnDate(today).first().isEmpty())
+        val cancelled = database.scheduledWorkoutDao().getEntity(id)!!
+        assertEquals(1_000L, cancelled.cancelledAt)
+        assertEquals(today.toString(), cancelled.scheduledDate)
     }
 
     @Test
@@ -254,15 +261,21 @@ class ScheduledWorkoutRepositoryRoomTest {
     }
 
     @Test
-    fun givenPastOrFutureScheduleWhenStartedThenItIsRejectedWithoutASession() = runTest {
+    fun givenPastScheduleWhenStartedThenItCompletesTheSameOccurrence() = runTest {
         val templateId = savePush("Push A")
-        val pastId = (scheduled.schedule(templateId, today.minusDays(1)) as ScheduleWorkoutResult.Scheduled).id
+        val past = today.minusDays(2)
+        val pastId = (scheduled.schedule(templateId, past) as ScheduleWorkoutResult.Scheduled).id
         val futureTemplate = savePush("Jövő")
         val futureId = (scheduled.schedule(futureTemplate, today.plusDays(1)) as ScheduleWorkoutResult.Scheduled).id
-        assertEquals(StartWorkoutResult.ScheduleNotOnToday, sessions.start(templateId, pastId))
+        val started = sessions.start(templateId, pastId) as StartWorkoutResult.Started
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(started.sessionId, skipRemaining = true))
+        val stored = scheduled.getById(pastId)!!
+        assertEquals(past, stored.scheduledDate)
+        assertEquals(past, stored.originalScheduledDate)
+        assertEquals(pastId, sessions.getAggregate(started.sessionId)!!.session.scheduledWorkoutId)
+        assertEquals(today, sessions.getAggregate(started.sessionId)!!.session.workoutDate)
+        assertEquals(ScheduledWorkoutStatus.COMPLETED, stored.status)
         assertEquals(StartWorkoutResult.ScheduleNotOnToday, sessions.start(futureTemplate, futureId))
-        assertNull(sessions.observeInProgress().first())
-        assertEquals(ScheduledWorkoutStatus.PLANNED, scheduled.getById(pastId)!!.status)
         assertEquals(ScheduledWorkoutStatus.PLANNED, scheduled.getById(futureId)!!.status)
     }
 
@@ -352,6 +365,89 @@ class ScheduledWorkoutRepositoryRoomTest {
         assertTrue(heatmap.isNotEmpty())
         assertEquals(started.sessionId, sessions.observeLatestCompleted().first()!!.session.id)
         assertNull(sessions.observeInProgress().first())
+    }
+
+    @Test
+    fun givenCancelledFutureOccurrenceWhenObservedThenItDoesNotRemainPlanned() = runTest {
+        val templateId = savePush("Push A")
+        val future = today.plusDays(3)
+        val id = (scheduled.schedule(templateId, future) as ScheduleWorkoutResult.Scheduled).id
+        assertEquals(UnscheduleWorkoutResult.Removed, scheduled.unschedule(id))
+        assertNull(scheduled.getById(id))
+        assertTrue(scheduled.observeUpcoming(today).first().none { it.id == id })
+        assertTrue(scheduled.observeAll().first().none { it.id == id })
+        val retained = database.scheduledWorkoutDao().getEntity(id)!!
+        assertEquals(future.toString(), retained.scheduledDate)
+        assertEquals(future.toString(), retained.originalScheduledDate)
+        assertEquals(1_000L, retained.cancelledAt)
+        assertEquals(StartWorkoutResult.ScheduleNotFound, sessions.start(templateId, id))
+        assertTrue(scheduled.schedule(templateId, future) is ScheduleWorkoutResult.Scheduled)
+    }
+
+    @Test
+    fun givenRescheduleWhenMovedThenIdentityStaysOneObligation() = runTest {
+        val templateId = savePush("Push A")
+        val wednesday = today.plusDays(2)
+        val thursday = wednesday.plusDays(1)
+        val id = (scheduled.schedule(templateId, wednesday) as ScheduleWorkoutResult.Scheduled).id
+        assertEquals(RescheduleWorkoutResult.Moved, scheduled.reschedule(id, thursday))
+        val stored = scheduled.getById(id)!!
+        assertEquals(thursday, stored.scheduledDate)
+        assertEquals(wednesday, stored.originalScheduledDate)
+        assertEquals(1, scheduled.observeAll().first().size)
+        assertTrue(scheduled.observeOnDate(wednesday).first().isEmpty())
+        assertEquals(listOf(id), scheduled.observeOnDate(thursday).first().map { it.id })
+    }
+
+    @Test
+    fun givenTemplateDeletedWhenHistoryExistsThenPastOccurrencesSurviveAndFutureOnesAreCancelled() = runTest {
+        val templateId = savePush("Push A")
+        val pastId = (scheduled.schedule(templateId, today.minusDays(2)) as ScheduleWorkoutResult.Scheduled).id
+        val futureId = (scheduled.schedule(templateId, today.plusDays(2)) as ScheduleWorkoutResult.Scheduled).id
+        assertEquals(TemplateDeleteResult.Deleted, templates.deletePermanently(templateId))
+        assertNull(database.workoutTemplateDao().getById(templateId))
+        val past = database.scheduledWorkoutDao().getEntity(pastId)!!
+        assertNull(past.cancelledAt)
+        assertNull(past.templateId)
+        assertEquals("Push A", past.templateName)
+        assertEquals(today.minusDays(2).toString(), past.originalScheduledDate)
+        val pastModel = scheduled.getById(pastId)!!
+        assertNull(pastModel.templateId)
+        assertTrue(pastModel.templateArchived)
+        assertEquals(ScheduledWorkoutStatus.PLANNED, pastModel.status)
+        assertNull(scheduled.getById(futureId))
+        val future = database.scheduledWorkoutDao().getEntity(futureId)!!
+        assertEquals(1_000L, future.cancelledAt)
+        assertNull(future.templateId)
+        assertEquals("Push A", future.templateName)
+    }
+
+    @Test
+    fun givenHubWorkoutWhenSameTemplateExistsOnTheScheduleThenTheOccurrenceStaysOpen() = runTest {
+        val templateId = savePush("Push A")
+        val scheduleId = (scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled).id
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        assertNull(sessions.getAggregate(started.sessionId)!!.session.scheduledWorkoutId)
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(started.sessionId, skipRemaining = true))
+        val occurrence = scheduled.getById(scheduleId)!!
+        assertNull(occurrence.sessionId)
+        assertEquals(ScheduledWorkoutStatus.PLANNED, occurrence.status)
+        val scheduledStart = sessions.start(templateId, scheduleId)
+        assertTrue(scheduledStart is StartWorkoutResult.Started)
+    }
+
+    @Test
+    fun givenAbandonedScheduledWorkoutWhenRestartedThenTheSameOccurrenceIsUsed() = runTest {
+        val templateId = savePush("Push A")
+        val scheduleId = (scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled).id
+        val started = sessions.start(templateId, scheduleId) as StartWorkoutResult.Started
+        assertEquals(AbandonWorkoutResult.Abandoned, sessions.abandon(started.sessionId))
+        val afterAbandon = scheduled.getById(scheduleId)!!
+        assertNull(afterAbandon.sessionId)
+        assertEquals(ScheduledWorkoutStatus.PLANNED, afterAbandon.status)
+        assertNull(afterAbandon.cancelledAt)
+        val restarted = sessions.start(templateId, scheduleId) as StartWorkoutResult.Started
+        assertEquals(scheduleId, sessions.getAggregate(restarted.sessionId)!!.session.scheduledWorkoutId)
     }
 
     private fun scheduler(createdAtMillis: Long): ScheduledWorkoutRepository {

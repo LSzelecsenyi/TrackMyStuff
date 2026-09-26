@@ -150,8 +150,11 @@ object AppBackupJson {
                         JSONObject()
                             .put("id", row.id)
                             .put("scheduledDate", row.scheduledDate)
-                            .put("templateId", row.templateId)
+                            .put("originalScheduledDate", row.originalScheduledDate)
+                            .put("templateId", nullable(row.templateId))
+                            .put("templateName", row.templateName)
                             .put("createdAt", row.createdAt)
+                            .put("cancelledAt", nullable(row.cancelledAt))
                     )
                 }
             }
@@ -303,7 +306,7 @@ object AppBackupJson {
         val schemaVersion = root.optionalInt("schemaVersion")
         if (schemaVersion == null) {
             errors += AppBackupError(AppBackupErrorCode.MissingField, "schemaVersion")
-        } else if (schemaVersion != AppBackupFormat.SCHEMA_VERSION) {
+        } else if (schemaVersion !in AppBackupFormat.MIN_SUPPORTED_SCHEMA_VERSION..AppBackupFormat.SCHEMA_VERSION) {
             errors += AppBackupError(
                 AppBackupErrorCode.UnsupportedSchemaVersion,
                 schemaVersion.toString()
@@ -346,7 +349,7 @@ object AppBackupJson {
         if (errors.isNotEmpty()) {
             return AppBackupParseResult.Failure(errors)
         }
-        val tables = AppBackupTables(
+        val parsedTables = AppBackupTables(
             weightMeasurements = parseArray(tablesObject, AppBackupFormat.TABLE_WEIGHT_MEASUREMENTS, errors) {
                 parseWeight(it, errors)
             },
@@ -392,6 +395,12 @@ object AppBackupJson {
                 AppBackupFormat.TABLE_WORKOUT_SESSION_SETS,
                 errors
             ) { parseSessionSet(it, errors) }
+        )
+        val tables = parsedTables.copy(
+            scheduledWorkouts = hydrateScheduledTemplateNames(
+                parsedTables.scheduledWorkouts,
+                parsedTables.workoutTemplates
+            )
         )
         val settings = parseSettings(settingsObject, errors)
         if (errors.isNotEmpty()) {
@@ -575,9 +584,38 @@ object AppBackupJson {
     ): ScheduledWorkoutEntity? {
         val id = obj.requiredId("id", errors) ?: return null
         val scheduledDate = obj.requiredString("scheduledDate", errors) ?: return null
-        val templateId = obj.requiredId("templateId", errors) ?: return null
+        val templateId = obj.optionalNullableId("templateId", errors)
         val createdAt = obj.requiredLong("createdAt", errors) ?: return null
-        return ScheduledWorkoutEntity(id, scheduledDate, templateId, createdAt)
+        val originalScheduledDate = obj.optionalNullableString("originalScheduledDate", errors)
+            ?: scheduledDate
+        val templateName = obj.optionalNullableString("templateName", errors).orEmpty()
+        val cancelledAt = obj.optionalNullableLong("cancelledAt", errors)
+        return ScheduledWorkoutEntity(
+            id = id,
+            scheduledDate = scheduledDate,
+            originalScheduledDate = originalScheduledDate,
+            templateId = templateId,
+            templateName = templateName,
+            createdAt = createdAt,
+            cancelledAt = cancelledAt
+        )
+    }
+
+    private fun hydrateScheduledTemplateNames(
+        rows: List<ScheduledWorkoutEntity>,
+        templates: List<WorkoutTemplateEntity>
+    ): List<ScheduledWorkoutEntity> {
+        if (rows.none { it.templateName.isBlank() }) {
+            return rows
+        }
+        val names = templates.associate { it.id to it.name }
+        return rows.map { row ->
+            if (row.templateName.isNotBlank()) {
+                row
+            } else {
+                row.copy(templateName = names[row.templateId].orEmpty())
+            }
+        }
     }
 
     private fun parseSession(obj: JSONObject, errors: MutableList<AppBackupError>): WorkoutSessionEntity? {

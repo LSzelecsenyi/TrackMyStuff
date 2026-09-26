@@ -43,11 +43,13 @@ import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
 import kotlinx.coroutines.test.runTest
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -117,6 +119,9 @@ class AppBackupRepositoryTest {
         assertEquals(81L, archivedTemplate.id)
         val completed = loaded.workoutSessions.single { it.status == SessionStatus.COMPLETED.name }
         assertEquals(90L, completed.scheduledWorkoutId)
+        assertEquals(99L, loaded.scheduledWorkouts.single { it.id == 92L }.cancelledAt)
+        assertEquals("2026-09-18", loaded.scheduledWorkouts.single { it.id == 91L }.originalScheduledDate)
+        assertEquals("Nyomó nap", loaded.scheduledWorkouts.single { it.id == 90L }.templateName)
         assertEquals("import:abc", completed.importFingerprint)
         assertEquals("Edzés jegyzet", completed.notes)
         val active = loaded.workoutSessions.single { it.status == SessionStatus.IN_PROGRESS.name }
@@ -255,6 +260,26 @@ class AppBackupRepositoryTest {
         assertEquals(existing, targetDb.appBackupDao().loadTables())
     }
 
+    @Test
+    fun schema6BackupRestoresScheduledRowsByHydratingTemplateNames() = runTest {
+        val json = schema6ScheduledBackup(representativeSnapshot())
+        val parsed = AppBackupJson.parse(json) as AppBackupParseResult.Success
+        assertEquals(6, parsed.snapshot.schemaVersion)
+        val scheduled = parsed.snapshot.tables.scheduledWorkouts
+        assertEquals(2, scheduled.size)
+        val linked = scheduled.single { it.id == 90L }
+        assertEquals("Nyomó nap", linked.templateName)
+        assertEquals("2026-09-20", linked.originalScheduledDate)
+        assertNull(linked.cancelledAt)
+        val pending = scheduled.single { it.id == 91L }
+        assertEquals("Régi cardio", pending.templateName)
+        assertEquals("2026-09-21", pending.originalScheduledDate)
+        assertEquals(AppBackupRestoreResult.Success, AppBackupRepository(targetDb, themePreferences).restoreJson(json))
+        val loaded = targetDb.appBackupDao().loadTables().scheduledWorkouts.sortedBy { it.id }
+        assertEquals(scheduled, loaded)
+        assertEquals(90L, targetDb.workoutSessionDao().getById(200)!!.scheduledWorkoutId)
+    }
+
     private fun sqliteSequence(table: String): Long? {
         val cursor = targetDb.openHelper.readableDatabase.query(
             "SELECT seq FROM sqlite_sequence WHERE name = ?",
@@ -278,6 +303,26 @@ private object JSONObjectLike {
         root.put("schemaVersion", 5)
         return root.toString()
     }
+}
+
+private fun schema6ScheduledBackup(snapshot: AppBackupSnapshot): String {
+    val root = JSONObject(AppBackupJson.encode(snapshot))
+    root.put("schemaVersion", 6)
+    val tables = root.getJSONObject("tables")
+    val original = tables.getJSONArray(AppBackupFormat.TABLE_SCHEDULED_WORKOUTS)
+    val schema6Rows = JSONArray()
+    for (index in 0 until original.length()) {
+        val row = original.getJSONObject(index)
+        if (!row.isNull("cancelledAt")) {
+            continue
+        }
+        row.remove("originalScheduledDate")
+        row.remove("templateName")
+        row.remove("cancelledAt")
+        schema6Rows.put(row)
+    }
+    tables.put(AppBackupFormat.TABLE_SCHEDULED_WORKOUTS, schema6Rows)
+    return root.toString()
 }
 
 private fun customAppearance(): AppearanceSettings {
@@ -381,8 +426,31 @@ private fun representativeTables(): AppBackupTables {
             WorkoutTemplateSetEntity(8100, 810, 0, null, null, PlannedLoadKind.NONE.name, null, 1800, 5000.0)
         ),
         scheduledWorkouts = listOf(
-            ScheduledWorkoutEntity(90, "2026-09-20", 80, 40),
-            ScheduledWorkoutEntity(91, "2026-09-21", 81, 41)
+            ScheduledWorkoutEntity(
+                id = 90,
+                scheduledDate = "2026-09-20",
+                originalScheduledDate = "2026-09-20",
+                templateId = 80,
+                templateName = "Nyomó nap",
+                createdAt = 40
+            ),
+            ScheduledWorkoutEntity(
+                id = 91,
+                scheduledDate = "2026-09-21",
+                originalScheduledDate = "2026-09-18",
+                templateId = 81,
+                templateName = "Régi cardio",
+                createdAt = 41
+            ),
+            ScheduledWorkoutEntity(
+                id = 92,
+                scheduledDate = "2026-09-20",
+                originalScheduledDate = "2026-09-20",
+                templateId = 80,
+                templateName = "Nyomó nap",
+                createdAt = 42,
+                cancelledAt = 99L
+            )
         ),
         workoutSessions = listOf(
             WorkoutSessionEntity(

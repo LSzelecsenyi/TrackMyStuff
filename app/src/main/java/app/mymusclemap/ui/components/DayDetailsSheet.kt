@@ -253,7 +253,7 @@ private fun ScheduledWorkoutRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (!actions.canStart) {
+                if (!actions.canStart || actions.status == ScheduledStatusLabel.MISSED) {
                     Spacer(Modifier.height(AppDimens.statSecondaryGap))
                     Text(
                         text = stringResource(actions.status.labelRes()),

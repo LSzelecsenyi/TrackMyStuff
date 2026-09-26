@@ -12,19 +12,22 @@ import androidx.room.PrimaryKey
             entity = WorkoutTemplateEntity::class,
             parentColumns = ["id"],
             childColumns = ["templateId"],
-            onDelete = ForeignKey.RESTRICT,
+            onDelete = ForeignKey.SET_NULL,
             onUpdate = ForeignKey.CASCADE
         )
     ],
     indices = [
-        Index(value = ["scheduledDate", "templateId"], unique = true),
         Index(value = ["scheduledDate"]),
-        Index(value = ["templateId"])
+        Index(value = ["templateId"]),
+        Index(value = ["cancelledAt"])
     ]
 )
 data class ScheduledWorkoutEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val scheduledDate: String,
-    val templateId: Long,
-    val createdAt: Long
+    val originalScheduledDate: String,
+    val templateId: Long?,
+    val templateName: String,
+    val createdAt: Long,
+    val cancelledAt: Long? = null
 )

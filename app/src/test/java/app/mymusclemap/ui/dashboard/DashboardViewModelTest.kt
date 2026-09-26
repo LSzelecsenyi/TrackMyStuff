@@ -350,19 +350,27 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun givenFutureOrPastPlannedWhenStartRequestedThenNothingStarts() = runTest {
+    fun givenFuturePlannedWhenStartRequestedThenNothingStarts() = runTest {
         val futureId = (scheduled.schedule(saveTemplate("Jövő"), today.plusDays(2)) as ScheduleWorkoutResult.Scheduled).id
-        val pastId = (scheduled.schedule(saveTemplate("Múlt"), today.minusDays(2)) as ScheduleWorkoutResult.Scheduled).id
         val viewModel = dashboard()
         viewModel.selectDay(today.plusDays(2))
         viewModel.uiState.first { it.daySheet?.scheduledWorkouts?.any { it.id == futureId } == true }
         viewModel.startScheduled(futureId)
         assertNull(viewModel.uiState.value.startedSessionId)
+        assertNull(sessionRepository.observeInProgress().first())
+    }
+
+    @Test
+    fun givenPastPlannedWhenStartRequestedThenTheSameOccurrenceStarts() = runTest {
+        val pastId = (scheduled.schedule(saveTemplate("Múlt"), today.minusDays(2)) as ScheduleWorkoutResult.Scheduled).id
+        val viewModel = dashboard()
         viewModel.selectDay(today.minusDays(2))
         viewModel.uiState.first { it.daySheet?.scheduledWorkouts?.any { it.id == pastId } == true }
         viewModel.startScheduled(pastId)
-        assertNull(viewModel.uiState.value.startedSessionId)
-        assertNull(sessionRepository.observeInProgress().first())
+        val started = viewModel.uiState.first { it.startedSessionId != null }
+        val stored = sessionRepository.getAggregate(started.startedSessionId!!)!!
+        assertEquals(pastId, stored.session.scheduledWorkoutId)
+        assertEquals(today, stored.session.workoutDate)
     }
 
     @Test

@@ -19,7 +19,7 @@ object QuickStartAssembler {
         val todayInProgress = todaySchedules.filter { item ->
             item.status == ScheduledWorkoutStatus.IN_PROGRESS
         }
-        val hiddenTemplateIds = (todayPlanned + todayInProgress).map { it.templateId }.toSet()
+        val hiddenTemplateIds = (todayPlanned + todayInProgress).mapNotNull { it.templateId }.toSet()
         return QuickStartContent(
             todayPlanned = todayPlanned,
             todayInProgress = todayInProgress,

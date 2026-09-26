@@ -315,7 +315,10 @@ class WorkoutSessionRepository(
             if (scheduled.templateId != templateId) {
                 return StartWorkoutResult.ScheduleTemplateMismatch
             }
-            if (scheduled.scheduledDate != dateProvider.today().toString()) {
+            if (scheduled.cancelledAt != null) {
+                return StartWorkoutResult.ScheduleNotFound
+            }
+            if (scheduled.scheduledDate > dateProvider.today().toString()) {
                 return StartWorkoutResult.ScheduleNotOnToday
             }
             if (sessionDao.getSessionIdByScheduledWorkoutId(scheduledWorkoutId) != null) {

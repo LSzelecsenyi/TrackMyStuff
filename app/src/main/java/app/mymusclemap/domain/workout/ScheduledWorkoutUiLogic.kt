@@ -40,7 +40,7 @@ object ScheduledWorkoutUiLogic {
                 canUnschedule = false
             )
             ScheduledWorkoutStatus.PLANNED -> {
-                if (item.templateArchived) {
+                if (item.templateArchived || item.templateId == null) {
                     ScheduledWorkoutActions(
                         status = ScheduledStatusLabel.ARCHIVED,
                         canStart = false,
@@ -69,7 +69,7 @@ object ScheduledWorkoutUiLogic {
                         )
                         else -> ScheduledWorkoutActions(
                             status = ScheduledStatusLabel.MISSED,
-                            canStart = false,
+                            canStart = true,
                             canContinue = false,
                             canOpenJournal = false,
                             canReschedule = true,
@@ -92,7 +92,7 @@ object ScheduledWorkoutUiLogic {
         active: List<TemplateListItem>,
         scheduledThatDay: List<ScheduledWorkout>
     ): List<TemplateListItem> {
-        val takenIds = scheduledThatDay.map { it.templateId }.toSet()
+        val takenIds = scheduledThatDay.mapNotNull { it.templateId }.toSet()
         return LocalizedLabelOrder.sorted(
             items = active.filter { !it.template.archived && it.template.id !in takenIds },
             label = { it.template.name },

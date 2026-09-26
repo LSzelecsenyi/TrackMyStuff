@@ -58,14 +58,16 @@ class ScheduledWorkoutRepository(
         if (template.archived) {
             return ScheduleWorkoutResult.TemplateArchived
         }
-        if (scheduledWorkoutDao.findByDateAndTemplate(date.toString(), templateId) != null) {
+        if (scheduledWorkoutDao.findActiveByDateAndTemplate(date.toString(), templateId) != null) {
             return ScheduleWorkoutResult.Duplicate
         }
         return try {
             val id = scheduledWorkoutDao.insert(
                 ScheduledWorkoutEntity(
                     scheduledDate = date.toString(),
+                    originalScheduledDate = date.toString(),
                     templateId = templateId,
+                    templateName = template.name,
                     createdAt = clock.millis()
                 )
             )
@@ -81,13 +83,17 @@ class ScheduledWorkoutRepository(
 
     suspend fun reschedule(id: Long, date: LocalDate): RescheduleWorkoutResult = mutex.withLock {
         val existing = scheduledWorkoutDao.getEntity(id) ?: return RescheduleWorkoutResult.NotFound
+        if (existing.cancelledAt != null) {
+            return RescheduleWorkoutResult.NotFound
+        }
         if (sessionDao.getSessionIdByScheduledWorkoutId(id) != null) {
             return RescheduleWorkoutResult.LinkedToSession
         }
         if (existing.scheduledDate == date.toString()) {
             return RescheduleWorkoutResult.Moved
         }
-        if (scheduledWorkoutDao.findByDateAndTemplate(date.toString(), existing.templateId) != null) {
+        val templateId = existing.templateId ?: return RescheduleWorkoutResult.NotFound
+        if (scheduledWorkoutDao.findActiveByDateAndTemplate(date.toString(), templateId) != null) {
             return RescheduleWorkoutResult.Duplicate
         }
         return try {
@@ -103,24 +109,15 @@ class ScheduledWorkoutRepository(
     }
 
     suspend fun unschedule(id: Long): UnscheduleWorkoutResult = mutex.withLock {
-        scheduledWorkoutDao.getEntity(id) ?: return UnscheduleWorkoutResult.NotFound
+        val existing = scheduledWorkoutDao.getEntity(id) ?: return UnscheduleWorkoutResult.NotFound
+        if (existing.cancelledAt != null) {
+            return UnscheduleWorkoutResult.NotFound
+        }
         if (sessionDao.getSessionIdByScheduledWorkoutId(id) != null) {
             return UnscheduleWorkoutResult.LinkedToSession
         }
-        return try {
-            val deleted = scheduledWorkoutDao.deleteById(id)
-            if (deleted <= 0) {
-                UnscheduleWorkoutResult.NotFound
-            } else {
-                UnscheduleWorkoutResult.Removed
-            }
-        } catch (error: Exception) {
-            if (isForeignKeyConstraint(error)) {
-                UnscheduleWorkoutResult.LinkedToSession
-            } else {
-                throw error
-            }
-        }
+        scheduledWorkoutDao.update(existing.copy(cancelledAt = clock.millis()))
+        return UnscheduleWorkoutResult.Removed
     }
 
     private fun isUniqueConstraint(error: Throwable): Boolean {
@@ -149,18 +146,21 @@ class ScheduledWorkoutRepository(
 }
 
 internal fun ScheduledWorkoutQueryRow.toModel(): ScheduledWorkout {
+    val date = LocalDate.parse(scheduledDate)
     return ScheduledWorkout(
         id = id,
-        scheduledDate = LocalDate.parse(scheduledDate),
+        scheduledDate = date,
         templateId = templateId,
         templateName = templateName,
         exerciseCount = exerciseCount,
         plannedSetCount = plannedSetCount,
-        templateArchived = templateArchived,
+        templateArchived = templateArchived ?: true,
         sessionId = sessionId,
         sessionStatus = sessionStatus?.let { raw ->
             runCatching { SessionStatus.valueOf(raw) }.getOrNull()
         },
-        createdAt = createdAt
+        createdAt = createdAt,
+        originalScheduledDate = LocalDate.parse(originalScheduledDate),
+        cancelledAt = cancelledAt
     )
 }

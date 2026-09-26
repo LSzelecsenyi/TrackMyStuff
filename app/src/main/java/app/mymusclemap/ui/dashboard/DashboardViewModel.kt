@@ -622,6 +622,7 @@ class DashboardViewModel(
         if (!actions.canStart) {
             return
         }
+        val templateId = item.templateId ?: return
         if (starting.value || scheduleBusy.value) {
             return
         }
@@ -629,7 +630,7 @@ class DashboardViewModel(
         scheduleBusy.value = true
         viewModelScope.launch {
             try {
-                when (val result = sessionRepository.start(item.templateId, item.id)) {
+                when (val result = sessionRepository.start(templateId, item.id)) {
                     is StartWorkoutResult.Started -> {
                         startedSessionId.value = result.sessionId
                     }

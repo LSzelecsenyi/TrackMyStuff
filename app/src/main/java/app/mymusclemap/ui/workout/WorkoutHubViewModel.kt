@@ -191,7 +191,7 @@ class WorkoutHubViewModel(
         if (!ScheduledWorkoutUiLogic.actions(item, dateProvider.today()).canStart) {
             return
         }
-        requestStart(item.templateId, scheduledWorkoutId = item.id)
+        requestStart(item.templateId ?: return, scheduledWorkoutId = item.id)
     }
 
     fun continueScheduled(item: ScheduledWorkout) {
