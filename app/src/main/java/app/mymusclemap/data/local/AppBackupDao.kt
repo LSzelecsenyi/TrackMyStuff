@@ -12,6 +12,9 @@ abstract class AppBackupDao {
     @Query("SELECT * FROM weight_measurements ORDER BY id ASC")
     abstract suspend fun getWeightMeasurements(): List<WeightMeasurementEntity>
 
+    @Query("SELECT * FROM body_measurements ORDER BY id ASC")
+    abstract suspend fun getBodyMeasurements(): List<BodyMeasurementEntity>
+
     @Query("SELECT * FROM exercises ORDER BY id ASC")
     abstract suspend fun getExercises(): List<ExerciseEntity>
 
@@ -75,8 +78,14 @@ abstract class AppBackupDao {
     @Query("DELETE FROM weight_measurements")
     abstract suspend fun deleteWeightMeasurements()
 
+    @Query("DELETE FROM body_measurements")
+    abstract suspend fun deleteBodyMeasurements()
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertWeightMeasurements(rows: List<WeightMeasurementEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertBodyMeasurements(rows: List<BodyMeasurementEntity>)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertExercises(rows: List<ExerciseEntity>)
@@ -121,7 +130,8 @@ abstract class AppBackupDao {
             workoutSessions = getWorkoutSessions(),
             workoutSessionExercises = getWorkoutSessionExercises(),
             workoutSessionExerciseMuscles = getWorkoutSessionExerciseMuscles(),
-            workoutSessionSets = getWorkoutSessionSets()
+            workoutSessionSets = getWorkoutSessionSets(),
+            bodyMeasurements = getBodyMeasurements()
         )
     }
 
@@ -137,9 +147,13 @@ abstract class AppBackupDao {
         deleteWorkoutTemplates()
         deleteExerciseMuscles()
         deleteExercises()
+        deleteBodyMeasurements()
         deleteWeightMeasurements()
         if (tables.weightMeasurements.isNotEmpty()) {
             insertWeightMeasurements(tables.weightMeasurements)
+        }
+        if (tables.bodyMeasurements.isNotEmpty()) {
+            insertBodyMeasurements(tables.bodyMeasurements)
         }
         if (tables.exercises.isNotEmpty()) {
             insertExercises(tables.exercises)

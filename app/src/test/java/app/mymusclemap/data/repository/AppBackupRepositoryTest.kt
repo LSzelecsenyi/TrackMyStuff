@@ -12,6 +12,7 @@ import app.mymusclemap.data.appbackup.AppBackupSnapshot
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupTables
 import app.mymusclemap.data.appbackup.emptyTables
+import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
 import app.mymusclemap.data.local.ScheduledWorkoutEntity
@@ -278,6 +279,37 @@ class AppBackupRepositoryTest {
         val loaded = targetDb.appBackupDao().loadTables().scheduledWorkouts.sortedBy { it.id }
         assertEquals(scheduled, loaded)
         assertEquals(90L, targetDb.workoutSessionDao().getById(200)!!.scheduledWorkoutId)
+    }
+
+    @Test
+    fun schema8RoundTripKeepsWeightShapeAndBodyRowsUnderFreeRestore() = runTest {
+        val body = BodyMeasurementEntity(
+            id = 4,
+            type = "NECK",
+            date = "2026-08-01",
+            value = 38.5,
+            source = "MANUAL",
+            externalId = null,
+            createdAt = 3,
+            updatedAt = 4
+        )
+        val known = body.copy(id = 5, type = "CHEST", date = "2026-08-02", value = 100.0)
+        val snapshot = representativeSnapshot().copy(
+            tables = representativeSnapshot().tables.copy(bodyMeasurements = listOf(body, known))
+        )
+        val json = AppBackupJson.encode(snapshot)
+        val weightObject = JSONObject(json).getJSONObject("tables").getJSONArray("weight_measurements").getJSONObject(0)
+        assertEquals(setOf("id", "date", "weightKg", "createdAt", "updatedAt"), weightObject.keys().asSequence().toSet())
+        val parsed = AppBackupJson.parse(json) as AppBackupParseResult.Success
+        assertEquals(listOf(body, known), parsed.snapshot.tables.bodyMeasurements)
+        assertEquals(AppBackupRestoreResult.Success, AppBackupRepository(targetDb, themePreferences).restoreJson(json))
+        assertEquals(listOf(body, known), targetDb.appBackupDao().loadTables().bodyMeasurements)
+        val withoutBody = JSONObject(json)
+        withoutBody.getJSONObject("tables").remove("body_measurements")
+        withoutBody.put("schemaVersion", 7)
+        val restoredOld = AppBackupJson.parse(withoutBody.toString()) as AppBackupParseResult.Success
+        assertTrue(restoredOld.snapshot.tables.bodyMeasurements.isEmpty())
+        assertEquals(snapshot.tables.weightMeasurements, restoredOld.snapshot.tables.weightMeasurements)
     }
 
     private fun sqliteSequence(table: String): Long? {

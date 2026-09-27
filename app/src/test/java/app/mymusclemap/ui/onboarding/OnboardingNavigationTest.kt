@@ -130,6 +130,10 @@ class OnboardingNavigationTest {
         coordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
         factory = WeightViewModelFactory(
             weightRepository = weightRepository,
+            bodyMeasurementRepository = app.mymusclemap.data.repository.BodyMeasurementRepository(
+                database.bodyMeasurementDao(),
+                clock
+            ),
             exerciseRepository = exerciseRepository,
             workoutTemplateRepository = workoutTemplateRepository,
             workoutSessionRepository = workoutSessionRepository,

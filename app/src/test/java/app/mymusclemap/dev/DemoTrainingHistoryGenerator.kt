@@ -6,6 +6,7 @@ import app.mymusclemap.data.appbackup.AppBackupSnapshot
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupTables
 import app.mymusclemap.data.appbackup.AppBackupValidator
+import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
 import app.mymusclemap.data.local.ScheduledWorkoutEntity
@@ -18,6 +19,8 @@ import app.mymusclemap.data.local.WorkoutTemplateEntity
 import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
 import app.mymusclemap.data.local.toModel
+import app.mymusclemap.domain.body.BodyMeasurementParser
+import app.mymusclemap.domain.body.BodyMeasurementType
 import app.mymusclemap.domain.exercise.ExerciseDraft
 import app.mymusclemap.domain.exercise.ExerciseNaming
 import app.mymusclemap.domain.exercise.MeasurementType
@@ -45,6 +48,7 @@ import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.round
+import kotlin.math.sin
 
 /**
  * Development-only generator for an importable schema 7 backup.
@@ -113,6 +117,7 @@ object DemoTrainingHistoryGenerator {
         val catalog = buildCatalog(calendar)
         val templates = buildTemplates(calendar, catalog)
         val weights = buildWeights(calendar)
+        val bodyMeasurements = buildBodyMeasurements(calendar)
         val outcomes = assignOutcomes(buildSlots(calendar), calendar)
         val training = buildTraining(outcomes, calendar, catalog, templates, weights)
         val snapshot = AppBackupSnapshot(
@@ -136,7 +141,8 @@ object DemoTrainingHistoryGenerator {
                 workoutSessionExercises = training.sessionExercises.sortedBy { it.id },
                 workoutSessionExerciseMuscles = training.sessionMuscles
                     .sortedWith(compareBy({ it.sessionExerciseId }, { it.muscleGroup })),
-                workoutSessionSets = training.sessionSets.sortedBy { it.id }
+                workoutSessionSets = training.sessionSets.sortedBy { it.id },
+                bodyMeasurements = bodyMeasurements.sortedBy { it.id }
             ),
             settings = AppearanceCodec.encode(AppearanceSettings.Default)
         )
@@ -590,6 +596,64 @@ object DemoTrainingHistoryGenerator {
             day += 1
         }
         return rows
+    }
+
+    private data class BodySeriesShape(
+        val type: BodyMeasurementType,
+        val start: Double,
+        val end: Double,
+        val noise: Double,
+        val everyDays: Long,
+        val offsetDays: Long
+    )
+
+    private fun buildBodyMeasurements(calendar: DemoCalendar): List<BodyMeasurementEntity> {
+        val shapes = listOf(
+            BodySeriesShape(BodyMeasurementType.WAIST, 92.0, 84.5, 1.1, 14, 2),
+            BodySeriesShape(BodyMeasurementType.BODY_FAT, 22.4, 16.8, 0.6, 21, 5),
+            BodySeriesShape(BodyMeasurementType.CHEST, 98.0, 104.0, 0.8, 28, 8),
+            BodySeriesShape(BodyMeasurementType.UPPER_ARM, 33.5, 37.0, 0.4, 18, 4),
+            BodySeriesShape(BodyMeasurementType.THIGH, 58.0, 61.5, 0.7, 25, 11),
+            BodySeriesShape(BodyMeasurementType.HIPS, 102.0, 96.5, 0.9, 16, 6)
+        )
+        val ids = Ids()
+        val rows = mutableListOf<BodyMeasurementEntity>()
+        shapes.forEach { shape ->
+            val dates = linkedSetOf<LocalDate>()
+            var date = calendar.historyStart.plusDays(shape.offsetDays)
+            while (!date.isAfter(calendar.referenceDate)) {
+                if (!inBreak(date, calendar)) dates += date
+                date = date.plusDays(shape.everyDays)
+            }
+            listOf(calendar.referenceDate.minusDays(18), calendar.referenceDate.minusDays(2)).forEach { extra ->
+                if (!extra.isBefore(calendar.historyStart) && !extra.isAfter(calendar.referenceDate) && !inBreak(extra, calendar)) {
+                    dates += extra
+                }
+            }
+            dates.sorted().forEach { sampleDate ->
+                val stamp = epoch(sampleDate, 7)
+                rows += BodyMeasurementEntity(
+                    id = ids.next(),
+                    type = shape.type.code,
+                    date = sampleDate.toString(),
+                    value = demoBodyValue(calendar, shape, sampleDate),
+                    source = "MANUAL",
+                    externalId = null,
+                    createdAt = stamp,
+                    updatedAt = stamp
+                )
+            }
+        }
+        return rows
+    }
+
+    private fun demoBodyValue(calendar: DemoCalendar, shape: BodySeriesShape, date: LocalDate): Double {
+        val span = ChronoUnit.DAYS.between(calendar.historyStart, calendar.referenceDate).coerceAtLeast(1)
+        val t = ChronoUnit.DAYS.between(calendar.historyStart, date).toDouble() / span.toDouble()
+        val wobble = sin(t * 9.0 + shape.type.ordinal) * shape.noise
+        val step = ((date.toEpochDay() % 5) - 2) * (shape.noise / 4.0)
+        val raw = shape.start + (shape.end - shape.start) * t + wobble + step
+        return BodyMeasurementParser.quantize(raw.coerceIn(shape.type.minimum, shape.type.maximum))
     }
 
     private fun buildSlots(calendar: DemoCalendar): List<PlannedSlot> {

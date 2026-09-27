@@ -22,6 +22,21 @@ class ProInfoCopyTest {
     }
 
     @Test
+    fun advancedBodyMeasurementsExplainsExtraMeasurementsWithoutCoaching() {
+        val copy = AppFeature.AdvancedBodyMeasurements.proInfoCopy()
+        assertEquals(R.string.pro_info_body_measurements_title, copy.titleRes)
+        assertEquals(R.string.pro_info_body_measurements_body, copy.bodyRes)
+        assertEquals(
+            listOf(
+                R.string.pro_info_body_measurements_fat,
+                R.string.pro_info_body_measurements_circumferences,
+                R.string.pro_info_body_measurements_existing_stay
+            ),
+            copy.highlights
+        )
+    }
+
+    @Test
     fun advancedReportsUsesLongerReportCopyWithoutStatisticsOrCoachingClaims() {
         val copy = AppFeature.AdvancedReports.proInfoCopy()
         assertEquals(R.string.pro_info_reports_title, copy.titleRes)

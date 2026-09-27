@@ -1,5 +1,6 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
 import app.mymusclemap.data.local.ScheduledWorkoutEntity
@@ -47,6 +48,24 @@ object AppBackupJson {
                             .put("id", row.id)
                             .put("date", row.date)
                             .put("weightKg", row.weightKg)
+                            .put("createdAt", row.createdAt)
+                            .put("updatedAt", row.updatedAt)
+                    )
+                }
+            }
+        )
+        tables.put(
+            AppBackupFormat.TABLE_BODY_MEASUREMENTS,
+            JSONArray().also { array ->
+                snapshot.tables.bodyMeasurements.sortedBy { it.id }.forEach { row ->
+                    array.put(
+                        JSONObject()
+                            .put("id", row.id)
+                            .put("type", row.type)
+                            .put("date", row.date)
+                            .put("value", row.value)
+                            .put("source", row.source)
+                            .put("externalId", nullable(row.externalId))
                             .put("createdAt", row.createdAt)
                             .put("updatedAt", row.updatedAt)
                     )
@@ -353,6 +372,7 @@ object AppBackupJson {
             weightMeasurements = parseArray(tablesObject, AppBackupFormat.TABLE_WEIGHT_MEASUREMENTS, errors) {
                 parseWeight(it, errors)
             },
+            bodyMeasurements = parseOptionalBodyMeasurements(tablesObject, errors),
             exercises = parseArray(tablesObject, AppBackupFormat.TABLE_EXERCISES, errors) {
                 parseExercise(it, errors)
             },
@@ -475,6 +495,35 @@ object AppBackupJson {
             }
         }
         return rows
+    }
+
+    private fun parseOptionalBodyMeasurements(
+        tables: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): List<BodyMeasurementEntity> {
+        if (!tables.has(AppBackupFormat.TABLE_BODY_MEASUREMENTS) || tables.isNull(AppBackupFormat.TABLE_BODY_MEASUREMENTS)) {
+            return emptyList()
+        }
+        if (tables.opt(AppBackupFormat.TABLE_BODY_MEASUREMENTS) !is JSONArray) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidType, "tables.${AppBackupFormat.TABLE_BODY_MEASUREMENTS}")
+            return emptyList()
+        }
+        return parseArray(tables, AppBackupFormat.TABLE_BODY_MEASUREMENTS, errors) { parseBodyMeasurement(it, errors) }
+    }
+
+    private fun parseBodyMeasurement(
+        obj: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): BodyMeasurementEntity? {
+        val id = obj.requiredId("id", errors) ?: return null
+        val type = obj.requiredString("type", errors) ?: return null
+        val date = obj.requiredString("date", errors) ?: return null
+        val value = obj.requiredDouble("value", errors) ?: return null
+        val source = obj.requiredString("source", errors) ?: return null
+        val externalId = obj.optionalNullableString("externalId", errors)
+        val createdAt = obj.requiredLong("createdAt", errors) ?: return null
+        val updatedAt = obj.requiredLong("updatedAt", errors) ?: return null
+        return BodyMeasurementEntity(id, type, date, value, source, externalId, createdAt, updatedAt)
     }
 
     private fun parseWeight(obj: JSONObject, errors: MutableList<AppBackupError>): WeightMeasurementEntity? {

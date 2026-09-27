@@ -7,6 +7,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
+import app.mymusclemap.data.repository.BodyMeasurementRepository
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.OnboardingRepository
@@ -39,6 +40,7 @@ import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
 
 class WeightViewModelFactory(
     private val weightRepository: WeightRepository,
+    private val bodyMeasurementRepository: BodyMeasurementRepository,
     private val exerciseRepository: ExerciseRepository,
     private val workoutTemplateRepository: WorkoutTemplateRepository,
     private val workoutSessionRepository: WorkoutSessionRepository,
@@ -66,7 +68,13 @@ class WeightViewModelFactory(
                 )
             }
             modelClass.isAssignableFrom(WeightDetailsViewModel::class.java) -> {
-                WeightDetailsViewModel(weightRepository, dateProvider, onboardingRepository)
+                WeightDetailsViewModel(
+                    weightRepository,
+                    dateProvider,
+                    onboardingRepository,
+                    bodyMeasurementRepository,
+                    featureEntitlements
+                )
             }
             modelClass.isAssignableFrom(HistoryViewModel::class.java) -> {
                 HistoryViewModel(

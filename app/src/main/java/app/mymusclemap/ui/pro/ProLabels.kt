@@ -17,6 +17,7 @@ fun AppFeature.titleRes(): Int {
         AppFeature.AdvancedMuscleAnalytics -> R.string.pro_feature_advanced_muscle_analytics
         AppFeature.UnlimitedWorkoutPlans -> R.string.pro_feature_unlimited_workout_plans
         AppFeature.AdvancedPlanning -> R.string.pro_feature_advanced_planning
+        AppFeature.AdvancedBodyMeasurements -> R.string.pro_feature_advanced_body_measurements
     }
 }
 
@@ -48,6 +49,15 @@ fun AppFeature?.proInfoCopy(): ProInfoCopy {
                 R.string.pro_info_plans_free_limit,
                 R.string.pro_info_plans_existing_stay,
                 R.string.pro_info_plans_unlimited
+            )
+        )
+        AppFeature.AdvancedBodyMeasurements -> ProInfoCopy(
+            titleRes = R.string.pro_info_body_measurements_title,
+            bodyRes = R.string.pro_info_body_measurements_body,
+            highlights = listOf(
+                R.string.pro_info_body_measurements_fat,
+                R.string.pro_info_body_measurements_circumferences,
+                R.string.pro_info_body_measurements_existing_stay
             )
         )
         AppFeature.AdvancedPlanning -> ProInfoCopy(

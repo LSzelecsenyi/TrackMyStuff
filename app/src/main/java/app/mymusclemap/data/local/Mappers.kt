@@ -12,3 +12,16 @@ fun WeightMeasurementEntity.toModel(): WeightMeasurement {
         updatedAt = updatedAt
     )
 }
+
+fun BodyMeasurementEntity.toModel(): app.mymusclemap.domain.body.BodyMeasurement {
+    return app.mymusclemap.domain.body.BodyMeasurement(
+        id = id,
+        typeCode = type,
+        date = LocalDate.parse(date),
+        value = value,
+        source = source,
+        externalId = externalId,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+}

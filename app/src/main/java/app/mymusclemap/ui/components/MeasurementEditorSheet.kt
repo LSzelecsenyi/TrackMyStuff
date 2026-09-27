@@ -202,7 +202,7 @@ fun dateErrorMessage(error: DateValidationError): Int {
     }
 }
 
-private class PastAndTodayDates(
+internal class PastAndTodayDates(
     private val today: LocalDate
 ) : SelectableDates {
     override fun isSelectableDate(utcTimeMillis: Long): Boolean {

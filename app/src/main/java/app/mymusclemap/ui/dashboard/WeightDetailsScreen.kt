@@ -1,17 +1,23 @@
 package app.mymusclemap.ui.dashboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -20,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -27,14 +34,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import app.mymusclemap.R
 import app.mymusclemap.domain.DashboardSnapshot
+import app.mymusclemap.domain.body.BodyMeasurementType
+import app.mymusclemap.domain.body.BodyMeasurementUnit
+import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.ChartRange
-import app.mymusclemap.ui.components.DeleteMeasurementDialog
 import app.mymusclemap.ui.components.HeroSurface
 import app.mymusclemap.ui.components.MeasurementEditorSheet
 import app.mymusclemap.ui.components.SectionHeader
@@ -42,7 +57,11 @@ import app.mymusclemap.ui.components.SegmentedControl
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.components.WeightChart
+import app.mymusclemap.ui.pro.ProBadge
+import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.AppShapeTokens
+import app.mymusclemap.ui.theme.AppTypeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,15 +77,20 @@ fun WeightDetailsScreen(
     onDeleteRequest: () -> Unit,
     onDeleteDismiss: () -> Unit,
     onDeleteConfirm: () -> Unit,
-    onMessageConsumed: () -> Unit
+    onMessageConsumed: () -> Unit,
+    onOpenMeasurement: (String) -> Unit = {},
+    onLockedMeasurement: (BodyMeasurementType) -> Unit = {},
+    onDismissLocked: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedPoint by remember { mutableStateOf<ChartPoint?>(null) }
-    UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
+    if (!state.measurementDetailVisible) {
+        UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.weight_details_title)) },
+                title = { Text(stringResource(R.string.body_progress_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -108,6 +132,18 @@ fun WeightDetailsScreen(
                 selectedPoint = selectedPoint,
                 onPointSelected = { selectedPoint = it }
             )
+            if (state.rows.isNotEmpty()) {
+                Spacer(Modifier.height(AppDimens.sectionGap))
+                SectionHeader(title = stringResource(R.string.body_measurements_section))
+                state.rows.forEach { row ->
+                    BodyMeasurementRow(
+                        row = row,
+                        onOpen = onOpenMeasurement,
+                        onLocked = onLockedMeasurement
+                    )
+                    Spacer(Modifier.height(AppDimens.itemGap))
+                }
+            }
         }
     }
     state.editor?.let { editor ->
@@ -122,6 +158,11 @@ fun WeightDetailsScreen(
             onDeleteDismiss = onDeleteDismiss,
             onDeleteConfirm = onDeleteConfirm
         )
+    }
+    if (!state.measurementDetailVisible) {
+        state.lockedFeature?.let { feature ->
+            ProInfoSheet(feature = feature, onDismiss = onDismissLocked)
+        }
     }
 }
 
@@ -251,4 +292,125 @@ internal fun ChartRange.labelRes(): Int {
         ChartRange.Days90 -> R.string.range_90
         ChartRange.All -> R.string.range_all
     }
+}
+
+internal const val BODY_ROW_TAG = "body-progress-row-"
+internal const val BODY_CHART_TAG = "body-measurement-chart"
+
+@Composable
+private fun BodyMeasurementRow(
+    row: BodyProgressRow,
+    onOpen: (String) -> Unit,
+    onLocked: (BodyMeasurementType) -> Unit
+) {
+    val type = row.type
+    val title = type?.let { stringResource(it.labelRes()) } ?: row.typeCode
+    val latest = row.latest
+    val valueText = latest?.let { formatBodyValue(it.value, type?.unit) }
+    val openLabel = stringResource(
+        if (row.lockedEmpty) R.string.body_measurement_open_pro else R.string.body_measurement_open_details
+    )
+    val proState = stringResource(R.string.pro_badge)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(BODY_ROW_TAG + row.typeCode)
+            .clickable(
+                onClickLabel = openLabel,
+                role = Role.Button,
+                onClick = {
+                    if (row.lockedEmpty && type != null) {
+                        onLocked(type)
+                    } else {
+                        onOpen(row.typeCode)
+                    }
+                }
+            ),
+        shape = AppShapeTokens.surface,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = AppDimens.minTouch)
+                .padding(horizontal = AppDimens.itemGap, vertical = 10.dp)
+                .semantics {
+                    if (row.lockedEmpty) {
+                        stateDescription = proState
+                    }
+                },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = AppTypeTokens.sectionTitle,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = valueText ?: stringResource(R.string.body_measurement_none),
+                    style = if (valueText == null) AppTypeTokens.statCaption else AppTypeTokens.statValue,
+                    color = if (valueText == null) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onBackground
+                    },
+                    maxLines = 1
+                )
+                if (latest != null) {
+                    val change = row.change?.let { formatSignedBodyValue(it, type?.unit) }
+                    val date = UiFormatters.compactDate(latest.date)
+                    Text(
+                        text = if (change == null) date else "$date · $change",
+                        style = AppTypeTokens.statCaption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            if (row.lockedEmpty) {
+                ProBadge()
+                Spacer(Modifier.width(AppDimens.itemGap))
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+internal fun BodyMeasurementType.labelRes(): Int {
+    return when (this) {
+        BodyMeasurementType.WAIST -> R.string.body_measurement_waist
+        BodyMeasurementType.BODY_FAT -> R.string.body_measurement_body_fat
+        BodyMeasurementType.CHEST -> R.string.body_measurement_chest
+        BodyMeasurementType.UPPER_ARM -> R.string.body_measurement_upper_arm
+        BodyMeasurementType.THIGH -> R.string.body_measurement_thigh
+        BodyMeasurementType.HIPS -> R.string.body_measurement_hips
+    }
+}
+
+internal fun formatBodyValue(value: Double, unit: BodyMeasurementUnit?): String {
+    val number = String.format(AppLocale.UI, "%.1f", value)
+    return when (unit) {
+        BodyMeasurementUnit.CENTIMETERS -> "$number cm"
+        BodyMeasurementUnit.PERCENT -> "$number%"
+        null -> number
+    }
+}
+
+internal fun formatSignedBodyValue(value: Double, unit: BodyMeasurementUnit?): String {
+    val sign = when {
+        value > 0.0 -> "+"
+        value < 0.0 -> "−"
+        else -> ""
+    }
+    return sign + formatBodyValue(kotlin.math.abs(value), unit)
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
+import app.mymusclemap.data.repository.BodyMeasurementRepository
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.OnboardingRepository
@@ -25,6 +26,10 @@ class AppContainer(context: Context) {
     private val database = WeightDatabase.create(appContext)
     val weightRepository = WeightRepository(
         dao = database.weightMeasurementDao(),
+        clock = clock
+    )
+    val bodyMeasurementRepository = BodyMeasurementRepository(
+        dao = database.bodyMeasurementDao(),
         clock = clock
     )
     val exerciseRepository = ExerciseRepository(
@@ -66,6 +71,7 @@ class AppContainer(context: Context) {
     )
     val viewModelFactory = WeightViewModelFactory(
         weightRepository = weightRepository,
+        bodyMeasurementRepository = bodyMeasurementRepository,
         exerciseRepository = exerciseRepository,
         workoutTemplateRepository = workoutTemplateRepository,
         workoutSessionRepository = workoutSessionRepository,

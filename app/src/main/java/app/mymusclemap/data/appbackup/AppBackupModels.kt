@@ -1,5 +1,6 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
 import app.mymusclemap.data.local.ScheduledWorkoutEntity
@@ -16,11 +17,12 @@ import java.time.Instant
 object AppBackupFormat {
     const val FORMAT = "my-muscle-map-backup"
     const val FORMAT_VERSION = 1
-    const val SCHEMA_VERSION = 7
+    const val SCHEMA_VERSION = 8
     const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024
 
     const val TABLE_WEIGHT_MEASUREMENTS = "weight_measurements"
+    const val TABLE_BODY_MEASUREMENTS = "body_measurements"
     const val TABLE_EXERCISES = "exercises"
     const val TABLE_EXERCISE_MUSCLES = "exercise_muscles"
     const val TABLE_WORKOUT_TEMPLATES = "workout_templates"
@@ -63,7 +65,8 @@ data class AppBackupTables(
     val workoutSessions: List<WorkoutSessionEntity>,
     val workoutSessionExercises: List<WorkoutSessionExerciseEntity>,
     val workoutSessionExerciseMuscles: List<WorkoutSessionExerciseMuscleEntity>,
-    val workoutSessionSets: List<WorkoutSessionSetEntity>
+    val workoutSessionSets: List<WorkoutSessionSetEntity>,
+    val bodyMeasurements: List<BodyMeasurementEntity> = emptyList()
 )
 
 data class AppBackupSnapshot(

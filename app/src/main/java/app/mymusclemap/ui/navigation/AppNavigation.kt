@@ -31,6 +31,9 @@ object AppRoutes {
     const val WORKOUT_DETAIL = "workout_detail"
     const val WORKOUT_DETAIL_PATTERN = "workout_detail?sessionId={sessionId}"
     const val WEIGHT_DETAILS = "weight_details"
+    const val BODY_PROGRESS_GRAPH = "body_progress_graph"
+    const val BODY_MEASUREMENT = "body_measurement"
+    const val BODY_MEASUREMENT_PATTERN = "body_measurement?type={type}"
     const val WORKOUT_IMPORT = "workout_import"
     const val WORKOUT_COMPLETE = "workout_complete"
     const val WORKOUT_COMPLETE_PATTERN =
@@ -141,6 +144,10 @@ object AppNavigation {
             backTarget = AppRoutes.OVERVIEW,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.ACTIVE_WORKOUT)
         )
+    }
+
+    fun bodyMeasurementRoute(typeCode: String): String {
+        return "${AppRoutes.BODY_MEASUREMENT}?type=$typeCode"
     }
 
     fun openWeightDetails(currentRoute: String?): InternalNavigation {

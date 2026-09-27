@@ -47,6 +47,7 @@ import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
 import app.mymusclemap.ui.dashboard.DashboardScreen
 import app.mymusclemap.ui.dashboard.DashboardViewModel
+import app.mymusclemap.ui.dashboard.BodyMeasurementDetailScreen
 import app.mymusclemap.ui.dashboard.WeightDetailsScreen
 import app.mymusclemap.ui.dashboard.WeightDetailsViewModel
 import app.mymusclemap.ui.exercises.ExerciseEditorScreen
@@ -107,6 +108,7 @@ private const val ARG_DURATION_MILLIS = "durationMillis"
 private const val ARG_STATISTICS_EXERCISE_ID = "exerciseId"
 private const val ARG_REPORT_KIND = "kind"
 private const val ARG_REPORT_START = "start"
+private const val ARG_BODY_TYPE = "type"
 private const val KEY_CATALOG_SAVED = "catalog_saved"
 private const val KEY_TEMPLATE_SAVED = "template_saved"
 private const val KEY_WORKOUT_DELETED = "workout_deleted"
@@ -135,6 +137,18 @@ private fun statisticsViewModel(
 ): StatisticsViewModel {
     val parent = remember(entry) {
         navController.getBackStackEntry(AppRoutes.STATISTICS_GRAPH)
+    }
+    return viewModel(parent, factory = factory)
+}
+
+@Composable
+private fun bodyProgressViewModel(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    entry: NavBackStackEntry
+): WeightDetailsViewModel {
+    val parent = remember(entry) {
+        navController.getBackStackEntry(AppRoutes.BODY_PROGRESS_GRAPH)
     }
     return viewModel(parent, factory = factory)
 }
@@ -585,23 +599,74 @@ fun WeightTrackerNavHost(
                     }
                 }
             }
-            composable(AppRoutes.WEIGHT_DETAILS) {
-                val viewModel: WeightDetailsViewModel = viewModel(factory = factory)
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-                WeightDetailsScreen(
-                    state = state,
-                    onBack = { navController.popBackStack() },
-                    onAddToday = { viewModel.openEditor() },
-                    onChartRangeSelected = viewModel::onChartRangeSelected,
-                    onEditorDateChange = viewModel::onEditorDateChange,
-                    onEditorWeightChange = viewModel::onEditorWeightChange,
-                    onSave = viewModel::saveEditor,
-                    onDismissEditor = viewModel::dismissEditor,
-                    onDeleteRequest = viewModel::requestDelete,
-                    onDeleteDismiss = viewModel::dismissDelete,
-                    onDeleteConfirm = viewModel::confirmDelete,
-                    onMessageConsumed = viewModel::consumeMessage
-                )
+            navigation(
+                route = AppRoutes.BODY_PROGRESS_GRAPH,
+                startDestination = AppRoutes.WEIGHT_DETAILS
+            ) {
+                composable(AppRoutes.WEIGHT_DETAILS) { entry ->
+                    val viewModel = bodyProgressViewModel(navController, factory, entry)
+                    val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    WeightDetailsScreen(
+                        state = state,
+                        onBack = { navController.popBackStack() },
+                        onAddToday = { viewModel.openEditor() },
+                        onChartRangeSelected = viewModel::onChartRangeSelected,
+                        onEditorDateChange = viewModel::onEditorDateChange,
+                        onEditorWeightChange = viewModel::onEditorWeightChange,
+                        onSave = viewModel::saveEditor,
+                        onDismissEditor = viewModel::dismissEditor,
+                        onDeleteRequest = viewModel::requestDelete,
+                        onDeleteDismiss = viewModel::dismissDelete,
+                        onDeleteConfirm = viewModel::confirmDelete,
+                        onMessageConsumed = viewModel::consumeMessage,
+                        onOpenMeasurement = { typeCode ->
+                            navController.navigateInternal(AppNavigation.bodyMeasurementRoute(typeCode))
+                        },
+                        onLockedMeasurement = viewModel::showBodyMeasurementLocked,
+                        onDismissLocked = viewModel::dismissLockedFeature
+                    )
+                }
+                composable(
+                    route = AppRoutes.BODY_MEASUREMENT_PATTERN,
+                    arguments = listOf(navArgument(ARG_BODY_TYPE) { type = NavType.StringType })
+                ) { entry ->
+                    val viewModel = bodyProgressViewModel(navController, factory, entry)
+                    val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    val typeCode = entry.arguments?.getString(ARG_BODY_TYPE).orEmpty()
+                    val detail = state.details[typeCode]
+                    if (detail == null) {
+                        LaunchedEffect(typeCode) { navController.popBackStack() }
+                    } else {
+                        BodyMeasurementDetailScreen(
+                            detail = detail,
+                            today = state.today,
+                            editor = state.bodyEditor,
+                            lockedFeature = state.lockedFeature,
+                            userMessage = state.userMessage,
+                            onBack = { navController.popBackStack() },
+                            onRangeSelected = viewModel::onBodyChartRangeSelected,
+                            onAdd = {
+                                val type = detail.type
+                                if (type != null) viewModel.openBodyEditor(type)
+                            },
+                            onOpenHistory = { measurement ->
+                                val type = detail.type
+                                if (type != null) viewModel.openBodyEditor(type, measurement)
+                            },
+                            onBodyDateChange = viewModel::onBodyEditorDateChange,
+                            onBodyValueChange = viewModel::onBodyEditorValueChange,
+                            onSaveBody = viewModel::saveBodyEditor,
+                            onDismissBodyEditor = viewModel::dismissBodyEditor,
+                            onBodyDeleteRequest = viewModel::requestBodyDelete,
+                            onBodyDeleteDismiss = viewModel::dismissBodyDelete,
+                            onBodyDeleteConfirm = viewModel::confirmBodyDelete,
+                            onDismissLocked = viewModel::dismissLockedFeature,
+                            onMessageConsumed = viewModel::consumeMessage,
+                            onOpened = { viewModel.setMeasurementDetailVisible(true) },
+                            onClosed = viewModel::leaveMeasurementDetail
+                        )
+                    }
+                }
             }
             composable(AppRoutes.EXERCISES) { entry ->
                 val viewModel: ExerciseListViewModel = viewModel(factory = factory)

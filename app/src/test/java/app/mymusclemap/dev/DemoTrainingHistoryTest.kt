@@ -11,6 +11,7 @@ import app.mymusclemap.data.appbackup.AppBackupSnapshot
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
+import app.mymusclemap.domain.body.BodyMeasurementType
 import app.mymusclemap.domain.exercise.StarterCatalog
 import app.mymusclemap.domain.statistics.StatisticsRange
 import app.mymusclemap.domain.theme.AppearanceSettings
@@ -292,6 +293,18 @@ class DemoTrainingHistoryTest {
         assertTrue(pushUpReps.last() > pushUpReps.first())
         assertTrue(pushUpReps.zipWithNext().any { (earlier, later) -> later < earlier })
         assertEquals(3, snapshot.tables.workoutTemplates.size)
+        BodyMeasurementType.entries.forEach { type ->
+            val rows = snapshot.tables.bodyMeasurements.filter { it.type == type.code }
+            assertTrue("${type.code} count ${rows.size}", rows.size >= 8)
+            assertTrue(rows.all { it.value in type.minimum..type.maximum })
+            assertTrue(rows.all { it.source == "MANUAL" && it.externalId == null })
+            val dates = rows.map { LocalDate.parse(it.date) }.sorted()
+            assertTrue(java.time.temporal.ChronoUnit.DAYS.between(dates.first(), dates.last()) > 365)
+            assertTrue(dates.zipWithNext().any { (earlier, later) ->
+                java.time.temporal.ChronoUnit.DAYS.between(earlier, later) >= 14
+            })
+            assertTrue(dates.any { !it.isBefore(analysis.referenceDate.minusDays(29)) })
+        }
     }
 
     @Test

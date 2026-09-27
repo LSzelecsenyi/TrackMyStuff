@@ -8,6 +8,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [
         WeightMeasurementEntity::class,
+        BodyMeasurementEntity::class,
         ExerciseEntity::class,
         ExerciseMuscleEntity::class,
         WorkoutTemplateEntity::class,
@@ -19,11 +20,12 @@ import androidx.room.RoomDatabase
         WorkoutSessionExerciseMuscleEntity::class,
         WorkoutSessionSetEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
     abstract fun weightMeasurementDao(): WeightMeasurementDao
+    abstract fun bodyMeasurementDao(): BodyMeasurementDao
     abstract fun exerciseDao(): ExerciseDao
     abstract fun workoutTemplateDao(): WorkoutTemplateDao
     abstract fun scheduledWorkoutDao(): ScheduledWorkoutDao
@@ -43,7 +45,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
-                    MIGRATION_6_7
+                    MIGRATION_6_7,
+                    MIGRATION_7_8
                 )
                 .build()
         }

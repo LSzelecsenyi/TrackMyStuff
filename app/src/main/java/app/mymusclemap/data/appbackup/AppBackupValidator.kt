@@ -16,11 +16,26 @@ import java.time.LocalDate
 import java.time.format.DateTimeParseException
 
 object AppBackupValidator {
+    private val BODY_CODE = Regex("""[A-Z][A-Z0-9_]{0,63}""")
+
     fun validate(snapshot: AppBackupSnapshot): List<AppBackupError> {
         val errors = mutableListOf<AppBackupError>()
         val tables = snapshot.tables
         requireUnique(tables.weightMeasurements.map { it.id }, "weight_measurements.id", errors)
         requireUnique(tables.weightMeasurements.map { it.date }, "weight_measurements.date", errors)
+        requireUnique(tables.bodyMeasurements.map { it.id }, "body_measurements.id", errors)
+        requireUnique(
+            tables.bodyMeasurements.map { it.type to it.date },
+            "body_measurements.type_date",
+            errors
+        )
+        requireUnique(
+            tables.bodyMeasurements.mapNotNull { row ->
+                row.externalId?.let { row.source to it }
+            },
+            "body_measurements.source_externalId",
+            errors
+        )
         requireUnique(tables.exercises.map { it.id }, "exercises.id", errors)
         requireUnique(tables.exercises.map { it.normalizedName }, "exercises.normalizedName", errors)
         requireUnique(
@@ -84,6 +99,21 @@ object AppBackupValidator {
         )
 
         tables.weightMeasurements.forEach { requireIsoDate(it.date, "weight_measurements.date", errors) }
+        tables.bodyMeasurements.forEach { row ->
+            if (!row.type.matches(BODY_CODE)) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "body_measurements.type")
+            }
+            requireIsoDate(row.date, "body_measurements.date", errors)
+            if (!row.value.isFinite()) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "body_measurements.value")
+            }
+            if (!row.source.matches(BODY_CODE)) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "body_measurements.source")
+            }
+            if (row.externalId != null && row.externalId.isBlank()) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "body_measurements.externalId")
+            }
+        }
         tables.scheduledWorkouts.forEach {
             requireIsoDate(it.scheduledDate, "scheduled_workouts.scheduledDate", errors)
             requireIsoDate(it.originalScheduledDate, "scheduled_workouts.originalScheduledDate", errors)

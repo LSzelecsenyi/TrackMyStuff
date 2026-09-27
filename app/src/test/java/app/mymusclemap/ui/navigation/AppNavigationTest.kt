@@ -172,10 +172,25 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_DETAIL_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("workout_detail?sessionId=3"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WEIGHT_DETAILS))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.BODY_PROGRESS_GRAPH))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.BODY_MEASUREMENT))
+        assertFalse(AppNavigation.showsBottomBar(AppNavigation.bodyMeasurementRoute("THIGH")))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_IMPORT))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_COMPLETE))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_COMPLETE_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("workout_complete?exercises=4&completedSets=14&durationMillis=3020000"))
+    }
+
+    @Test
+    fun bodyMeasurementDetailPushesOverBodyProgress() {
+        val route = AppNavigation.bodyMeasurementRoute("THIGH")
+        assertEquals("body_measurement?type=THIGH", route)
+        assertEquals(AppRoutes.BODY_MEASUREMENT, AppNavigation.canonicalRoute(route))
+        assertTrue(AppNavigation.shouldNavigate(AppRoutes.WEIGHT_DETAILS, route))
+        assertFalse(AppNavigation.shouldNavigate(route, route))
+        val backToOverview = AppNavigation.openWeightDetails(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.WEIGHT_DETAILS, backToOverview.targetRoute)
+        assertEquals(AppRoutes.OVERVIEW, backToOverview.backTarget)
     }
 
     @Test

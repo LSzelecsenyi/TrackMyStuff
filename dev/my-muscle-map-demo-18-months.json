@@ -1,7 +1,7 @@
 {
   "format": "my-muscle-map-backup",
   "formatVersion": 1,
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "exportedAt": "2026-09-27T18:00:00Z",
   "source": {
     "applicationId": "app.mymusclemap.debug",
@@ -1758,6 +1758,1818 @@
         "weightKg": 79,
         "createdAt": 1790406000000,
         "updatedAt": 1790406000000
+      }
+    ],
+    "body_measurements": [
+      {
+        "id": 1,
+        "type": "WAIST",
+        "date": "2025-03-29",
+        "value": 91.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1743231600000,
+        "updatedAt": 1743231600000
+      },
+      {
+        "id": 2,
+        "type": "WAIST",
+        "date": "2025-04-12",
+        "value": 91.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1744441200000,
+        "updatedAt": 1744441200000
+      },
+      {
+        "id": 3,
+        "type": "WAIST",
+        "date": "2025-04-26",
+        "value": 92.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1745650800000,
+        "updatedAt": 1745650800000
+      },
+      {
+        "id": 4,
+        "type": "WAIST",
+        "date": "2025-05-10",
+        "value": 92.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1746860400000,
+        "updatedAt": 1746860400000
+      },
+      {
+        "id": 5,
+        "type": "WAIST",
+        "date": "2025-05-24",
+        "value": 92.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1748070000000,
+        "updatedAt": 1748070000000
+      },
+      {
+        "id": 6,
+        "type": "WAIST",
+        "date": "2025-06-07",
+        "value": 91.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1749279600000,
+        "updatedAt": 1749279600000
+      },
+      {
+        "id": 7,
+        "type": "WAIST",
+        "date": "2025-06-21",
+        "value": 91.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1750489200000,
+        "updatedAt": 1750489200000
+      },
+      {
+        "id": 8,
+        "type": "WAIST",
+        "date": "2025-07-05",
+        "value": 92.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1751698800000,
+        "updatedAt": 1751698800000
+      },
+      {
+        "id": 9,
+        "type": "WAIST",
+        "date": "2025-07-19",
+        "value": 91.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1752908400000,
+        "updatedAt": 1752908400000
+      },
+      {
+        "id": 10,
+        "type": "WAIST",
+        "date": "2025-08-02",
+        "value": 91.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1754118000000,
+        "updatedAt": 1754118000000
+      },
+      {
+        "id": 11,
+        "type": "WAIST",
+        "date": "2025-08-16",
+        "value": 90.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1755327600000,
+        "updatedAt": 1755327600000
+      },
+      {
+        "id": 12,
+        "type": "WAIST",
+        "date": "2025-08-30",
+        "value": 89.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1756537200000,
+        "updatedAt": 1756537200000
+      },
+      {
+        "id": 13,
+        "type": "WAIST",
+        "date": "2025-09-13",
+        "value": 90.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1757746800000,
+        "updatedAt": 1757746800000
+      },
+      {
+        "id": 14,
+        "type": "WAIST",
+        "date": "2025-09-27",
+        "value": 89.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1758956400000,
+        "updatedAt": 1758956400000
+      },
+      {
+        "id": 15,
+        "type": "WAIST",
+        "date": "2025-10-11",
+        "value": 89.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1760166000000,
+        "updatedAt": 1760166000000
+      },
+      {
+        "id": 16,
+        "type": "WAIST",
+        "date": "2025-10-25",
+        "value": 88.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1761375600000,
+        "updatedAt": 1761375600000
+      },
+      {
+        "id": 17,
+        "type": "WAIST",
+        "date": "2025-11-08",
+        "value": 87.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1762585200000,
+        "updatedAt": 1762585200000
+      },
+      {
+        "id": 18,
+        "type": "WAIST",
+        "date": "2025-11-22",
+        "value": 88.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1763794800000,
+        "updatedAt": 1763794800000
+      },
+      {
+        "id": 19,
+        "type": "WAIST",
+        "date": "2025-12-06",
+        "value": 87.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1765004400000,
+        "updatedAt": 1765004400000
+      },
+      {
+        "id": 20,
+        "type": "WAIST",
+        "date": "2025-12-20",
+        "value": 87.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1766214000000,
+        "updatedAt": 1766214000000
+      },
+      {
+        "id": 21,
+        "type": "WAIST",
+        "date": "2026-01-03",
+        "value": 86.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1767423600000,
+        "updatedAt": 1767423600000
+      },
+      {
+        "id": 22,
+        "type": "WAIST",
+        "date": "2026-01-17",
+        "value": 86.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1768633200000,
+        "updatedAt": 1768633200000
+      },
+      {
+        "id": 23,
+        "type": "WAIST",
+        "date": "2026-01-31",
+        "value": 87.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1769842800000,
+        "updatedAt": 1769842800000
+      },
+      {
+        "id": 24,
+        "type": "WAIST",
+        "date": "2026-02-14",
+        "value": 86.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1771052400000,
+        "updatedAt": 1771052400000
+      },
+      {
+        "id": 25,
+        "type": "WAIST",
+        "date": "2026-02-28",
+        "value": 86.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1772262000000,
+        "updatedAt": 1772262000000
+      },
+      {
+        "id": 26,
+        "type": "WAIST",
+        "date": "2026-03-14",
+        "value": 86.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1773471600000,
+        "updatedAt": 1773471600000
+      },
+      {
+        "id": 27,
+        "type": "WAIST",
+        "date": "2026-03-28",
+        "value": 86.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1774681200000,
+        "updatedAt": 1774681200000
+      },
+      {
+        "id": 28,
+        "type": "WAIST",
+        "date": "2026-04-11",
+        "value": 87.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1775890800000,
+        "updatedAt": 1775890800000
+      },
+      {
+        "id": 29,
+        "type": "WAIST",
+        "date": "2026-04-25",
+        "value": 87.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1777100400000,
+        "updatedAt": 1777100400000
+      },
+      {
+        "id": 30,
+        "type": "WAIST",
+        "date": "2026-05-09",
+        "value": 86.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1778310000000,
+        "updatedAt": 1778310000000
+      },
+      {
+        "id": 31,
+        "type": "WAIST",
+        "date": "2026-05-23",
+        "value": 86.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1779519600000,
+        "updatedAt": 1779519600000
+      },
+      {
+        "id": 32,
+        "type": "WAIST",
+        "date": "2026-06-06",
+        "value": 86.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1780729200000,
+        "updatedAt": 1780729200000
+      },
+      {
+        "id": 33,
+        "type": "WAIST",
+        "date": "2026-06-20",
+        "value": 87.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1781938800000,
+        "updatedAt": 1781938800000
+      },
+      {
+        "id": 34,
+        "type": "WAIST",
+        "date": "2026-07-04",
+        "value": 87,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1783148400000,
+        "updatedAt": 1783148400000
+      },
+      {
+        "id": 35,
+        "type": "WAIST",
+        "date": "2026-08-01",
+        "value": 86.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1785567600000,
+        "updatedAt": 1785567600000
+      },
+      {
+        "id": 36,
+        "type": "WAIST",
+        "date": "2026-08-15",
+        "value": 85.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1786777200000,
+        "updatedAt": 1786777200000
+      },
+      {
+        "id": 37,
+        "type": "WAIST",
+        "date": "2026-08-29",
+        "value": 86.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1787986800000,
+        "updatedAt": 1787986800000
+      },
+      {
+        "id": 38,
+        "type": "WAIST",
+        "date": "2026-09-09",
+        "value": 84.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1788937200000,
+        "updatedAt": 1788937200000
+      },
+      {
+        "id": 39,
+        "type": "WAIST",
+        "date": "2026-09-12",
+        "value": 85.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1789196400000,
+        "updatedAt": 1789196400000
+      },
+      {
+        "id": 40,
+        "type": "WAIST",
+        "date": "2026-09-25",
+        "value": 84.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1790319600000,
+        "updatedAt": 1790319600000
+      },
+      {
+        "id": 41,
+        "type": "WAIST",
+        "date": "2026-09-26",
+        "value": 85,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1790406000000,
+        "updatedAt": 1790406000000
+      },
+      {
+        "id": 42,
+        "type": "BODY_FAT",
+        "date": "2025-04-01",
+        "value": 23.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1743490800000,
+        "updatedAt": 1743490800000
+      },
+      {
+        "id": 43,
+        "type": "BODY_FAT",
+        "date": "2025-04-22",
+        "value": 22.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1745305200000,
+        "updatedAt": 1745305200000
+      },
+      {
+        "id": 44,
+        "type": "BODY_FAT",
+        "date": "2025-05-13",
+        "value": 22.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1747119600000,
+        "updatedAt": 1747119600000
+      },
+      {
+        "id": 45,
+        "type": "BODY_FAT",
+        "date": "2025-06-03",
+        "value": 22.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1748934000000,
+        "updatedAt": 1748934000000
+      },
+      {
+        "id": 46,
+        "type": "BODY_FAT",
+        "date": "2025-06-24",
+        "value": 22,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1750748400000,
+        "updatedAt": 1750748400000
+      },
+      {
+        "id": 47,
+        "type": "BODY_FAT",
+        "date": "2025-07-15",
+        "value": 21.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1752562800000,
+        "updatedAt": 1752562800000
+      },
+      {
+        "id": 48,
+        "type": "BODY_FAT",
+        "date": "2025-08-05",
+        "value": 20.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1754377200000,
+        "updatedAt": 1754377200000
+      },
+      {
+        "id": 49,
+        "type": "BODY_FAT",
+        "date": "2025-08-26",
+        "value": 20.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1756191600000,
+        "updatedAt": 1756191600000
+      },
+      {
+        "id": 50,
+        "type": "BODY_FAT",
+        "date": "2025-09-16",
+        "value": 20.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1758006000000,
+        "updatedAt": 1758006000000
+      },
+      {
+        "id": 51,
+        "type": "BODY_FAT",
+        "date": "2025-10-07",
+        "value": 20.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1759820400000,
+        "updatedAt": 1759820400000
+      },
+      {
+        "id": 52,
+        "type": "BODY_FAT",
+        "date": "2025-10-28",
+        "value": 19.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1761634800000,
+        "updatedAt": 1761634800000
+      },
+      {
+        "id": 53,
+        "type": "BODY_FAT",
+        "date": "2025-11-18",
+        "value": 19.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1763449200000,
+        "updatedAt": 1763449200000
+      },
+      {
+        "id": 54,
+        "type": "BODY_FAT",
+        "date": "2025-12-09",
+        "value": 19.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1765263600000,
+        "updatedAt": 1765263600000
+      },
+      {
+        "id": 55,
+        "type": "BODY_FAT",
+        "date": "2025-12-30",
+        "value": 19.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1767078000000,
+        "updatedAt": 1767078000000
+      },
+      {
+        "id": 56,
+        "type": "BODY_FAT",
+        "date": "2026-01-20",
+        "value": 19.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1768892400000,
+        "updatedAt": 1768892400000
+      },
+      {
+        "id": 57,
+        "type": "BODY_FAT",
+        "date": "2026-02-10",
+        "value": 19.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1770706800000,
+        "updatedAt": 1770706800000
+      },
+      {
+        "id": 58,
+        "type": "BODY_FAT",
+        "date": "2026-03-03",
+        "value": 18.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1772521200000,
+        "updatedAt": 1772521200000
+      },
+      {
+        "id": 59,
+        "type": "BODY_FAT",
+        "date": "2026-03-24",
+        "value": 18.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1774335600000,
+        "updatedAt": 1774335600000
+      },
+      {
+        "id": 60,
+        "type": "BODY_FAT",
+        "date": "2026-04-14",
+        "value": 19,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1776150000000,
+        "updatedAt": 1776150000000
+      },
+      {
+        "id": 61,
+        "type": "BODY_FAT",
+        "date": "2026-05-05",
+        "value": 19,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1777964400000,
+        "updatedAt": 1777964400000
+      },
+      {
+        "id": 62,
+        "type": "BODY_FAT",
+        "date": "2026-05-26",
+        "value": 19,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1779778800000,
+        "updatedAt": 1779778800000
+      },
+      {
+        "id": 63,
+        "type": "BODY_FAT",
+        "date": "2026-06-16",
+        "value": 18.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1781593200000,
+        "updatedAt": 1781593200000
+      },
+      {
+        "id": 64,
+        "type": "BODY_FAT",
+        "date": "2026-07-07",
+        "value": 17.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1783407600000,
+        "updatedAt": 1783407600000
+      },
+      {
+        "id": 65,
+        "type": "BODY_FAT",
+        "date": "2026-07-28",
+        "value": 17.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1785222000000,
+        "updatedAt": 1785222000000
+      },
+      {
+        "id": 66,
+        "type": "BODY_FAT",
+        "date": "2026-08-18",
+        "value": 17.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1787036400000,
+        "updatedAt": 1787036400000
+      },
+      {
+        "id": 67,
+        "type": "BODY_FAT",
+        "date": "2026-09-08",
+        "value": 17.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1788850800000,
+        "updatedAt": 1788850800000
+      },
+      {
+        "id": 68,
+        "type": "BODY_FAT",
+        "date": "2026-09-09",
+        "value": 16.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1788937200000,
+        "updatedAt": 1788937200000
+      },
+      {
+        "id": 69,
+        "type": "BODY_FAT",
+        "date": "2026-09-25",
+        "value": 16.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1790319600000,
+        "updatedAt": 1790319600000
+      },
+      {
+        "id": 70,
+        "type": "CHEST",
+        "date": "2025-04-04",
+        "value": 98.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1743750000000,
+        "updatedAt": 1743750000000
+      },
+      {
+        "id": 71,
+        "type": "CHEST",
+        "date": "2025-05-02",
+        "value": 98.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1746169200000,
+        "updatedAt": 1746169200000
+      },
+      {
+        "id": 72,
+        "type": "CHEST",
+        "date": "2025-05-30",
+        "value": 99,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1748588400000,
+        "updatedAt": 1748588400000
+      },
+      {
+        "id": 73,
+        "type": "CHEST",
+        "date": "2025-06-27",
+        "value": 98.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1751007600000,
+        "updatedAt": 1751007600000
+      },
+      {
+        "id": 74,
+        "type": "CHEST",
+        "date": "2025-07-25",
+        "value": 99.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1753426800000,
+        "updatedAt": 1753426800000
+      },
+      {
+        "id": 75,
+        "type": "CHEST",
+        "date": "2025-08-22",
+        "value": 98.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1755846000000,
+        "updatedAt": 1755846000000
+      },
+      {
+        "id": 76,
+        "type": "CHEST",
+        "date": "2025-09-19",
+        "value": 98.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1758265200000,
+        "updatedAt": 1758265200000
+      },
+      {
+        "id": 77,
+        "type": "CHEST",
+        "date": "2025-10-17",
+        "value": 99.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1760684400000,
+        "updatedAt": 1760684400000
+      },
+      {
+        "id": 78,
+        "type": "CHEST",
+        "date": "2025-11-14",
+        "value": 100,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1763103600000,
+        "updatedAt": 1763103600000
+      },
+      {
+        "id": 79,
+        "type": "CHEST",
+        "date": "2025-12-12",
+        "value": 101.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1765522800000,
+        "updatedAt": 1765522800000
+      },
+      {
+        "id": 80,
+        "type": "CHEST",
+        "date": "2026-01-09",
+        "value": 101.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1767942000000,
+        "updatedAt": 1767942000000
+      },
+      {
+        "id": 81,
+        "type": "CHEST",
+        "date": "2026-02-06",
+        "value": 101.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1770361200000,
+        "updatedAt": 1770361200000
+      },
+      {
+        "id": 82,
+        "type": "CHEST",
+        "date": "2026-03-06",
+        "value": 102.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1772780400000,
+        "updatedAt": 1772780400000
+      },
+      {
+        "id": 83,
+        "type": "CHEST",
+        "date": "2026-04-03",
+        "value": 102.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1775199600000,
+        "updatedAt": 1775199600000
+      },
+      {
+        "id": 84,
+        "type": "CHEST",
+        "date": "2026-05-01",
+        "value": 103.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1777618800000,
+        "updatedAt": 1777618800000
+      },
+      {
+        "id": 85,
+        "type": "CHEST",
+        "date": "2026-05-29",
+        "value": 103,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1780038000000,
+        "updatedAt": 1780038000000
+      },
+      {
+        "id": 86,
+        "type": "CHEST",
+        "date": "2026-06-26",
+        "value": 102.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1782457200000,
+        "updatedAt": 1782457200000
+      },
+      {
+        "id": 87,
+        "type": "CHEST",
+        "date": "2026-08-21",
+        "value": 102.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1787295600000,
+        "updatedAt": 1787295600000
+      },
+      {
+        "id": 88,
+        "type": "CHEST",
+        "date": "2026-09-09",
+        "value": 102.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1788937200000,
+        "updatedAt": 1788937200000
+      },
+      {
+        "id": 89,
+        "type": "CHEST",
+        "date": "2026-09-18",
+        "value": 103.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1789714800000,
+        "updatedAt": 1789714800000
+      },
+      {
+        "id": 90,
+        "type": "CHEST",
+        "date": "2026-09-25",
+        "value": 103,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1790319600000,
+        "updatedAt": 1790319600000
+      },
+      {
+        "id": 91,
+        "type": "UPPER_ARM",
+        "date": "2025-03-31",
+        "value": 33.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1743404400000,
+        "updatedAt": 1743404400000
+      },
+      {
+        "id": 92,
+        "type": "UPPER_ARM",
+        "date": "2025-04-18",
+        "value": 33.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1744959600000,
+        "updatedAt": 1744959600000
+      },
+      {
+        "id": 93,
+        "type": "UPPER_ARM",
+        "date": "2025-05-06",
+        "value": 33.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1746514800000,
+        "updatedAt": 1746514800000
+      },
+      {
+        "id": 94,
+        "type": "UPPER_ARM",
+        "date": "2025-05-24",
+        "value": 33.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1748070000000,
+        "updatedAt": 1748070000000
+      },
+      {
+        "id": 95,
+        "type": "UPPER_ARM",
+        "date": "2025-06-11",
+        "value": 33.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1749625200000,
+        "updatedAt": 1749625200000
+      },
+      {
+        "id": 96,
+        "type": "UPPER_ARM",
+        "date": "2025-06-29",
+        "value": 33.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1751180400000,
+        "updatedAt": 1751180400000
+      },
+      {
+        "id": 97,
+        "type": "UPPER_ARM",
+        "date": "2025-07-17",
+        "value": 33.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1752735600000,
+        "updatedAt": 1752735600000
+      },
+      {
+        "id": 98,
+        "type": "UPPER_ARM",
+        "date": "2025-08-04",
+        "value": 34.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1754290800000,
+        "updatedAt": 1754290800000
+      },
+      {
+        "id": 99,
+        "type": "UPPER_ARM",
+        "date": "2025-08-22",
+        "value": 34.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1755846000000,
+        "updatedAt": 1755846000000
+      },
+      {
+        "id": 100,
+        "type": "UPPER_ARM",
+        "date": "2025-09-09",
+        "value": 34.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1757401200000,
+        "updatedAt": 1757401200000
+      },
+      {
+        "id": 101,
+        "type": "UPPER_ARM",
+        "date": "2025-09-27",
+        "value": 34.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1758956400000,
+        "updatedAt": 1758956400000
+      },
+      {
+        "id": 102,
+        "type": "UPPER_ARM",
+        "date": "2025-10-15",
+        "value": 34.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1760511600000,
+        "updatedAt": 1760511600000
+      },
+      {
+        "id": 103,
+        "type": "UPPER_ARM",
+        "date": "2025-11-02",
+        "value": 35.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1762066800000,
+        "updatedAt": 1762066800000
+      },
+      {
+        "id": 104,
+        "type": "UPPER_ARM",
+        "date": "2025-11-20",
+        "value": 35.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1763622000000,
+        "updatedAt": 1763622000000
+      },
+      {
+        "id": 105,
+        "type": "UPPER_ARM",
+        "date": "2025-12-08",
+        "value": 35.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1765177200000,
+        "updatedAt": 1765177200000
+      },
+      {
+        "id": 106,
+        "type": "UPPER_ARM",
+        "date": "2025-12-26",
+        "value": 35.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1766732400000,
+        "updatedAt": 1766732400000
+      },
+      {
+        "id": 107,
+        "type": "UPPER_ARM",
+        "date": "2026-01-13",
+        "value": 35.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1768287600000,
+        "updatedAt": 1768287600000
+      },
+      {
+        "id": 108,
+        "type": "UPPER_ARM",
+        "date": "2026-01-31",
+        "value": 36.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1769842800000,
+        "updatedAt": 1769842800000
+      },
+      {
+        "id": 109,
+        "type": "UPPER_ARM",
+        "date": "2026-02-18",
+        "value": 35.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1771398000000,
+        "updatedAt": 1771398000000
+      },
+      {
+        "id": 110,
+        "type": "UPPER_ARM",
+        "date": "2026-03-08",
+        "value": 35.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1772953200000,
+        "updatedAt": 1772953200000
+      },
+      {
+        "id": 111,
+        "type": "UPPER_ARM",
+        "date": "2026-03-26",
+        "value": 36.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1774508400000,
+        "updatedAt": 1774508400000
+      },
+      {
+        "id": 112,
+        "type": "UPPER_ARM",
+        "date": "2026-04-13",
+        "value": 35.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1776063600000,
+        "updatedAt": 1776063600000
+      },
+      {
+        "id": 113,
+        "type": "UPPER_ARM",
+        "date": "2026-05-01",
+        "value": 36.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1777618800000,
+        "updatedAt": 1777618800000
+      },
+      {
+        "id": 114,
+        "type": "UPPER_ARM",
+        "date": "2026-05-19",
+        "value": 36,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1779174000000,
+        "updatedAt": 1779174000000
+      },
+      {
+        "id": 115,
+        "type": "UPPER_ARM",
+        "date": "2026-06-06",
+        "value": 35.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1780729200000,
+        "updatedAt": 1780729200000
+      },
+      {
+        "id": 116,
+        "type": "UPPER_ARM",
+        "date": "2026-06-24",
+        "value": 36.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1782284400000,
+        "updatedAt": 1782284400000
+      },
+      {
+        "id": 117,
+        "type": "UPPER_ARM",
+        "date": "2026-07-12",
+        "value": 36,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1783839600000,
+        "updatedAt": 1783839600000
+      },
+      {
+        "id": 118,
+        "type": "UPPER_ARM",
+        "date": "2026-07-30",
+        "value": 36.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1785394800000,
+        "updatedAt": 1785394800000
+      },
+      {
+        "id": 119,
+        "type": "UPPER_ARM",
+        "date": "2026-08-17",
+        "value": 36.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1786950000000,
+        "updatedAt": 1786950000000
+      },
+      {
+        "id": 120,
+        "type": "UPPER_ARM",
+        "date": "2026-09-04",
+        "value": 36.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1788505200000,
+        "updatedAt": 1788505200000
+      },
+      {
+        "id": 121,
+        "type": "UPPER_ARM",
+        "date": "2026-09-09",
+        "value": 36.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1788937200000,
+        "updatedAt": 1788937200000
+      },
+      {
+        "id": 122,
+        "type": "UPPER_ARM",
+        "date": "2026-09-22",
+        "value": 36.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1790060400000,
+        "updatedAt": 1790060400000
+      },
+      {
+        "id": 123,
+        "type": "UPPER_ARM",
+        "date": "2026-09-25",
+        "value": 36.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1790319600000,
+        "updatedAt": 1790319600000
+      },
+      {
+        "id": 124,
+        "type": "THIGH",
+        "date": "2025-04-07",
+        "value": 57.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1744009200000,
+        "updatedAt": 1744009200000
+      },
+      {
+        "id": 125,
+        "type": "THIGH",
+        "date": "2025-05-02",
+        "value": 57.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1746169200000,
+        "updatedAt": 1746169200000
+      },
+      {
+        "id": 126,
+        "type": "THIGH",
+        "date": "2025-05-27",
+        "value": 57.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1748329200000,
+        "updatedAt": 1748329200000
+      },
+      {
+        "id": 127,
+        "type": "THIGH",
+        "date": "2025-06-21",
+        "value": 57.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1750489200000,
+        "updatedAt": 1750489200000
+      },
+      {
+        "id": 128,
+        "type": "THIGH",
+        "date": "2025-07-16",
+        "value": 58,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1752649200000,
+        "updatedAt": 1752649200000
+      },
+      {
+        "id": 129,
+        "type": "THIGH",
+        "date": "2025-08-10",
+        "value": 58.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1754809200000,
+        "updatedAt": 1754809200000
+      },
+      {
+        "id": 130,
+        "type": "THIGH",
+        "date": "2025-09-04",
+        "value": 58.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1756969200000,
+        "updatedAt": 1756969200000
+      },
+      {
+        "id": 131,
+        "type": "THIGH",
+        "date": "2025-09-29",
+        "value": 59.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1759129200000,
+        "updatedAt": 1759129200000
+      },
+      {
+        "id": 132,
+        "type": "THIGH",
+        "date": "2025-10-24",
+        "value": 59.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1761289200000,
+        "updatedAt": 1761289200000
+      },
+      {
+        "id": 133,
+        "type": "THIGH",
+        "date": "2025-11-18",
+        "value": 59.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1763449200000,
+        "updatedAt": 1763449200000
+      },
+      {
+        "id": 134,
+        "type": "THIGH",
+        "date": "2025-12-13",
+        "value": 60,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1765609200000,
+        "updatedAt": 1765609200000
+      },
+      {
+        "id": 135,
+        "type": "THIGH",
+        "date": "2026-01-07",
+        "value": 59.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1767769200000,
+        "updatedAt": 1767769200000
+      },
+      {
+        "id": 136,
+        "type": "THIGH",
+        "date": "2026-02-01",
+        "value": 59.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1769929200000,
+        "updatedAt": 1769929200000
+      },
+      {
+        "id": 137,
+        "type": "THIGH",
+        "date": "2026-02-26",
+        "value": 59.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1772089200000,
+        "updatedAt": 1772089200000
+      },
+      {
+        "id": 138,
+        "type": "THIGH",
+        "date": "2026-03-23",
+        "value": 59.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1774249200000,
+        "updatedAt": 1774249200000
+      },
+      {
+        "id": 139,
+        "type": "THIGH",
+        "date": "2026-04-17",
+        "value": 59.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1776409200000,
+        "updatedAt": 1776409200000
+      },
+      {
+        "id": 140,
+        "type": "THIGH",
+        "date": "2026-05-12",
+        "value": 59.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1778569200000,
+        "updatedAt": 1778569200000
+      },
+      {
+        "id": 141,
+        "type": "THIGH",
+        "date": "2026-06-06",
+        "value": 59.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1780729200000,
+        "updatedAt": 1780729200000
+      },
+      {
+        "id": 142,
+        "type": "THIGH",
+        "date": "2026-07-01",
+        "value": 60,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1782889200000,
+        "updatedAt": 1782889200000
+      },
+      {
+        "id": 143,
+        "type": "THIGH",
+        "date": "2026-08-20",
+        "value": 60.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1787209200000,
+        "updatedAt": 1787209200000
+      },
+      {
+        "id": 144,
+        "type": "THIGH",
+        "date": "2026-09-09",
+        "value": 61.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1788937200000,
+        "updatedAt": 1788937200000
+      },
+      {
+        "id": 145,
+        "type": "THIGH",
+        "date": "2026-09-14",
+        "value": 61.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1789369200000,
+        "updatedAt": 1789369200000
+      },
+      {
+        "id": 146,
+        "type": "THIGH",
+        "date": "2026-09-25",
+        "value": 61.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1790319600000,
+        "updatedAt": 1790319600000
+      },
+      {
+        "id": 147,
+        "type": "HIPS",
+        "date": "2025-04-02",
+        "value": 100.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1743577200000,
+        "updatedAt": 1743577200000
+      },
+      {
+        "id": 148,
+        "type": "HIPS",
+        "date": "2025-04-18",
+        "value": 100.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1744959600000,
+        "updatedAt": 1744959600000
+      },
+      {
+        "id": 149,
+        "type": "HIPS",
+        "date": "2025-05-04",
+        "value": 101.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1746342000000,
+        "updatedAt": 1746342000000
+      },
+      {
+        "id": 150,
+        "type": "HIPS",
+        "date": "2025-05-20",
+        "value": 101.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1747724400000,
+        "updatedAt": 1747724400000
+      },
+      {
+        "id": 151,
+        "type": "HIPS",
+        "date": "2025-06-05",
+        "value": 101.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1749106800000,
+        "updatedAt": 1749106800000
+      },
+      {
+        "id": 152,
+        "type": "HIPS",
+        "date": "2025-06-21",
+        "value": 100.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1750489200000,
+        "updatedAt": 1750489200000
+      },
+      {
+        "id": 153,
+        "type": "HIPS",
+        "date": "2025-07-07",
+        "value": 101.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1751871600000,
+        "updatedAt": 1751871600000
+      },
+      {
+        "id": 154,
+        "type": "HIPS",
+        "date": "2025-07-23",
+        "value": 101.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1753254000000,
+        "updatedAt": 1753254000000
+      },
+      {
+        "id": 155,
+        "type": "HIPS",
+        "date": "2025-08-08",
+        "value": 101.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1754636400000,
+        "updatedAt": 1754636400000
+      },
+      {
+        "id": 156,
+        "type": "HIPS",
+        "date": "2025-08-24",
+        "value": 101.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1756018800000,
+        "updatedAt": 1756018800000
+      },
+      {
+        "id": 157,
+        "type": "HIPS",
+        "date": "2025-09-09",
+        "value": 100.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1757401200000,
+        "updatedAt": 1757401200000
+      },
+      {
+        "id": 158,
+        "type": "HIPS",
+        "date": "2025-09-25",
+        "value": 100.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1758783600000,
+        "updatedAt": 1758783600000
+      },
+      {
+        "id": 159,
+        "type": "HIPS",
+        "date": "2025-10-11",
+        "value": 100.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1760166000000,
+        "updatedAt": 1760166000000
+      },
+      {
+        "id": 160,
+        "type": "HIPS",
+        "date": "2025-10-27",
+        "value": 100.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1761548400000,
+        "updatedAt": 1761548400000
+      },
+      {
+        "id": 161,
+        "type": "HIPS",
+        "date": "2025-11-12",
+        "value": 100.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1762930800000,
+        "updatedAt": 1762930800000
+      },
+      {
+        "id": 162,
+        "type": "HIPS",
+        "date": "2025-11-28",
+        "value": 99.4,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1764313200000,
+        "updatedAt": 1764313200000
+      },
+      {
+        "id": 163,
+        "type": "HIPS",
+        "date": "2025-12-14",
+        "value": 99.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1765695600000,
+        "updatedAt": 1765695600000
+      },
+      {
+        "id": 164,
+        "type": "HIPS",
+        "date": "2025-12-30",
+        "value": 99.1,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1767078000000,
+        "updatedAt": 1767078000000
+      },
+      {
+        "id": 165,
+        "type": "HIPS",
+        "date": "2026-01-15",
+        "value": 98.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1768460400000,
+        "updatedAt": 1768460400000
+      },
+      {
+        "id": 166,
+        "type": "HIPS",
+        "date": "2026-01-31",
+        "value": 98.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1769842800000,
+        "updatedAt": 1769842800000
+      },
+      {
+        "id": 167,
+        "type": "HIPS",
+        "date": "2026-02-16",
+        "value": 97.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1771225200000,
+        "updatedAt": 1771225200000
+      },
+      {
+        "id": 168,
+        "type": "HIPS",
+        "date": "2026-03-04",
+        "value": 97.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1772607600000,
+        "updatedAt": 1772607600000
+      },
+      {
+        "id": 169,
+        "type": "HIPS",
+        "date": "2026-03-20",
+        "value": 97.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1773990000000,
+        "updatedAt": 1773990000000
+      },
+      {
+        "id": 170,
+        "type": "HIPS",
+        "date": "2026-04-05",
+        "value": 97.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1775372400000,
+        "updatedAt": 1775372400000
+      },
+      {
+        "id": 171,
+        "type": "HIPS",
+        "date": "2026-04-21",
+        "value": 97.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1776754800000,
+        "updatedAt": 1776754800000
+      },
+      {
+        "id": 172,
+        "type": "HIPS",
+        "date": "2026-05-07",
+        "value": 96.8,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1778137200000,
+        "updatedAt": 1778137200000
+      },
+      {
+        "id": 173,
+        "type": "HIPS",
+        "date": "2026-05-23",
+        "value": 97,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1779519600000,
+        "updatedAt": 1779519600000
+      },
+      {
+        "id": 174,
+        "type": "HIPS",
+        "date": "2026-06-08",
+        "value": 97.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1780902000000,
+        "updatedAt": 1780902000000
+      },
+      {
+        "id": 175,
+        "type": "HIPS",
+        "date": "2026-06-24",
+        "value": 97.6,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1782284400000,
+        "updatedAt": 1782284400000
+      },
+      {
+        "id": 176,
+        "type": "HIPS",
+        "date": "2026-07-10",
+        "value": 97.9,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1783666800000,
+        "updatedAt": 1783666800000
+      },
+      {
+        "id": 177,
+        "type": "HIPS",
+        "date": "2026-08-11",
+        "value": 97.3,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1786431600000,
+        "updatedAt": 1786431600000
+      },
+      {
+        "id": 178,
+        "type": "HIPS",
+        "date": "2026-08-27",
+        "value": 97.5,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1787814000000,
+        "updatedAt": 1787814000000
+      },
+      {
+        "id": 179,
+        "type": "HIPS",
+        "date": "2026-09-09",
+        "value": 97,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1788937200000,
+        "updatedAt": 1788937200000
+      },
+      {
+        "id": 180,
+        "type": "HIPS",
+        "date": "2026-09-12",
+        "value": 97.7,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1789196400000,
+        "updatedAt": 1789196400000
+      },
+      {
+        "id": 181,
+        "type": "HIPS",
+        "date": "2026-09-25",
+        "value": 97.2,
+        "source": "MANUAL",
+        "externalId": null,
+        "createdAt": 1790319600000,
+        "updatedAt": 1790319600000
       }
     ],
     "exercises": [

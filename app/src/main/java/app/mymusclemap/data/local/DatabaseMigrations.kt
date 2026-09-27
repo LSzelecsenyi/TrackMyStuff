@@ -480,3 +480,28 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `body_measurements` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `type` TEXT NOT NULL,
+                `date` TEXT NOT NULL,
+                `value` REAL NOT NULL,
+                `source` TEXT NOT NULL DEFAULT 'MANUAL',
+                `externalId` TEXT,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_body_measurements_type_date` ON `body_measurements` (`type`, `date`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_body_measurements_source_externalId` ON `body_measurements` (`source`, `externalId`)"
+        )
+    }
+}
+
