@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.ArchiveFilter
+import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
 import app.mymusclemap.domain.workout.TemplateListItem
 import app.mymusclemap.ui.components.CompactSearchBar
@@ -75,6 +76,7 @@ internal const val TEMPLATE_LIST = "template-list"
 internal const val TEMPLATE_FILTER_ACTIVE = "template-list-filter-active"
 internal const val TEMPLATE_FILTER_ARCHIVED = "template-list-filter-archived"
 internal const val TEMPLATE_FILTER_ALL = "template-list-filter-all"
+internal const val TEMPLATE_PLAN_LIMIT = "template-list-plan-limit"
 
 internal fun templateRowTag(id: Long): String = "template-list-row-$id"
 internal fun templateOverflowAnchorTag(id: Long): String = "template-list-overflow-anchor-$id"
@@ -94,7 +96,8 @@ fun TemplateListScreen(
     onRequestDelete: (TemplateListItem) -> Unit,
     onDismissDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
-    onMessageConsumed: () -> Unit
+    onMessageConsumed: () -> Unit,
+    onDismissLocked: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -151,6 +154,7 @@ fun TemplateListScreen(
                 )
                 IconButton(
                     onClick = { navigateOnce(onAdd) },
+                    enabled = !state.loading,
                     modifier = Modifier
                         .size(AppDimens.minTouch)
                         .testTag(TEMPLATE_ADD)
@@ -160,6 +164,17 @@ fun TemplateListScreen(
                         contentDescription = stringResource(R.string.action_create_template_header)
                     )
                 }
+            }
+            if (!state.loading && !state.canCreatePlan) {
+                Text(
+                    text = stringResource(R.string.plan_limit_caption),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(TEMPLATE_PLAN_LIMIT),
+                    style = AppTypeTokens.statCaption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(AppDimens.itemGap))
             }
             CompactSearchBar(
                 value = state.query,
@@ -256,6 +271,12 @@ fun TemplateListScreen(
                     Text(stringResource(R.string.action_ok))
                 }
             }
+        )
+    }
+    state.lockedFeature?.let { feature ->
+        ProInfoSheet(
+            feature = feature,
+            onDismiss = onDismissLocked
         )
     }
 }

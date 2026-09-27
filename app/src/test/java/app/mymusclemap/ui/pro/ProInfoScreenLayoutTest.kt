@@ -121,16 +121,13 @@ class ProInfoScreenLayoutTest {
         composeRule.waitForIdle()
         assertEquals(0, allowed[0])
         composeRule.onNodeWithTag(PRO_INFO_TITLE).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.pro_info_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(
-            testString(
-                R.string.pro_info_feature_body,
-                testString(R.string.pro_feature_advanced_planning)
-            )
-        ).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_scheduling_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_scheduling_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_INFO_HIGHLIGHTS).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_scheduling_schedule)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_info_title)).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.pro_info_statistics_title)).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.pro_info_statistics_body)).assertDoesNotExist()
-        composeRule.onNodeWithTag(PRO_INFO_HIGHLIGHTS).assertDoesNotExist()
         composeRule.onNodeWithTag(PRO_INFO_DISMISS).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()

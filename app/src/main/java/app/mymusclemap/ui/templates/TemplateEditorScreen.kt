@@ -45,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.exercise.Exercise
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MeasurementType
@@ -105,7 +106,8 @@ fun TemplateEditorScreen(
     onDismissDiscard: () -> Unit,
     onConfirmDiscard: () -> Unit,
     onFinished: (Boolean, Boolean) -> Unit,
-    onScrollConsumed: () -> Unit
+    onScrollConsumed: () -> Unit,
+    onDismissLocked: () -> Unit = {}
 ) {
     BackHandler {
         if (state.pane == TemplateEditorPane.Picker) onClosePicker() else onBack()
@@ -328,6 +330,12 @@ fun TemplateEditorScreen(
                     Text(stringResource(R.string.action_cancel))
                 }
             }
+        )
+    }
+    state.lockedFeature?.let { feature ->
+        ProInfoSheet(
+            feature = feature,
+            onDismiss = onDismissLocked
         )
     }
 }

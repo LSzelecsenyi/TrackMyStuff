@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -25,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
@@ -35,6 +38,7 @@ import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.domain.workout.ElapsedTime
 import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.ui.components.SegmentedControl
+import app.mymusclemap.ui.pro.ProBadge
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
@@ -52,6 +56,7 @@ internal const val STATISTICS_EXERCISES = "statistics-exercises"
 internal const val STATISTICS_SEE_MUSCLES = "statistics-see-muscles"
 internal const val STATISTICS_SEE_REST = "statistics-see-rest"
 internal const val STATISTICS_SEE_EXERCISES = "statistics-see-exercises"
+internal const val STATISTICS_REPORTS = "statistics-reports"
 
 internal val statisticsRangeTags = listOf(
     "statistics-range-30d",
@@ -175,13 +180,20 @@ internal fun DestinationRow(
     title: String,
     subtitle: String? = null,
     onClick: () -> Unit,
-    testTag: String
+    testTag: String,
+    showProBadge: Boolean = false
 ) {
+    val proState = if (showProBadge) stringResource(R.string.pro_badge) else null
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = AppDimens.minTouch)
             .clickable(onClick = onClick)
+            .semantics {
+                if (proState != null) {
+                    stateDescription = proState
+                }
+            }
             .testTag(testTag)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -203,6 +215,10 @@ internal fun DestinationRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+        if (showProBadge) {
+            ProBadge()
+            Spacer(Modifier.width(AppDimens.itemGap))
         }
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,

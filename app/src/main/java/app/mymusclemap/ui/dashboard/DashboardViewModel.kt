@@ -10,6 +10,10 @@ import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.DashboardAssembler
 import app.mymusclemap.domain.DashboardSnapshot
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.DaySheetFactory
 import app.mymusclemap.domain.DaySheetState
 import app.mymusclemap.domain.MeasurementValidationResult
@@ -86,7 +90,8 @@ data class DashboardUiState(
     val onboarding: OnboardingGuide = OnboardingGuide.Inactive,
     val onboardingWeightInput: String = "",
     val onboardingWeightError: WeightParseError? = null,
-    val openWeightDetailsForOnboarding: Boolean = false
+    val openWeightDetailsForOnboarding: Boolean = false,
+    val lockedFeature: AppFeature? = null
 )
 
 private data class DashboardChrome(
@@ -109,6 +114,13 @@ private data class ScheduleSignals(
     val templates: List<TemplateListItem>
 )
 
+private data class NavSignals(
+    val error: UserMessage?,
+    val started: Long?,
+    val journal: Long?,
+    val locked: AppFeature?
+)
+
 private data class DialogChrome(
     val pickerVisible: Boolean,
     val reschedule: ScheduledWorkout?,
@@ -116,7 +128,8 @@ private data class DialogChrome(
     val busy: Boolean,
     val actionError: UserMessage?,
     val startedSessionId: Long?,
-    val journalSessionId: Long?
+    val journalSessionId: Long?,
+    val lockedFeature: AppFeature?
 )
 
 private data class OnboardingChrome(
@@ -132,7 +145,8 @@ class DashboardViewModel(
     private val dateProvider: DateProvider,
     private val scheduledWorkoutRepository: ScheduledWorkoutRepository,
     private val templateRepository: WorkoutTemplateRepository,
-    private val onboardingRepository: OnboardingRepository? = null
+    private val onboardingRepository: OnboardingRepository? = null,
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
     private val editor = MutableStateFlow<EditorUiState?>(null)
@@ -148,6 +162,7 @@ class DashboardViewModel(
     private val scheduleActionError = MutableStateFlow<UserMessage?>(null)
     private val startedSessionId = MutableStateFlow<Long?>(null)
     private val journalSessionId = MutableStateFlow<Long?>(null)
+    private val lockedFeature = MutableStateFlow<AppFeature?>(null)
     private val starting = MutableStateFlow(false)
     private val onboardingWeightInput = MutableStateFlow("")
     private val onboardingWeightError = MutableStateFlow<WeightParseError?>(null)
@@ -227,8 +242,9 @@ class DashboardViewModel(
             picker, reschedule, remove, busy ->
             Quad(picker, reschedule, remove, busy)
         },
-        combine(scheduleActionError, startedSessionId, journalSessionId) { error, started, journal ->
-            Triple(error, started, journal)
+        combine(scheduleActionError, startedSessionId, journalSessionId, lockedFeature) {
+                error, started, journal, locked ->
+            NavSignals(error, started, journal, locked)
         }
     ) { openState, navState ->
         DialogChrome(
@@ -236,9 +252,10 @@ class DashboardViewModel(
             reschedule = openState.second,
             remove = openState.third,
             busy = openState.fourth,
-            actionError = navState.first,
-            startedSessionId = navState.second,
-            journalSessionId = navState.third
+            actionError = navState.error,
+            startedSessionId = navState.started,
+            journalSessionId = navState.journal,
+            lockedFeature = navState.locked
         )
     }
 
@@ -308,6 +325,7 @@ class DashboardViewModel(
             scheduleActionError = dialogState.actionError,
             startedSessionId = dialogState.startedSessionId,
             journalSessionId = dialogState.journalSessionId,
+            lockedFeature = dialogState.lockedFeature,
             onboarding = onboardingState.guide,
             onboardingWeightInput = onboardingState.weightInput,
             onboardingWeightError = onboardingState.weightError,
@@ -480,6 +498,9 @@ class DashboardViewModel(
         if (selectedDay.value == null) {
             return
         }
+        if (denyScheduling()) {
+            return
+        }
         scheduleActionError.value = null
         schedulePickerOpen.value = true
     }
@@ -494,6 +515,9 @@ class DashboardViewModel(
 
     fun scheduleTemplate(templateId: Long) {
         val date = selectedDay.value ?: return
+        if (denyScheduling()) {
+            return
+        }
         if (scheduleBusy.value) {
             return
         }
@@ -526,6 +550,9 @@ class DashboardViewModel(
         if (!actions.canReschedule) {
             return
         }
+        if (denyScheduling()) {
+            return
+        }
         scheduleActionError.value = null
         rescheduleTarget.value = item
     }
@@ -540,6 +567,9 @@ class DashboardViewModel(
 
     fun confirmReschedule(date: LocalDate) {
         val target = rescheduleTarget.value ?: return
+        if (denyScheduling()) {
+            return
+        }
         if (scheduleBusy.value) {
             return
         }
@@ -614,6 +644,31 @@ class DashboardViewModel(
                 scheduleBusy.value = false
             }
         }
+    }
+
+    fun requestCreatePlan(onAllowed: () -> Unit) {
+        viewModelScope.launch {
+            if (WorkoutPlanAccess.canCreateAnother(templateRepository.planCount(), entitlements)) {
+                onAllowed()
+            } else {
+                schedulePickerOpen.value = false
+                lockedFeature.value = AppFeature.UnlimitedWorkoutPlans
+            }
+        }
+    }
+
+    fun consumeLockedFeature() {
+        lockedFeature.value = null
+    }
+
+    private fun denyScheduling(): Boolean {
+        if (WorkoutPlanAccess.canSchedule(entitlements)) {
+            return false
+        }
+        schedulePickerOpen.value = false
+        rescheduleTarget.value = null
+        lockedFeature.value = AppFeature.AdvancedPlanning
+        return true
     }
 
     fun startScheduled(id: Long) {

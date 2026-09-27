@@ -8,6 +8,10 @@ import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
 import app.mymusclemap.domain.workout.ActiveSessionSummary
 import app.mymusclemap.domain.workout.QuickStartAssembler
@@ -39,7 +43,8 @@ data class WorkoutHubUiState(
     val message: WorkoutHubMessage? = null,
     val startedSessionId: Long? = null,
     val recentCompleted: WorkoutSessionSummary? = null,
-    val pickerVisible: Boolean = false
+    val pickerVisible: Boolean = false,
+    val lockedFeature: AppFeature? = null
 ) {
     val isEmpty: Boolean
         get() = !loading &&
@@ -66,16 +71,18 @@ sealed interface WorkoutPrimaryAction {
 
 class WorkoutHubViewModel(
     exerciseRepository: ExerciseRepository,
-    templateRepository: WorkoutTemplateRepository,
+    private val templateRepository: WorkoutTemplateRepository,
     private val sessionRepository: WorkoutSessionRepository,
     scheduledWorkoutRepository: ScheduledWorkoutRepository,
-    private val dateProvider: DateProvider
+    private val dateProvider: DateProvider,
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModel() {
     private val starting = MutableStateFlow(false)
     private val preparingStart = MutableStateFlow(false)
     private val message = MutableStateFlow<WorkoutHubMessage?>(null)
     private val startedSessionId = MutableStateFlow<Long?>(null)
     private val pickerOpen = MutableStateFlow(false)
+    private val lockedFeature = MutableStateFlow<AppFeature?>(null)
 
     private data class Counts(
         val exercises: Int,
@@ -88,7 +95,8 @@ class WorkoutHubViewModel(
         val currentMessage: WorkoutHubMessage?,
         val started: Long?,
         val isStarting: Boolean,
-        val pickerVisible: Boolean
+        val pickerVisible: Boolean,
+        val lockedFeature: AppFeature?
     )
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -103,9 +111,9 @@ class WorkoutHubViewModel(
         },
         templateRepository.observeActive(),
         sessionRepository.observeInProgress(),
-        combine(message, startedSessionId, starting, pickerOpen) {
-            currentMessage, started, isStarting, pickerVisible ->
-            StartExtras(currentMessage, started, isStarting, pickerVisible)
+        combine(message, startedSessionId, starting, pickerOpen, lockedFeature) {
+            currentMessage, started, isStarting, pickerVisible, locked ->
+            StartExtras(currentMessage, started, isStarting, pickerVisible, locked)
         },
         combine(
             sessionRepository.observeLatestCompleted(),
@@ -139,7 +147,8 @@ class WorkoutHubViewModel(
             message = extras.currentMessage,
             startedSessionId = extras.started,
             recentCompleted = recent,
-            pickerVisible = extras.pickerVisible && active == null
+            pickerVisible = extras.pickerVisible && active == null,
+            lockedFeature = extras.lockedFeature
         )
     }.stateIn(
         scope = viewModelScope,
@@ -165,6 +174,21 @@ class WorkoutHubViewModel(
             return
         }
         pickerOpen.value = false
+    }
+
+    fun requestCreatePlan(onAllowed: () -> Unit) {
+        viewModelScope.launch {
+            if (WorkoutPlanAccess.canCreateAnother(templateRepository.planCount(), entitlements)) {
+                onAllowed()
+            } else {
+                pickerOpen.value = false
+                lockedFeature.value = AppFeature.UnlimitedWorkoutPlans
+            }
+        }
+    }
+
+    fun consumeLockedFeature() {
+        lockedFeature.value = null
     }
 
     fun chooseTemplate(item: TemplateListItem) {

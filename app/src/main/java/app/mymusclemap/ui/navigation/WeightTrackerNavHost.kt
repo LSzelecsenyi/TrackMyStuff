@@ -42,6 +42,7 @@ import app.mymusclemap.R
 import app.mymusclemap.WeightViewModelFactory
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.reports.ReportPeriod
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
 import app.mymusclemap.ui.dashboard.DashboardScreen
@@ -66,8 +67,12 @@ import app.mymusclemap.ui.onboarding.OnboardingWorkoutSpotlight
 import app.mymusclemap.ui.settings.HelpTipsScreen
 import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.pro.ProInfoScreen
+import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.ui.settings.SettingsScreen
 import app.mymusclemap.ui.settings.SettingsViewModel
+import app.mymusclemap.ui.reports.ReportDetailScreen
+import app.mymusclemap.ui.reports.ReportsScreen
+import app.mymusclemap.ui.reports.ReportsViewModel
 import app.mymusclemap.ui.statistics.StatisticsExerciseDetailScreen
 import app.mymusclemap.ui.statistics.StatisticsExerciseListScreen
 import app.mymusclemap.ui.statistics.StatisticsMuscleDistributionScreen
@@ -100,6 +105,8 @@ private const val ARG_EXERCISES = "exercises"
 private const val ARG_COMPLETED_SETS = "completedSets"
 private const val ARG_DURATION_MILLIS = "durationMillis"
 private const val ARG_STATISTICS_EXERCISE_ID = "exerciseId"
+private const val ARG_REPORT_KIND = "kind"
+private const val ARG_REPORT_START = "start"
 private const val KEY_CATALOG_SAVED = "catalog_saved"
 private const val KEY_TEMPLATE_SAVED = "template_saved"
 private const val KEY_WORKOUT_DELETED = "workout_deleted"
@@ -116,6 +123,10 @@ private fun statisticsExerciseRoute(exerciseId: Long): String {
     return "${AppRoutes.STATISTICS_EXERCISE}?$ARG_STATISTICS_EXERCISE_ID=$exerciseId"
 }
 
+private fun reportDetailRoute(period: ReportPeriod): String {
+    return "${AppRoutes.REPORT_DETAIL}?$ARG_REPORT_KIND=${period.kind.name}&$ARG_REPORT_START=${period.startInclusive}"
+}
+
 @Composable
 private fun statisticsViewModel(
     navController: NavHostController,
@@ -124,6 +135,18 @@ private fun statisticsViewModel(
 ): StatisticsViewModel {
     val parent = remember(entry) {
         navController.getBackStackEntry(AppRoutes.STATISTICS_GRAPH)
+    }
+    return viewModel(parent, factory = factory)
+}
+
+@Composable
+private fun reportsViewModel(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    entry: NavBackStackEntry
+): ReportsViewModel {
+    val parent = remember(entry) {
+        navController.getBackStackEntry(AppRoutes.REPORTS_GRAPH)
     }
     return viewModel(parent, factory = factory)
 }
@@ -193,7 +216,9 @@ fun WeightTrackerNavHost(
     }
     LaunchedEffect(openNewTemplate) {
         if (!openNewTemplate) return@LaunchedEffect
-        navController.navigateInternal(templateEditorRoute(null))
+        workoutHubViewModel.requestCreatePlan {
+            navController.navigateInternal(templateEditorRoute(null))
+        }
         onOpenedNewTemplate()
     }
 
@@ -272,13 +297,18 @@ fun WeightTrackerNavHost(
                     onContinueScheduled = viewModel::continueScheduled,
                     onOpenScheduledJournal = viewModel::openScheduledJournal,
                     onCreateTemplateFromSchedule = {
-                        viewModel.dismissSchedulePicker()
-                        navController.navigateInternal(templateEditorRoute(null))
+                        viewModel.requestCreatePlan {
+                            viewModel.dismissSchedulePicker()
+                            navController.navigateInternal(templateEditorRoute(null))
+                        }
                     },
+                    onDismissLocked = viewModel::consumeLockedFeature,
                     onContinueOnboarding = {
                         when (state.onboarding.resumeTarget) {
                             OnboardingResumeTarget.CreatePlan -> {
-                                navController.navigateInternal(templateEditorRoute(null))
+                                viewModel.requestCreatePlan {
+                                    navController.navigateInternal(templateEditorRoute(null))
+                                }
                             }
                             OnboardingResumeTarget.StartWorkout -> {
                                 onboardingGuideViewModel.requestStartWorkoutCoach()
@@ -457,7 +487,8 @@ fun WeightTrackerNavHost(
                         },
                         onOpenExercise = { id ->
                             navController.navigateInternal(statisticsExerciseRoute(id))
-                        }
+                        },
+                        onOpenReports = { navController.navigateInternal(AppRoutes.REPORTS_GRAPH) }
                     )
                 }
                 composable(AppRoutes.STATISTICS_MUSCLES) { entry ->
@@ -502,6 +533,56 @@ fun WeightTrackerNavHost(
                         summary = viewModel.exercise(exerciseId),
                         onBack = { navController.popBackStack() }
                     )
+                }
+                navigation(
+                    route = AppRoutes.REPORTS_GRAPH,
+                    startDestination = AppRoutes.REPORTS
+                ) {
+                    composable(AppRoutes.REPORTS) { entry ->
+                        val viewModel = reportsViewModel(navController, factory, entry)
+                        val state by viewModel.uiState.collectAsStateWithLifecycle()
+                        ReportsScreen(
+                            state = state,
+                            onBack = { navController.popBackStack() },
+                            onKindSelected = viewModel::onKindSelected,
+                            onOpenReport = { period ->
+                                viewModel.openReport(period) {
+                                    navController.navigateInternal(reportDetailRoute(period))
+                                }
+                            },
+                            onLockedReport = viewModel::showLockedReports,
+                            onDismissLocked = viewModel::consumeLockedFeature
+                        )
+                    }
+                    composable(
+                        route = AppRoutes.REPORT_DETAIL_PATTERN,
+                        arguments = listOf(
+                            navArgument(ARG_REPORT_KIND) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(ARG_REPORT_START) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            }
+                        )
+                    ) { entry ->
+                        val viewModel = reportsViewModel(navController, factory, entry)
+                        val state by viewModel.uiState.collectAsStateWithLifecycle()
+                        val kindName = entry.arguments?.getString(ARG_REPORT_KIND)
+                        val denial = viewModel.denial(kindName)
+                        ReportDetailScreen(
+                            loading = state.loading,
+                            summary = if (denial != null) {
+                                null
+                            } else {
+                                viewModel.summary(kindName, entry.arguments?.getString(ARG_REPORT_START))
+                            },
+                            lockedFeature = denial,
+                            onDismissLocked = { navController.popBackStack() },
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
             }
             composable(AppRoutes.WEIGHT_DETAILS) {
@@ -610,10 +691,13 @@ fun WeightTrackerNavHost(
                     state = state,
                     onBack = { navController.popBackStack() },
                     onAdd = {
-                        navController.navigate(templateEditorRoute(null)) {
-                            launchSingleTop = true
+                        viewModel.requestCreate {
+                            navController.navigate(templateEditorRoute(null)) {
+                                launchSingleTop = true
+                            }
                         }
                     },
+                    onDismissLocked = viewModel::consumeLockedFeature,
                     onEdit = { id ->
                         navController.navigate(templateEditorRoute(id)) {
                             launchSingleTop = true
@@ -674,6 +758,7 @@ fun WeightTrackerNavHost(
                     onDismissDiscard = viewModel::dismissDiscard,
                     onConfirmDiscard = viewModel::confirmDiscard,
                     onScrollConsumed = viewModel::consumeScrollEvent,
+                    onDismissLocked = viewModel::consumeLockedFeature,
                     onFinished = { saved, created ->
                         if (saved) {
                             navController.previousBackStackEntry
@@ -853,13 +938,21 @@ fun WeightTrackerNavHost(
                 navController.navigateInternal(AppRoutes.TEMPLATES)
             },
             onCreateTemplate = {
-                workoutHubViewModel.dismissPicker()
-                navController.navigateInternal(templateEditorRoute(null))
+                workoutHubViewModel.requestCreatePlan {
+                    workoutHubViewModel.dismissPicker()
+                    navController.navigateInternal(templateEditorRoute(null))
+                }
             },
             todayPlanned = hubState.todayPlanned,
             todayInProgress = hubState.todayInProgress,
             onStartScheduled = workoutHubViewModel::startScheduled,
             onContinueScheduled = workoutHubViewModel::continueScheduled
+        )
+    }
+    hubState.lockedFeature?.let { feature ->
+        ProInfoSheet(
+            feature = feature,
+            onDismiss = workoutHubViewModel::consumeLockedFeature
         )
     }
 }

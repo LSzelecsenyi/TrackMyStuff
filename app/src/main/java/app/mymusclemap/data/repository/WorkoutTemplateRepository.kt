@@ -39,6 +39,14 @@ class WorkoutTemplateRepository(
 
     fun observeArchivedCount(): Flow<Int> = templateDao.observeArchivedCount()
 
+    fun observePlanCount(): Flow<Int> {
+        return combine(observeActiveCount(), observeArchivedCount()) { active, archived ->
+            active + archived
+        }
+    }
+
+    suspend fun planCount(): Int = templateDao.countAll()
+
     fun observeReferencedExerciseIds(): Flow<Set<Long>> {
         return templateDao.observeReferencedExerciseIds().map { it.toSet() }
     }

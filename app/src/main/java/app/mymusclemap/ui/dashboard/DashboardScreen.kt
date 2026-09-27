@@ -64,6 +64,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.DashboardSnapshot
 import app.mymusclemap.domain.WeeklyOverview
 import app.mymusclemap.domain.WeeklyOverviewLogic
@@ -149,7 +150,8 @@ fun DashboardScreen(
     onCalendarBounds: (Rect) -> Unit = {},
     onTodayBounds: (Rect) -> Unit = {},
     onChartBounds: (Rect) -> Unit = {},
-    onDashboardTargetRevealed: () -> Unit = {}
+    onDashboardTargetRevealed: () -> Unit = {},
+    onDismissLocked: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -357,6 +359,12 @@ fun DashboardScreen(
             onDeleteRequest = onDeleteRequest,
             onDeleteDismiss = onDeleteDismiss,
             onDeleteConfirm = onDeleteConfirm
+        )
+    }
+    state.lockedFeature?.let { feature ->
+        ProInfoSheet(
+            feature = feature,
+            onDismiss = onDismissLocked
         )
     }
 }

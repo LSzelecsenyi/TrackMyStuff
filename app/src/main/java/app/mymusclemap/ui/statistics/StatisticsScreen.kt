@@ -63,7 +63,8 @@ fun StatisticsScreen(
     onOpenMuscleDistribution: () -> Unit = {},
     onOpenRest: () -> Unit = {},
     onOpenExercises: () -> Unit = {},
-    onOpenExercise: (Long) -> Unit = {}
+    onOpenExercise: (Long) -> Unit = {},
+    onOpenReports: () -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier
@@ -108,6 +109,7 @@ fun StatisticsScreen(
                     )
                     CompactEditorDivider()
                     AdherenceSection(state.dashboard.adherence)
+                    ReportsEntry(onOpenReports)
                 } else if (!state.loading) {
                     ActivitySection(state.dashboard.activity)
                     CompactEditorDivider()
@@ -130,6 +132,7 @@ fun StatisticsScreen(
                         onSeeAll = onOpenExercises,
                         onOpenExercise = onOpenExercise
                     )
+                    ReportsEntry(onOpenReports)
                 }
             }
         }
@@ -137,6 +140,17 @@ fun StatisticsScreen(
     state.lockedFeature?.let { feature ->
         ProInfoSheet(feature = feature, onDismiss = onDismissLocked)
     }
+}
+
+@Composable
+private fun ReportsEntry(onOpenReports: () -> Unit) {
+    CompactEditorDivider()
+    DestinationRow(
+        title = stringResource(R.string.reports_entry_title),
+        subtitle = stringResource(R.string.reports_entry_subtitle),
+        onClick = onOpenReports,
+        testTag = STATISTICS_REPORTS
+    )
 }
 
 @Composable

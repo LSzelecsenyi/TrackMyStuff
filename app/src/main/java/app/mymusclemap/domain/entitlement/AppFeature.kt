@@ -6,6 +6,7 @@ package app.mymusclemap.domain.entitlement
  */
 enum class AppFeature {
     AdvancedStatistics,
+    AdvancedReports,
     AdvancedMuscleAnalytics,
     UnlimitedWorkoutPlans,
     AdvancedPlanning

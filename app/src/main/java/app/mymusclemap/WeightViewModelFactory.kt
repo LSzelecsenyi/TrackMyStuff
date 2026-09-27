@@ -28,6 +28,7 @@ import app.mymusclemap.ui.history.HistoryViewModel
 import app.mymusclemap.ui.history.WorkoutDetailViewModel
 import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingViewModel
+import app.mymusclemap.ui.reports.ReportsViewModel
 import app.mymusclemap.ui.settings.SettingsViewModel
 import app.mymusclemap.ui.statistics.StatisticsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
@@ -60,7 +61,8 @@ class WeightViewModelFactory(
                     dateProvider,
                     scheduledWorkoutRepository,
                     workoutTemplateRepository,
-                    onboardingRepository
+                    onboardingRepository,
+                    featureEntitlements
                 )
             }
             modelClass.isAssignableFrom(WeightDetailsViewModel::class.java) -> {
@@ -80,7 +82,8 @@ class WeightViewModelFactory(
                     workoutTemplateRepository,
                     workoutSessionRepository,
                     scheduledWorkoutRepository,
-                    dateProvider
+                    dateProvider,
+                    featureEntitlements
                 )
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
@@ -105,13 +108,14 @@ class WeightViewModelFactory(
                 }
             }
             modelClass.isAssignableFrom(TemplateListViewModel::class.java) -> {
-                TemplateListViewModel(workoutTemplateRepository)
+                TemplateListViewModel(workoutTemplateRepository, featureEntitlements)
             }
             modelClass.isAssignableFrom(TemplateEditorViewModel::class.java) -> {
                 TemplateEditorViewModel(
                     extras.createSavedStateHandle(),
                     workoutTemplateRepository,
-                    exerciseRepository
+                    exerciseRepository,
+                    featureEntitlements
                 )
             }
             modelClass.isAssignableFrom(ActiveWorkoutViewModel::class.java) -> {
@@ -142,6 +146,16 @@ class WeightViewModelFactory(
                 StatisticsViewModel(
                     workoutSessionRepository,
                     scheduledWorkoutRepository,
+                    dateProvider,
+                    featureEntitlements,
+                    extras.createSavedStateHandle()
+                )
+            }
+            modelClass.isAssignableFrom(ReportsViewModel::class.java) -> {
+                ReportsViewModel(
+                    workoutSessionRepository,
+                    scheduledWorkoutRepository,
+                    weightRepository,
                     dateProvider,
                     featureEntitlements,
                     extras.createSavedStateHandle()

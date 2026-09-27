@@ -29,6 +29,7 @@ import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.musclemap.MuscleTrainingExercise
+import app.mymusclemap.domain.workout.WorkoutSession
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
 import app.mymusclemap.domain.workout.ElapsedTime
@@ -134,6 +135,11 @@ class WorkoutSessionRepository(
 
     fun observeHasCompletedWorkout(): Flow<Boolean> {
         return sessionDao.observeCompletedSessions().map { it.isNotEmpty() }
+    }
+
+    /** Every persisted session, including in-progress and abandoned, for report history bounds. */
+    fun observeSessions(): Flow<List<WorkoutSession>> {
+        return sessionDao.observeAll().map { rows -> rows.map { it.toModel() } }
     }
 
     fun observeCompletedAggregates(): Flow<List<WorkoutSessionAggregate>> {

@@ -272,6 +272,40 @@ class AppRootNavigationTest {
         assertEquals(AppRoutes.OVERVIEW, nav.currentDestination?.route)
     }
 
+    @Test
+    fun givenReportsDetailWhenBackThenReportsStatisticsAndOverviewRemain() {
+        val nav = host()
+        composeRule.runOnIdle {
+            nav.navigateInternal(AppRoutes.STATISTICS_GRAPH)
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            nav.navigateInternal(AppRoutes.REPORTS_GRAPH)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.REPORTS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.navigateInternal("report_detail?kind=Monthly&start=2026-08-01")
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.REPORT_DETAIL_PATTERN, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.REPORTS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.STATISTICS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.OVERVIEW, nav.currentDestination?.route)
+    }
+
     private fun host(): NavHostController {
         lateinit var navController: NavHostController
         composeRule.setContent {
@@ -297,6 +331,25 @@ class AppRootNavigationTest {
                         composable(AppRoutes.STATISTICS_MUSCLES) { Text("muscles") }
                         composable(AppRoutes.STATISTICS_REST) { Text("rest") }
                         composable(AppRoutes.STATISTICS_EXERCISES) { Text("exercises") }
+                        navigation(
+                            route = AppRoutes.REPORTS_GRAPH,
+                            startDestination = AppRoutes.REPORTS
+                        ) {
+                            composable(AppRoutes.REPORTS) { Text("reports") }
+                            composable(
+                                route = AppRoutes.REPORT_DETAIL_PATTERN,
+                                arguments = listOf(
+                                    navArgument("kind") {
+                                        type = NavType.StringType
+                                        defaultValue = ""
+                                    },
+                                    navArgument("start") {
+                                        type = NavType.StringType
+                                        defaultValue = ""
+                                    }
+                                )
+                            ) { Text("report") }
+                        }
                     }
                     composable(
                         route = AppRoutes.ACTIVE_WORKOUT_PATTERN,

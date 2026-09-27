@@ -22,6 +22,18 @@ class FeatureEntitlementsTest {
         assertTrue(entitlements.hasAccess(AppFeature.AdvancedPlanning))
         assertFalse(entitlements.hasAccess(AppFeature.AdvancedMuscleAnalytics))
         assertFalse(entitlements.hasAccess(AppFeature.UnlimitedWorkoutPlans))
+        assertFalse(entitlements.hasAccess(AppFeature.AdvancedReports))
+    }
+
+    @Test
+    fun advancedStatisticsDoesNotGrantAdvancedReports() {
+        val statistics = SelectiveFeatureEntitlements(setOf(AppFeature.AdvancedStatistics))
+        assertTrue(statistics.hasAccess(AppFeature.AdvancedStatistics))
+        assertFalse(statistics.hasAccess(AppFeature.AdvancedReports))
+
+        val reports = SelectiveFeatureEntitlements(setOf(AppFeature.AdvancedReports))
+        assertTrue(reports.hasAccess(AppFeature.AdvancedReports))
+        assertFalse(reports.hasAccess(AppFeature.AdvancedStatistics))
     }
 
     @Test

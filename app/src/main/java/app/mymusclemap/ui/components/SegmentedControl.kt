@@ -20,9 +20,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import app.mymusclemap.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,7 +40,8 @@ fun SegmentedControl(
     onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
-    optionTestTags: List<String> = emptyList()
+    optionTestTags: List<String> = emptyList(),
+    lockedIndices: Set<Int> = emptySet()
 ) {
     val shape = if (compact) AppShapeTokens.compact else RoundedCornerShape(16.dp)
     val rowModifier = if (compact) {
@@ -54,6 +58,7 @@ fun SegmentedControl(
             .selectableGroup()
             .padding(4.dp)
     }
+    val lockedState = stringResource(R.string.pro_badge)
     Row(
         modifier = rowModifier,
         horizontalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp)
@@ -85,6 +90,9 @@ fun SegmentedControl(
                     .semantics {
                         role = Role.Tab
                         this.selected = selected
+                        if (index in lockedIndices) {
+                            stateDescription = lockedState
+                        }
                     }
                     .padding(horizontal = if (compact) 8.dp else 8.dp, vertical = if (compact) 6.dp else 8.dp),
                 contentAlignment = Alignment.Center

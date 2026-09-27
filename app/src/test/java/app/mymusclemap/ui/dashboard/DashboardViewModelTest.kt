@@ -14,6 +14,10 @@ import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.FixedDateProvider
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.SelectiveFeatureEntitlements
 import app.mymusclemap.domain.MutableDateProvider
 import app.mymusclemap.domain.WeeklyOverview
 import app.mymusclemap.domain.exercise.ExerciseCategory
@@ -474,16 +478,94 @@ class DashboardViewModelTest {
         assertTrue(restored.monthGrid.cells.first { it.date == today }.hasPlannedWorkout)
     }
 
+    @Test
+    fun freeSchedulingAttemptLeavesExistingFutureOccurrenceUntouched() = runTest {
+        val templateId = saveTemplate("Push A")
+        val futureId = (scheduled.schedule(templateId, today.plusDays(4)) as ScheduleWorkoutResult.Scheduled).id
+        val before = scheduled.getById(futureId)!!
+        val viewModel = dashboard(entitlements = SelectiveFeatureEntitlements(emptySet()))
+        viewModel.selectDay(today.plusDays(4))
+        val shown = viewModel.uiState.first {
+            it.daySheet?.scheduledWorkouts?.singleOrNull()?.id == futureId
+        }
+        assertFalse(shown.daySheet!!.scheduledWorkouts.single().isCancelled)
+        viewModel.openSchedulePicker()
+        val locked = viewModel.uiState.first { it.lockedFeature == AppFeature.AdvancedPlanning }
+        assertFalse(locked.schedulePickerVisible)
+        viewModel.openReschedule(shown.daySheet.scheduledWorkouts.single())
+        assertNull(viewModel.uiState.value.rescheduleTarget)
+        assertEquals(AppFeature.AdvancedPlanning, viewModel.uiState.value.lockedFeature)
+        assertEquals(before, scheduled.getById(futureId))
+    }
+
+    @Test
+    fun schedulingEntitlementCanCreateAnOccurrence() = runTest {
+        val templateId = saveTemplate("Push A")
+        val viewModel = dashboard(
+            entitlements = SelectiveFeatureEntitlements(setOf(AppFeature.AdvancedPlanning))
+        )
+        viewModel.selectDay(today.plusDays(1))
+        viewModel.uiState.first { it.daySheet?.date == today.plusDays(1) }
+        viewModel.openSchedulePicker()
+        viewModel.uiState.first { it.schedulePickerVisible }
+        viewModel.scheduleTemplate(templateId)
+        val sheet = viewModel.uiState.first { it.daySheet?.scheduledWorkouts?.size == 1 }.daySheet!!
+        assertEquals(today.plusDays(1), sheet.scheduledWorkouts.single().scheduledDate)
+        assertNull(viewModel.uiState.value.lockedFeature)
+    }
+
+    @Test
+    fun unlimitedPlansDoesNotUnlockScheduling() = runTest {
+        val templateId = saveTemplate("Push A")
+        val viewModel = dashboard(
+            entitlements = SelectiveFeatureEntitlements(setOf(AppFeature.UnlimitedWorkoutPlans))
+        )
+        viewModel.selectDay(today)
+        viewModel.uiState.first { it.daySheet?.date == today }
+        viewModel.scheduleTemplate(templateId)
+        assertEquals(
+            AppFeature.AdvancedPlanning,
+            viewModel.uiState.first { it.lockedFeature == AppFeature.AdvancedPlanning }.lockedFeature
+        )
+        assertTrue(scheduled.observeOnDate(today).first().isEmpty())
+    }
+
+    @Test
+    fun freeCanStartAndRemoveAnExistingScheduledWorkout() = runTest {
+        val templateId = saveTemplate("Push A")
+        val todayId = (scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled).id
+        val laterId = (scheduled.schedule(templateId, today.plusDays(2)) as ScheduleWorkoutResult.Scheduled).id
+        val viewModel = dashboard(entitlements = SelectiveFeatureEntitlements(emptySet()))
+        viewModel.selectDay(today)
+        viewModel.uiState.first { it.daySheet?.scheduledWorkouts?.any { item -> item.id == todayId } == true }
+        viewModel.startScheduled(todayId)
+        assertNotNull(viewModel.uiState.first { it.startedSessionId != null }.startedSessionId)
+        assertNull(viewModel.uiState.value.lockedFeature)
+        viewModel.selectDay(today.plusDays(2))
+        val later = viewModel.uiState.first {
+            it.daySheet?.scheduledWorkouts?.any { item -> item.id == laterId } == true
+        }.daySheet!!.scheduledWorkouts.single { it.id == laterId }
+        viewModel.openRemove(later)
+        viewModel.uiState.first { it.removeTarget?.id == laterId }
+        viewModel.confirmRemove()
+        viewModel.uiState.first { it.removeTarget == null && it.userMessage == UserMessage.ScheduleRemoved }
+        val history = scheduled.observeHistorical().first()
+        assertTrue(history.single { it.id == laterId }.isCancelled)
+        assertFalse(history.single { it.id == todayId }.isCancelled)
+    }
+
     private fun dashboard(
         weights: WeightRepository = WeightRepository(FakeWeightMeasurementDao(), clock),
-        dates: app.mymusclemap.domain.DateProvider = dateProvider
+        dates: app.mymusclemap.domain.DateProvider = dateProvider,
+        entitlements: FeatureEntitlements = OpenFeatureEntitlements
     ): DashboardViewModel {
         return DashboardViewModel(
             repository = weights,
             sessionRepository = sessionRepository,
             dateProvider = dates,
             scheduledWorkoutRepository = scheduled,
-            templateRepository = templates
+            templateRepository = templates,
+            entitlements = entitlements
         )
     }
 

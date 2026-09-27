@@ -67,6 +67,9 @@ fun SeriesChart(
     chartHeight: Dp = 240.dp,
     valueDomain: ChartValueDomain = ChartValueDomain.Padded,
     xAxisLabel: (LocalDate) -> String = { UiFormatters.compactDate(it) },
+    yAxisLabel: (Double) -> String = { value ->
+        String.format(app.mymusclemap.domain.locale.AppLocale.UI, "%.1f", value)
+    },
     snapXAxisToPoints: Boolean = false
 ) {
     val lineColor = MaterialTheme.colorScheme.primary
@@ -101,7 +104,8 @@ fun SeriesChart(
                             rightInset = 16.dp.toPx(),
                             top = 12.dp.toPx(),
                             bottomInset = 40.dp.toPx(),
-                            valueDomain = valueDomain
+                            valueDomain = valueDomain,
+                            yAxisLabel = yAxisLabel
                         )
                         val hit = layout.hitTest(tap)
                         selectedDate = hit?.date?.toString()
@@ -119,6 +123,7 @@ fun SeriesChart(
                 bottomInset = 40.dp.toPx(),
                 valueDomain = valueDomain,
                 xAxisLabel = xAxisLabel,
+                yAxisLabel = yAxisLabel,
                 snapXAxisToPoints = snapXAxisToPoints
             )
             layout.yLabels.forEach { label ->
@@ -235,6 +240,9 @@ private data class ChartLayout(
             bottomInset: Float,
             valueDomain: ChartValueDomain,
             xAxisLabel: (LocalDate) -> String = { UiFormatters.compactDate(it) },
+            yAxisLabel: (Double) -> String = { value ->
+                String.format(app.mymusclemap.domain.locale.AppLocale.UI, "%.1f", value)
+            },
             snapXAxisToPoints: Boolean = false
         ): ChartLayout {
             val right = width - rightInset
@@ -261,7 +269,7 @@ private data class ChartLayout(
             val yLabels = yValues.map { value ->
                 val yRatio = ((value - yMin) / yRange).toFloat()
                 AxisLabel(
-                    text = String.format(app.mymusclemap.domain.locale.AppLocale.UI, "%.1f", value),
+                    text = yAxisLabel(value),
                     y = bottom - yRatio * (bottom - top)
                 )
             }

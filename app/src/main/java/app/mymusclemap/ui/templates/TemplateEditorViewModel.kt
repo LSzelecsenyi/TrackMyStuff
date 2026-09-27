@@ -5,6 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.exercise.Exercise
 import app.mymusclemap.domain.exercise.ExerciseCatalogLogic
 import app.mymusclemap.domain.exercise.ExerciseCategory
@@ -62,7 +66,8 @@ data class TemplateEditorUiState(
     val created: Boolean = false,
     val saved: Boolean = false,
     val musclePreview: TemplateMuscleMapState = TemplateMuscleMapAssembler.assemble(emptyList()),
-    val scrollEvent: TemplateScrollEvent? = null
+    val scrollEvent: TemplateScrollEvent? = null,
+    val lockedFeature: AppFeature? = null
 ) {
     val canSave: Boolean
         get() = TemplateDraftLogic.validate(draft, catalog).isEmpty() && !duplicateName
@@ -71,7 +76,8 @@ data class TemplateEditorUiState(
 class TemplateEditorViewModel(
     savedStateHandle: SavedStateHandle,
     private val templateRepository: WorkoutTemplateRepository,
-    private val exerciseRepository: ExerciseRepository
+    private val exerciseRepository: ExerciseRepository,
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModel() {
     private val templateId: Long? = savedStateHandle.get<Long>(TEMPLATE_ID_KEY)
         ?.takeIf { it > 0L }
@@ -91,6 +97,7 @@ class TemplateEditorViewModel(
     private val saved = MutableStateFlow(false)
     private val loading = MutableStateFlow(templateId != null)
     private val scrollEvent = MutableStateFlow<TemplateScrollEvent?>(null)
+    private val lockedFeature = MutableStateFlow<AppFeature?>(null)
     private var nextLocalId = -1L
     private var scrollGeneration = 0L
 
@@ -110,8 +117,9 @@ class TemplateEditorViewModel(
         },
         combine(finished, created, saved, loading, scrollEvent) { done, wasCreated, wasSaved, isLoading, scroll ->
             EditorFinish(done, wasCreated, wasSaved, isLoading, scroll)
-        }
-    ) { core, flags, finish ->
+        },
+        lockedFeature
+    ) { core, flags, finish, locked ->
         val catalog = core.exercises.associateBy { it.id }
         val pickerVisible = ExerciseCatalogLogic.filter(
             exercises = core.exercises,
@@ -140,7 +148,8 @@ class TemplateEditorViewModel(
             musclePreview = TemplateMuscleMapAssembler.assemble(
                 core.draft.exercises.mapNotNull { catalog[it.exerciseId] }
             ),
-            scrollEvent = finish.scroll
+            scrollEvent = finish.scroll,
+            lockedFeature = locked
         )
     }.stateIn(
         scope = viewModelScope,
@@ -436,6 +445,12 @@ class TemplateEditorViewModel(
             return
         }
         viewModelScope.launch {
+            if (current.id == null &&
+                !WorkoutPlanAccess.canCreateAnother(templateRepository.planCount(), entitlements)
+            ) {
+                lockedFeature.value = AppFeature.UnlimitedWorkoutPlans
+                return@launch
+            }
             when (val result = templateRepository.save(current)) {
                 is TemplateSaveResult.Created -> {
                     created.value = true
@@ -456,6 +471,10 @@ class TemplateEditorViewModel(
 
     fun consumeScrollEvent() {
         scrollEvent.value = null
+    }
+
+    fun consumeLockedFeature() {
+        lockedFeature.value = null
     }
 
     fun requestLeave() {

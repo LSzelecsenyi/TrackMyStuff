@@ -1,5 +1,6 @@
 package app.mymusclemap.domain.reports
 
+import app.mymusclemap.domain.entitlement.AppFeature
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -12,7 +13,11 @@ enum class ReportKind {
     Monthly,
     Quarterly,
     HalfYear,
-    Yearly
+    Yearly;
+
+    /** Monthly reports are free. Longer closed periods use [AppFeature.AdvancedReports]. */
+    val requiredFeature: AppFeature?
+        get() = if (this == Monthly) null else AppFeature.AdvancedReports
 }
 
 data class ReportPeriod(

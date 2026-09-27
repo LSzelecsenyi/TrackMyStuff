@@ -70,6 +70,7 @@ class StatisticsScreenLayoutTest {
         composeRule.onNodeWithTag(STATISTICS_VOLUME).assertDoesNotExist()
         composeRule.onNodeWithTag(STATISTICS_ADHERENCE).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.statistics_adherence_empty)).assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_REPORTS).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -110,6 +111,8 @@ class StatisticsScreenLayoutTest {
         composeRule.onNodeWithTag(STATISTICS_MUSCLES).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.muscle_chest)).onFirst().assertIsDisplayed()
         composeRule.onNodeWithTag(STATISTICS_REST).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_REPORTS).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.reports_entry_title)).assertIsDisplayed()
     }
 
     @Test

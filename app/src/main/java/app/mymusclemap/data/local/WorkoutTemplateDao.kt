@@ -25,6 +25,9 @@ abstract class WorkoutTemplateDao {
     @Query("SELECT COUNT(*) FROM workout_templates WHERE archived = 1")
     abstract fun observeArchivedCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM workout_templates")
+    abstract suspend fun countAll(): Int
+
     @Query("SELECT * FROM workout_template_exercises ORDER BY templateId ASC, position ASC, id ASC")
     abstract fun observeExercises(): Flow<List<WorkoutTemplateExerciseEntity>>
 

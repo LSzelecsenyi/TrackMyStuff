@@ -3,6 +3,10 @@ package app.mymusclemap.ui.templates
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.exercise.ArchiveFilter
 import app.mymusclemap.domain.workout.TemplateCatalogLogic
 import app.mymusclemap.domain.workout.TemplateDeleteResult
@@ -23,7 +27,10 @@ data class TemplateListUiState(
     val message: TemplateMessage? = null,
     val pendingDelete: TemplateListItem? = null,
     val pendingBlocked: TemplateListItem? = null,
-    val referencedIds: Set<Long> = emptySet()
+    val referencedIds: Set<Long> = emptySet(),
+    val planCount: Int = 0,
+    val canCreatePlan: Boolean = true,
+    val lockedFeature: AppFeature? = null
 )
 
 enum class TemplateEmptyKind {
@@ -43,13 +50,15 @@ sealed interface TemplateMessage {
 }
 
 class TemplateListViewModel(
-    private val repository: WorkoutTemplateRepository
+    private val repository: WorkoutTemplateRepository,
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val archiveFilter = MutableStateFlow(ArchiveFilter.ACTIVE)
     private val message = MutableStateFlow<TemplateMessage?>(null)
     private val pendingDelete = MutableStateFlow<TemplateListItem?>(null)
     private val pendingBlocked = MutableStateFlow<TemplateListItem?>(null)
+    private val lockedFeature = MutableStateFlow<AppFeature?>(null)
 
     private data class Controls(
         val query: String,
@@ -62,11 +71,13 @@ class TemplateListViewModel(
     val uiState: StateFlow<TemplateListUiState> = combine(
         repository.observeAll(),
         repository.observeReferencedTemplateIds(),
+        repository.observePlanCount(),
         combine(query, archiveFilter, message, pendingDelete, pendingBlocked) {
                 text, filter, currentMessage, delete, blocked ->
             Controls(text, filter, currentMessage, delete, blocked)
-        }
-    ) { items, referenced, controls ->
+        },
+        lockedFeature
+    ) { items, referenced, planCount, controls, locked ->
         val visible = TemplateCatalogLogic.filter(
             items = items,
             query = controls.query,
@@ -86,7 +97,10 @@ class TemplateListViewModel(
             message = controls.message,
             pendingDelete = controls.pendingDelete,
             pendingBlocked = controls.pendingBlocked,
-            referencedIds = referenced
+            referencedIds = referenced,
+            planCount = planCount,
+            canCreatePlan = WorkoutPlanAccess.canCreateAnother(planCount, entitlements),
+            lockedFeature = locked
         )
     }.stateIn(
         scope = viewModelScope,
@@ -141,6 +155,22 @@ class TemplateListViewModel(
                 TemplateDeleteResult.NotFound -> TemplateMessage.DeleteBlocked
             }
         }
+    }
+
+    fun requestCreate(onAllowed: () -> Unit) {
+        val state = uiState.value
+        if (state.loading) {
+            return
+        }
+        if (WorkoutPlanAccess.canCreateAnother(state.planCount, entitlements)) {
+            onAllowed()
+        } else {
+            lockedFeature.value = AppFeature.UnlimitedWorkoutPlans
+        }
+    }
+
+    fun consumeLockedFeature() {
+        lockedFeature.value = null
     }
 
     fun showSaved(created: Boolean) {
