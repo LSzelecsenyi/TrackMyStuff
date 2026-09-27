@@ -111,6 +111,9 @@ android {
 // Production builds never read this property.
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     systemProperty("demo.backup.write", (findProperty("demo.backup.write") ?: "false").toString())
+    findProperty("demo.referenceDate")?.let { value ->
+        systemProperty("demo.referenceDate", value.toString())
+    }
 }
 
 kotlin {

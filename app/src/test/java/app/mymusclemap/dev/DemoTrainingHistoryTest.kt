@@ -22,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -29,15 +30,81 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
 @RunWith(RobolectricTestRunner::class)
 class DemoTrainingHistoryTest {
     @Test
     fun sameReferenceDateIsDeterministic() {
+        assertEquals(LocalDate.of(2026, 9, 26), DemoTrainingHistoryGenerator.referenceDate)
         val again = DemoTrainingHistoryGenerator.generate()
         assertEquals(snapshot, again)
         assertEquals(json, AppBackupJson.encode(again))
+        assertEquals(
+            DemoTrainingHistoryGenerator.referenceDate,
+            snapshot.exportedAt.atZone(ZoneOffset.UTC).toLocalDate()
+        )
+    }
+
+    @Test
+    fun blankReferenceDatePropertyKeepsTheFixedDate() {
+        assertEquals(
+            DemoTrainingHistoryGenerator.referenceDate,
+            DemoTrainingHistoryGenerator.referenceDateFromProperty(null)
+        )
+        assertEquals(
+            DemoTrainingHistoryGenerator.referenceDate,
+            DemoTrainingHistoryGenerator.referenceDateFromProperty("  ")
+        )
+    }
+
+    @Test
+    fun customReferenceDateShiftsHistoryAndKeepsDemoShape() {
+        val custom = LocalDate.of(2026, 9, 27)
+        val customSnapshot = DemoTrainingHistoryGenerator.generate(custom)
+        val customAnalysis = DemoTrainingHistoryGenerator.analyze(customSnapshot)
+        assertEquals(custom, customAnalysis.referenceDate)
+        assertEquals(custom.minusMonths(18), customAnalysis.historyStart)
+        assertFalse(customAnalysis.lastCompleted.isAfter(custom))
+        assertFalse(customAnalysis.lastCompleted.isBefore(custom.minusDays(6)))
+        assertEquals(custom, customSnapshot.exportedAt.atZone(ZoneOffset.UTC).toLocalDate())
+        assertTrue(ChronoUnit.DAYS.between(customAnalysis.firstCompleted, customAnalysis.lastCompleted) > 365)
+        assertFalse(customAnalysis.firstCompleted.isAfter(customAnalysis.historyStart.plusDays(7)))
+        assertTrue(customAnalysis.lateCompletions >= 5)
+        assertTrue(customAnalysis.missedOccurrences >= 5)
+        assertTrue(customAnalysis.cancelledOccurrences >= 8)
+        assertTrue(customAnalysis.rescheduledOccurrences >= 3)
+        assertTrue(customAnalysis.unplannedWorkouts >= 5)
+        assertTrue(customAnalysis.adherencePercent in 80..90)
+        val breakDays = ChronoUnit.DAYS.between(customAnalysis.breakStart, customAnalysis.breakEnd) + 1
+        assertTrue(breakDays in 12..16)
+        assertEquals(0.0, customAnalysis.breakVolumeKg, 0.001)
+        assertTrue(customAnalysis.firstBodyWeightKg > customAnalysis.lastBodyWeightKg)
+        assertTrue(customAnalysis.bodyWeightEntries in 100..400)
+        assertFalse(json == AppBackupJson.encode(customSnapshot))
+
+        val shifted = LocalDate.of(2026, 1, 15)
+        val shiftedAnalysis = DemoTrainingHistoryGenerator.analyze(
+            DemoTrainingHistoryGenerator.generate(shifted)
+        )
+        assertEquals(shifted.minusMonths(18), shiftedAnalysis.historyStart)
+        assertFalse(shiftedAnalysis.lastCompleted.isAfter(shifted))
+        assertFalse(shiftedAnalysis.lastCompleted.isBefore(shifted.minusDays(6)))
+        assertTrue(shiftedAnalysis.breakStart != analysis.breakStart)
+        assertTrue(shiftedAnalysis.unplannedWorkouts >= 5)
+        assertEquals(0.0, shiftedAnalysis.breakVolumeKg, 0.001)
+    }
+
+    @Test
+    fun invalidReferenceDateFailsClearly() {
+        listOf("2026-09-31", "2026/09/27", "2026-9-27", "yesterday", "2026-09-27T00:00").forEach { raw ->
+            val error = assertThrows(IllegalArgumentException::class.java) {
+                DemoTrainingHistoryGenerator.referenceDateFromProperty(raw)
+            }
+            assertTrue(error.message, error.message!!.contains("YYYY-MM-DD"))
+            assertTrue(error.message, error.message!!.contains(raw))
+        }
     }
 
     @Test
@@ -275,27 +342,40 @@ class DemoTrainingHistoryTest {
     }
 
     @Test
-    fun checkedInDemoBackupMatchesGenerator() {
+    fun checkedInDemoBackupMatchesSeptember272026Reference() {
+        val checkedInDate = LocalDate.of(2026, 9, 27)
         val file = DemoTrainingHistoryPaths.backupFile()
         assertTrue(
             "Missing ${file.absolutePath}. Regenerate with gradlew.bat :app:testDebugUnitTest " +
                 "--tests app.mymusclemap.dev.DemoTrainingHistoryTest.writesDemoBackupFileWhenRequested " +
-                "-Pdemo.backup.write=true",
+                "\"-Pdemo.backup.write=true\" \"-Pdemo.referenceDate=2026-09-27\"",
             file.isFile
         )
         val text = file.readText().replace("\r\n", "\n")
-        assertEquals(json, text)
+        assertEquals(DemoTrainingHistoryGenerator.encode(checkedInDate), text)
+        assertFalse(text == json)
         val parsed = AppBackupJson.parse(text)
         assertTrue(parsed is AppBackupParseResult.Success)
-        assertEquals(AppBackupFormat.SCHEMA_VERSION, (parsed as AppBackupParseResult.Success).snapshot.schemaVersion)
+        val restored = (parsed as AppBackupParseResult.Success).snapshot
+        assertEquals(AppBackupFormat.SCHEMA_VERSION, restored.schemaVersion)
+        assertEquals(checkedInDate, restored.exportedAt.atZone(ZoneOffset.UTC).toLocalDate())
     }
 
     @Test
     fun writesDemoBackupFileWhenRequested() {
         assumeTrue(System.getProperty("demo.backup.write") == "true")
-        val file = DemoTrainingHistoryGenerator.writeBackup()
+        val referenceDate = DemoTrainingHistoryGenerator.referenceDateFromProperty(
+            System.getProperty(DemoTrainingHistoryGenerator.REFERENCE_DATE_PROPERTY)
+        )
+        val file = DemoTrainingHistoryGenerator.writeBackup(referenceDate = referenceDate)
         assertTrue(file.isFile)
         assertTrue(file.length() > 0L)
+        val parsed = AppBackupJson.parse(file.readText().replace("\r\n", "\n"))
+        assertTrue(parsed is AppBackupParseResult.Success)
+        assertEquals(
+            referenceDate,
+            (parsed as AppBackupParseResult.Success).snapshot.exportedAt.atZone(ZoneOffset.UTC).toLocalDate()
+        )
     }
 
     private fun completedDatesFor(exerciseName: String): List<LocalDate> {

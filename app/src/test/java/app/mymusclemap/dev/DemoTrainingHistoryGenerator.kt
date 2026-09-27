@@ -41,6 +41,7 @@ import java.io.File
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.round
@@ -52,15 +53,43 @@ import kotlin.math.round
  * entity model the app exports, then encodes them with [AppBackupJson]. Nothing
  * here is referenced from production source, and it never opens the app database.
  *
- * The checked-in example is [DemoTrainingHistoryPaths.backupFile]. Regenerate it
- * from the repository root with:
+ * The checked-in example is [DemoTrainingHistoryPaths.backupFile]. Normal tests
+ * always use [referenceDate] and ignore Gradle properties. Regenerate the file
+ * from the repository root. Quote each `-P` on PowerShell:
  *
- * `gradlew.bat :app:testDebugUnitTest --tests app.mymusclemap.dev.DemoTrainingHistoryTest.writesDemoBackupFileWhenRequested -Pdemo.backup.write=true`
+ * `gradlew.bat :app:testDebugUnitTest --tests app.mymusclemap.dev.DemoTrainingHistoryTest.writesDemoBackupFileWhenRequested "-Pdemo.backup.write=true" "-Pdemo.referenceDate=2026-09-27"`
  *
+ * Omit `-Pdemo.referenceDate` to write the fixed [referenceDate] dataset.
  * Restore that file yourself through Settings. This generator does not seed the app.
  */
 object DemoTrainingHistoryGenerator {
+    const val REFERENCE_DATE_PROPERTY: String = "demo.referenceDate"
+
+    /** Fixed date for tests. Never [LocalDate.now]. */
     val referenceDate: LocalDate = LocalDate.of(2026, 9, 26)
+
+    private val referenceDatePattern = Regex("""\d{4}-\d{2}-\d{2}""")
+
+    /**
+     * Resolves the opt-in backup date. Blank means [referenceDate].
+     * Anything else must be a real `YYYY-MM-DD` date.
+     */
+    fun referenceDateFromProperty(raw: String?): LocalDate {
+        val value = raw?.trim().orEmpty()
+        if (value.isEmpty()) return referenceDate
+        if (!referenceDatePattern.matches(value)) {
+            throw IllegalArgumentException(invalidReferenceDateMessage(value))
+        }
+        return try {
+            LocalDate.parse(value)
+        } catch (error: DateTimeParseException) {
+            throw IllegalArgumentException(invalidReferenceDateMessage(value), error)
+        }
+    }
+
+    private fun invalidReferenceDateMessage(value: String): String {
+        return "Invalid $REFERENCE_DATE_PROPERTY '$value'. Expected YYYY-MM-DD."
+    }
 
     private val zone: ZoneOffset = ZoneOffset.UTC
     private const val WORKOUT_START_HOUR = 9
