@@ -32,6 +32,7 @@ import app.mymusclemap.testString
 import app.mymusclemap.ui.navigation.AppNavigation
 import app.mymusclemap.ui.navigation.AppRoutes
 import app.mymusclemap.ui.pro.PRO_BADGE
+import app.mymusclemap.ui.progress.PROGRESS_PHOTOS_ROW
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -90,6 +91,8 @@ class BodyProgressScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.body_measurement_add)).assertDoesNotExist()
         composeRule.onNodeWithTag(BODY_CHART_TAG).assertDoesNotExist()
         composeRule.onAllNodesWithTag(PRO_BADGE, useUnmergedTree = true).assertCountEquals(4)
+        composeRule.onNodeWithTag(PROGRESS_PHOTOS_ROW).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_empty)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(BODY_ROW_TAG + "THIGH").performScrollTo().performClick()
         assertEquals("THIGH", opened)
         composeRule.onNodeWithTag(BODY_ROW_TAG + "CHEST").performScrollTo().performClick()

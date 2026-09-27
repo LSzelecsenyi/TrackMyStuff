@@ -50,6 +50,9 @@ import app.mymusclemap.ui.dashboard.DashboardViewModel
 import app.mymusclemap.ui.dashboard.BodyMeasurementDetailScreen
 import app.mymusclemap.ui.dashboard.WeightDetailsScreen
 import app.mymusclemap.ui.dashboard.WeightDetailsViewModel
+import app.mymusclemap.ui.progress.ProgressPhotoCompareScreen
+import app.mymusclemap.ui.progress.ProgressPhotoViewerScreen
+import app.mymusclemap.ui.progress.ProgressPhotosScreen
 import app.mymusclemap.ui.exercises.ExerciseEditorScreen
 import app.mymusclemap.ui.exercises.ExerciseEditorViewModel
 import app.mymusclemap.ui.exercises.ExerciseListScreen
@@ -109,6 +112,9 @@ private const val ARG_STATISTICS_EXERCISE_ID = "exerciseId"
 private const val ARG_REPORT_KIND = "kind"
 private const val ARG_REPORT_START = "start"
 private const val ARG_BODY_TYPE = "type"
+private const val ARG_PHOTO_ID = "photoId"
+private const val ARG_PHOTO_FIRST = "first"
+private const val ARG_PHOTO_SECOND = "second"
 private const val KEY_CATALOG_SAVED = "catalog_saved"
 private const val KEY_TEMPLATE_SAVED = "template_saved"
 private const val KEY_WORKOUT_DELETED = "workout_deleted"
@@ -137,6 +143,18 @@ private fun statisticsViewModel(
 ): StatisticsViewModel {
     val parent = remember(entry) {
         navController.getBackStackEntry(AppRoutes.STATISTICS_GRAPH)
+    }
+    return viewModel(parent, factory = factory)
+}
+
+@Composable
+private fun progressPhotosViewModel(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    entry: NavBackStackEntry
+): app.mymusclemap.ui.progress.ProgressPhotosViewModel {
+    val parent = remember(entry) {
+        navController.getBackStackEntry(AppRoutes.BODY_PROGRESS_GRAPH)
     }
     return viewModel(parent, factory = factory)
 }
@@ -605,7 +623,9 @@ fun WeightTrackerNavHost(
             ) {
                 composable(AppRoutes.WEIGHT_DETAILS) { entry ->
                     val viewModel = bodyProgressViewModel(navController, factory, entry)
+                    val photosViewModel = progressPhotosViewModel(navController, factory, entry)
                     val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    val photos by photosViewModel.uiState.collectAsStateWithLifecycle()
                     WeightDetailsScreen(
                         state = state,
                         onBack = { navController.popBackStack() },
@@ -623,8 +643,114 @@ fun WeightTrackerNavHost(
                             navController.navigateInternal(AppNavigation.bodyMeasurementRoute(typeCode))
                         },
                         onLockedMeasurement = viewModel::showBodyMeasurementLocked,
-                        onDismissLocked = viewModel::dismissLockedFeature
+                        onDismissLocked = viewModel::dismissLockedFeature,
+                        progressPhotoCount = photos.photos.size,
+                        progressPhotoLatestDate = photos.latest?.date,
+                        progressPhotoProBadge = photos.showProBadge,
+                        progressPhotoThumbnail = photos.latestThumbnail,
+                        progressPhotoMissing = photos.latest?.missing == true,
+                        onOpenProgressPhotos = {
+                            navController.navigateInternal(AppRoutes.PROGRESS_PHOTOS)
+                        }
                     )
+                }
+                composable(AppRoutes.PROGRESS_PHOTOS) { entry ->
+                    val photosViewModel = progressPhotosViewModel(navController, factory, entry)
+                    val photos by photosViewModel.uiState.collectAsStateWithLifecycle()
+                    val context = LocalContext.current
+                    ProgressPhotosScreen(
+                        state = photos,
+                        onBack = { navController.popBackStack() },
+                        onAdd = photosViewModel::requestAdd,
+                        onConsumeLaunchPicker = photosViewModel::consumeLaunchPicker,
+                        onPicked = { uri ->
+                            if (uri == null) {
+                                photosViewModel.onPickerCancelled()
+                            } else {
+                                val stream = context.contentResolver.openInputStream(uri)
+                                if (stream == null) {
+                                    photosViewModel.import(java.io.ByteArrayInputStream(byteArrayOf()))
+                                } else {
+                                    photosViewModel.import(stream)
+                                }
+                            }
+                        },
+                        onOpenPhoto = { id ->
+                            navController.navigateInternal(AppNavigation.progressPhotoRoute(id))
+                        },
+                        onBeginCompare = photosViewModel::beginCompare,
+                        onToggleCompare = photosViewModel::toggleCompareSelection,
+                        onCancelCompare = photosViewModel::cancelCompare,
+                        onShowCompare = { first, second ->
+                            photosViewModel.cancelCompare()
+                            navController.navigateInternal(
+                                AppNavigation.progressPhotoCompareRoute(first, second)
+                            )
+                        },
+                        onDismissLocked = photosViewModel::dismissLockedFeature,
+                        decode = photosViewModel::decode
+                    )
+                }
+                composable(
+                    route = AppRoutes.PROGRESS_PHOTO_PATTERN,
+                    arguments = listOf(navArgument(ARG_PHOTO_ID) { type = NavType.LongType })
+                ) { entry ->
+                    val photosViewModel = progressPhotosViewModel(navController, factory, entry)
+                    val photos by photosViewModel.uiState.collectAsStateWithLifecycle()
+                    val photoId = entry.arguments?.getLong(ARG_PHOTO_ID) ?: -1L
+                    val photo = photos.photos.find { it.id == photoId }
+                    if (photos.loaded && photo == null) {
+                        LaunchedEffect(photoId) { navController.popBackStack() }
+                    } else if (photo != null) {
+                        var bitmap by remember(photo.fileName) { mutableStateOf<android.graphics.Bitmap?>(null) }
+                        LaunchedEffect(photo.fileName, photo.missing) {
+                            bitmap = if (photo.missing) {
+                                null
+                            } else {
+                                photosViewModel.decode(photo.fileName, 1600)
+                            }
+                        }
+                        ProgressPhotoViewerScreen(
+                            date = photo.date,
+                            bitmap = bitmap,
+                            missing = photo.missing,
+                            onBack = { navController.popBackStack() },
+                            onDelete = { photosViewModel.delete(photo.id) }
+                        )
+                    }
+                }
+                composable(
+                    route = AppRoutes.PROGRESS_PHOTO_COMPARE_PATTERN,
+                    arguments = listOf(
+                        navArgument(ARG_PHOTO_FIRST) { type = NavType.LongType },
+                        navArgument(ARG_PHOTO_SECOND) { type = NavType.LongType }
+                    )
+                ) { entry ->
+                    val photosViewModel = progressPhotosViewModel(navController, factory, entry)
+                    val photos by photosViewModel.uiState.collectAsStateWithLifecycle()
+                    val firstId = entry.arguments?.getLong(ARG_PHOTO_FIRST) ?: -1L
+                    val secondId = entry.arguments?.getLong(ARG_PHOTO_SECOND) ?: -1L
+                    val first = photos.photos.find { it.id == firstId }
+                    val second = photos.photos.find { it.id == secondId }
+                    if (photos.loaded && (first == null || second == null)) {
+                        LaunchedEffect(firstId, secondId) { navController.popBackStack() }
+                    } else if (first != null && second != null) {
+                        var before by remember(first.fileName) { mutableStateOf<android.graphics.Bitmap?>(null) }
+                        var after by remember(second.fileName) { mutableStateOf<android.graphics.Bitmap?>(null) }
+                        LaunchedEffect(first.fileName, first.missing, second.fileName, second.missing) {
+                            before = if (first.missing) null else photosViewModel.decode(first.fileName, 1600)
+                            after = if (second.missing) null else photosViewModel.decode(second.fileName, 1600)
+                        }
+                        ProgressPhotoCompareScreen(
+                            beforeDate = first.date,
+                            before = before,
+                            beforeMissing = first.missing,
+                            afterDate = second.date,
+                            after = after,
+                            afterMissing = second.missing,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
                 composable(
                     route = AppRoutes.BODY_MEASUREMENT_PATTERN,

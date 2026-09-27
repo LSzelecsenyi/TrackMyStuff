@@ -18,9 +18,10 @@ import androidx.room.RoomDatabase
         WorkoutSessionEntity::class,
         WorkoutSessionExerciseEntity::class,
         WorkoutSessionExerciseMuscleEntity::class,
-        WorkoutSessionSetEntity::class
+        WorkoutSessionSetEntity::class,
+        ProgressPhotoEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class WeightDatabase : RoomDatabase() {
     abstract fun scheduledWorkoutDao(): ScheduledWorkoutDao
     abstract fun workoutSessionDao(): WorkoutSessionDao
     abstract fun appBackupDao(): AppBackupDao
+    abstract fun progressPhotoDao(): ProgressPhotoDao
 
     companion object {
         fun create(context: Context): WeightDatabase {
@@ -46,7 +48,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
-                    MIGRATION_7_8
+                    MIGRATION_7_8,
+                    MIGRATION_8_9
                 )
                 .build()
         }

@@ -34,6 +34,11 @@ object AppRoutes {
     const val BODY_PROGRESS_GRAPH = "body_progress_graph"
     const val BODY_MEASUREMENT = "body_measurement"
     const val BODY_MEASUREMENT_PATTERN = "body_measurement?type={type}"
+    const val PROGRESS_PHOTOS = "progress_photos"
+    const val PROGRESS_PHOTO = "progress_photo"
+    const val PROGRESS_PHOTO_PATTERN = "progress_photo?photoId={photoId}"
+    const val PROGRESS_PHOTO_COMPARE = "progress_photo_compare"
+    const val PROGRESS_PHOTO_COMPARE_PATTERN = "progress_photo_compare?first={first}&second={second}"
     const val WORKOUT_IMPORT = "workout_import"
     const val WORKOUT_COMPLETE = "workout_complete"
     const val WORKOUT_COMPLETE_PATTERN =
@@ -148,6 +153,14 @@ object AppNavigation {
 
     fun bodyMeasurementRoute(typeCode: String): String {
         return "${AppRoutes.BODY_MEASUREMENT}?type=$typeCode"
+    }
+
+    fun progressPhotoRoute(photoId: Long): String {
+        return "${AppRoutes.PROGRESS_PHOTO}?photoId=$photoId"
+    }
+
+    fun progressPhotoCompareRoute(first: Long, second: Long): String {
+        return "${AppRoutes.PROGRESS_PHOTO_COMPARE}?first=$first&second=$second"
     }
 
     fun openWeightDetails(currentRoute: String?): InternalNavigation {

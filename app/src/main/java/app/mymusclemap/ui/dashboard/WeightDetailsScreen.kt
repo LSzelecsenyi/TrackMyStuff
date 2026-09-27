@@ -59,6 +59,7 @@ import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.components.WeightChart
 import app.mymusclemap.ui.pro.ProBadge
 import app.mymusclemap.ui.pro.ProInfoSheet
+import app.mymusclemap.ui.progress.ProgressPhotosOverviewRow
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
@@ -80,7 +81,13 @@ fun WeightDetailsScreen(
     onMessageConsumed: () -> Unit,
     onOpenMeasurement: (String) -> Unit = {},
     onLockedMeasurement: (BodyMeasurementType) -> Unit = {},
-    onDismissLocked: () -> Unit = {}
+    onDismissLocked: () -> Unit = {},
+    progressPhotoCount: Int = 0,
+    progressPhotoLatestDate: java.time.LocalDate? = null,
+    progressPhotoProBadge: Boolean = false,
+    progressPhotoThumbnail: android.graphics.Bitmap? = null,
+    progressPhotoMissing: Boolean = false,
+    onOpenProgressPhotos: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedPoint by remember { mutableStateOf<ChartPoint?>(null) }
@@ -144,6 +151,15 @@ fun WeightDetailsScreen(
                     Spacer(Modifier.height(AppDimens.itemGap))
                 }
             }
+            Spacer(Modifier.height(AppDimens.sectionGap))
+            ProgressPhotosOverviewRow(
+                count = progressPhotoCount,
+                latestDate = progressPhotoLatestDate,
+                showProBadge = progressPhotoProBadge,
+                latestThumbnail = progressPhotoThumbnail,
+                latestMissing = progressPhotoMissing,
+                onOpen = onOpenProgressPhotos
+            )
         }
     }
     state.editor?.let { editor ->

@@ -143,6 +143,14 @@ class OnboardingNavigationTest {
             workoutImportFileReader = ContentWorkoutImportFileReader(context),
             appBackupRepository = AppBackupRepository(database, themePreferences),
             firstRunCoordinator = coordinator,
+            progressPhotoRepository = app.mymusclemap.data.repository.ProgressPhotoRepository(
+                dao = database.progressPhotoDao(),
+                store = app.mymusclemap.data.progress.ProgressPhotoStore(
+                    java.io.File(context.filesDir, "progress_photos_onboarding_test")
+                ),
+                clock = clock,
+                dateProvider = dateProvider
+            ),
             onboardingRepository = app.mymusclemap.data.repository.OnboardingRepository(
                 themePreferences = themePreferences,
                 sessionRepository = workoutSessionRepository,

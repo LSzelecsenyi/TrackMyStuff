@@ -22,6 +22,21 @@ class ProInfoCopyTest {
     }
 
     @Test
+    fun progressPhotosExplainPrivateComparisonWithoutAnalysis() {
+        val copy = AppFeature.ProgressPhotos.proInfoCopy()
+        assertEquals(R.string.pro_info_progress_photos_title, copy.titleRes)
+        assertEquals(R.string.pro_info_progress_photos_body, copy.bodyRes)
+        assertEquals(
+            listOf(
+                R.string.pro_info_progress_photos_compare,
+                R.string.pro_info_progress_photos_private,
+                R.string.pro_info_progress_photos_existing_stay
+            ),
+            copy.highlights
+        )
+    }
+
+    @Test
     fun advancedBodyMeasurementsExplainsExtraMeasurementsWithoutCoaching() {
         val copy = AppFeature.AdvancedBodyMeasurements.proInfoCopy()
         assertEquals(R.string.pro_info_body_measurements_title, copy.titleRes)

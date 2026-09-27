@@ -7,7 +7,10 @@ import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.FirstRunCoordinator
+import app.mymusclemap.data.progress.ProgressPhotoStore
 import app.mymusclemap.data.repository.OnboardingRepository
+import app.mymusclemap.data.repository.ProgressPhotoRepository
+import java.io.File
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
@@ -63,6 +66,12 @@ class AppContainer(context: Context) {
     val appBackupRepository = AppBackupRepository(database, themePreferences)
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
+    val progressPhotoRepository = ProgressPhotoRepository(
+        dao = database.progressPhotoDao(),
+        store = ProgressPhotoStore(File(appContext.filesDir, ProgressPhotoStore.DIRECTORY_NAME)),
+        clock = clock,
+        dateProvider = dateProvider
+    )
     val onboardingRepository = OnboardingRepository(
         themePreferences = themePreferences,
         sessionRepository = workoutSessionRepository,
@@ -82,6 +91,7 @@ class AppContainer(context: Context) {
         appBackupRepository = appBackupRepository,
         firstRunCoordinator = firstRunCoordinator,
         onboardingRepository = onboardingRepository,
+        progressPhotoRepository = progressPhotoRepository,
         featureEntitlements = featureEntitlements
     )
 }

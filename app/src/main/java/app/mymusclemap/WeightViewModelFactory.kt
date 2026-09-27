@@ -11,6 +11,7 @@ import app.mymusclemap.data.repository.BodyMeasurementRepository
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.OnboardingRepository
+import app.mymusclemap.data.repository.ProgressPhotoRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
@@ -29,6 +30,7 @@ import app.mymusclemap.ui.history.HistoryViewModel
 import app.mymusclemap.ui.history.WorkoutDetailViewModel
 import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingViewModel
+import app.mymusclemap.ui.progress.ProgressPhotosViewModel
 import app.mymusclemap.ui.reports.ReportsViewModel
 import app.mymusclemap.ui.settings.SettingsViewModel
 import app.mymusclemap.ui.statistics.StatisticsViewModel
@@ -51,6 +53,7 @@ class WeightViewModelFactory(
     private val appBackupRepository: AppBackupRepository,
     private val firstRunCoordinator: FirstRunCoordinator,
     private val onboardingRepository: OnboardingRepository,
+    private val progressPhotoRepository: ProgressPhotoRepository,
     private val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
@@ -158,6 +161,9 @@ class WeightViewModelFactory(
                     featureEntitlements,
                     extras.createSavedStateHandle()
                 )
+            }
+            modelClass.isAssignableFrom(ProgressPhotosViewModel::class.java) -> {
+                ProgressPhotosViewModel(progressPhotoRepository, featureEntitlements)
             }
             modelClass.isAssignableFrom(ReportsViewModel::class.java) -> {
                 ReportsViewModel(

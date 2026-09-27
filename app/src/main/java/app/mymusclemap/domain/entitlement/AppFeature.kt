@@ -10,5 +10,6 @@ enum class AppFeature {
     AdvancedMuscleAnalytics,
     UnlimitedWorkoutPlans,
     AdvancedPlanning,
-    AdvancedBodyMeasurements
+    AdvancedBodyMeasurements,
+    ProgressPhotos
 }

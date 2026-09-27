@@ -312,6 +312,27 @@ class AppBackupRepositoryTest {
         assertEquals(snapshot.tables.weightMeasurements, restoredOld.snapshot.tables.weightMeasurements)
     }
 
+    @Test
+    fun jsonBackupOmitsProgressPhotoFilesAndRestoreKeepsLocalRows() = runTest {
+        val photoId = targetDb.progressPhotoDao().insert(
+            app.mymusclemap.data.local.ProgressPhotoEntity(
+                date = "2026-09-27",
+                fileName = "22222222-2222-2222-2222-222222222222.jpg",
+                createdAt = 1,
+                updatedAt = 1
+            )
+        )
+        val json = AppBackupRepository(targetDb, themePreferences)
+            .exportJson(AppBackupSource("app.mymusclemap", "1"))
+        assertFalse(json.contains("progress_photos"))
+        assertFalse(json.contains("22222222-2222-2222-2222-222222222222"))
+        assertEquals(
+            AppBackupRestoreResult.Success,
+            AppBackupRepository(targetDb, themePreferences).restoreJson(json)
+        )
+        assertEquals(photoId, targetDb.progressPhotoDao().getAll().single().id)
+    }
+
     private fun sqliteSequence(table: String): Long? {
         val cursor = targetDb.openHelper.readableDatabase.query(
             "SELECT seq FROM sqlite_sequence WHERE name = ?",

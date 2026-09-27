@@ -1,6 +1,7 @@
 package app.mymusclemap.data.local
 
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.domain.progress.ProgressPhoto
 import java.time.LocalDate
 
 fun WeightMeasurementEntity.toModel(): WeightMeasurement {
@@ -21,6 +22,16 @@ fun BodyMeasurementEntity.toModel(): app.mymusclemap.domain.body.BodyMeasurement
         value = value,
         source = source,
         externalId = externalId,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+}
+
+fun ProgressPhotoEntity.toModel(): ProgressPhoto {
+    return ProgressPhoto(
+        id = id,
+        date = LocalDate.parse(date),
+        fileName = fileName,
         createdAt = createdAt,
         updatedAt = updatedAt
     )

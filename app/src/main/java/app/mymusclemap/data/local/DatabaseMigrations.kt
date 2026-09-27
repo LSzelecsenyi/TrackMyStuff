@@ -505,3 +505,25 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `progress_photos` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `date` TEXT NOT NULL,
+                `fileName` TEXT NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_progress_photos_fileName` ON `progress_photos` (`fileName`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_progress_photos_date_id` ON `progress_photos` (`date`, `id`)"
+        )
+    }
+}
+
