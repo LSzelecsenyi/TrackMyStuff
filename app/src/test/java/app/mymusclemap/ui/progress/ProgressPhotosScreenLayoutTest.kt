@@ -58,17 +58,18 @@ class ProgressPhotosScreenLayoutTest {
         var opened = false
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                ProgressPhotosOverviewRow(
+                ProgressPhotosOverviewCard(
                     count = 0,
                     latestDate = null,
                     showProBadge = true,
-                    latestThumbnail = null,
+                    thumbnails = emptyList(),
                     latestMissing = false,
                     onOpen = { opened = true }
                 )
             }
         }
         composeRule.onNodeWithText(testString(R.string.progress_photos_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_overview_support)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.progress_photos_empty)).assertIsDisplayed()
         composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithTag(PROGRESS_PHOTOS_ROW).performClick()

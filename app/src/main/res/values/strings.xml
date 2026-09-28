@@ -639,6 +639,7 @@
     <string name="body_measurement_change">Change %1$s</string>
     <string name="body_measurement_history">History</string>
     <string name="progress_photos_title">Progress Photos</string>
+    <string name="progress_photos_overview_support">Track visual changes over time</string>
     <string name="progress_photos_empty">No photos</string>
     <string name="progress_photos_empty_body">Add a photo to look back at how you look over time. Photos stay on this device.</string>
     <string name="progress_photos_add">Add photo</string>
@@ -651,6 +652,11 @@
     <string name="progress_photos_compare_action">Show comparison</string>
     <string name="progress_photos_compare_cancel">Cancel</string>
     <string name="progress_photos_compare_title">Compare</string>
+    <string name="progress_photos_compare_slider">Slider</string>
+    <string name="progress_photos_compare_side_by_side">Side by side</string>
+    <string name="progress_photos_compare_position">Comparison position. Earlier photo %1$s. Later photo %2$s.</string>
+    <string name="progress_photos_compare_earlier">Earlier photo, %1$s</string>
+    <string name="progress_photos_compare_later">Later photo, %1$s</string>
     <string name="progress_photos_delete_message">Delete the photo from %1$s?</string>
     <string name="progress_photos_thumbnail">Progress photo, %1$s</string>
     <plurals name="progress_photos_count">

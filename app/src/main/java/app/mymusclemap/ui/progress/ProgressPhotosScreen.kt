@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -66,61 +66,102 @@ import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 
 internal const val PROGRESS_PHOTOS_ROW = "progress-photos-row"
+internal const val PROGRESS_PHOTOS_OVERVIEW_THUMB = "progress-photos-overview-thumb-"
 internal const val PROGRESS_PHOTO_ADD = "progress-photo-add"
 internal const val PROGRESS_PHOTO_CELL = "progress-photo-cell-"
 internal const val PROGRESS_PHOTO_COMPARE = "progress-photo-compare"
 internal const val PROGRESS_PHOTO_COMPARE_SHOW = "progress-photo-compare-show"
 
 @Composable
-internal fun ProgressPhotosOverviewRow(
+internal fun ProgressPhotosOverviewCard(
     count: Int,
     latestDate: java.time.LocalDate?,
     showProBadge: Boolean,
-    latestThumbnail: Bitmap?,
+    thumbnails: List<Bitmap>,
     latestMissing: Boolean,
     onOpen: () -> Unit
 ) {
     val openLabel = stringResource(R.string.progress_photos_open)
     val proState = stringResource(R.string.pro_badge)
+    val preview = thumbnails.take(OVERVIEW_PREVIEW_COUNT)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(PROGRESS_PHOTOS_ROW)
             .clickable(onClickLabel = openLabel, role = Role.Button, onClick = onOpen),
         shape = AppShapeTokens.surface,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 0.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = AppDimens.minTouch)
-                .padding(horizontal = AppDimens.itemGap, vertical = 10.dp)
+                .padding(AppDimens.itemGap)
                 .semantics {
                     if (showProBadge) stateDescription = proState
-                },
-            verticalAlignment = Alignment.CenterVertically
+                }
         ) {
-            if (latestThumbnail != null) {
-                Image(
-                    bitmap = latestThumbnail.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .padding(end = AppDimens.itemGap),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = stringResource(R.string.progress_photos_title),
-                    style = AppTypeTokens.sectionTitle,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
-                val subtitle = when {
-                    count == 0 -> stringResource(R.string.progress_photos_empty)
+                if (showProBadge) {
+                    Spacer(Modifier.width(8.dp))
+                    ProBadge()
+                }
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            if (count == 0) {
+                Text(
+                    text = stringResource(R.string.progress_photos_overview_support),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Text(
+                    text = stringResource(R.string.progress_photos_empty),
+                    style = AppTypeTokens.sectionSubtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            } else {
+                if (preview.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        preview.forEachIndexed { index, thumbnail ->
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(AppShapeTokens.compact)
+                                    .testTag(PROGRESS_PHOTOS_OVERVIEW_THUMB + index)
+                            ) {
+                                Image(
+                                    bitmap = thumbnail.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
+                }
+                val summary = when {
                     latestMissing -> stringResource(R.string.progress_photos_missing)
                     latestDate != null -> {
                         pluralStringResource(R.plurals.progress_photos_count, count, count) +
@@ -129,26 +170,19 @@ internal fun ProgressPhotosOverviewRow(
                     else -> pluralStringResource(R.plurals.progress_photos_count, count, count)
                 }
                 Text(
-                    text = subtitle,
-                    style = AppTypeTokens.statCaption,
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = if (preview.isEmpty()) 4.dp else 8.dp)
                 )
             }
-            if (showProBadge) {
-                ProBadge()
-                Spacer(Modifier.width(AppDimens.itemGap))
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
+
+private const val OVERVIEW_PREVIEW_COUNT = 3
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

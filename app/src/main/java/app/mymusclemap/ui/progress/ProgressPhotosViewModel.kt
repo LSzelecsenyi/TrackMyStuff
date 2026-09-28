@@ -42,6 +42,7 @@ data class ProgressPhotosUiState(
     val selectingCompare: Boolean = false,
     val selectedIds: List<Long> = emptyList(),
     val latestThumbnail: Bitmap? = null,
+    val recentThumbnails: List<Bitmap> = emptyList(),
     val loaded: Boolean = false
 ) {
     val latest: ProgressPhotoListItem? get() = photos.firstOrNull()
@@ -52,7 +53,7 @@ class ProgressPhotosViewModel(
     private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModel() {
     private val photos = MutableStateFlow<List<ProgressPhotoListItem>>(emptyList())
-    private val latestThumbnail = MutableStateFlow<Bitmap?>(null)
+    private val recentThumbnails = MutableStateFlow<List<Bitmap>>(emptyList())
     private val launchPicker = MutableStateFlow(false)
     private val importing = MutableStateFlow(false)
     private val message = MutableStateFlow<ProgressPhotoMessage?>(null)
@@ -62,8 +63,8 @@ class ProgressPhotosViewModel(
     private val loaded = MutableStateFlow(false)
 
     val uiState: StateFlow<ProgressPhotosUiState> = combine(
-        combine(photos, latestThumbnail, launchPicker, importing, loaded) { items, thumbnail, picker, busy, ready ->
-            PhotoListInputs(items, thumbnail, picker, busy, ready)
+        combine(photos, recentThumbnails, launchPicker, importing, loaded) { items, thumbnails, picker, busy, ready ->
+            PhotoListInputs(items, thumbnails, picker, busy, ready)
         },
         combine(message, lockedFeature, selectingCompare, selectedIds) { note, locked, selecting, selected ->
             PhotoChromeInputs(note, locked, selecting, selected)
@@ -80,7 +81,8 @@ class ProgressPhotosViewModel(
             lockedFeature = chrome.locked,
             selectingCompare = chrome.selecting,
             selectedIds = chrome.selected,
-            latestThumbnail = list.thumbnail,
+            latestThumbnail = list.thumbnails.firstOrNull(),
+            recentThumbnails = list.thumbnails,
             loaded = list.ready
         )
     }.stateIn(
@@ -107,8 +109,10 @@ class ProgressPhotosViewModel(
                 photos.value = items
                 loaded.value = true
                 selectedIds.value = selectedIds.value.filter { id -> items.any { it.id == id } }
-                latestThumbnail.value = withContext(Dispatchers.IO) {
-                    items.firstOrNull { !it.missing }?.let { repository.decode(it.fileName, THUMBNAIL_EDGE) }
+                recentThumbnails.value = withContext(Dispatchers.IO) {
+                    items.filter { !it.missing }
+                        .take(OVERVIEW_THUMBNAILS)
+                        .mapNotNull { repository.decode(it.fileName, THUMBNAIL_EDGE) }
                 }
             }
         }
@@ -190,7 +194,7 @@ class ProgressPhotosViewModel(
 
     private data class PhotoListInputs(
         val items: List<ProgressPhotoListItem>,
-        val thumbnail: Bitmap?,
+        val thumbnails: List<Bitmap>,
         val picker: Boolean,
         val busy: Boolean,
         val ready: Boolean
@@ -205,5 +209,6 @@ class ProgressPhotosViewModel(
 
     private companion object {
         const val THUMBNAIL_EDGE = 240
+        const val OVERVIEW_THUMBNAILS = 3
     }
 }

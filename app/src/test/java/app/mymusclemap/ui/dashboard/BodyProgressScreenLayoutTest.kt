@@ -1,11 +1,14 @@
 package app.mymusclemap.ui.dashboard
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -28,10 +31,12 @@ import app.mymusclemap.domain.body.BodyMeasurement
 import app.mymusclemap.domain.body.BodyMeasurementSeries
 import app.mymusclemap.domain.body.BodyMeasurementType
 import app.mymusclemap.domain.model.ChartRange
+import app.mymusclemap.testQuantity
 import app.mymusclemap.testString
 import app.mymusclemap.ui.navigation.AppNavigation
 import app.mymusclemap.ui.navigation.AppRoutes
 import app.mymusclemap.ui.pro.PRO_BADGE
+import app.mymusclemap.ui.progress.PROGRESS_PHOTOS_OVERVIEW_THUMB
 import app.mymusclemap.ui.progress.PROGRESS_PHOTOS_ROW
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -92,11 +97,76 @@ class BodyProgressScreenLayoutTest {
         composeRule.onNodeWithTag(BODY_CHART_TAG).assertDoesNotExist()
         composeRule.onAllNodesWithTag(PRO_BADGE, useUnmergedTree = true).assertCountEquals(4)
         composeRule.onNodeWithTag(PROGRESS_PHOTOS_ROW).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.progress_photos_empty)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_overview_support)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_empty)).assertIsDisplayed()
+        val chartTop = composeRule.onNodeWithText(testString(R.string.chart_title)).getBoundsInRoot().top
+        val photosTop = composeRule.onNodeWithTag(PROGRESS_PHOTOS_ROW).getBoundsInRoot().top
+        val measurementsTop = composeRule.onNodeWithText(testString(R.string.body_measurements_section)).getBoundsInRoot().top
+        assertTrue(chartTop < photosTop)
+        assertTrue(photosTop < measurementsTop)
         composeRule.onNodeWithTag(BODY_ROW_TAG + "THIGH").performScrollTo().performClick()
         assertEquals("THIGH", opened)
         composeRule.onNodeWithTag(BODY_ROW_TAG + "CHEST").performScrollTo().performClick()
         assertEquals(BodyMeasurementType.CHEST, locked)
+    }
+
+    @Test
+    fun progressPhotosCardPreviewsRecentPhotosAboveMeasurements() {
+        var opened = false
+        val thumbnails = listOf(Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW).map { color ->
+            Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
+        }
+        composeRule.setContent {
+            WeightTrackerThemeForPreview {
+                WeightDetailsScreen(
+                    state = WeightDetailsUiState(
+                        today = today,
+                        rows = overviewRows()
+                    ),
+                    onBack = {},
+                    onAddToday = {},
+                    onChartRangeSelected = {},
+                    onEditorDateChange = {},
+                    onEditorWeightChange = {},
+                    onSave = {},
+                    onDismissEditor = {},
+                    onDeleteRequest = {},
+                    onDeleteDismiss = {},
+                    onDeleteConfirm = {},
+                    onMessageConsumed = {},
+                    progressPhotoCount = 4,
+                    progressPhotoLatestDate = today,
+                    progressPhotoProBadge = true,
+                    progressPhotoThumbnails = thumbnails,
+                    onOpenProgressPhotos = { opened = true }
+                )
+            }
+        }
+        composeRule.onNodeWithTag(PROGRESS_PHOTOS_ROW).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testQuantity(R.plurals.progress_photos_count, 4) + " · Sep 27"
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_empty)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_overview_support)).assertDoesNotExist()
+        composeRule.onNodeWithTag(PROGRESS_PHOTOS_OVERVIEW_THUMB + 0, useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(PROGRESS_PHOTOS_OVERVIEW_THUMB + 1, useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(PROGRESS_PHOTOS_OVERVIEW_THUMB + 2, useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(PROGRESS_PHOTOS_OVERVIEW_THUMB + 3, useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule.onAllNodesWithTag(PRO_BADGE, useUnmergedTree = true).assertCountEquals(5)
+        composeRule.onNodeWithText(testString(R.string.body_measurements_section)).performScrollTo()
+        val photosTop = composeRule.onNodeWithTag(PROGRESS_PHOTOS_ROW).getBoundsInRoot().top
+        val measurementsTop = composeRule.onNodeWithText(testString(R.string.body_measurements_section)).getBoundsInRoot().top
+        assertTrue(photosTop < measurementsTop)
+        composeRule.onNodeWithTag(PROGRESS_PHOTOS_ROW).performScrollTo().performClick()
+        assertTrue(opened)
     }
 
     @Test

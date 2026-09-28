@@ -59,7 +59,7 @@ import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.components.WeightChart
 import app.mymusclemap.ui.pro.ProBadge
 import app.mymusclemap.ui.pro.ProInfoSheet
-import app.mymusclemap.ui.progress.ProgressPhotosOverviewRow
+import app.mymusclemap.ui.progress.ProgressPhotosOverviewCard
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
@@ -85,7 +85,7 @@ fun WeightDetailsScreen(
     progressPhotoCount: Int = 0,
     progressPhotoLatestDate: java.time.LocalDate? = null,
     progressPhotoProBadge: Boolean = false,
-    progressPhotoThumbnail: android.graphics.Bitmap? = null,
+    progressPhotoThumbnails: List<android.graphics.Bitmap> = emptyList(),
     progressPhotoMissing: Boolean = false,
     onOpenProgressPhotos: () -> Unit = {}
 ) {
@@ -139,6 +139,15 @@ fun WeightDetailsScreen(
                 selectedPoint = selectedPoint,
                 onPointSelected = { selectedPoint = it }
             )
+            Spacer(Modifier.height(AppDimens.sectionGap))
+            ProgressPhotosOverviewCard(
+                count = progressPhotoCount,
+                latestDate = progressPhotoLatestDate,
+                showProBadge = progressPhotoProBadge,
+                thumbnails = progressPhotoThumbnails,
+                latestMissing = progressPhotoMissing,
+                onOpen = onOpenProgressPhotos
+            )
             if (state.rows.isNotEmpty()) {
                 Spacer(Modifier.height(AppDimens.sectionGap))
                 SectionHeader(title = stringResource(R.string.body_measurements_section))
@@ -151,15 +160,6 @@ fun WeightDetailsScreen(
                     Spacer(Modifier.height(AppDimens.itemGap))
                 }
             }
-            Spacer(Modifier.height(AppDimens.sectionGap))
-            ProgressPhotosOverviewRow(
-                count = progressPhotoCount,
-                latestDate = progressPhotoLatestDate,
-                showProBadge = progressPhotoProBadge,
-                latestThumbnail = progressPhotoThumbnail,
-                latestMissing = progressPhotoMissing,
-                onOpen = onOpenProgressPhotos
-            )
         }
     }
     state.editor?.let { editor ->

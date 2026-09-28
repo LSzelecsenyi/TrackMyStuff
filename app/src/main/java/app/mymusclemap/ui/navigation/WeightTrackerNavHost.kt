@@ -647,7 +647,7 @@ fun WeightTrackerNavHost(
                         progressPhotoCount = photos.photos.size,
                         progressPhotoLatestDate = photos.latest?.date,
                         progressPhotoProBadge = photos.showProBadge,
-                        progressPhotoThumbnail = photos.latestThumbnail,
+                        progressPhotoThumbnails = photos.recentThumbnails,
                         progressPhotoMissing = photos.latest?.missing == true,
                         onOpenProgressPhotos = {
                             navController.navigateInternal(AppRoutes.PROGRESS_PHOTOS)
