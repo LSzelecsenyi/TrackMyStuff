@@ -43,6 +43,7 @@ internal const val HELP_TOPIC_HEATMAP = "help-topic-heatmap"
 internal const val HELP_TOPIC_WEIGHT = "help-topic-weight"
 internal const val HELP_TOPIC_CALENDAR = "help-topic-calendar"
 internal const val HELP_TOPIC_BACKUP = "help-topic-backup"
+internal const val HELP_TOPIC_HEALTH = "help-topic-health"
 
 private val heatmapBandLabels = listOf(
     R.string.heatmap_band_today,
@@ -106,6 +107,12 @@ fun HelpTipsScreen(onBack: () -> Unit) {
                     title = stringResource(R.string.help_backup_title),
                     body = stringResource(R.string.help_backup_body),
                     testTag = HELP_TOPIC_BACKUP
+                )
+                CompactEditorDivider()
+                HelpTopic(
+                    title = stringResource(R.string.help_health_title),
+                    body = stringResource(R.string.help_health_body),
+                    testTag = HELP_TOPIC_HEALTH
                 )
             }
         }

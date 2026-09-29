@@ -151,6 +151,10 @@ class OnboardingNavigationTest {
                 clock = clock,
                 dateProvider = dateProvider
             ),
+            healthRepository = app.mymusclemap.data.health.HealthRepository(
+                source = app.mymusclemap.domain.health.HealthSource.Unavailable,
+                dateProvider = dateProvider
+            ),
             onboardingRepository = app.mymusclemap.data.repository.OnboardingRepository(
                 themePreferences = themePreferences,
                 sessionRepository = workoutSessionRepository,

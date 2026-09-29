@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
@@ -32,6 +33,7 @@ import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingViewModel
 import app.mymusclemap.ui.progress.ProgressPhotosViewModel
 import app.mymusclemap.ui.reports.ReportsViewModel
+import app.mymusclemap.ui.health.HealthConnectViewModel
 import app.mymusclemap.ui.settings.SettingsViewModel
 import app.mymusclemap.ui.statistics.StatisticsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
@@ -54,6 +56,7 @@ class WeightViewModelFactory(
     private val firstRunCoordinator: FirstRunCoordinator,
     private val onboardingRepository: OnboardingRepository,
     private val progressPhotoRepository: ProgressPhotoRepository,
+    private val healthRepository: HealthRepository,
     private val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
@@ -164,6 +167,9 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(ProgressPhotosViewModel::class.java) -> {
                 ProgressPhotosViewModel(progressPhotoRepository, featureEntitlements)
+            }
+            modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {
+                HealthConnectViewModel(healthRepository, dateProvider)
             }
             modelClass.isAssignableFrom(ReportsViewModel::class.java) -> {
                 ReportsViewModel(

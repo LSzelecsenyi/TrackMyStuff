@@ -254,8 +254,8 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.palette_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.theme_preview_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.data_title).uppercase()).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.privacy_title).uppercase()).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.privacy_body)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.privacy_title).uppercase()).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.privacy_body)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PREVIEW).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_EDITOR_MODE).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.backup_body)).fetchSemanticsNodes().let { nodes ->

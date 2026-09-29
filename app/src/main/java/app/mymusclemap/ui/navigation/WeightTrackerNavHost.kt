@@ -72,6 +72,12 @@ import app.mymusclemap.ui.settings.HelpTipsScreen
 import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.pro.ProInfoScreen
 import app.mymusclemap.ui.pro.ProInfoSheet
+import app.mymusclemap.domain.health.HealthSettingsAction
+import app.mymusclemap.ui.health.HealthConnectViewModel
+import app.mymusclemap.ui.health.RefreshHealthConnectOnResume
+import app.mymusclemap.ui.health.openHealthConnectManageAccess
+import app.mymusclemap.ui.health.openHealthConnectProviderInstall
+import app.mymusclemap.ui.health.rememberHealthConnectPermissionLaunch
 import app.mymusclemap.ui.settings.SettingsScreen
 import app.mymusclemap.ui.settings.SettingsViewModel
 import app.mymusclemap.ui.reports.ReportDetailScreen
@@ -203,7 +209,9 @@ fun WeightTrackerNavHost(
     factory: WeightViewModelFactory,
     dateProvider: DateProvider,
     openNewTemplate: Boolean = false,
-    onOpenedNewTemplate: () -> Unit = {}
+    onOpenedNewTemplate: () -> Unit = {},
+    openPrivacyPolicy: Boolean = false,
+    onOpenedPrivacyPolicy: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -220,6 +228,14 @@ fun WeightTrackerNavHost(
     var calendarBounds by remember { mutableStateOf(Rect.Zero) }
     var todayBounds by remember { mutableStateOf(Rect.Zero) }
     var chartBounds by remember { mutableStateOf(Rect.Zero) }
+    LaunchedEffect(openPrivacyPolicy) {
+        if (openPrivacyPolicy) {
+            navController.navigate(AppRoutes.PRIVACY) {
+                launchSingleTop = true
+            }
+            onOpenedPrivacyPolicy()
+        }
+    }
     val onPrimaryWorkoutClick = {
         onboardingGuideViewModel.dismissStartWorkoutCoach()
         when (val action = workoutHubViewModel.onPrimaryWorkoutAction()) {
@@ -287,6 +303,9 @@ fun WeightTrackerNavHost(
             composable(AppRoutes.OVERVIEW) {
                 val viewModel: DashboardViewModel = viewModel(factory = factory)
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
+                val healthViewModel: HealthConnectViewModel = viewModel(factory = factory)
+                val health by healthViewModel.card.collectAsStateWithLifecycle()
+                RefreshHealthConnectOnResume(healthViewModel::refresh)
                 DashboardScreen(
                     state = state,
                     onPreviousMonth = viewModel::onPreviousMonth,
@@ -309,6 +328,8 @@ fun WeightTrackerNavHost(
                     onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
                     onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
                     onOpenStatistics = { navController.navigateInternal(AppRoutes.STATISTICS_GRAPH) },
+                    health = health,
+                    onOpenHealthSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
                     onOpenWorkout = { id ->
                         viewModel.dismissDaySheet()
                         navController.navigate(workoutDetailRoute(id)) {
@@ -480,10 +501,14 @@ fun WeightTrackerNavHost(
             composable(AppRoutes.SETTINGS) {
                 val viewModel: SettingsViewModel = viewModel(factory = factory)
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
+                val healthViewModel: HealthConnectViewModel = viewModel(factory = factory)
+                val health by healthViewModel.settings.collectAsStateWithLifecycle()
                 SettingsRoute(
                     viewModel = viewModel,
                     state = state,
                     today = dateProvider.today(),
+                    health = health,
+                    onHealthRefresh = healthViewModel::refresh,
                     onBack = { navController.popBackStack() },
                     onOpenHelp = { navController.navigateInternal(AppRoutes.HELP) },
                     onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) }
@@ -1153,10 +1178,14 @@ private fun SettingsRoute(
     viewModel: SettingsViewModel,
     state: app.mymusclemap.ui.settings.SettingsUiState,
     today: LocalDate,
+    health: app.mymusclemap.domain.health.HealthSettingsState,
+    onHealthRefresh: () -> Unit,
     onBack: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenPrivacy: () -> Unit
 ) {
+    val launchHealthPermissions = rememberHealthConnectPermissionLaunch(onHealthRefresh)
+    RefreshHealthConnectOnResume(onHealthRefresh)
     val context = LocalContext.current
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
@@ -1293,7 +1322,22 @@ private fun SettingsRoute(
         },
         onOpenHelp = onOpenHelp,
         onMessageConsumed = viewModel::consumeMessage,
-        onBack = onBack
+        onBack = onBack,
+        health = health,
+        onHealthAction = {
+            val opened = when (health.action) {
+                HealthSettingsAction.InstallOrUpdate -> openHealthConnectProviderInstall(context)
+                HealthSettingsAction.RequestPermissions -> {
+                    launchHealthPermissions()
+                    true
+                }
+                HealthSettingsAction.ManageAccess -> openHealthConnectManageAccess(context)
+                HealthSettingsAction.None -> true
+            }
+            if (!opened) {
+                viewModel.onHealthConnectOpenFailed()
+            }
+        }
     )
 }
 

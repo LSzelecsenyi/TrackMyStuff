@@ -92,7 +92,9 @@ import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.PaletteValidationError
 import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.domain.theme.ThemeMode
+import app.mymusclemap.domain.health.HealthSettingsState
 import app.mymusclemap.ui.components.CompactEditorDivider
+import app.mymusclemap.ui.health.HealthConnectSettingsSection
 import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.PaletteSwatch
 import app.mymusclemap.ui.components.UserMessageEffect
@@ -162,7 +164,9 @@ fun SettingsScreen(
     onOpenPrivacyPolicy: () -> Unit,
     onOpenHelp: () -> Unit,
     onMessageConsumed: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    health: HealthSettingsState = HealthSettingsState.NotConnected,
+    onHealthAction: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
@@ -241,6 +245,11 @@ fun SettingsScreen(
                 AppBackupSection(
                     onExportClick = onAppBackupExportClick,
                     onRestoreClick = onRestoreClick
+                )
+                CompactEditorDivider()
+                HealthConnectSettingsSection(
+                    state = health,
+                    onAction = onHealthAction
                 )
                 CompactEditorDivider()
                 CompactEditorSection(title = settingsKicker(stringResource(R.string.privacy_title))) {

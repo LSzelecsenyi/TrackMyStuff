@@ -261,6 +261,10 @@ class SettingsViewModel(
         userMessage.value = UserMessage.FeedbackEmailUnavailable
     }
 
+    fun onHealthConnectOpenFailed() {
+        userMessage.value = UserMessage.HealthConnectOpenFailed
+    }
+
     suspend fun buildAppBackupJson(source: AppBackupSource): String {
         return appBackupRepository.exportJson(source)
     }

@@ -13,6 +13,8 @@ coroutines = "1.10.2"
 junit = "4.13.2"
 robolectric = "4.16"
 androidxTestCore = "1.7.0"
+healthConnect = "1.1.0"
+healthConnectTesting = "1.0.0-alpha04"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -40,6 +42,8 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-health-connect-client = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
+androidx-health-connect-testing = { group = "androidx.health.connect", name = "connect-testing", version.ref = "healthConnectTesting" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

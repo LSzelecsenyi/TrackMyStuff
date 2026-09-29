@@ -55,6 +55,8 @@ class HelpTipsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.help_calendar_body)).assertIsDisplayed()
         composeRule.onNodeWithTag(HELP_TOPIC_BACKUP).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.help_backup_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag(HELP_TOPIC_HEALTH).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.help_health_body)).assertIsDisplayed()
         composeRule.onNodeWithText(
             testString(R.string.help_workout_title).uppercase(AppLocale.UI)
         ).assertIsDisplayed()

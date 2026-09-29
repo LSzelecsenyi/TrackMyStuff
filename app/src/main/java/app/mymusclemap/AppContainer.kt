@@ -1,6 +1,8 @@
 package app.mymusclemap
 
 import android.content.Context
+import app.mymusclemap.data.health.HealthConnectGateway
+import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
@@ -72,6 +74,10 @@ class AppContainer(context: Context) {
         clock = clock,
         dateProvider = dateProvider
     )
+    val healthRepository = HealthRepository(
+        source = HealthConnectGateway(appContext),
+        dateProvider = dateProvider
+    )
     val onboardingRepository = OnboardingRepository(
         themePreferences = themePreferences,
         sessionRepository = workoutSessionRepository,
@@ -92,6 +98,7 @@ class AppContainer(context: Context) {
         firstRunCoordinator = firstRunCoordinator,
         onboardingRepository = onboardingRepository,
         progressPhotoRepository = progressPhotoRepository,
+        healthRepository = healthRepository,
         featureEntitlements = featureEntitlements
     )
 }

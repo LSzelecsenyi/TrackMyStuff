@@ -145,6 +145,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    implementation(libs.androidx.health.connect.client)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
@@ -155,6 +157,7 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.health.connect.testing)
 }
 
 gradle.taskGraph.whenReady {

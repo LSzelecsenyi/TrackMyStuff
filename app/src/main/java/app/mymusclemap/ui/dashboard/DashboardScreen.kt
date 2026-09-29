@@ -83,7 +83,10 @@ import app.mymusclemap.ui.components.UnscheduleWorkoutDialog
 import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.components.stringRes
 import app.mymusclemap.ui.components.WeightChart
+import app.mymusclemap.domain.health.HealthCardState
+import app.mymusclemap.domain.health.HealthQuietStatus
 import app.mymusclemap.ui.components.musclemap.MuscleHeatmapCard
+import app.mymusclemap.ui.health.HealthConnectOverviewCard
 import app.mymusclemap.ui.onboarding.OnboardingReminderCard
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
@@ -151,7 +154,9 @@ fun DashboardScreen(
     onTodayBounds: (Rect) -> Unit = {},
     onChartBounds: (Rect) -> Unit = {},
     onDashboardTargetRevealed: () -> Unit = {},
-    onDismissLocked: () -> Unit = {}
+    onDismissLocked: () -> Unit = {},
+    health: HealthCardState = HealthCardState.Quiet(HealthQuietStatus.NotConnected),
+    onOpenHealthSettings: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -252,6 +257,11 @@ fun DashboardScreen(
                 subtitle = stringResource(R.string.statistics_entry_subtitle),
                 onClick = onOpenStatistics,
                 testTag = OVERVIEW_STATISTICS
+            )
+            OverviewSectionDivider()
+            HealthConnectOverviewCard(
+                state = health,
+                onOpenSettings = onOpenHealthSettings
             )
             OverviewSectionDivider()
             Column(
