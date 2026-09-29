@@ -24,7 +24,9 @@ sealed interface HealthCardState {
         val stepsGranted: Boolean,
         val heartRateGranted: Boolean,
         val recentSteps: List<StepSlot>,
-        val readFailed: Boolean
+        val readFailed: Boolean,
+        val stepsFailed: Boolean = false,
+        val heartFailed: Boolean = false
     ) : HealthCardState
 }
 
@@ -47,7 +49,10 @@ data class HealthSettingsState(
     val status: HealthSettingsStatus,
     val stepsGranted: Boolean,
     val restingHeartRateGranted: Boolean,
-    val action: HealthSettingsAction
+    val action: HealthSettingsAction,
+    val exerciseGranted: Boolean = false,
+    val hrvGranted: Boolean = false,
+    val sleepGranted: Boolean = false
 ) {
     companion object {
         val NotConnected = HealthSettingsState(
@@ -70,7 +75,7 @@ object HealthPresentation {
             HealthAvailability.ProviderUpdateRequired ->
                 HealthCardState.Quiet(HealthQuietStatus.UpdateRequired)
             HealthAvailability.Available -> {
-                if (!access.stepsGranted && !access.restingHeartRateGranted) {
+                if (!access.anyGranted()) {
                     HealthCardState.Quiet(HealthQuietStatus.NotConnected)
                 } else {
                     HealthCardState.Readings(
@@ -83,7 +88,9 @@ object HealthPresentation {
                         stepsGranted = access.stepsGranted,
                         heartRateGranted = access.restingHeartRateGranted,
                         recentSteps = if (access.stepsGranted) recentSteps(readings.steps, today) else emptyList(),
-                        readFailed = readings.readFailed
+                        readFailed = readings.readFailed,
+                        stepsFailed = readings.failed.contains(HealthMetric.STEPS),
+                        heartFailed = readings.failed.contains(HealthMetric.RESTING_HEART_RATE)
                     )
                 }
             }
@@ -116,7 +123,7 @@ object HealthPresentation {
                 action = HealthSettingsAction.InstallOrUpdate
             )
             HealthAvailability.Available -> {
-                val connected = access.stepsGranted || access.restingHeartRateGranted
+                val connected = access.anyGranted()
                 HealthSettingsState(
                     ready = true,
                     status = if (connected) {
@@ -130,7 +137,10 @@ object HealthPresentation {
                         HealthSettingsAction.ManageAccess
                     } else {
                         HealthSettingsAction.RequestPermissions
-                    }
+                    },
+                    exerciseGranted = access.exerciseGranted,
+                    hrvGranted = access.hrvGranted,
+                    sleepGranted = access.sleepGranted
                 )
             }
         }

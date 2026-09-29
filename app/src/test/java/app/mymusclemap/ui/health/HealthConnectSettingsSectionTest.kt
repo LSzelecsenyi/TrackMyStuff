@@ -93,6 +93,29 @@ class HealthConnectSettingsSectionTest {
             )
         )
         composeRule.onNodeWithText(testString(R.string.health_connect_both)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.health_connect_view_data)).assertIsDisplayed()
+    }
+
+    @Test
+    fun partialNewGrantsListOnlyWhatIsOn() {
+        val opens = intArrayOf(0)
+        render(
+            HealthSettingsState(
+                ready = true,
+                status = HealthSettingsStatus.Connected,
+                stepsGranted = true,
+                restingHeartRateGranted = false,
+                action = HealthSettingsAction.ManageAccess,
+                exerciseGranted = true,
+                hrvGranted = false,
+                sleepGranted = true
+            ),
+            onOpenDetails = { opens[0] += 1 }
+        )
+        composeRule.onNodeWithText("Steps, Exercise sessions, Sleep").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.health_connect_partial_steps)).assertDoesNotExist()
+        composeRule.onNodeWithTag(SETTINGS_HEALTH_DETAILS).performClick()
+        assertEquals(1, opens[0])
     }
 
     private fun status(status: HealthSettingsStatus, action: HealthSettingsAction): HealthSettingsState {
@@ -105,10 +128,18 @@ class HealthConnectSettingsSectionTest {
         )
     }
 
-    private fun render(state: HealthSettingsState, onAction: () -> Unit = {}) {
+    private fun render(
+        state: HealthSettingsState,
+        onAction: () -> Unit = {},
+        onOpenDetails: () -> Unit = {}
+    ) {
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                HealthConnectSettingsSection(state = state, onAction = onAction)
+                HealthConnectSettingsSection(
+                    state = state,
+                    onAction = onAction,
+                    onOpenDetails = onOpenDetails
+                )
             }
         }
     }

@@ -15,8 +15,12 @@ import app.mymusclemap.domain.body.BodyMeasurementType
 import app.mymusclemap.domain.FixedDateProvider
 import app.mymusclemap.domain.csv.WeightCsv
 import app.mymusclemap.domain.health.HealthAvailability
+import app.mymusclemap.domain.health.HealthExerciseKind
+import app.mymusclemap.domain.health.HealthExerciseSession
 import app.mymusclemap.domain.health.HealthGrants
+import app.mymusclemap.domain.health.HealthHrvSample
 import app.mymusclemap.domain.health.HealthMetricBucket
+import app.mymusclemap.domain.health.HealthSleepSpan
 import app.mymusclemap.domain.health.HealthSource
 import app.mymusclemap.domain.reports.ReportInputs
 import app.mymusclemap.domain.reports.ReportKind
@@ -34,9 +38,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.time.Clock
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 
 @RunWith(RobolectricTestRunner::class)
 class HealthConnectIsolationTest {
@@ -82,7 +89,13 @@ class HealthConnectIsolationTest {
         val health = HealthRepository(
             source = object : HealthSource {
                 override fun availability() = HealthAvailability.Available
-                override suspend fun grantedPermissions() = HealthGrants(steps = true, restingHeartRate = true)
+                override suspend fun grantedPermissions() = HealthGrants(
+                    steps = true,
+                    restingHeartRate = true,
+                    exercise = true,
+                    hrv = true,
+                    sleep = true
+                )
                 override suspend fun readSteps(
                     startInclusive: LocalDateTime,
                     endExclusive: LocalDateTime
@@ -91,6 +104,31 @@ class HealthConnectIsolationTest {
                     startInclusive: LocalDateTime,
                     endExclusive: LocalDateTime
                 ) = listOf(HealthMetricBucket(today, 59))
+                override suspend fun readExerciseSessions(
+                    startInclusive: LocalDateTime,
+                    endExclusive: LocalDateTime
+                ) = listOf(
+                    HealthExerciseSession(
+                        start = today.atTime(18, 0).atZone(zone).toInstant(),
+                        end = today.atTime(18, 45).atZone(zone).toInstant(),
+                        zone = zone,
+                        kind = HealthExerciseKind.STRENGTH
+                    )
+                )
+                override suspend fun readHrvSamples(
+                    startInclusive: LocalDateTime,
+                    endExclusive: LocalDateTime
+                ) = listOf(HealthHrvSample(Instant.parse("2024-09-28T06:00:00Z"), ZoneOffset.UTC, 45.0))
+                override suspend fun readSleepSpans(
+                    startInclusive: LocalDateTime,
+                    endExclusive: LocalDateTime
+                ) = listOf(
+                    HealthSleepSpan(
+                        start = today.atTime(0, 20).atZone(zone).toInstant(),
+                        end = today.atTime(7, 0).atZone(zone).toInstant(),
+                        zone = zone
+                    )
+                )
             },
             dateProvider = FixedDateProvider(today)
         )
@@ -122,6 +160,11 @@ class HealthConnectIsolationTest {
         assertFalse(json.contains("424242"))
         assertFalse(json.contains("restingHeartRate"))
         assertFalse(json.contains("health_connect"))
+        assertFalse(json.contains("heartRateVariability"))
+        assertFalse(json.contains("sleepDuration"))
+        assertEquals(0, database.workoutSessionDao().observeAll().first().size)
+        assertEquals(1, health.readings.value.exercise.single().strength.sessions)
+        assertEquals(Duration.ofMinutes(45), health.readings.value.exercise.single().strength.duration)
         assertEquals(8, AppBackupFormat.SCHEMA_VERSION)
         assertTrue(AppBackupFormat.TABLE_NAMES.none { it.contains("health") || it.contains("step") })
         assertEquals(0, database.progressPhotoDao().observeAll().first().size)

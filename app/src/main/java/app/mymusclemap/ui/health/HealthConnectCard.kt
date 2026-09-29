@@ -2,7 +2,6 @@ package app.mymusclemap.ui.health
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,8 +10,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,11 +47,13 @@ internal const val OVERVIEW_HEALTH_STEPS = "overview-health-steps"
 internal const val OVERVIEW_HEALTH_HEART = "overview-health-heart"
 internal const val OVERVIEW_HEALTH_CHART = "overview-health-steps-chart"
 internal const val OVERVIEW_HEALTH_CHART_SLOT = "overview-health-steps-slot-"
+internal const val OVERVIEW_HEALTH_MORE = "overview-health-more"
 
 @Composable
 fun HealthConnectOverviewCard(
     state: HealthCardState,
     onOpenSettings: () -> Unit,
+    onOpenDetails: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     when (state) {
@@ -58,7 +63,11 @@ fun HealthConnectOverviewCard(
             onOpenSettings = onOpenSettings,
             modifier = modifier
         )
-        is HealthCardState.Readings -> ReadingsHealthCard(state = state, modifier = modifier)
+        is HealthCardState.Readings -> ReadingsHealthCard(
+            state = state,
+            onOpenDetails = onOpenDetails,
+            modifier = modifier
+        )
     }
 }
 
@@ -101,11 +110,14 @@ private fun QuietHealthCard(
 @Composable
 private fun ReadingsHealthCard(
     state: HealthCardState.Readings,
+    onOpenDetails: () -> Unit,
     modifier: Modifier
 ) {
+    val blocked = state.readFailed && state.stepsFailed == state.heartFailed
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(onClick = onOpenDetails)
             .testTag(OVERVIEW_HEALTH),
         shape = AppShapeTokens.surface,
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -114,7 +126,6 @@ private fun ReadingsHealthCard(
         Column(modifier = Modifier.padding(AppDimens.itemGap)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -132,8 +143,17 @@ private fun ReadingsHealthCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.health_connect_open_details),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(start = AppDimens.statSecondaryGap)
+                        .size(18.dp)
+                        .testTag(OVERVIEW_HEALTH_MORE)
+                )
             }
-            if (state.readFailed) {
+            if (blocked) {
                 Text(
                     text = stringResource(R.string.health_connect_read_failed),
                     style = AppTypeTokens.statCaption,
@@ -199,6 +219,7 @@ private fun ReadingsHealthCard(
 
 @Composable
 private fun stepsValue(state: HealthCardState.Readings): String {
+    if (state.stepsFailed) return stringResource(R.string.health_connect_read_failed)
     if (!state.stepsGranted) return stringResource(R.string.health_connect_steps_off)
     val steps = state.todaySteps ?: return stringResource(R.string.health_connect_no_steps)
     return formatSteps(steps)
@@ -206,6 +227,7 @@ private fun stepsValue(state: HealthCardState.Readings): String {
 
 @Composable
 private fun heartValue(state: HealthCardState.Readings): String {
+    if (state.heartFailed) return stringResource(R.string.health_connect_read_failed)
     if (!state.heartRateGranted) return stringResource(R.string.health_connect_heart_off)
     val bpm = state.todayHeartRate ?: return stringResource(R.string.health_connect_no_heart)
     return stringResource(R.string.health_connect_bpm, bpm.toInt())

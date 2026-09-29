@@ -2,7 +2,10 @@ package app.mymusclemap.data.health
 
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.testing.FakeHealthConnectClient
@@ -21,12 +24,15 @@ import java.time.Period
 @RunWith(RobolectricTestRunner::class)
 class HealthConnectPermissionSetTest {
     @Test
-    fun requestedPermissionsAreOnlyStepsAndRestingHeartRateReads() {
+    fun requestedPermissionsAreTheFiveRecentReads() {
         val requested = HealthConnectGateway.readPermissions()
         assertEquals(
             setOf(
                 HealthPermission.getReadPermission(StepsRecord::class),
-                HealthPermission.getReadPermission(RestingHeartRateRecord::class)
+                HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+                HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+                HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+                HealthPermission.getReadPermission(SleepSessionRecord::class)
             ),
             requested
         )
@@ -36,8 +42,14 @@ class HealthConnectPermissionSetTest {
         assertFalse(joined.contains("BACKGROUND"))
         assertFalse(joined.contains("WEIGHT"))
         assertFalse(joined.contains("BODY_FAT"))
+        assertFalse(joined.contains("READ_DISTANCE"))
+        assertFalse(joined.contains("VO2"))
+        assertFalse(joined.contains("OXYGEN"))
         assertTrue(joined.contains("READ_STEPS"))
         assertTrue(joined.contains("READ_RESTING_HEART_RATE"))
+        assertTrue(joined.contains("READ_EXERCISE"))
+        assertTrue(joined.contains("READ_HEART_RATE_VARIABILITY"))
+        assertTrue(joined.contains("READ_SLEEP"))
     }
 
     @Test

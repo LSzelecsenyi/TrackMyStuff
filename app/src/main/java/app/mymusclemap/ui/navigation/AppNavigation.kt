@@ -6,6 +6,7 @@ object AppRoutes {
     const val OVERVIEW = "dashboard"
     const val JOURNAL = "history"
     const val SETTINGS = "settings"
+    const val HEALTH_CONNECT = "health_connect"
     const val HELP = "help"
     const val PRIVACY = "privacy"
     const val PRO_INFO = "pro_info"

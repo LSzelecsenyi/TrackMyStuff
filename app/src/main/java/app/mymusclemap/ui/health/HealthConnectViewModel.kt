@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.health.HealthCardState
+import app.mymusclemap.domain.health.HealthDetailPresentation
+import app.mymusclemap.domain.health.HealthDetailState
 import app.mymusclemap.domain.health.HealthPresentation
 import app.mymusclemap.domain.health.HealthSettingsState
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,6 +27,14 @@ class HealthConnectViewModel(
     ) { access, readings, today ->
         HealthPresentation.card(access, readings, today)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HealthCardState.Checking)
+
+    val detail: StateFlow<HealthDetailState> = combine(
+        repository.access,
+        repository.readings,
+        dateProvider.observeToday()
+    ) { access, readings, today ->
+        HealthDetailPresentation.detail(access, readings, today)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, HealthDetailState.Checking)
 
     val settings: StateFlow<HealthSettingsState> = repository.access
         .map { HealthPresentation.settings(it) }

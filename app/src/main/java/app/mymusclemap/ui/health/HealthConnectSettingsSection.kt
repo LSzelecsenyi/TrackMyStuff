@@ -32,11 +32,13 @@ import app.mymusclemap.ui.theme.AppTypeTokens
 
 internal const val SETTINGS_HEALTH = "settings-health"
 internal const val SETTINGS_HEALTH_ACTION = "settings-health-action"
+internal const val SETTINGS_HEALTH_DETAILS = "settings-health-details"
 
 @Composable
 fun HealthConnectSettingsSection(
     state: HealthSettingsState,
     onAction: () -> Unit,
+    onOpenDetails: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     CompactEditorSection(
@@ -69,6 +71,13 @@ fun HealthConnectSettingsSection(
                 title = actionTitle(state),
                 onClick = onAction
             )
+            if (state.status == HealthSettingsStatus.Connected) {
+                HealthActionRow(
+                    title = stringResource(R.string.health_connect_view_data),
+                    onClick = onOpenDetails,
+                    tag = SETTINGS_HEALTH_DETAILS
+                )
+            }
         }
     }
 }
@@ -87,13 +96,24 @@ private fun statusText(state: HealthSettingsState): String {
 
 @Composable
 private fun connectedDetail(state: HealthSettingsState): String {
-    return when {
-        state.stepsGranted && state.restingHeartRateGranted ->
-            stringResource(R.string.health_connect_both)
-        state.stepsGranted -> stringResource(R.string.health_connect_partial_steps)
-        state.restingHeartRateGranted -> stringResource(R.string.health_connect_partial_heart)
-        else -> stringResource(R.string.health_connect_status_not_connected)
+    val extra = state.exerciseGranted || state.hrvGranted || state.sleepGranted
+    if (!extra) {
+        return when {
+            state.stepsGranted && state.restingHeartRateGranted ->
+                stringResource(R.string.health_connect_both)
+            state.stepsGranted -> stringResource(R.string.health_connect_partial_steps)
+            state.restingHeartRateGranted -> stringResource(R.string.health_connect_partial_heart)
+            else -> stringResource(R.string.health_connect_status_not_connected)
+        }
     }
+    val names = buildList {
+        if (state.stepsGranted) add(stringResource(R.string.health_connect_steps))
+        if (state.exerciseGranted) add(stringResource(R.string.health_connect_exercise_sessions))
+        if (state.restingHeartRateGranted) add(stringResource(R.string.health_connect_resting_heart_rate))
+        if (state.hrvGranted) add(stringResource(R.string.health_connect_hrv))
+        if (state.sleepGranted) add(stringResource(R.string.health_connect_sleep))
+    }
+    return names.joinToString(", ")
 }
 
 @Composable
@@ -111,14 +131,15 @@ private fun actionTitle(state: HealthSettingsState): String {
 @Composable
 private fun HealthActionRow(
     title: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    tag: String = SETTINGS_HEALTH_ACTION
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = AppDimens.minTouch)
             .clickable(onClick = onClick)
-            .testTag(SETTINGS_HEALTH_ACTION),
+            .testTag(tag),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(

@@ -129,7 +129,7 @@ class HealthConnectCardTest {
         )
         composeRule.onNodeWithText(testString(R.string.health_connect_bpm, 59)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.health_connect_steps_off)).assertIsDisplayed()
-        composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART).assertDoesNotExist()
+        composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART, useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.health_connect_last_7_days)).assertDoesNotExist()
     }
 
@@ -157,8 +157,8 @@ class HealthConnectCardTest {
         composeRule.onNodeWithText("7,300").assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.health_connect_bpm, 59)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.health_connect_last_7_days)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Sep 22, 4,200 steps").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Sep 27, 0 steps").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Sep 22, 4,200 steps", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Sep 27, 0 steps", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onAllNodesWithText("0").assertCountEquals(0)
         assertChartStaysInStepsColumn("Sep 28, 7,300 steps")
     }
@@ -193,9 +193,9 @@ class HealthConnectCardTest {
         composeRule.onNodeWithText(testString(R.string.health_connect_no_steps)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.health_connect_no_heart)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.health_connect_last_7_days)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Sep 28, 7,300 steps").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Sep 23, 8,100 steps").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Sep 29, 0 steps").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Sep 28, 7,300 steps", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Sep 23, 8,100 steps", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Sep 29, 0 steps", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("7,300").assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.health_connect_bpm, 59)).assertDoesNotExist()
         composeRule.onAllNodesWithText("0").assertCountEquals(0)
@@ -216,7 +216,7 @@ class HealthConnectCardTest {
         )
         composeRule.onNodeWithText(testString(R.string.health_connect_no_steps)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.health_connect_no_heart)).assertIsDisplayed()
-        composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART).assertDoesNotExist()
+        composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART, useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.health_connect_last_7_days)).assertDoesNotExist()
     }
 
@@ -242,7 +242,7 @@ class HealthConnectCardTest {
         renderStepsChart(sevenDays(4_200, null, null, null, null, null, null), todaySteps = null)
         assertSevenFixedSlots()
         assertDescribedInSlot("Sep 22, 4,200 steps", 0)
-        composeRule.onNodeWithContentDescription("Sep 23, 0 steps").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Sep 23, 0 steps", useUnmergedTree = true).assertDoesNotExist()
         assertChartStaysInStepsColumn("Sep 22, 4,200 steps")
     }
 
@@ -251,7 +251,7 @@ class HealthConnectCardTest {
         renderStepsChart(sevenDays(null, null, null, null, null, null, 1_067))
         assertSevenFixedSlots()
         assertDescribedInSlot("Sep 28, 1,067 steps", 6)
-        val chart = composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART).getBoundsInRoot()
+        val chart = composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART, useUnmergedTree = true).getBoundsInRoot()
         val todaySlot = chartSlot(6)
         assertTrue(todaySlot.left.value > chart.left.value + (chart.right.value - chart.left.value) * 0.7f)
         assertChartStaysInStepsColumn("Sep 28, 1,067 steps")
@@ -274,8 +274,8 @@ class HealthConnectCardTest {
         val first = chartSlot(0)
         val fourth = chartSlot(3)
         assertTrue(fourth.left.value - first.right.value > (first.right.value - first.left.value))
-        composeRule.onNodeWithContentDescription("Sep 23, 0 steps").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Sep 24, 0 steps").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Sep 23, 0 steps", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Sep 24, 0 steps", useUnmergedTree = true).assertDoesNotExist()
         assertChartStaysInStepsColumn("Sep 25, 9,000 steps")
     }
 
@@ -324,7 +324,7 @@ class HealthConnectCardTest {
     ).getBoundsInRoot()
 
     private fun assertSevenFixedSlots() {
-        val chart = composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART).getBoundsInRoot()
+        val chart = composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART, useUnmergedTree = true).getBoundsInRoot()
         val slots = (0 until 7).map { chartSlot(it) }
         assertEquals(chart.left.value, slots.first().left.value, 1f)
         assertEquals(chart.right.value, slots.last().right.value, 1f)
@@ -341,17 +341,17 @@ class HealthConnectCardTest {
     }
 
     private fun assertDescribedInSlot(description: String, index: Int) {
-        val described = composeRule.onNodeWithContentDescription(description).getBoundsInRoot()
+        val described = composeRule.onNodeWithContentDescription(description, useUnmergedTree = true).getBoundsInRoot()
         val bounds = chartSlot(index)
         assertEquals(bounds.left.value, described.left.value, 1f)
         assertEquals(bounds.right.value, described.right.value, 1f)
     }
 
     private fun assertChartStaysInStepsColumn(rightmostBar: String) {
-        val steps = composeRule.onNodeWithTag(OVERVIEW_HEALTH_STEPS).getBoundsInRoot()
-        val heart = composeRule.onNodeWithTag(OVERVIEW_HEALTH_HEART).getBoundsInRoot()
-        val chart = composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART).getBoundsInRoot()
-        val bar = composeRule.onNodeWithContentDescription(rightmostBar).getBoundsInRoot()
+        val steps = composeRule.onNodeWithTag(OVERVIEW_HEALTH_STEPS, useUnmergedTree = true).getBoundsInRoot()
+        val heart = composeRule.onNodeWithTag(OVERVIEW_HEALTH_HEART, useUnmergedTree = true).getBoundsInRoot()
+        val chart = composeRule.onNodeWithTag(OVERVIEW_HEALTH_CHART, useUnmergedTree = true).getBoundsInRoot()
+        val bar = composeRule.onNodeWithContentDescription(rightmostBar, useUnmergedTree = true).getBoundsInRoot()
         assertTrue(steps.right <= heart.left)
         assertTrue(chart.left >= steps.left)
         assertTrue(chart.right <= steps.right)
@@ -361,13 +361,45 @@ class HealthConnectCardTest {
         assertTrue(bar.right <= heart.left)
     }
 
+    @Test
+    fun readingsCardOpensDetailsAndKeepsTheTwoColumns() {
+        val details = intArrayOf(0)
+        val settings = intArrayOf(0)
+        render(
+            HealthCardState.Readings(
+                todaySteps = null,
+                todayHeartRate = null,
+                stepsGranted = true,
+                heartRateGranted = true,
+                recentSteps = HealthPresentation.recentSteps(
+                    listOf(DailyStepTotal(today.minusDays(1), 7_300)),
+                    today
+                ),
+                readFailed = false
+            ),
+            onOpenSettings = { settings[0] += 1 },
+            onOpenDetails = { details[0] += 1 }
+        )
+        composeRule.onNodeWithTag(OVERVIEW_HEALTH_MORE, useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.health_connect_no_steps)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.health_connect_no_heart)).assertIsDisplayed()
+        composeRule.onNodeWithTag(OVERVIEW_HEALTH).performClick()
+        assertEquals(1, details[0])
+        assertEquals(0, settings[0])
+    }
+
     private fun render(
         state: HealthCardState,
-        onOpenSettings: () -> Unit = {}
+        onOpenSettings: () -> Unit = {},
+        onOpenDetails: () -> Unit = {}
     ) {
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                HealthConnectOverviewCard(state = state, onOpenSettings = onOpenSettings)
+                HealthConnectOverviewCard(
+                    state = state,
+                    onOpenSettings = onOpenSettings,
+                    onOpenDetails = onOpenDetails
+                )
             }
         }
     }

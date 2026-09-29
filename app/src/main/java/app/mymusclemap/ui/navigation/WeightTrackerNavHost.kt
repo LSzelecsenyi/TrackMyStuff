@@ -73,6 +73,7 @@ import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.pro.ProInfoScreen
 import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.health.HealthSettingsAction
+import app.mymusclemap.ui.health.HealthConnectDetailScreen
 import app.mymusclemap.ui.health.HealthConnectViewModel
 import app.mymusclemap.ui.health.RefreshHealthConnectOnResume
 import app.mymusclemap.ui.health.openHealthConnectManageAccess
@@ -330,6 +331,7 @@ fun WeightTrackerNavHost(
                     onOpenStatistics = { navController.navigateInternal(AppRoutes.STATISTICS_GRAPH) },
                     health = health,
                     onOpenHealthSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
+                    onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) },
                     onOpenWorkout = { id ->
                         viewModel.dismissDaySheet()
                         navController.navigate(workoutDetailRoute(id)) {
@@ -511,7 +513,17 @@ fun WeightTrackerNavHost(
                     onHealthRefresh = healthViewModel::refresh,
                     onBack = { navController.popBackStack() },
                     onOpenHelp = { navController.navigateInternal(AppRoutes.HELP) },
-                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) }
+                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) },
+                    onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) }
+                )
+            }
+            composable(AppRoutes.HEALTH_CONNECT) {
+                val healthViewModel: HealthConnectViewModel = viewModel(factory = factory)
+                val detail by healthViewModel.detail.collectAsStateWithLifecycle()
+                RefreshHealthConnectOnResume(healthViewModel::refresh)
+                HealthConnectDetailScreen(
+                    state = detail,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(AppRoutes.HELP) {
@@ -1182,7 +1194,8 @@ private fun SettingsRoute(
     onHealthRefresh: () -> Unit,
     onBack: () -> Unit,
     onOpenHelp: () -> Unit,
-    onOpenPrivacy: () -> Unit
+    onOpenPrivacy: () -> Unit,
+    onOpenHealthDetails: () -> Unit
 ) {
     val launchHealthPermissions = rememberHealthConnectPermissionLaunch(onHealthRefresh)
     RefreshHealthConnectOnResume(onHealthRefresh)
@@ -1324,6 +1337,7 @@ private fun SettingsRoute(
         onMessageConsumed = viewModel::consumeMessage,
         onBack = onBack,
         health = health,
+        onOpenHealthDetails = onOpenHealthDetails,
         onHealthAction = {
             val opened = when (health.action) {
                 HealthSettingsAction.InstallOrUpdate -> openHealthConnectProviderInstall(context)

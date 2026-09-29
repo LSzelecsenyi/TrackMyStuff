@@ -149,6 +149,7 @@ class AppNavigationTest {
     @Test
     fun bottomBarIsHiddenOnActiveEditorsDetailsAndImport() {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.SETTINGS))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.HEALTH_CONNECT))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.HELP))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRIVACY))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRO_INFO))

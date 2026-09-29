@@ -166,7 +166,8 @@ fun SettingsScreen(
     onMessageConsumed: () -> Unit,
     onBack: () -> Unit,
     health: HealthSettingsState = HealthSettingsState.NotConnected,
-    onHealthAction: () -> Unit = {}
+    onHealthAction: () -> Unit = {},
+    onOpenHealthDetails: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
@@ -249,7 +250,8 @@ fun SettingsScreen(
                 CompactEditorDivider()
                 HealthConnectSettingsSection(
                     state = health,
-                    onAction = onHealthAction
+                    onAction = onHealthAction,
+                    onOpenDetails = onOpenHealthDetails
                 )
                 CompactEditorDivider()
                 CompactEditorSection(title = settingsKicker(stringResource(R.string.privacy_title))) {

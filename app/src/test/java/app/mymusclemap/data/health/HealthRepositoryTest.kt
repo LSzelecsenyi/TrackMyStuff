@@ -2,8 +2,13 @@ package app.mymusclemap.data.health
 
 import app.mymusclemap.domain.FixedDateProvider
 import app.mymusclemap.domain.health.HealthAvailability
+import app.mymusclemap.domain.health.HealthExerciseKind
+import app.mymusclemap.domain.health.HealthExerciseSession
 import app.mymusclemap.domain.health.HealthGrants
+import app.mymusclemap.domain.health.HealthHrvSample
+import app.mymusclemap.domain.health.HealthMetric
 import app.mymusclemap.domain.health.HealthMetricBucket
+import app.mymusclemap.domain.health.HealthSleepSpan
 import app.mymusclemap.domain.health.HealthSource
 import app.mymusclemap.domain.health.HealthWindow
 import kotlinx.coroutines.test.runTest
@@ -13,8 +18,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 class HealthRepositoryTest {
     private val today = LocalDate.of(2024, 6, 15)
@@ -202,15 +209,140 @@ class HealthRepositoryTest {
         assertTrue(repository.readings.value.restingHeartRate.isEmpty())
     }
 
+    @Test
+    fun exerciseGrantDoesNotReadStepsAndKeepsExternalSessions() = runTest {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = false, restingHeartRate = false, exercise = true)
+        val start = today.atTime(18, 0).toInstant(ZoneOffset.UTC)
+        source.exercise = listOf(
+            HealthExerciseSession(
+                start = start,
+                end = start.plus(Duration.ofMinutes(45)),
+                zone = ZoneOffset.UTC,
+                kind = HealthExerciseKind.STRENGTH
+            )
+        )
+        repository.refresh()
+        assertEquals(0, source.stepReads)
+        assertEquals(0, source.heartReads)
+        assertEquals(1, source.exerciseReads)
+        assertEquals(1, repository.readings.value.exercise.single().strength.sessions)
+        assertEquals(Duration.ofMinutes(45), repository.readings.value.exercise.single().strength.duration)
+        assertFalse(repository.readings.value.readFailed)
+    }
+
+    @Test
+    fun deniedSleepLeavesStepsUsable() = runTest {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = true, restingHeartRate = false, sleep = false)
+        source.steps = listOf(HealthMetricBucket(today, 4_200))
+        repository.refresh()
+        assertEquals(4_200L, repository.readings.value.steps.single().steps)
+        assertTrue(repository.readings.value.sleep.isEmpty())
+        assertEquals(0, source.sleepReads)
+        assertFalse(repository.readings.value.readFailed)
+    }
+
+    @Test
+    fun hrvFailureKeepsStepsAndMarksOnlyHrv() = runTest {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = true, restingHeartRate = false, hrv = true)
+        source.steps = listOf(HealthMetricBucket(today, 8_100))
+        source.failHrv = true
+        repository.refresh()
+        assertEquals(8_100L, repository.readings.value.steps.single().steps)
+        assertTrue(repository.readings.value.hrv.isEmpty())
+        assertEquals(setOf(HealthMetric.HRV), repository.readings.value.failed)
+        assertFalse(repository.readings.value.readFailed)
+    }
+
+    @Test
+    fun sleepFailureDoesNotClearSteps() = runTest {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = true, restingHeartRate = true, sleep = true)
+        source.steps = listOf(HealthMetricBucket(today, 6_500))
+        source.heart = listOf(HealthMetricBucket(today, 58))
+        source.failSleep = true
+        repository.refresh()
+        assertEquals(6_500L, repository.readings.value.steps.single().steps)
+        assertEquals(58L, repository.readings.value.restingHeartRate.single().beatsPerMinute)
+        assertTrue(repository.readings.value.failed.contains(HealthMetric.SLEEP))
+        assertFalse(repository.readings.value.readFailed)
+    }
+
+    @Test
+    fun revokeExerciseClearsSessionsAndKeepsSteps() = runTest {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = true, restingHeartRate = false, exercise = true)
+        val start = today.atTime(18, 0).toInstant(ZoneOffset.UTC)
+        source.steps = listOf(HealthMetricBucket(today, 9_000))
+        source.exercise = listOf(
+            HealthExerciseSession(start, start.plus(Duration.ofMinutes(50)), ZoneOffset.UTC, HealthExerciseKind.STRENGTH)
+        )
+        repository.refresh()
+        assertEquals(1, repository.readings.value.exercise.single().strength.sessions)
+        source.grants = HealthGrants(steps = true, restingHeartRate = false, exercise = false)
+        repository.refresh()
+        assertTrue(repository.readings.value.exercise.isEmpty())
+        assertEquals(9_000L, repository.readings.value.steps.single().steps)
+        assertEquals(1, source.exerciseReads)
+    }
+
+    @Test
+    fun revokeHrvClearsThePreviousSample() = runTest {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = false, restingHeartRate = false, hrv = true)
+        source.hrv = listOf(HealthHrvSample(today.atTime(7, 30).toInstant(ZoneOffset.UTC), ZoneOffset.UTC, 48.0))
+        repository.refresh()
+        assertEquals(48.0, repository.readings.value.hrv.single().millis, 0.0)
+        source.grants = HealthGrants(steps = false, restingHeartRate = false, hrv = false)
+        repository.refresh()
+        assertTrue(repository.readings.value.hrv.isEmpty())
+        assertEquals(1, source.hrvReads)
+    }
+
+    @Test
+    fun futureExerciseAndHrvAreDropped() = runTest {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = false, restingHeartRate = false, exercise = true, hrv = true, sleep = true)
+        val tomorrow = today.plusDays(1).atTime(8, 0).toInstant(ZoneOffset.UTC)
+        source.exercise = listOf(
+            HealthExerciseSession(
+                tomorrow,
+                tomorrow.plus(Duration.ofMinutes(30)),
+                ZoneOffset.UTC,
+                HealthExerciseKind.RUNNING
+            )
+        )
+        source.hrv = listOf(HealthHrvSample(tomorrow, ZoneOffset.UTC, 40.0))
+        source.sleep = listOf(
+            HealthSleepSpan(tomorrow, tomorrow.plus(Duration.ofHours(7)), ZoneOffset.UTC)
+        )
+        repository.refresh()
+        assertTrue(repository.readings.value.exercise.isEmpty())
+        assertTrue(repository.readings.value.hrv.isEmpty())
+        assertTrue(repository.readings.value.sleep.isEmpty())
+    }
+
     private class FakeHealthSource : HealthSource {
         var availability: HealthAvailability = HealthAvailability.Unavailable
         var grants = HealthGrants(steps = false, restingHeartRate = false)
         var steps: List<HealthMetricBucket> = emptyList()
         var heart: List<HealthMetricBucket> = emptyList()
+        var exercise: List<HealthExerciseSession> = emptyList()
+        var hrv: List<HealthHrvSample> = emptyList()
+        var sleep: List<HealthSleepSpan> = emptyList()
         var failReads = false
+        var failHeart = false
+        var failExercise = false
+        var failHrv = false
+        var failSleep = false
         var permissionReads = 0
         var stepReads = 0
         var heartReads = 0
+        var exerciseReads = 0
+        var hrvReads = 0
+        var sleepReads = 0
         var stepStart: LocalDateTime? = null
         var stepEnd: LocalDateTime? = null
         var heartStart: LocalDateTime? = null
@@ -241,8 +373,35 @@ class HealthRepositoryTest {
             heartReads += 1
             heartStart = startInclusive
             heartEnd = endExclusive
-            if (failReads) throw IOException("health read failed")
+            if (failReads || failHeart) throw IOException("health read failed")
             return heart
+        }
+
+        override suspend fun readExerciseSessions(
+            startInclusive: LocalDateTime,
+            endExclusive: LocalDateTime
+        ): List<HealthExerciseSession> {
+            exerciseReads += 1
+            if (failReads || failExercise) throw IOException("health read failed")
+            return exercise
+        }
+
+        override suspend fun readHrvSamples(
+            startInclusive: LocalDateTime,
+            endExclusive: LocalDateTime
+        ): List<HealthHrvSample> {
+            hrvReads += 1
+            if (failReads || failHrv) throw IOException("health read failed")
+            return hrv
+        }
+
+        override suspend fun readSleepSpans(
+            startInclusive: LocalDateTime,
+            endExclusive: LocalDateTime
+        ): List<HealthSleepSpan> {
+            sleepReads += 1
+            if (failReads || failSleep) throw IOException("health read failed")
+            return sleep
         }
     }
 }

@@ -156,7 +156,8 @@ fun DashboardScreen(
     onDashboardTargetRevealed: () -> Unit = {},
     onDismissLocked: () -> Unit = {},
     health: HealthCardState = HealthCardState.Quiet(HealthQuietStatus.NotConnected),
-    onOpenHealthSettings: () -> Unit = {}
+    onOpenHealthSettings: () -> Unit = {},
+    onOpenHealthDetails: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -261,7 +262,8 @@ fun DashboardScreen(
             OverviewSectionDivider()
             HealthConnectOverviewCard(
                 state = health,
-                onOpenSettings = onOpenHealthSettings
+                onOpenSettings = onOpenHealthSettings,
+                onOpenDetails = onOpenHealthDetails
             )
             OverviewSectionDivider()
             Column(
