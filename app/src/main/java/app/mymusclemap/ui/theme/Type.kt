@@ -107,8 +107,8 @@ object AppTypeTokens {
     )
     val statBand = TabularSans.copy(
         fontWeight = FontWeight.SemiBold,
-        fontSize = 26.sp,
-        lineHeight = 32.sp,
+        fontSize = 22.sp,
+        lineHeight = 26.sp,
         letterSpacing = (-0.2).sp
     )
 }

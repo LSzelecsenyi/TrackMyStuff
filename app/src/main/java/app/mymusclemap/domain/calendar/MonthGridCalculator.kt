@@ -16,6 +16,20 @@ data class CalendarCell(
 ) {
     val hasCompletedWorkout: Boolean get() = completedWorkoutCount > 0
     val hasPlannedWorkout: Boolean get() = plannedWorkoutCount > 0
+
+    fun workoutMark(): CalendarWorkoutMark {
+        return when {
+            hasCompletedWorkout -> CalendarWorkoutMark.Completed
+            hasPlannedWorkout -> CalendarWorkoutMark.Planned
+            else -> CalendarWorkoutMark.None
+        }
+    }
+}
+
+enum class CalendarWorkoutMark {
+    None,
+    Planned,
+    Completed
 }
 
 data class MonthGrid(

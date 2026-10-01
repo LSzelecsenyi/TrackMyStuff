@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
@@ -30,6 +29,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import android.provider.Settings
+import app.mymusclemap.ui.theme.WorkoutColors
 import kotlin.math.pow
 
 internal const val WORKOUT_COMPLETE_MARK = "workout-complete-mark"
@@ -116,11 +116,7 @@ internal fun WorkoutCompletionMark(
         elapsed.value.toLong(),
         !playAnimation || animatorScale <= 0f || settled
     )
-    val accent = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
-        Color(0xFF81C784)
-    } else {
-        Color(0xFF2E7D32)
-    }
+    val accent = WorkoutColors.accent(MaterialTheme.colorScheme.background.luminance())
     Canvas(
         modifier = modifier
             .size(76.dp)

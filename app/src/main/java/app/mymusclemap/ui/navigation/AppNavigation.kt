@@ -60,6 +60,7 @@ data class InternalNavigation(
 object AppNavigation {
     val rootTabs: List<RootTab> = listOf(
         RootTab(AppRoutes.OVERVIEW, R.string.nav_dashboard),
+        RootTab(AppRoutes.STATISTICS_GRAPH, R.string.statistics_title),
         RootTab(AppRoutes.JOURNAL, R.string.nav_journal)
     )
 
@@ -68,6 +69,7 @@ object AppNavigation {
     private val bottomBarRoutes: Set<String> = setOf(
         AppRoutes.OVERVIEW,
         AppRoutes.JOURNAL,
+        AppRoutes.STATISTICS,
         AppRoutes.EXERCISES,
         AppRoutes.TEMPLATES
     )
@@ -82,6 +84,13 @@ object AppNavigation {
 
     fun showsBottomBar(route: String?): Boolean {
         return canonicalRoute(route) in bottomBarRoutes
+    }
+
+    fun bottomTabRoute(route: String?): String? {
+        return when (val canonical = canonicalRoute(route)) {
+            AppRoutes.STATISTICS, AppRoutes.STATISTICS_GRAPH -> AppRoutes.STATISTICS
+            else -> canonical
+        }
     }
 
     fun isSettingsBottomDestination(): Boolean {
@@ -217,10 +226,9 @@ object AppNavigation {
     }
 
     fun backFromRootTab(currentRoute: String?): String? {
-        val current = canonicalRoute(currentRoute) ?: return null
-        if (current == AppRoutes.OVERVIEW || current !in rootRoutes) {
-            return null
+        return when (canonicalRoute(currentRoute)) {
+            AppRoutes.JOURNAL, AppRoutes.STATISTICS, AppRoutes.STATISTICS_GRAPH -> AppRoutes.OVERVIEW
+            else -> null
         }
-        return AppRoutes.OVERVIEW
     }
 }

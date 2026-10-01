@@ -363,6 +363,12 @@ class DashboardViewModel(
         displayedMonth.value = displayedMonth.value.plusMonths(1)
     }
 
+    fun showMonth(month: YearMonth) {
+        if (displayedMonth.value != month) {
+            displayedMonth.value = month
+        }
+    }
+
     fun selectDay(date: LocalDate) {
         selectedDay.value = date
         showDayDeleteConfirm.value = false

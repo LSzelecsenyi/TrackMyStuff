@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalResources
@@ -36,15 +40,18 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.domain.calendar.CalendarCell
 import app.mymusclemap.domain.calendar.CalendarDayCopy
+import app.mymusclemap.domain.calendar.CalendarWorkoutMark
 import app.mymusclemap.domain.calendar.MonthGrid
 import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.WorkoutColors
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -59,6 +66,7 @@ fun MonthCalendar(
     modifier: Modifier = Modifier,
     isDayEnabled: (CalendarCell) -> Boolean = { true },
     showLegend: Boolean = true,
+    onCollapse: (() -> Unit)? = null,
     onTodayBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {}
 ) {
     val locale = AppLocale.UI
@@ -92,6 +100,19 @@ fun MonthCalendar(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                     contentDescription = stringResource(R.string.calendar_next_month)
                 )
+            }
+            if (onCollapse != null) {
+                IconButton(
+                    onClick = onCollapse,
+                    modifier = Modifier
+                        .size(AppDimens.minTouch)
+                        .testTag("overview-calendar-collapse")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ExpandLess,
+                        contentDescription = stringResource(R.string.calendar_show_week)
+                    )
+                }
             }
         }
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -164,8 +185,8 @@ private fun CalendarLegend() {
         ) {
             Box(
                 modifier = Modifier
-                    .size(6.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .size(12.dp)
+                    .background(workoutAccent(), AppShapeTokens.compact)
             )
             Text(
                 text = stringResource(R.string.calendar_legend_workout),
@@ -180,8 +201,8 @@ private fun CalendarLegend() {
         ) {
             Box(
                 modifier = Modifier
-                    .size(6.dp)
-                    .border(AppDimens.strokeThin, MaterialTheme.colorScheme.secondary, CircleShape)
+                    .size(12.dp)
+                    .border(1.5.dp, workoutAccent(), AppShapeTokens.compact)
             )
             Text(
                 text = stringResource(R.string.calendar_legend_planned),
@@ -193,14 +214,16 @@ private fun CalendarLegend() {
 }
 
 @Composable
-private fun CalendarDayCell(
+internal fun CalendarDayCell(
     cell: CalendarCell,
     selected: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
     onTodayBounds: (androidx.compose.ui.geometry.Rect) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cellHeight: Dp = AppDimens.calendarCell
 ) {
+    val mark = cell.workoutMark()
     val label = CalendarDayCopy.description(
         resources = LocalResources.current,
         date = cell.date,
@@ -210,30 +233,42 @@ private fun CalendarDayCell(
         isFuture = cell.isFuture,
         plannedWorkoutCount = cell.plannedWorkoutCount
     )
+    val luminance = MaterialTheme.colorScheme.background.luminance()
+    val workout = WorkoutColors.accent(luminance)
+    val onWorkout = WorkoutColors.onAccent(luminance)
+    val shape = AppShapeTokens.compact
     val textColor = when {
+        mark == CalendarWorkoutMark.Completed -> onWorkout
         !cell.inDisplayedMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
         !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
-        selected || cell.isToday -> MaterialTheme.colorScheme.primary
-        cell.isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+        selected -> MaterialTheme.colorScheme.primary
+        cell.isFuture && mark == CalendarWorkoutMark.None ->
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
         else -> MaterialTheme.colorScheme.onSurface
     }
-    val outline = when {
-        selected -> MaterialTheme.colorScheme.primary
-        cell.isToday -> MaterialTheme.colorScheme.outline
-        else -> null
+    val borderColor = when (mark) {
+        CalendarWorkoutMark.Planned -> workout
+        CalendarWorkoutMark.None -> if (selected) MaterialTheme.colorScheme.primary else null
+        CalendarWorkoutMark.Completed -> null
+    }
+    val workoutTag = when (mark) {
+        CalendarWorkoutMark.Completed -> "calendar-completed-fill"
+        CalendarWorkoutMark.Planned -> "calendar-planned-outline"
+        CalendarWorkoutMark.None -> null
     }
     Box(
         modifier = modifier
-            .height(AppDimens.calendarCell)
-            .padding(1.dp)
+            .height(cellHeight)
+            .padding(horizontal = 2.dp, vertical = 1.dp)
             .then(
-                if (outline != null) {
-                    Modifier.border(AppDimens.strokeThin, outline, AppShapeTokens.compact)
+                if (borderColor != null) {
+                    Modifier.border(1.5.dp, borderColor, shape)
                 } else {
                     Modifier
                 }
             )
-            .clip(AppShapeTokens.compact)
+            .clip(shape)
+            .background(if (mark == CalendarWorkoutMark.Completed) workout else Color.Transparent)
             .clickable(enabled = enabled, onClick = onClick)
             .then(
                 if (cell.isToday) {
@@ -244,71 +279,65 @@ private fun CalendarDayCell(
                     Modifier
                 }
             )
-            .semantics { contentDescription = label }
+            .then(if (workoutTag != null) Modifier.testTag(workoutTag) else Modifier)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        if (selected && mark == CalendarWorkoutMark.Completed) {
             Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = cell.date.dayOfMonth.toString(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (cell.isToday || selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = textColor
-                )
-            }
-            if (cell.hasMeasurement || cell.hasPlannedWorkout || cell.hasCompletedWorkout) {
-                Row(
-                    modifier = Modifier.padding(bottom = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(1.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (cell.hasMeasurement) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .testTag("calendar-weight-dot")
-                                .border(
-                                    width = AppDimens.strokeThin,
-                                    color = MaterialTheme.colorScheme.tertiary,
-                                    shape = CircleShape
-                                )
-                        )
-                    }
-                    if (cell.hasPlannedWorkout) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .testTag("calendar-planned-dot")
-                                .border(
-                                    width = AppDimens.strokeThin,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    shape = CircleShape
-                                )
-                        )
-                    }
-                    if (cell.hasCompletedWorkout) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .testTag("calendar-completed-dot")
-                                .background(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    shape = CircleShape
-                                )
-                        )
-                    }
-                }
-            }
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(3.dp)
+                    .border(1.dp, onWorkout, shape)
+            )
+        }
+        Text(
+            text = cell.date.dayOfMonth.toString(),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (cell.isToday || selected || mark == CalendarWorkoutMark.Completed) {
+                FontWeight.SemiBold
+            } else {
+                FontWeight.Normal
+            },
+            color = textColor,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+        if (cell.isToday) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 3.dp)
+                    .width(12.dp)
+                    .height(2.dp)
+                    .clip(CircleShape)
+                    .background(if (mark == CalendarWorkoutMark.Completed) onWorkout else MaterialTheme.colorScheme.onSurface)
+                    .testTag("calendar-today-marker")
+            )
+        }
+        if (cell.hasMeasurement) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp)
+                    .size(4.dp)
+                    .testTag("calendar-weight-dot")
+                    .border(
+                        width = AppDimens.strokeThin,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        shape = CircleShape
+                    )
+            )
         }
     }
 }
 
-private fun weekdayOrder(): List<DayOfWeek> {
+@Composable
+internal fun workoutAccent(): Color {
+    return WorkoutColors.accent(MaterialTheme.colorScheme.background.luminance())
+}
+
+internal fun weekdayOrder(): List<DayOfWeek> {
     return listOf(
         DayOfWeek.MONDAY,
         DayOfWeek.TUESDAY,

@@ -45,6 +45,7 @@ class AppBottomBarLayoutTest {
         var workouts = 0
         render(hasActiveSession = false, onWorkoutAction = { workouts += 1 })
         composeRule.onNodeWithText(testString(R.string.nav_dashboard)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.statistics_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.nav_journal)).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.nav_workout)).assertCountEquals(0)
         composeRule.onNodeWithContentDescription(testString(R.string.action_start_workout)).assertIsDisplayed()
@@ -76,10 +77,12 @@ class AppBottomBarLayoutTest {
         render(fontScale = 1.3f)
         val overview = composeRule.onNodeWithTag(BOTTOM_OVERVIEW).getBoundsInRoot()
         val action = composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).getBoundsInRoot()
+        val statistics = composeRule.onNodeWithTag(BOTTOM_STATISTICS).getBoundsInRoot()
         val journal = composeRule.onNodeWithTag(BOTTOM_JOURNAL).getBoundsInRoot()
         assertFalse("overview and action overlap $overview $action", overlaps(overview, action))
-        assertFalse("action and journal overlap $action $journal", overlaps(action, journal))
-        listOf(overview, action, journal).forEach { bounds ->
+        assertFalse("action and statistics overlap $action $statistics", overlaps(action, statistics))
+        assertFalse("statistics and journal overlap $statistics $journal", overlaps(statistics, journal))
+        listOf(overview, action, statistics, journal).forEach { bounds ->
             assertTrue("touch width $bounds", bounds.right - bounds.left >= 48.dp)
             assertTrue("touch height $bounds", bounds.bottom - bounds.top >= 48.dp)
             assertTrue("stays on 360dp $bounds", bounds.right <= 360.dp + 1.dp)
@@ -87,10 +90,24 @@ class AppBottomBarLayoutTest {
         }
     }
 
+    @Test
+    fun statisticsTabUsesTheStatisticsDestinationAndShowsSelected() {
+        var opened = 0
+        render(selectedRoute = AppRoutes.STATISTICS, onStatistics = { opened += 1 })
+        composeRule.onNodeWithTag(BOTTOM_STATISTICS).performClick()
+        assertEquals(1, opened)
+        composeRule.onNodeWithTag(BOTTOM_STATISTICS)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        composeRule.onNodeWithTag(BOTTOM_OVERVIEW)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, false))
+    }
+
     private fun render(
         hasActiveSession: Boolean = false,
         fontScale: Float = 1f,
         highlightWorkoutAction: Boolean = false,
+        selectedRoute: String = AppRoutes.OVERVIEW,
+        onStatistics: () -> Unit = {},
         onWorkoutAction: () -> Unit = {}
     ) {
         composeRule.setContent {
@@ -105,10 +122,11 @@ class AppBottomBarLayoutTest {
                             .fillMaxSize()
                     ) {
                         AppBottomBar(
-                            selectedRoute = AppRoutes.OVERVIEW,
+                            selectedRoute = selectedRoute,
                             hasActiveSession = hasActiveSession,
                             highlightWorkoutAction = highlightWorkoutAction,
                             onOverview = {},
+                            onStatistics = onStatistics,
                             onJournal = {},
                             onWorkoutAction = onWorkoutAction
                         )

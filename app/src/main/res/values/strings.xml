@@ -104,6 +104,10 @@
     <string name="hero_weekly_average">Weekly average: %1$s</string>
     <string name="change_from_previous_week_value">Compared with last week\'s average: %1$s</string>
     <string name="calendar_title">Calendar</string>
+    <string name="calendar_week_heading">This week · %1$s</string>
+    <string name="calendar_show_month">Show month</string>
+    <string name="calendar_show_week">Show week</string>
+    <string name="calendar_return_today">Today</string>
     <string name="calendar_previous_month">Previous month</string>
     <string name="calendar_next_month">Next month</string>
     <string name="calendar_today_label">today</string>
@@ -628,7 +632,7 @@
     <string name="workout_detail_extra">Added during workout</string>
     <string name="workout_detail_exercise_position">Exercise %1$d</string>
     <string name="calendar_legend_weight">Body weight</string>
-    <string name="calendar_legend_workout">Workout</string>
+    <string name="calendar_legend_workout">Completed workout</string>
     <string name="calendar_legend_planned">Planned workout</string>
     <string name="day_sheet_workouts">Workouts</string>
     <string name="day_sheet_scheduled_title">Planned workouts</string>

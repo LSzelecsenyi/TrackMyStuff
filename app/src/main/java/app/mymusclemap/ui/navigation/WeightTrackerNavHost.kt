@@ -279,9 +279,10 @@ fun WeightTrackerNavHost(
         bottomBar = {
             if (showBottomBar) {
                 AppBottomBar(
-                    selectedRoute = AppNavigation.canonicalRoute(currentRoute),
+                    selectedRoute = AppNavigation.bottomTabRoute(currentRoute),
                     hasActiveSession = hubState.activeSession != null,
                     onOverview = { navController.navigateRoot(AppRoutes.OVERVIEW) },
+                    onStatistics = { navController.navigateRoot(AppRoutes.STATISTICS_GRAPH) },
                     onJournal = { navController.navigateRoot(AppRoutes.JOURNAL) },
                     onWorkoutAction = onPrimaryWorkoutClick,
                     onWorkoutActionBounds = { bounds ->
@@ -328,7 +329,7 @@ fun WeightTrackerNavHost(
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
                     onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
                     onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
-                    onOpenStatistics = { navController.navigateInternal(AppRoutes.STATISTICS_GRAPH) },
+                    onDisplayedMonthChange = viewModel::showMonth,
                     health = health,
                     onOpenHealthSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
                     onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) },

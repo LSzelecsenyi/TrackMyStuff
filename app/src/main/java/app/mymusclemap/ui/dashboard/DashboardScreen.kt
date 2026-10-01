@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,7 +73,7 @@ import app.mymusclemap.domain.workout.ScheduledWorkout
 import app.mymusclemap.ui.components.DayDetailsSheet
 import app.mymusclemap.ui.components.DeleteMeasurementDialog
 import app.mymusclemap.ui.components.MeasurementEditorSheet
-import app.mymusclemap.ui.components.MonthCalendar
+import app.mymusclemap.ui.components.OverviewCalendar
 import app.mymusclemap.ui.components.RescheduleDateSheet
 import app.mymusclemap.ui.components.ScheduleWorkoutPickerSheet
 import app.mymusclemap.ui.components.UiFormatters
@@ -89,7 +87,6 @@ import app.mymusclemap.ui.components.musclemap.MuscleHeatmapCard
 import app.mymusclemap.ui.health.HealthConnectOverviewCard
 import app.mymusclemap.ui.onboarding.OnboardingReminderCard
 import app.mymusclemap.ui.theme.AppDimens
-import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
@@ -103,7 +100,6 @@ internal const val OVERVIEW_OVERFLOW_MENU = "overview-overflow-menu"
 internal const val OVERVIEW_OVERFLOW_TEMPLATES = "overview-overflow-templates"
 internal const val OVERVIEW_OVERFLOW_EXERCISES = "overview-overflow-exercises"
 internal const val OVERVIEW_OVERFLOW_SETTINGS = "overview-overflow-settings"
-internal const val OVERVIEW_STATISTICS = "overview-statistics"
 private val HeatmapCoachCalloutSpace = 176.dp
 
 @Composable
@@ -111,6 +107,7 @@ fun DashboardScreen(
     state: DashboardUiState,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
+    onDisplayedMonthChange: (YearMonth) -> Unit = {},
     onDaySelected: (LocalDate) -> Unit,
     onDismissDaySheet: () -> Unit,
     onRecordSelectedDay: () -> Unit,
@@ -128,7 +125,6 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit,
     onOpenTemplates: () -> Unit,
     onOpenCatalog: () -> Unit,
-    onOpenStatistics: () -> Unit = {},
     onOpenWorkout: (Long) -> Unit,
     onOpenWeightDetails: () -> Unit,
     onOpenSchedulePicker: () -> Unit = {},
@@ -224,7 +220,7 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(horizontal = AppDimens.screenPadding)
-                .padding(top = 8.dp, bottom = 24.dp)
+                .padding(top = 4.dp, bottom = 24.dp)
         ) {
             OverviewHeader(
                 overview = state.weeklyOverview,
@@ -253,11 +249,21 @@ fun DashboardScreen(
                     }
             )
             OverviewSectionDivider()
-            OverviewDestinationRow(
-                title = stringResource(R.string.statistics_title),
-                subtitle = stringResource(R.string.statistics_entry_subtitle),
-                onClick = onOpenStatistics,
-                testTag = OVERVIEW_STATISTICS
+            OverviewCalendar(
+                monthGrid = state.monthGrid,
+                displayedMonth = state.displayedMonth,
+                today = state.today,
+                selectedDate = state.daySheet?.date,
+                onDisplayedMonthChange = onDisplayedMonthChange,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+                onDayClick = onDaySelected,
+                onTodayBounds = reportTodayBounds,
+                modifier = Modifier.onGloballyPositioned { coordinates ->
+                    calendarSize = coordinates.size
+                    calendarYInContent = coordinates.positionInParent().y.roundToInt()
+                    reportCalendarBounds(coordinates.boundsInRoot())
+                }
             )
             OverviewSectionDivider()
             HealthConnectOverviewCard(
@@ -265,33 +271,6 @@ fun DashboardScreen(
                 onOpenSettings = onOpenHealthSettings,
                 onOpenDetails = onOpenHealthDetails
             )
-            OverviewSectionDivider()
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onGloballyPositioned { coordinates ->
-                        calendarSize = coordinates.size
-                        calendarYInContent = coordinates.positionInParent().y.roundToInt()
-                        reportCalendarBounds(coordinates.boundsInRoot())
-                    }
-            ) {
-                Text(
-                    text = stringResource(R.string.calendar_title),
-                    style = AppTypeTokens.sectionTitle,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.testTag("dashboard_calendar_title")
-                )
-                Spacer(Modifier.height(AppDimens.statSecondaryGap))
-                MonthCalendar(
-                    grid = state.monthGrid,
-                    selectedDate = state.daySheet?.date,
-                    onPreviousMonth = onPreviousMonth,
-                    onNextMonth = onNextMonth,
-                    onDayClick = onDaySelected,
-                    onTodayBounds = reportTodayBounds,
-                    modifier = Modifier.testTag("dashboard_calendar")
-                )
-            }
             OverviewSectionDivider()
             CompactWeightChartSection(
                 snapshot = state.snapshot,
@@ -382,64 +361,16 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun OverviewDestinationRow(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    testTag: String
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = AppShapeTokens.surface,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 0.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = AppDimens.minTouch)
-                .clickable(onClick = onClick)
-                .testTag(testTag)
-                .padding(AppDimens.heroPadding),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = AppTypeTokens.sectionTitle,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = AppTypeTokens.statCaption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-@Composable
 private fun OverviewSectionDivider() {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Spacer(Modifier.height(AppDimens.sectionDividerSpace))
+        Spacer(Modifier.height(8.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(AppDimens.strokeThin)
                 .background(MaterialTheme.colorScheme.outlineVariant)
         )
-        Spacer(Modifier.height(AppDimens.sectionDividerSpace))
+        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -586,7 +517,7 @@ private fun OverviewHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("dashboard_weekly_header"),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Bottom
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -597,7 +528,6 @@ private fun OverviewHeader(
                     overflow = TextOverflow.Clip,
                     modifier = Modifier.testTag("dashboard_weekly_kicker")
                 )
-                Spacer(Modifier.height(AppDimens.statSecondaryGap))
                 Text(
                     text = dateRange,
                     style = AppTypeTokens.sectionSubtitle,

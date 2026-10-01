@@ -24,6 +24,17 @@ class UiFormattersTest {
     }
 
     @Test
+    fun inclusiveDateRangeShowsYearsWhenWindowCrossesAYear() {
+        assertEquals(
+            "Dec 28, 2026–Jan 3, 2027",
+            UiFormatters.inclusiveDateRange(
+                LocalDate.of(2026, 12, 28),
+                LocalDate.of(2027, 1, 3)
+            )
+        )
+    }
+
+    @Test
     fun inclusiveDateRangeShowsBothMonthsWhenWindowCrosses() {
         assertEquals(
             "Aug 29–Sep 4",

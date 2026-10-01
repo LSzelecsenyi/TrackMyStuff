@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.Icon
@@ -49,6 +50,7 @@ import app.mymusclemap.ui.theme.AppDimens
 internal const val BOTTOM_BAR = "app-bottom-bar"
 internal const val BOTTOM_OVERVIEW = "app-bottom-overview"
 internal const val BOTTOM_WORKOUT_ACTION = "app-bottom-workout-action"
+internal const val BOTTOM_STATISTICS = "app-bottom-statistics"
 internal const val BOTTOM_JOURNAL = "app-bottom-journal"
 
 @Composable
@@ -56,6 +58,7 @@ fun AppBottomBar(
     selectedRoute: String?,
     hasActiveSession: Boolean,
     onOverview: () -> Unit,
+    onStatistics: () -> Unit,
     onJournal: () -> Unit,
     onWorkoutAction: () -> Unit,
     modifier: Modifier = Modifier,
@@ -107,6 +110,15 @@ fun AppBottomBar(
                 modifier = Modifier
                     .weight(1f)
                     .testTag(BOTTOM_WORKOUT_ACTION)
+            )
+            BottomTab(
+                label = stringResource(R.string.statistics_title),
+                icon = Icons.Outlined.BarChart,
+                selected = selectedRoute == AppRoutes.STATISTICS,
+                onClick = onStatistics,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(BOTTOM_STATISTICS)
             )
             BottomTab(
                 label = stringResource(R.string.nav_journal),

@@ -9,14 +9,14 @@ import org.junit.Test
 
 class AppNavigationTest {
     @Test
-    fun bottomNavigationContainsExactlyOverviewAndJournal() {
-        assertEquals(2, AppNavigation.rootTabs.size)
+    fun bottomNavigationContainsOverviewStatisticsAndJournal() {
+        assertEquals(3, AppNavigation.rootTabs.size)
         assertEquals(
-            listOf(R.string.nav_dashboard, R.string.nav_journal),
+            listOf(R.string.nav_dashboard, R.string.statistics_title, R.string.nav_journal),
             AppNavigation.rootTabs.map { it.labelRes }
         )
         assertEquals(
-            listOf(AppRoutes.OVERVIEW, AppRoutes.JOURNAL),
+            listOf(AppRoutes.OVERVIEW, AppRoutes.STATISTICS_GRAPH, AppRoutes.JOURNAL),
             AppNavigation.rootTabs.map { it.route }
         )
         assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.TEMPLATES })
@@ -74,15 +74,20 @@ class AppNavigationTest {
     }
 
     @Test
-    fun statisticsOpensFromOverviewWithoutDuplicatingAndHidesBottomBar() {
+    fun statisticsIsABottomDestinationAndReusesTheExistingGraph() {
         val navigation = AppNavigation.openStatistics(AppRoutes.OVERVIEW)
         assertEquals(AppRoutes.STATISTICS_GRAPH, navigation.targetRoute)
         assertEquals(AppRoutes.OVERVIEW, navigation.backTarget)
         assertTrue(navigation.shouldPush)
         assertFalse(AppNavigation.openStatistics(AppRoutes.STATISTICS_GRAPH).shouldPush)
+        assertTrue(AppNavigation.showsBottomBar(AppRoutes.STATISTICS))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_MUSCLES))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_GRAPH))
-        assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS))
-        assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.STATISTICS })
+        assertEquals(AppRoutes.STATISTICS, AppNavigation.bottomTabRoute(AppRoutes.STATISTICS))
+        assertEquals(AppRoutes.STATISTICS, AppNavigation.bottomTabRoute(AppRoutes.STATISTICS_GRAPH))
+        assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.STATISTICS))
+        assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.STATISTICS_GRAPH))
+        assertTrue(AppNavigation.rootTabs.any { it.route == AppRoutes.STATISTICS_GRAPH })
         assertFalse(AppNavigation.shouldNavigate(AppRoutes.STATISTICS_GRAPH, AppRoutes.STATISTICS_GRAPH))
         assertTrue(AppNavigation.shouldNavigate(AppRoutes.OVERVIEW, AppRoutes.STATISTICS_GRAPH))
     }
@@ -139,6 +144,7 @@ class AppNavigationTest {
     @Test
     fun bottomBarIsVisibleOnOverviewJournalAndRootLists() {
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.OVERVIEW))
+        assertTrue(AppNavigation.showsBottomBar(AppRoutes.STATISTICS))
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.JOURNAL))
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.EXERCISES))
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.TEMPLATES))
@@ -154,7 +160,6 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRIVACY))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRO_INFO))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_GRAPH))
-        assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_MUSCLES))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_REST))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_EXERCISES))
@@ -257,6 +262,7 @@ class AppNavigationTest {
     @Test
     fun backFromNonDefaultRootReturnsToOverview() {
         assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.JOURNAL))
+        assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.STATISTICS))
         assertNull(AppNavigation.backFromRootTab(AppRoutes.OVERVIEW))
         assertNull(AppNavigation.backFromRootTab(AppRoutes.SETTINGS))
         assertNull(AppNavigation.backFromRootTab(AppRoutes.TEMPLATES))

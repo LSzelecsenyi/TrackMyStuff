@@ -249,6 +249,32 @@ class AppRootNavigationTest {
     }
 
     @Test
+    fun statisticsBottomTabRestoresOverviewOnBackAndDoesNotStackDuplicates() {
+        val nav = host()
+        composeRule.runOnIdle {
+            nav.navigateRoot(AppRoutes.STATISTICS_GRAPH)
+            nav.navigateRoot(AppRoutes.STATISTICS_GRAPH)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.STATISTICS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.navigateRoot(AppRoutes.JOURNAL)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.JOURNAL, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.navigateRoot(AppRoutes.STATISTICS_GRAPH)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.STATISTICS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.OVERVIEW, nav.currentDestination?.route)
+    }
+
+    @Test
     fun givenStatisticsDetailsWhenBackThenStatisticsThenOverviewRemain() {
         val nav = host()
         composeRule.runOnIdle {

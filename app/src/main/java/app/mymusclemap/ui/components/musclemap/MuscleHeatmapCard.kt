@@ -39,7 +39,6 @@ import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MuscleHeatmapCard(
     state: MuscleHeatmapState,
@@ -53,23 +52,27 @@ fun MuscleHeatmapCard(
         Text(
             text = stringResource(R.string.heatmap_title),
             style = AppTypeTokens.sectionTitle,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
-        Spacer(Modifier.height(AppDimens.statSecondaryGap))
         Text(
             text = stringResource(R.string.heatmap_subtitle),
             style = AppTypeTokens.sectionSubtitle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 2.dp)
         )
         if (!state.hasCompletedWorkouts) {
             Text(
                 text = stringResource(R.string.heatmap_empty),
                 style = AppTypeTokens.sectionSubtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = AppDimens.headerStackGap)
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
-        Spacer(Modifier.height(AppDimens.headerStackGap))
+        Spacer(Modifier.height(4.dp))
         MuscleMap(
             fills = fills,
             unmappedFill = MuscleMapColors.unmappedFill(scheme),
@@ -79,13 +82,18 @@ fun MuscleHeatmapCard(
             selected = selected,
             onSelect = { selected = it },
             contentDescription = heatmapContentDescription(state),
-            accessibilityActions = heatmapActions(state)
+            accessibilityActions = heatmapActions(state),
+            maxFigureHeight = if (state.hasCompletedWorkouts) {
+                NarrowOverviewFigureHeight
+            } else {
+                NarrowOverviewEmptyFigureHeight
+            }
         )
         selectedEntry?.let { entry ->
             Spacer(Modifier.height(AppDimens.headerStackGap))
             HeatmapSelectionRow(entry = entry)
         }
-        Spacer(Modifier.height(AppDimens.headerStackGap))
+        Spacer(Modifier.height(4.dp))
         HeatmapRecencyLegend()
         state.fullBody?.let { entry ->
             Text(
@@ -238,6 +246,11 @@ internal fun MuscleRecencyBand.labelRes(): Int {
     }
 }
 
-private const val LegendScale = 1.2f
+private const val LegendScale = 1f
+private val NarrowOverviewFigureHeight = 300.dp
+
+// The empty explanation adds a line. Short phones give that height back from the figures
+// so the week calendar still fits. A trained heatmap keeps the taller cap.
+private val NarrowOverviewEmptyFigureHeight = 260.dp
 private val LegendDotSize = 8.dp * LegendScale
 private val LegendDotLabelGap = 4.dp * LegendScale

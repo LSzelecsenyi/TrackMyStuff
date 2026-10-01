@@ -106,6 +106,7 @@ import app.mymusclemap.ui.templates.labelRes
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.WorkoutColors
 internal const val WORKOUT_HEADER_KEY = "workout-header"
 internal const val WORKOUT_FINISH_KEY = "workout-finish"
 internal const val WORKOUT_FINISH_CTA = "workout-finish-cta"
@@ -880,7 +881,7 @@ private fun SetRow(
         statusLabel.ifBlank { stringResource(R.string.set_status_pending) }
     )
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val currentGreen = if (dark) Color(0xFF81C784) else Color(0xFF2E7D32)
+    val currentGreen = WorkoutColors.accent(MaterialTheme.colorScheme.background.luminance())
     val glow = if (dark) Color(0x2281C784) else Color(0x182E7D32)
     val showFields = set.status != SessionSetStatus.SKIPPED &&
         (set.status == SessionSetStatus.PENDING || editing)

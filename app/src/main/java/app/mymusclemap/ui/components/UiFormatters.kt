@@ -51,7 +51,11 @@ object UiFormatters {
     fun monthTitle(month: YearMonth): String = month.format(monthTitle)
 
     fun inclusiveDateRange(start: LocalDate, end: LocalDate): String {
-        return if (start.month == end.month && start.year == end.year) {
+        if (start.year != end.year) {
+            val withYear = DateTimeFormatter.ofPattern("MMM d, yyyy", locale)
+            return "${start.format(withYear)}–${end.format(withYear)}"
+        }
+        return if (start.month == end.month) {
             "${start.format(monthAbbrev)} ${start.dayOfMonth}–${end.dayOfMonth}"
         } else {
             "${start.format(chartDate)}–${end.format(chartDate)}"

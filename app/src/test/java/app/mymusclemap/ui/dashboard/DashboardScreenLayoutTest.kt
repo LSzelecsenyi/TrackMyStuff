@@ -5,6 +5,7 @@ import app.mymusclemap.testQuantity
 import app.mymusclemap.testString
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -25,7 +26,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.domain.DashboardSnapshot
@@ -35,7 +39,11 @@ import app.mymusclemap.domain.calendar.MonthGrid
 import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.musclemap.MuscleHeatmapAssembler
+import app.mymusclemap.domain.musclemap.MuscleHeatmapState
+import app.mymusclemap.domain.musclemap.MuscleTrainingExercise
+import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.onboarding.OnboardingChecklist
 import app.mymusclemap.domain.onboarding.OnboardingFacts
 import app.mymusclemap.domain.onboarding.OnboardingFlags
@@ -43,7 +51,6 @@ import app.mymusclemap.domain.onboarding.OnboardingGuide
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
-import app.mymusclemap.domain.entitlement.SelectiveFeatureEntitlements
 import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.ui.onboarding.ONBOARDING_CALENDAR_COACH
 import app.mymusclemap.ui.onboarding.ONBOARDING_CHART_COACH
@@ -54,8 +61,6 @@ import app.mymusclemap.ui.onboarding.ONBOARDING_REMINDER_DISMISS
 import app.mymusclemap.ui.onboarding.ONBOARDING_WEIGHT_SHEET
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.pro.LocalFeatureEntitlements
-import app.mymusclemap.ui.pro.PRO_BADGE
-import app.mymusclemap.ui.pro.PRO_INFO_TITLE
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -79,30 +84,10 @@ class DashboardScreenLayoutTest {
     private val today = LocalDate.of(2026, 3, 11)
 
     @Test
-    fun statisticsRowIsVisibleWithoutProBadgeAndOpensForEveryone() {
-        val opened = intArrayOf(0)
-        render(onOpenStatistics = { opened[0] += 1 })
-        composeRule.onNodeWithTag(OVERVIEW_STATISTICS).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.statistics_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.statistics_entry_subtitle)).assertIsDisplayed()
-        composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertDoesNotExist()
-        composeRule.onNodeWithTag(OVERVIEW_STATISTICS).performClick()
-        assertEquals(1, opened[0])
-        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
-    }
-
-    @Test
-    fun lockedEntitlementsStillOpenStatisticsFromOverview() {
-        val opened = intArrayOf(0)
-        render(
-            entitlements = SelectiveFeatureEntitlements(emptySet()),
-            onOpenStatistics = { opened[0] += 1 }
-        )
-        composeRule.onNodeWithTag(OVERVIEW_STATISTICS).performClick()
-        composeRule.waitForIdle()
-        assertEquals(1, opened[0])
-        composeRule.onNodeWithTag(PRO_INFO_TITLE).assertDoesNotExist()
-        composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertDoesNotExist()
+    fun statisticsEntryIsAbsentBecauseStatisticsIsABottomDestination() {
+        render()
+        composeRule.onNodeWithText(testString(R.string.statistics_entry_subtitle)).assertDoesNotExist()
+        composeRule.onNodeWithTag("overview-statistics").assertDoesNotExist()
     }
 
     @Test
@@ -116,23 +101,21 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun sectionOrderIsHeatmapThenStatisticsThenCalendarThenWeightChart() {
+    fun sectionOrderIsHeatmapThenWeekCalendarThenHealthThenWeightChart() {
         render()
         val weekly = composeRule.onNodeWithTag("dashboard_weekly_overview").getUnclippedBoundsInRoot()
         val heatmap = composeRule.onNodeWithTag("dashboard_heatmap").getUnclippedBoundsInRoot()
-        val statistics = composeRule.onNodeWithTag(OVERVIEW_STATISTICS).getUnclippedBoundsInRoot()
+        val calendar = composeRule.onNodeWithTag("dashboard_calendar").getUnclippedBoundsInRoot()
         val health = composeRule.onNodeWithTag(
             app.mymusclemap.ui.health.OVERVIEW_HEALTH
         ).getUnclippedBoundsInRoot()
-        val calendar = composeRule.onNodeWithTag("dashboard_calendar").getUnclippedBoundsInRoot()
         val chart = composeRule.onNodeWithTag("dashboard_weight_chart").getUnclippedBoundsInRoot()
         assertTrue(weekly.top.value < heatmap.top.value)
-        assertTrue(heatmap.top.value < statistics.top.value)
-        assertTrue(statistics.top.value < health.top.value)
-        assertTrue(health.top.value < calendar.top.value)
-        assertTrue(calendar.top.value < chart.top.value)
+        assertTrue(heatmap.top.value < calendar.top.value)
+        assertTrue(calendar.top.value < health.top.value)
+        assertTrue(health.top.value < chart.top.value)
         composeRule.onNodeWithText(testString(R.string.heatmap_title)).assertIsDisplayed()
-        composeRule.onNodeWithTag("dashboard_calendar_title").assertExists()
+        composeRule.onNodeWithTag("overview-calendar-expand").assertExists()
         composeRule.onNodeWithText(testString(R.string.chart_title)).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText("Muscle load").assertCountEquals(0)
     }
@@ -140,8 +123,7 @@ class DashboardScreenLayoutTest {
     @Test
     fun muscleHeatmapSectionUsesRenamedTitle() {
         render()
-        composeRule.onNodeWithText("Muscle heatmap").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Muscle load").assertCountEquals(0)
+        assertHeatmapTitleSitsAboveSubtitle()
     }
 
     @Test
@@ -226,6 +208,7 @@ class DashboardScreenLayoutTest {
             .onFirst()
             .performClick()
         assertEquals(LocalDate.of(2026, 3, 12), selected.get())
+        composeRule.onNodeWithTag("overview-calendar-expand").performClick()
         composeRule.onNodeWithText(testString(R.string.calendar_legend_planned)).assertExists()
     }
 
@@ -305,11 +288,14 @@ class DashboardScreenLayoutTest {
             )
         )
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
+        composeRule.onAllNodesWithTag("calendar-completed-fill", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithTag("calendar-planned-outline", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-today-marker", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onNodeWithTag("overview-calendar-expand").performClick()
         composeRule.onNodeWithTag("calendar-legend-planned").assertExists()
         composeRule.onNodeWithText(testString(R.string.calendar_legend_planned)).assertExists()
-        composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).onFirst().assertExists()
-        composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).onFirst().assertExists()
-        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onNodeWithText(testString(R.string.calendar_legend_workout)).assertExists()
         val todayCell = composeRule.onNode(hasContentDescription("March 11, 2026", substring = true))
         todayCell.assert(hasContentDescription(testQuantity(R.plurals.calendar_completed_workouts, 1), substring = true))
         todayCell.assert(hasContentDescription(testQuantity(R.plurals.calendar_planned_workouts, 1), substring = true))
@@ -349,9 +335,9 @@ class DashboardScreenLayoutTest {
                 )
             )
         )
-        composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
-        composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).assertCountEquals(5)
-        composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).assertCountEquals(4)
+        composeRule.onNodeWithTag("overview-calendar-expand").performScrollTo().performClick()
+        composeRule.onAllNodesWithTag("calendar-planned-outline", useUnmergedTree = true).assertCountEquals(3)
+        composeRule.onAllNodesWithTag("calendar-completed-fill", useUnmergedTree = true).assertCountEquals(4)
         composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).assertCountEquals(4)
         val crowded = composeRule.onNode(hasContentDescription("March 7, 2026", substring = true))
         val bounds = crowded.getBoundsInRoot()
@@ -378,12 +364,14 @@ class DashboardScreenLayoutTest {
                 plannedWorkoutCounts = mapOf(today to 1)
             )
         )
+        assertHeatmapTitleSitsAboveSubtitle()
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
-        composeRule.onAllNodesWithTag("calendar-planned-dot", useUnmergedTree = true).onFirst().assertExists()
-        composeRule.onAllNodesWithTag("calendar-completed-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-completed-fill", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-planned-outline", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onNodeWithTag("overview-calendar-expand").performClick()
         composeRule.onNodeWithText(testString(R.string.calendar_legend_planned)).assertExists()
-        composeRule.onNodeWithText(testString(R.string.nav_workout)).assertExists()
+        composeRule.onNodeWithText(testString(R.string.calendar_legend_workout)).assertExists()
     }
 
     @Test
@@ -692,6 +680,138 @@ class DashboardScreenLayoutTest {
         assertTrue(rect.height > 1f)
     }
 
+    @Test
+    fun weekCalendarExpandsInlineToTheMonthAndCollapses() {
+        render()
+        composeRule.onNodeWithTag("overview-calendar-expand").assertExists()
+        composeRule.onNodeWithText("March 2026").assertDoesNotExist()
+        composeRule.onNodeWithTag("overview-calendar-expand").performClick()
+        composeRule.onNodeWithText("March 2026").assertExists()
+        composeRule.onNodeWithTag("overview-calendar-collapse").performClick()
+        composeRule.onNodeWithTag("overview-calendar-expand").assertExists()
+        composeRule.onNodeWithText("March 2026").assertDoesNotExist()
+    }
+
+    @Test
+    fun expandingTheWeekScrollsTheFullMonthIntoView() {
+        render(width = 360.dp, viewportHeight = 696.dp)
+        composeRule.onNodeWithTag("overview-calendar-expand").performClick()
+        composeRule.waitForIdle()
+        val calendar = composeRule.onNodeWithTag("dashboard_calendar")
+        val unclipped = calendar.getUnclippedBoundsInRoot()
+        val clipped = calendar.getBoundsInRoot()
+        assertEquals(
+            "month bottom stays behind the viewport: unclipped=$unclipped clipped=$clipped",
+            unclipped.bottom.value,
+            clipped.bottom.value,
+            2f
+        )
+        assertTrue(unclipped.bottom <= 696.dp + 1.dp)
+        if (unclipped.bottom - unclipped.top <= 696.dp) {
+            assertEquals(
+                "month top is clipped: unclipped=$unclipped clipped=$clipped",
+                unclipped.top.value,
+                clipped.top.value,
+                2f
+            )
+            assertTrue(unclipped.top >= 0.dp)
+        }
+        composeRule.onNodeWithTag("overview-calendar-collapse").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("overview-calendar-expand").assertIsDisplayed()
+        composeRule.onNodeWithText("March 2026").assertDoesNotExist()
+    }
+
+    @Test
+    fun swipingAwayFromTheCurrentWeekOffersAReturnToToday() {
+        render()
+        composeRule.onNodeWithTag("overview-calendar-today").assertDoesNotExist()
+        composeRule.onNodeWithTag("overview-calendar-pager").performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("overview-calendar-today").assertExists()
+        composeRule.onNodeWithTag("overview-calendar-today").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("overview-calendar-today").assertDoesNotExist()
+    }
+
+    @Test
+    fun collapsedWeekFitsWithSummaryAndHeatmapOnAShortPhone() {
+        assertCollapsedCalendarFits(width = 360.dp, viewportHeight = 696.dp)
+    }
+
+    @Test
+    fun collapsedWeekFitsWithSummaryAndHeatmapOnAWiderPhone() {
+        assertCollapsedCalendarFits(width = 411.dp, viewportHeight = 780.dp)
+    }
+
+    @Test
+    fun collapsedWeekFitsWhenTheHeatmapIsEmptyOnAShortPhone() {
+        assertCollapsedCalendarFits(
+            width = 360.dp,
+            viewportHeight = 696.dp,
+            heatmap = MuscleHeatmapAssembler.assemble(emptyList(), today)
+        )
+    }
+
+    private fun assertCollapsedCalendarFits(
+        width: Dp,
+        viewportHeight: Dp,
+        heatmap: MuscleHeatmapState = MuscleHeatmapAssembler.assemble(
+                listOf(
+                    MuscleTrainingExercise(
+                        status = SessionStatus.COMPLETED,
+                        workoutDate = today,
+                        primaryMuscle = MuscleGroup.CHEST,
+                        secondaryMuscles = emptyList(),
+                        completedSetCount = 3
+                    )
+                ),
+                today
+            )
+    ) {
+        render(
+            width = width,
+            viewportHeight = viewportHeight,
+            heatmap = heatmap
+        )
+        val calendar = composeRule.onNodeWithTag("dashboard_calendar")
+        val unclipped = calendar.getUnclippedBoundsInRoot()
+        val clipped = calendar.getBoundsInRoot()
+        assertEquals(
+            "calendar is clipped: unclipped=$unclipped clipped=$clipped",
+            unclipped.bottom.value,
+            clipped.bottom.value,
+            1.5f
+        )
+        assertTrue(
+            "calendar bottom ${unclipped.bottom} exceeds $viewportHeight",
+            unclipped.bottom <= viewportHeight + 1.dp
+        )
+        val legend = composeRule.onNodeWithTag("heatmap_legend")
+        val legendBounds = legend.getUnclippedBoundsInRoot()
+        assertEquals(
+            "heatmap legend is clipped: $legendBounds",
+            legendBounds.bottom.value,
+            legend.getBoundsInRoot().bottom.value,
+            1.5f
+        )
+        assertTrue(legendBounds.bottom < unclipped.top)
+        val summary = composeRule.onNodeWithTag("dashboard_weekly_overview").getBoundsInRoot()
+        assertTrue(summary.bottom < legendBounds.top)
+    }
+
+    private fun assertHeatmapTitleSitsAboveSubtitle() {
+        val title = composeRule.onNodeWithText("Muscle heatmap").getBoundsInRoot()
+        val subtitle = composeRule.onNodeWithText("Based on recent completed workouts").getBoundsInRoot()
+        composeRule.onAllNodesWithText("Muscle load").assertCountEquals(0)
+        assertTrue("subtitle should sit under the title", subtitle.top >= title.bottom - 1.dp)
+        assertTrue(
+            "subtitle should stay close to the title: titleBottom=${title.bottom} subtitleTop=${subtitle.top}",
+            subtitle.top <= title.bottom + 8.dp
+        )
+        assertTrue("subtitle should stay left-aligned with the title", subtitle.left <= title.left + 4.dp)
+    }
+
     private fun reminderGuide(): OnboardingGuide {
         return OnboardingGuide(
             flags = OnboardingFlags(started = true),
@@ -718,7 +838,6 @@ class DashboardScreenLayoutTest {
         onOpenTemplates: () -> Unit = {},
         onOpenCatalog: () -> Unit = {},
         onOpenSettings: () -> Unit = {},
-        onOpenStatistics: () -> Unit = {},
         entitlements: FeatureEntitlements = OpenFeatureEntitlements,
         onboarding: OnboardingGuide = OnboardingGuide.Inactive,
         onContinueOnboarding: () -> Unit = {},
@@ -729,7 +848,10 @@ class DashboardScreenLayoutTest {
         onHeatmapBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
         onCalendarBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
         onChartBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
-        onDashboardTargetRevealed: () -> Unit = {}
+        onDashboardTargetRevealed: () -> Unit = {},
+        width: Dp = 360.dp,
+        viewportHeight: Dp? = null,
+        heatmap: MuscleHeatmapState? = null
     ) {
         val measurement = WeightMeasurement(1, today, 82.4, 0, 0)
         val month = YearMonth.from(today)
@@ -746,8 +868,14 @@ class DashboardScreenLayoutTest {
                 ) {
                     Box(
                         modifier = Modifier
-                            .width(360.dp)
-                            .fillMaxSize()
+                            .width(width)
+                            .then(
+                                if (viewportHeight != null) {
+                                    Modifier.height(viewportHeight)
+                                } else {
+                                    Modifier.fillMaxSize()
+                                }
+                            )
                     ) {
                         DashboardScreen(
                             state = DashboardUiState(
@@ -771,7 +899,7 @@ class DashboardScreenLayoutTest {
                                 weeklyOverview = weeklyOverview,
                                 displayedMonth = month,
                                 monthGrid = grid,
-                                heatmap = MuscleHeatmapAssembler.assemble(emptyList(), today),
+                                heatmap = heatmap ?: MuscleHeatmapAssembler.assemble(emptyList(), today),
                                 onboarding = onboarding
                             ),
                             onPreviousMonth = {},
@@ -793,7 +921,6 @@ class DashboardScreenLayoutTest {
                             onOpenSettings = onOpenSettings,
                             onOpenTemplates = onOpenTemplates,
                             onOpenCatalog = onOpenCatalog,
-                            onOpenStatistics = onOpenStatistics,
                             onOpenWorkout = {},
                             onOpenWeightDetails = onOpenWeightDetails,
                             onContinueOnboarding = onContinueOnboarding,

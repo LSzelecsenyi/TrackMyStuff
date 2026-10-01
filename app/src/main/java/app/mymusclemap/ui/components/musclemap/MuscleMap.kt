@@ -86,7 +86,8 @@ fun MuscleMap(
     contentDescription: String,
     accessibilityActions: List<Pair<String, MuscleGroup>> = emptyList(),
     modifier: Modifier = Modifier,
-    interactive: Boolean = true
+    interactive: Boolean = true,
+    maxFigureHeight: Dp = Dp.Unspecified
 ) {
     val parsed = rememberParsedMuscleRegions()
     val front = remember(parsed) {
@@ -108,9 +109,16 @@ fun MuscleMap(
     }
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val availableWidth = if (constraints.hasBoundedWidth) maxWidth else 0.dp
+        // Full-aspect figures are too tall to leave room for the week calendar on narrow phones.
+        val heightCap = if (maxFigureHeight.isSpecified && availableWidth <= 336.dp) {
+            maxFigureHeight
+        } else {
+            Dp.Unspecified
+        }
         val pair = muscleMapPairLayout(
             availableWidth = availableWidth,
-            gap = MUSCLE_MAP_FIGURE_GAP
+            gap = MUSCLE_MAP_FIGURE_GAP,
+            maxFigureHeight = heightCap
         )
         Row(
             modifier = Modifier
@@ -221,15 +229,26 @@ internal data class MuscleMapPairLayout(
 
 internal fun muscleMapPairLayout(
     availableWidth: Dp,
-    gap: Dp = MUSCLE_MAP_FIGURE_GAP
+    gap: Dp = MUSCLE_MAP_FIGURE_GAP,
+    maxFigureHeight: Dp = Dp.Unspecified
 ): MuscleMapPairLayout {
     val boundedWidth = if (!availableWidth.isSpecified || !availableWidth.isFinite || availableWidth < 0.dp) {
         0.dp
     } else {
         availableWidth
     }
-    val figureWidth = ((boundedWidth - gap) / 2f).coerceAtLeast(0.dp)
-    val figureHeight = figureWidth * MUSCLE_MAP_ASPECT
+    val naturalWidth = ((boundedWidth - gap) / 2f).coerceAtLeast(0.dp)
+    val naturalHeight = naturalWidth * MUSCLE_MAP_ASPECT
+    val figureHeight = if (maxFigureHeight.isSpecified && naturalHeight > maxFigureHeight) {
+        maxFigureHeight
+    } else {
+        naturalHeight
+    }
+    val figureWidth = if (figureHeight == naturalHeight) {
+        naturalWidth
+    } else {
+        (figureHeight / MUSCLE_MAP_ASPECT).coerceAtLeast(0.dp)
+    }
     return MuscleMapPairLayout(
         figureWidth = figureWidth,
         figureHeight = figureHeight,
