@@ -439,20 +439,20 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun restoredViewModelDoesNotFinishCompletedSessionAgain() = runTest {
+    fun restoredViewModelReopensCompletionWithoutFinishingAgain() = runTest {
         val viewModel = startSingleSet()
         viewModel.loaded()
         viewModel.confirmFinish(true)
-        awaitReal { viewModel.uiState.first { it.finished && it.completionSummary != null } }
+        val original = awaitReal { viewModel.uiState.first { it.finished && it.completionSummary != null } }
         val restored = active(sessionId)
-        val restoredState = restored.loaded()
-        assertFalse(restoredState.finished)
-        assertNull(restoredState.completionSummary)
+        val restoredState = awaitReal {
+            restored.uiState.first { it.finished && it.completionSummary != null }
+        }
+        assertEquals(original.completionSummary, restoredState.completionSummary)
         assertEquals(SessionStatus.COMPLETED, sessions.getAggregate(sessionId)!!.session.status)
         restored.confirmFinish(true)
-        awaitReal { restored.uiState.first { !it.finishing } }
-        assertFalse(restored.uiState.value.finished)
-        assertNull(restored.uiState.value.completionSummary)
+        assertEquals(original.completionSummary, restored.uiState.value.completionSummary)
+        assertEquals(SessionStatus.COMPLETED, sessions.getAggregate(sessionId)!!.session.status)
     }
 
     @Test

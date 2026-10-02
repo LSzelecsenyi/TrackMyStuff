@@ -603,39 +603,23 @@ class WorkoutSessionRepository(
     }
 
     suspend fun finish(sessionId: Long, skipRemaining: Boolean): FinishWorkoutResult = mutex.withLock {
-        val session = sessionDao.getById(sessionId) ?: return FinishWorkoutResult.NotFound
-        if (session.status != SessionStatus.IN_PROGRESS.name) {
-            return FinishWorkoutResult.AlreadyTerminal
+        withContext(NonCancellable) {
+            val outcome = sessionDao.finishActiveSession(sessionId, clock.millis(), skipRemaining)
+            when (outcome) {
+                1 -> {
+                    onHeatmapDataChanged()
+                    FinishWorkoutResult.Finished
+                }
+                -1 -> FinishWorkoutResult.AlreadyTerminal
+                -2 -> {
+                    val pending = sessionDao.getExercises(sessionId)
+                        .flatMap { sessionDao.getSets(it.id) }
+                        .count { it.status == SessionSetStatus.PENDING.name }
+                    FinishWorkoutResult.PendingRemaining(pending)
+                }
+                else -> FinishWorkoutResult.NotFound
+            }
         }
-        val pending = sessionDao.getExercises(sessionId).flatMap { sessionDao.getSets(it.id) }
-            .filter { it.status == SessionSetStatus.PENDING.name }
-        if (pending.isNotEmpty() && !skipRemaining) {
-            return FinishWorkoutResult.PendingRemaining(pending.size)
-        }
-        val now = clock.millis()
-        pending.forEach { set ->
-            sessionDao.updateSet(
-                set.copy(
-                    actualReps = null,
-                    actualLoadKind = null,
-                    actualWeightKg = null,
-                    actualDurationSeconds = null,
-                    actualDistanceMeters = null,
-                    status = SessionSetStatus.SKIPPED.name,
-                    completedAt = null
-                )
-            )
-        }
-        sessionDao.updateSession(
-            session.copy(
-                status = SessionStatus.COMPLETED.name,
-                finishedAt = now,
-                updatedAt = now,
-                activeLock = SessionStatus.COMPLETED.activeLock()
-            )
-        )
-        onHeatmapDataChanged()
-        FinishWorkoutResult.Finished
     }
 
     suspend fun abandon(sessionId: Long): AbandonWorkoutResult = mutex.withLock {

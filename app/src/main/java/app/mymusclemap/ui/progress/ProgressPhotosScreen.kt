@@ -198,7 +198,7 @@ fun ProgressPhotosScreen(
     onCancelCompare: () -> Unit,
     onShowCompare: (Long, Long) -> Unit,
     onDismissLocked: () -> Unit,
-    decode: (String, Int) -> Bitmap? = { _, _ -> null }
+    decode: suspend (String, Int) -> Bitmap? = { _, _ -> null }
 ) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         onPicked(uri)
@@ -333,7 +333,7 @@ fun ProgressPhotosScreen(
 private fun ProgressPhotoCell(
     photo: ProgressPhotoListItem,
     selected: Boolean,
-    decode: (String, Int) -> Bitmap?,
+    decode: suspend (String, Int) -> Bitmap?,
     onClick: () -> Unit
 ) {
     val date = UiFormatters.compactDate(photo.date)

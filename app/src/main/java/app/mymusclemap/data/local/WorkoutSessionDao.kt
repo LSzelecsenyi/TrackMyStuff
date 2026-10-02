@@ -204,6 +204,47 @@ abstract class WorkoutSessionDao {
         return deleteSessionById(id)
     }
 
+    /**
+     * Skips every still-pending set and marks the session completed in one transaction.
+     * Returns 1 when finished, -1 when the session is already terminal, -2 when pending
+     * sets remain and [skipRemaining] is false, 0 when the session does not exist.
+     */
+    @Transaction
+    open suspend fun finishActiveSession(sessionId: Long, finishedAt: Long, skipRemaining: Boolean): Int {
+        val session = getById(sessionId) ?: return 0
+        if (session.status != "IN_PROGRESS") {
+            return -1
+        }
+        val pending = getExercises(sessionId)
+            .flatMap { getSets(it.id) }
+            .filter { it.status == "PENDING" }
+        if (pending.isNotEmpty() && !skipRemaining) {
+            return -2
+        }
+        pending.forEach { set ->
+            updateSet(
+                set.copy(
+                    actualReps = null,
+                    actualLoadKind = null,
+                    actualWeightKg = null,
+                    actualDurationSeconds = null,
+                    actualDistanceMeters = null,
+                    status = "SKIPPED",
+                    completedAt = null
+                )
+            )
+        }
+        updateSession(
+            session.copy(
+                status = "COMPLETED",
+                finishedAt = finishedAt,
+                updatedAt = finishedAt,
+                activeLock = null
+            )
+        )
+        return 1
+    }
+
     @Query("UPDATE workout_session_sets SET position = :position WHERE id = :id")
     abstract suspend fun updateSetPosition(id: Long, position: Int)
 

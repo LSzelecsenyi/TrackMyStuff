@@ -236,6 +236,16 @@ class ActiveWorkoutViewModel(
                 expandedIds.value = expandedIds.value + pendingId
             }
         }
+        viewModelScope.launch {
+            sessionRepository.observeAggregate(sessionId).collect { aggregate ->
+                val summary = aggregate?.let(WorkoutCompletionLogic::from) ?: return@collect
+                if (completionSummary.value == null && !discarding.value) {
+                    completionSummary.value = summary
+                    pendingFinishCount.value = null
+                    finished.value = true
+                }
+            }
+        }
     }
 
     fun selectExercise(index: Int) {

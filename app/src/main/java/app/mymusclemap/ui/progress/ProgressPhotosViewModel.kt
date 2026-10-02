@@ -188,7 +188,9 @@ class ProgressPhotosViewModel(
         selectedIds.value = emptyList()
     }
 
-    fun decode(fileName: String, edge: Int): Bitmap? = repository.decode(fileName, edge)
+    suspend fun decode(fileName: String, edge: Int): Bitmap? = withContext(Dispatchers.IO) {
+        repository.decode(fileName, edge)
+    }
 
     fun photo(id: Long): ProgressPhotoListItem? = photos.value.find { it.id == id }
 
