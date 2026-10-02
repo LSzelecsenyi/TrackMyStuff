@@ -34,7 +34,6 @@ data class DashboardSnapshot(
     val chartPoints: List<ChartPoint>,
     val recentItems: List<MeasurementListItem>,
     val todayHasMeasurement: Boolean,
-    val measurementDates: Set<LocalDate> = emptySet(),
     val chartRangeAverageKg: Double? = null
 )
 
@@ -77,7 +76,6 @@ object DashboardAssembler {
             chartPoints = chartPoints,
             recentItems = withDiffs.take(recentLimit),
             todayHasMeasurement = chronological.any { it.date == today },
-            measurementDates = chronological.map { it.date }.toSet(),
             chartRangeAverageKg = if (chartPoints.isEmpty()) null else chartPoints.map { it.weightKg }.average()
         )
     }

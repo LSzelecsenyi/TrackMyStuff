@@ -12,7 +12,6 @@ object CalendarDayCopy {
     fun description(
         resources: Resources,
         date: LocalDate,
-        hasMeasurement: Boolean,
         completedWorkoutCount: Int,
         isToday: Boolean = false,
         isFuture: Boolean = false,
@@ -24,7 +23,6 @@ object CalendarDayCopy {
         }
         parts += entryState(
             resources,
-            hasMeasurement,
             completedWorkoutCount,
             plannedWorkoutCount
         )
@@ -36,14 +34,10 @@ object CalendarDayCopy {
 
     fun entryState(
         resources: Resources,
-        hasMeasurement: Boolean,
         completedWorkoutCount: Int,
         plannedWorkoutCount: Int = 0
     ): String {
         val parts = mutableListOf<String>()
-        if (hasMeasurement) {
-            parts += resources.getString(R.string.calendar_has_weight)
-        }
         if (completedWorkoutCount > 0) {
             parts += resources.getQuantityString(
                 R.plurals.calendar_completed_workouts,

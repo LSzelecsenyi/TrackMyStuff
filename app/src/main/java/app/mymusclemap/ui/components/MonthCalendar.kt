@@ -222,22 +222,6 @@ private fun CalendarLegend() {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.testTag("calendar-legend-weight")
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .border(AppDimens.strokeThin, MaterialTheme.colorScheme.tertiary, CircleShape)
-            )
-            Text(
-                text = stringResource(R.string.calendar_legend_weight),
-                style = AppTypeTokens.statCaption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.testTag("calendar-legend-completed")
         ) {
             Box(
@@ -284,7 +268,6 @@ internal fun CalendarDayCell(
     val label = CalendarDayCopy.description(
         resources = LocalResources.current,
         date = cell.date,
-        hasMeasurement = cell.hasMeasurement,
         completedWorkoutCount = cell.completedWorkoutCount,
         isToday = cell.isToday,
         isFuture = cell.isFuture,
@@ -370,20 +353,6 @@ internal fun CalendarDayCell(
                     .clip(CircleShape)
                     .background(if (mark == CalendarWorkoutMark.Completed) onWorkout else MaterialTheme.colorScheme.onSurface)
                     .testTag("calendar-today-marker")
-            )
-        }
-        if (cell.hasMeasurement) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(2.dp)
-                    .size(4.dp)
-                    .testTag("calendar-weight-dot")
-                    .border(
-                        width = AppDimens.strokeThin,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        shape = CircleShape
-                    )
             )
         }
     }

@@ -282,7 +282,6 @@ class DashboardScreenLayoutTest {
             monthGrid = MonthGridCalculator.grid(
                 month = YearMonth.from(today),
                 today = today,
-                measuredDates = setOf(today),
                 completedWorkoutCounts = mapOf(today to 1),
                 plannedWorkoutCounts = mapOf(today to 1)
             )
@@ -290,10 +289,11 @@ class DashboardScreenLayoutTest {
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
         composeRule.onAllNodesWithTag("calendar-completed-fill", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onAllNodesWithTag("calendar-planned-outline", useUnmergedTree = true).assertCountEquals(0)
-        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onAllNodesWithTag("calendar-today-marker", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onNodeWithTag("overview-calendar-expand").performClick()
         composeRule.onNodeWithTag("calendar-legend-planned").assertExists()
+        composeRule.onNodeWithTag("calendar-legend-weight").assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.calendar_legend_planned)).assertExists()
         composeRule.onNodeWithText(testString(R.string.calendar_legend_workout)).assertExists()
         val todayCell = composeRule.onNode(hasContentDescription("March 11, 2026", substring = true))
@@ -319,7 +319,6 @@ class DashboardScreenLayoutTest {
             monthGrid = MonthGridCalculator.grid(
                 month = month,
                 today = today,
-                measuredDates = setOf(weightOnly, weightPlanned, weightCompleted, allThree),
                 completedWorkoutCounts = mapOf(
                     completedOnly to 1,
                     weightCompleted to 1,
@@ -338,7 +337,9 @@ class DashboardScreenLayoutTest {
         composeRule.onNodeWithTag("overview-calendar-expand").performScrollTo().performClick()
         composeRule.onAllNodesWithTag("calendar-planned-outline", useUnmergedTree = true).assertCountEquals(3)
         composeRule.onAllNodesWithTag("calendar-completed-fill", useUnmergedTree = true).assertCountEquals(4)
-        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).assertCountEquals(4)
+        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).assertCountEquals(0)
+        val weightOnlyCell = composeRule.onNode(hasContentDescription("March 1, 2026", substring = true))
+        weightOnlyCell.assert(hasContentDescription(testString(R.string.calendar_no_entry), substring = true))
         val crowded = composeRule.onNode(hasContentDescription("March 7, 2026", substring = true))
         val bounds = crowded.getBoundsInRoot()
         assertTrue(bounds.bottom - bounds.top <= 48.dp)
@@ -349,7 +350,7 @@ class DashboardScreenLayoutTest {
         assertNotClipped("calendar-legend")
         composeRule.onNodeWithTag("calendar-legend-planned").assertExists()
         composeRule.onNodeWithTag("calendar-legend-completed").assertExists()
-        composeRule.onNodeWithTag("calendar-legend-weight").assertExists()
+        composeRule.onNodeWithTag("calendar-legend-weight").assertDoesNotExist()
     }
 
     @Test
@@ -359,7 +360,6 @@ class DashboardScreenLayoutTest {
             monthGrid = MonthGridCalculator.grid(
                 month = YearMonth.from(today),
                 today = today,
-                measuredDates = setOf(today),
                 completedWorkoutCounts = mapOf(today to 1),
                 plannedWorkoutCounts = mapOf(today to 1)
             )
@@ -368,7 +368,7 @@ class DashboardScreenLayoutTest {
         composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
         composeRule.onAllNodesWithTag("calendar-completed-fill", useUnmergedTree = true).onFirst().assertExists()
         composeRule.onAllNodesWithTag("calendar-planned-outline", useUnmergedTree = true).assertCountEquals(0)
-        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).onFirst().assertExists()
+        composeRule.onAllNodesWithTag("calendar-weight-dot", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onNodeWithTag("overview-calendar-expand").performClick()
         composeRule.onNodeWithText(testString(R.string.calendar_legend_planned)).assertExists()
         composeRule.onNodeWithText(testString(R.string.calendar_legend_workout)).assertExists()
@@ -855,7 +855,7 @@ class DashboardScreenLayoutTest {
     ) {
         val measurement = WeightMeasurement(1, today, 82.4, 0, 0)
         val month = YearMonth.from(today)
-        val grid = monthGrid ?: MonthGridCalculator.grid(month, today, setOf(today))
+        val grid = monthGrid ?: MonthGridCalculator.grid(month, today)
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -892,7 +892,6 @@ class DashboardScreenLayoutTest {
                                     ),
                                     recentItems = emptyList(),
                                     todayHasMeasurement = true,
-                                    measurementDates = setOf(today),
                                     chartRangeAverageKg = 82.1
                                 ),
                                 today = today,

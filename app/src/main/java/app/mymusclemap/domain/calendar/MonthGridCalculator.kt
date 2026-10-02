@@ -9,7 +9,6 @@ data class CalendarCell(
     val date: LocalDate,
     val inDisplayedMonth: Boolean,
     val isToday: Boolean,
-    val hasMeasurement: Boolean,
     val completedWorkoutCount: Int,
     val plannedWorkoutCount: Int = 0,
     val isFuture: Boolean
@@ -51,7 +50,6 @@ object MonthGridCalculator {
     fun grid(
         month: YearMonth,
         today: LocalDate,
-        measuredDates: Set<LocalDate>,
         completedWorkoutCounts: Map<LocalDate, Int> = emptyMap(),
         plannedWorkoutCounts: Map<LocalDate, Int> = emptyMap()
     ): MonthGrid {
@@ -62,7 +60,6 @@ object MonthGridCalculator {
                 date = date,
                 inDisplayedMonth = YearMonth.from(date) == month,
                 isToday = date == today,
-                hasMeasurement = measuredDates.contains(date),
                 completedWorkoutCount = completedWorkoutCounts[date] ?: 0,
                 plannedWorkoutCount = plannedWorkoutCounts[date] ?: 0,
                 isFuture = date.isAfter(today)

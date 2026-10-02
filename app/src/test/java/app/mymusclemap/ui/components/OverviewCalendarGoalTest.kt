@@ -98,7 +98,7 @@ class OverviewCalendarGoalTest {
         composeRule.setContent {
             WeightTrackerThemeForPreview {
                 OverviewCalendar(
-                    monthGrid = MonthGridCalculator.grid(month, today, emptySet(), emptyMap(), emptyMap()),
+                    monthGrid = MonthGridCalculator.grid(month, today),
                     displayedMonth = month,
                     today = today,
                     selectedDate = null,

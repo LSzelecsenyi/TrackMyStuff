@@ -130,7 +130,6 @@
     <string name="calendar_previous_month">Previous month</string>
     <string name="calendar_next_month">Next month</string>
     <string name="calendar_today_label">today</string>
-    <string name="calendar_has_weight">body-weight measurement</string>
     <string name="calendar_future_label">future day</string>
     <string name="calendar_no_entry">no entries</string>
     <string name="calendar_entry_two">%1$s and %2$s</string>
@@ -650,7 +649,6 @@
     <string name="workout_detail_performed">Performed: %1$s</string>
     <string name="workout_detail_extra">Added during workout</string>
     <string name="workout_detail_exercise_position">Exercise %1$d</string>
-    <string name="calendar_legend_weight">Body weight</string>
     <string name="calendar_legend_workout">Completed workout</string>
     <string name="calendar_legend_planned">Planned workout</string>
     <string name="day_sheet_workouts">Workouts</string>

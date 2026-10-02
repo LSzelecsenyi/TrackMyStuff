@@ -58,7 +58,6 @@ class WeekCalendarTest {
             date = LocalDate.of(2026, 3, 11),
             inDisplayedMonth = true,
             isToday = true,
-            hasMeasurement = false,
             completedWorkoutCount = completed,
             plannedWorkoutCount = planned,
             isFuture = false

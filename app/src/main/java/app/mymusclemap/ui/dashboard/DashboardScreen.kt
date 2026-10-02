@@ -719,13 +719,12 @@ private fun DashboardPreview() {
                     ),
                     recentItems = emptyList(),
                     todayHasMeasurement = true,
-                    measurementDates = setOf(date),
                     chartRangeAverageKg = 82.1
                 ),
                 today = date,
                 weeklyOverview = WeeklyOverview(workoutCount = 3, completedSetCount = 18, weightChangeKg = 0.4),
                 displayedMonth = month,
-                monthGrid = MonthGridCalculator.grid(month, date, setOf(date))
+                monthGrid = MonthGridCalculator.grid(month, date)
             ),
             onPreviousMonth = {},
             onNextMonth = {},
@@ -763,7 +762,7 @@ private fun EmptyDashboardPreview() {
                 today = date,
                 weeklyOverview = WeeklyOverview(),
                 displayedMonth = month,
-                monthGrid = MonthGridCalculator.grid(month, date, emptySet())
+                monthGrid = MonthGridCalculator.grid(month, date)
             ),
             onPreviousMonth = {},
             onNextMonth = {},

@@ -77,8 +77,7 @@ data class DashboardUiState(
     val displayedMonth: YearMonth = YearMonth.of(1970, 1),
     val monthGrid: MonthGrid = MonthGridCalculator.grid(
         month = YearMonth.of(1970, 1),
-        today = LocalDate.of(1970, 1, 1),
-        measuredDates = emptySet()
+        today = LocalDate.of(1970, 1, 1)
     ),
     val daySheet: DaySheetState? = null,
     val showDayDeleteConfirm: Boolean = false,
@@ -309,7 +308,6 @@ class DashboardViewModel(
                 monthGrid = MonthGridCalculator.grid(
                     month = chromeState.month,
                     today = today,
-                    measuredDates = snapshot.measurementDates,
                     completedWorkoutCounts = sessions.counts,
                     plannedWorkoutCounts = schedules.plannedCounts
                 ),
@@ -358,8 +356,7 @@ class DashboardViewModel(
             displayedMonth = YearMonth.from(dateProvider.today()),
             monthGrid = MonthGridCalculator.grid(
                 month = YearMonth.from(dateProvider.today()),
-                today = dateProvider.today(),
-                measuredDates = emptySet()
+                today = dateProvider.today()
             )
         )
     )

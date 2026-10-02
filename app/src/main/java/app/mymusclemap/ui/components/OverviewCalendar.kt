@@ -414,7 +414,6 @@ private fun CalendarPreview(
             monthGrid = MonthGridCalculator.grid(
                 month = month,
                 today = today,
-                measuredDates = setOf(today),
                 completedWorkoutCounts = completed,
                 plannedWorkoutCounts = planned
             ),
@@ -442,7 +441,6 @@ private fun weekCells(grid: MonthGrid, weekStart: LocalDate, today: LocalDate): 
                 date = date,
                 inDisplayedMonth = true,
                 isToday = date == today,
-                hasMeasurement = false,
                 completedWorkoutCount = 0,
                 plannedWorkoutCount = 0,
                 isFuture = date.isAfter(today)

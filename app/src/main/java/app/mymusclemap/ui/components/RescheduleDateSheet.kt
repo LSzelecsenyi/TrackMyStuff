@@ -50,8 +50,7 @@ fun RescheduleDateSheet(
     }
     val grid = MonthGridCalculator.grid(
         month = month,
-        today = today,
-        measuredDates = emptySet()
+        today = today
     )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
