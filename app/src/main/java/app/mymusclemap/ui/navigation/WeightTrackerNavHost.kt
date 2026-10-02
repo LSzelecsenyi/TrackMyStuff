@@ -212,7 +212,8 @@ fun WeightTrackerNavHost(
     openNewTemplate: Boolean = false,
     onOpenedNewTemplate: () -> Unit = {},
     openPrivacyPolicy: Boolean = false,
-    onOpenedPrivacyPolicy: () -> Unit = {}
+    onOpenedPrivacyPolicy: () -> Unit = {},
+    openOverviewRequest: Int = 0
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -229,6 +230,11 @@ fun WeightTrackerNavHost(
     var calendarBounds by remember { mutableStateOf(Rect.Zero) }
     var todayBounds by remember { mutableStateOf(Rect.Zero) }
     var chartBounds by remember { mutableStateOf(Rect.Zero) }
+    LaunchedEffect(openOverviewRequest) {
+        if (openOverviewRequest > 0) {
+            navController.navigateRoot(AppRoutes.OVERVIEW)
+        }
+    }
     LaunchedEffect(openPrivacyPolicy) {
         if (openPrivacyPolicy) {
             navController.navigate(AppRoutes.PRIVACY) {

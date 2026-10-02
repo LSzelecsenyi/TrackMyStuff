@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,17 +29,20 @@ import app.mymusclemap.ui.theme.WeightTrackerTheme
 
 class MainActivity : ComponentActivity() {
     private val openPrivacyPolicy = mutableStateOf(false)
+    private val overviewRequest = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         openPrivacyPolicy.value = HealthConnectGateway.isPermissionUsage(intent)
+        acceptOverviewRequest(intent)
         val container = (application as WeightTrackerApplication).container
         setContent {
             val appearance by container.themePreferences.appearance.collectAsStateWithLifecycle(
                 initialValue = AppearanceSettings.Default
             )
             val openPrivacy by openPrivacyPolicy
+            val openOverviewRequest by overviewRequest
             var decision by remember { mutableStateOf<FirstRunDecision?>(null) }
             var openNewTemplate by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
@@ -84,7 +88,8 @@ class MainActivity : ComponentActivity() {
                             openNewTemplate = openNewTemplate,
                             onOpenedNewTemplate = { openNewTemplate = false },
                             openPrivacyPolicy = openPrivacy,
-                            onOpenedPrivacyPolicy = { openPrivacyPolicy.value = false }
+                            onOpenedPrivacyPolicy = { openPrivacyPolicy.value = false },
+                            openOverviewRequest = openOverviewRequest
                         )
                     }
                 }
@@ -98,5 +103,16 @@ class MainActivity : ComponentActivity() {
         if (HealthConnectGateway.isPermissionUsage(intent)) {
             openPrivacyPolicy.value = true
         }
+        acceptOverviewRequest(intent)
+    }
+
+    private fun acceptOverviewRequest(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_OVERVIEW, false) == true) {
+            overviewRequest.intValue += 1
+        }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_OVERVIEW = "app.mymusclemap.OPEN_OVERVIEW"
     }
 }

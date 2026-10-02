@@ -19,6 +19,7 @@ import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.ContentWorkoutImportFileReader
+import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.SystemDateProvider
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
@@ -64,7 +65,8 @@ class AppContainer(context: Context) {
         exerciseDao = database.exerciseDao(),
         weightRepository = weightRepository,
         clock = clock,
-        dateProvider = dateProvider
+        dateProvider = dateProvider,
+        onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) }
     )
     val weeklyGoalRepository = WeeklyGoalRepository(
         dao = database.weeklyWorkoutGoalDao(),
@@ -74,7 +76,11 @@ class AppContainer(context: Context) {
         }
     )
     val themePreferences = ThemePreferences(appContext)
-    val appBackupRepository = AppBackupRepository(database, themePreferences)
+    val appBackupRepository = AppBackupRepository(
+        database,
+        themePreferences,
+        onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) }
+    )
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
     val progressPhotoRepository = ProgressPhotoRepository(

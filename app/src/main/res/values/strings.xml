@@ -683,6 +683,10 @@
     <string name="set_status_skipped_label">Skipped</string>
     <string name="heatmap_title">Muscle heatmap</string>
     <string name="heatmap_subtitle">Based on recent completed workouts</string>
+    <string name="widget_heatmap_description">Front and back muscle heatmap from your completed workouts</string>
+    <string name="widget_heatmap_content_description">Muscle heatmap. Tap to open My Muscle Map.</string>
+    <string name="widget_heatmap_front">Front body</string>
+    <string name="widget_heatmap_back">Back body</string>
     <string name="heatmap_empty">There are no completed workouts yet, so the heatmap is empty.</string>
     <string name="heatmap_empty_trained">Completed workouts do not yet have finished sets assigned to a muscle group.</string>
     <string name="heatmap_selection">%1$s: %2$s</string>

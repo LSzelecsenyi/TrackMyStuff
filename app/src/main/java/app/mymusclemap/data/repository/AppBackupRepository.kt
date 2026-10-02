@@ -18,6 +18,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class AppBackupRepository(
     private val database: WeightDatabase,
     private val themePreferences: ThemePreferences,
+    private val onHeatmapDataChanged: () -> Unit = {},
     private val instantSource: () -> Instant = { Instant.now() }
 ) {
     suspend fun exportJson(source: AppBackupSource): String {
@@ -61,6 +62,7 @@ class AppBackupRepository(
             )
         }
         themePreferences.replaceAppearance(AppearanceCodec.decodeFrom(snapshot.settings))
+        onHeatmapDataChanged()
         return AppBackupRestoreResult.Success
     }
 }

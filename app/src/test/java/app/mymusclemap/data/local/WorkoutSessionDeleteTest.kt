@@ -53,6 +53,7 @@ class WorkoutSessionDeleteTest {
     private lateinit var weights: WeightRepository
     private lateinit var sessions: WorkoutSessionRepository
     private val today = LocalDate.parse("2026-09-16")
+    private var heatmapUpdates = 0
 
     @Before
     fun setUp() {
@@ -80,7 +81,8 @@ class WorkoutSessionDeleteTest {
             database.exerciseDao(),
             weights,
             clock,
-            FixedDateProvider(today)
+            FixedDateProvider(today),
+            onHeatmapDataChanged = { heatmapUpdates++ }
         )
     }
 
@@ -259,6 +261,21 @@ class WorkoutSessionDeleteTest {
         assertTrue(DeleteWorkoutResult.NotFound in results || results == setOf(DeleteWorkoutResult.Deleted))
         assertNull(sessions.getAggregate(completed))
         assertTrue(database.workoutSessionDao().observeAll().first().isEmpty())
+    }
+
+    @Test
+    fun heatmapRefreshFollowsCompletedWorkoutsOnly() = runTest {
+        val pull = savePull()
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        assertEquals(0, heatmapUpdates)
+        assertEquals(AbandonWorkoutResult.Abandoned, sessions.abandon(started.sessionId))
+        assertEquals(0, heatmapUpdates)
+
+        val completed = completeWorkout(templateId)
+        assertEquals(1, heatmapUpdates)
+        assertEquals(DeleteWorkoutResult.Deleted, sessions.deleteWorkout(completed))
+        assertEquals(2, heatmapUpdates)
     }
 
     private suspend fun completeWorkout(templateId: Long): Long {

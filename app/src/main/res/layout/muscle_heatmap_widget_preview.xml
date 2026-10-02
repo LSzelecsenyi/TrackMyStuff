@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:padding="4dp">
+
+    <ImageView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="2dp"
+        android:layout_weight="1"
+        android:contentDescription="@string/widget_heatmap_front"
+        android:scaleType="fitCenter"
+        android:src="@drawable/widget_heatmap_preview_figure" />
+
+    <ImageView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="2dp"
+        android:layout_weight="1"
+        android:contentDescription="@string/widget_heatmap_back"
+        android:scaleType="fitCenter"
+        android:src="@drawable/widget_heatmap_preview_figure" />
+</LinearLayout>

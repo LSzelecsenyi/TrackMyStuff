@@ -208,7 +208,13 @@ private fun MuscleFigure(
                 drawPath(
                     path = parsed.path,
                     color = strokeColor,
-                    style = Stroke(width = if (isSelected) 0.28f else 0.12f)
+                    style = Stroke(
+                        width = if (isSelected) {
+                            MUSCLE_MAP_SELECTED_STROKE_WIDTH
+                        } else {
+                            MUSCLE_MAP_STROKE_WIDTH
+                        }
+                    )
                 )
             }
         }
@@ -216,6 +222,8 @@ private fun MuscleFigure(
 }
 
 internal val MUSCLE_MAP_FIGURE_GAP = 12.dp
+internal const val MUSCLE_MAP_STROKE_WIDTH = 0.12f
+internal const val MUSCLE_MAP_SELECTED_STROKE_WIDTH = 0.28f
 internal val MUSCLE_MAP_ASPECT = BodyMusclesArtwork.VIEW_HEIGHT / BodyMusclesArtwork.VIEW_WIDTH
 
 internal data class MuscleMapPairLayout(

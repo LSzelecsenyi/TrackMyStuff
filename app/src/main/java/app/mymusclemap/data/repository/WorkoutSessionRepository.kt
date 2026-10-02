@@ -57,7 +57,8 @@ class WorkoutSessionRepository(
     private val exerciseDao: app.mymusclemap.data.local.ExerciseDao,
     private val weightRepository: WeightRepository,
     private val clock: Clock,
-    private val dateProvider: DateProvider
+    private val dateProvider: DateProvider,
+    private val onHeatmapDataChanged: () -> Unit = {}
 ) {
     private val mutex = Mutex()
 
@@ -275,6 +276,7 @@ class WorkoutSessionRepository(
         }
         return try {
             val ids = sessionDao.insertImportedAggregates(aggregates)
+            onHeatmapDataChanged()
             WorkoutImportPersistenceResult.Imported(
                 sessionIds = ids,
                 workoutCount = ids.size,
@@ -582,10 +584,14 @@ class WorkoutSessionRepository(
                 if (session.status == SessionStatus.IN_PROGRESS.name) {
                     return@withContext DeleteWorkoutResult.ActiveSession
                 }
+                val affectsHeatmap = session.status == SessionStatus.COMPLETED.name
                 val deleted = sessionDao.deleteSessionAggregate(sessionId)
                 if (deleted <= 0) {
                     DeleteWorkoutResult.NotFound
                 } else {
+                    if (affectsHeatmap) {
+                        onHeatmapDataChanged()
+                    }
                     DeleteWorkoutResult.Deleted
                 }
             } catch (cancelled: CancellationException) {
@@ -628,6 +634,7 @@ class WorkoutSessionRepository(
                 activeLock = SessionStatus.COMPLETED.activeLock()
             )
         )
+        onHeatmapDataChanged()
         FinishWorkoutResult.Finished
     }
 
