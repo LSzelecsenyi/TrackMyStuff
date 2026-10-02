@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +36,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -67,9 +69,11 @@ fun MonthCalendar(
     isDayEnabled: (CalendarCell) -> Boolean = { true },
     showLegend: Boolean = true,
     onCollapse: (() -> Unit)? = null,
-    onTodayBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {}
+    onTodayBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
+    streakForWeek: (LocalDate) -> Int = { 0 }
 ) {
     val locale = AppLocale.UI
+    val showStreakColumn = grid.weeks.any { week -> streakForWeek(week.first().date) > 0 }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -116,6 +120,9 @@ fun MonthCalendar(
             }
         }
         Row(modifier = Modifier.fillMaxWidth()) {
+            if (showStreakColumn) {
+                Spacer(Modifier.width(StreakColumnWidth))
+            }
             weekdayOrder().forEach { day ->
                 Text(
                     text = day.getDisplayName(TextStyle.SHORT, locale),
@@ -129,10 +136,16 @@ fun MonthCalendar(
         }
         Spacer(Modifier.height(2.dp))
         grid.weeks.forEach { week ->
+            val weekStart = week.first().date
+            val streak = streakForWeek(weekStart)
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(0.dp)
             ) {
+                if (showStreakColumn) {
+                    WeekStreakMark(streak)
+                }
                 week.forEach { cell ->
                     CalendarDayCell(
                         cell = cell,
@@ -148,6 +161,39 @@ fun MonthCalendar(
         if (showLegend) {
             Spacer(Modifier.height(AppDimens.headerStackGap))
             CalendarLegend()
+        }
+    }
+}
+
+private val StreakColumnWidth = 40.dp
+
+@Composable
+private fun WeekStreakMark(streak: Int) {
+    Box(
+        modifier = Modifier
+            .width(StreakColumnWidth)
+            .height(AppDimens.calendarCell)
+            .testTag("calendar-week-streak"),
+        contentAlignment = Alignment.Center
+    ) {
+        if (streak > 0) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.EmojiEvents,
+                    contentDescription = pluralStringResource(R.plurals.weekly_goal_streak, streak, streak),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = streak.toString(),
+                    style = AppTypeTokens.statCaption,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1
+                )
+            }
         }
     }
 }

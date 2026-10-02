@@ -37,6 +37,16 @@ abstract class WorkoutSessionDao {
 
     @Query(
         """
+        SELECT workoutDate AS date, COUNT(*) AS completedCount
+        FROM workout_sessions
+        WHERE status = 'COMPLETED'
+        GROUP BY workoutDate
+        """
+    )
+    abstract fun observeAllCompletedCounts(): Flow<List<WorkoutDateCount>>
+
+    @Query(
+        """
         SELECT * FROM workout_sessions
         WHERE workoutDate = :date
         ORDER BY startedAt DESC, id DESC

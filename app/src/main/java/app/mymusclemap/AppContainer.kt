@@ -16,6 +16,7 @@ import java.io.File
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
+import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.ContentWorkoutImportFileReader
 import app.mymusclemap.domain.DateProvider
@@ -64,6 +65,10 @@ class AppContainer(context: Context) {
         clock = clock,
         dateProvider = dateProvider
     )
+    val weeklyGoalRepository = WeeklyGoalRepository(
+        dao = database.weeklyWorkoutGoalDao(),
+        clock = clock
+    )
     val themePreferences = ThemePreferences(appContext)
     val appBackupRepository = AppBackupRepository(database, themePreferences)
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
@@ -99,6 +104,7 @@ class AppContainer(context: Context) {
         onboardingRepository = onboardingRepository,
         progressPhotoRepository = progressPhotoRepository,
         healthRepository = healthRepository,
-        featureEntitlements = featureEntitlements
+        featureEntitlements = featureEntitlements,
+        weeklyGoalRepository = weeklyGoalRepository
     )
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,6 +45,10 @@ import app.mymusclemap.domain.calendar.MonthGrid
 import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.calendar.WeekCalendar
 import app.mymusclemap.domain.locale.AppLocale
+import app.mymusclemap.domain.workout.WeekProgress
+import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import app.mymusclemap.domain.workout.WeeklyGoalRevision
+import app.mymusclemap.domain.workout.WeeklyGoalStatus
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
@@ -69,7 +75,9 @@ fun OverviewCalendar(
     onDayClick: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
     onTodayBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
-    startExpanded: Boolean = false
+    startExpanded: Boolean = false,
+    weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(today),
+    onConfigureGoal: () -> Unit = {}
 ) {
     var expanded by rememberSaveable { mutableStateOf(startExpanded) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -106,7 +114,8 @@ fun OverviewCalendar(
                 onCollapse = {
                     expanded = false
                 },
-                onTodayBounds = onTodayBounds
+                onTodayBounds = onTodayBounds,
+                streakForWeek = { weekStart -> weeklyGoal.weeks[weekStart]?.streak ?: 0 }
             )
         } else {
             WeekCalendarHeader(
@@ -122,6 +131,11 @@ fun OverviewCalendar(
                 onReturnToToday = {
                     scope.launch { pagerState.animateScrollToPage(WeekPager.Center) }
                 }
+            )
+            WeekGoalLine(
+                progress = weeklyGoal.progressOn(weekStart),
+                offerSetup = weekOffset == 0 && weeklyGoal.progressOn(weekStart).goal == null,
+                onConfigureGoal = onConfigureGoal
             )
             WeekdayLabels()
             HorizontalPager(
@@ -193,6 +207,61 @@ private fun WeekCalendarHeader(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp)
         )
+    }
+}
+
+@Composable
+private fun WeekGoalLine(
+    progress: WeekProgress,
+    offerSetup: Boolean,
+    onConfigureGoal: () -> Unit
+) {
+    val goal = progress.goal
+    if (goal == null && !offerSetup) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (goal == null) {
+            Text(
+                text = stringResource(R.string.weekly_goal_set_cta),
+                style = AppTypeTokens.statCaption,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable(onClick = onConfigureGoal)
+                    .testTag("overview-weekly-goal")
+            )
+        } else {
+            Text(
+                text = stringResource(R.string.weekly_goal_progress, progress.completed, goal),
+                style = AppTypeTokens.statCaption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("overview-weekly-goal")
+            )
+            if (progress.streak > 0) {
+                Icon(
+                    imageVector = Icons.Filled.EmojiEvents,
+                    contentDescription = pluralStringResource(
+                        R.plurals.weekly_goal_streak,
+                        progress.streak,
+                        progress.streak
+                    ),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .size(14.dp)
+                        .testTag("overview-weekly-streak")
+                )
+                Text(
+                    text = progress.streak.toString(),
+                    style = AppTypeTokens.statCaption,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 2.dp)
+                )
+            }
+        }
     }
 }
 
@@ -278,12 +347,74 @@ private fun ExpandedMonthPreview() {
     )
 }
 
+@Preview(showBackground = true, name = "Goal incomplete")
+@Composable
+private fun IncompleteGoalPreview() {
+    val today = LocalDate.of(2026, 10, 1)
+    CalendarPreview(
+        today = today,
+        completed = mapOf(LocalDate.of(2026, 9, 29) to 1, LocalDate.of(2026, 9, 30) to 1),
+        weeklyGoal = goalStatus(today, 4, mapOf(LocalDate.of(2026, 9, 29) to 1, LocalDate.of(2026, 9, 30) to 1))
+    )
+}
+
+@Preview(showBackground = true, name = "Goal reached")
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "Goal reached dark")
+@Composable
+private fun ReachedGoalPreview() {
+    val today = LocalDate.of(2026, 10, 1)
+    val completed = mapOf(
+        LocalDate.of(2026, 9, 21) to 1,
+        LocalDate.of(2026, 9, 23) to 1,
+        LocalDate.of(2026, 9, 25) to 1,
+        LocalDate.of(2026, 9, 28) to 1,
+        LocalDate.of(2026, 9, 29) to 1,
+        LocalDate.of(2026, 9, 30) to 1,
+        LocalDate.of(2026, 10, 1) to 1
+    )
+    CalendarPreview(
+        today = today,
+        completed = completed,
+        planned = mapOf(LocalDate.of(2026, 10, 1) to 1),
+        weeklyGoal = goalStatus(today, 3, completed)
+    )
+}
+
+@Preview(showBackground = true, name = "Month streaks")
+@Composable
+private fun ExpandedStreakPreview() {
+    val today = LocalDate.of(2026, 10, 1)
+    val completed = (0..4).associate { offset ->
+        LocalDate.of(2026, 9, 7).plusWeeks(offset.toLong()) to 1
+    } + (LocalDate.of(2026, 10, 1) to 1)
+    CalendarPreview(
+        today = today,
+        completed = completed,
+        expanded = true,
+        weeklyGoal = goalStatus(today, 1, completed, LocalDate.of(2026, 9, 7))
+    )
+}
+
+private fun goalStatus(
+    today: LocalDate,
+    goal: Int,
+    completed: Map<LocalDate, Int>,
+    effective: LocalDate = LocalDate.of(2026, 9, 7)
+): WeeklyGoalStatus {
+    return WeeklyGoalLogic.evaluate(
+        listOf(WeeklyGoalRevision(WeekCalendar.start(effective), goal, graceWeek = false)),
+        completed,
+        today
+    )
+}
+
 @Composable
 private fun CalendarPreview(
     today: LocalDate,
     completed: Map<LocalDate, Int> = emptyMap(),
     planned: Map<LocalDate, Int> = emptyMap(),
-    expanded: Boolean = false
+    expanded: Boolean = false,
+    weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(today)
 ) {
     val month = YearMonth.from(today)
     WeightTrackerTheme {
@@ -302,7 +433,8 @@ private fun CalendarPreview(
             onPreviousMonth = {},
             onNextMonth = {},
             onDayClick = {},
-            startExpanded = expanded
+            startExpanded = expanded,
+            weeklyGoal = weeklyGoal
         )
     }
 }

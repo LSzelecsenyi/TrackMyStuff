@@ -8,6 +8,10 @@
         <item quantity="one">%d planned workout</item>
         <item quantity="other">%d planned workouts</item>
     </plurals>
+    <plurals name="weekly_goal_streak">
+        <item quantity="one">%d week streak</item>
+        <item quantity="other">%d week streak</item>
+    </plurals>
     <plurals name="weekly_overview_workouts">
         <item quantity="one">%d workout</item>
         <item quantity="other">%d workouts</item>

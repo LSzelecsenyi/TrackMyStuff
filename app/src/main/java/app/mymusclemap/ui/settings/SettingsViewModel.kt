@@ -8,6 +8,7 @@ import app.mymusclemap.data.appbackup.AppBackupRestoreResult
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
+import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.csv.WeightCsv
@@ -20,13 +21,17 @@ import app.mymusclemap.domain.theme.PaletteSaveResult
 import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.domain.theme.ThemeMode
+import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import app.mymusclemap.domain.workout.WeeklyGoalStatus
 import app.mymusclemap.ui.components.UserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import java.time.LocalDate
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
@@ -39,7 +44,8 @@ data class SettingsUiState(
     val restoreErrors: List<AppBackupError> = emptyList(),
     val userMessage: UserMessage? = null,
     val appVersionName: String = "",
-    val privacyPolicyUrl: String? = null
+    val privacyPolicyUrl: String? = null,
+    val weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(LocalDate.of(1970, 1, 1))
 ) {
     val customEditorVisible: Boolean get() = draft != null
 }
@@ -60,6 +66,7 @@ class SettingsViewModel(
     private val themePreferences: ThemePreferences,
     private val dateProvider: DateProvider,
     private val appBackupRepository: AppBackupRepository,
+    private val weeklyGoalRepository: WeeklyGoalRepository? = null,
     private val appVersionName: String = BuildConfig.VERSION_NAME,
     private val privacyPolicyUrl: String? = AboutConfig.privacyPolicyUrl
 ) : ViewModel() {
@@ -80,13 +87,22 @@ class SettingsViewModel(
         BackupChrome(explanation, errors)
     }
 
+    private val weeklyGoalStatus = if (weeklyGoalRepository == null) {
+        dateProvider.observeToday().map { WeeklyGoalStatus.none(it) }
+    } else {
+        combine(weeklyGoalRepository.observe(), dateProvider.observeToday()) { history, today ->
+            WeeklyGoalLogic.evaluate(history, emptyMap(), today)
+        }
+    }
+
     val uiState: StateFlow<SettingsUiState> = combine(
         chrome,
         showImportExplanation,
         importErrors,
         userMessage,
-        backupChrome
-    ) { chromeState, explanation, errors, message, backup ->
+        combine(backupChrome, weeklyGoalStatus) { backup, goal -> backup to goal }
+    ) { chromeState, explanation, errors, message, backupAndGoal ->
+        val (backup, goal) = backupAndGoal
         SettingsUiState(
             appearance = chromeState.appearance,
             draft = chromeState.draft,
@@ -97,7 +113,8 @@ class SettingsViewModel(
             restoreErrors = backup.restoreErrors,
             userMessage = message,
             appVersionName = appVersionName,
-            privacyPolicyUrl = privacyPolicyUrl
+            privacyPolicyUrl = privacyPolicyUrl,
+            weeklyGoal = goal
         )
     }.stateIn(
         scope = viewModelScope,
@@ -107,6 +124,20 @@ class SettingsViewModel(
             privacyPolicyUrl = privacyPolicyUrl
         )
     )
+
+    fun setWeeklyGoal(workoutsPerWeek: Int) {
+        val repository = weeklyGoalRepository ?: return
+        viewModelScope.launch {
+            repository.setGoal(dateProvider.today(), workoutsPerWeek)
+        }
+    }
+
+    fun disableWeeklyGoal() {
+        val repository = weeklyGoalRepository ?: return
+        viewModelScope.launch {
+            repository.disable(dateProvider.today())
+        }
+    }
 
     init {
         viewModelScope.launch {

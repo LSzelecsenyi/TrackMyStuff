@@ -15,6 +15,7 @@ import app.mymusclemap.data.local.WorkoutSessionEntity
 import app.mymusclemap.data.local.WorkoutSessionExerciseEntity
 import app.mymusclemap.data.local.WorkoutSessionExerciseMuscleEntity
 import app.mymusclemap.data.local.WorkoutSessionSetEntity
+import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.local.WorkoutTemplateEntity
 import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
@@ -39,6 +40,9 @@ import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.TemplateNaming
+import app.mymusclemap.domain.workout.WeekVerdict
+import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import app.mymusclemap.domain.workout.WeeklyGoalRevision
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
 import java.io.File
 import java.time.DayOfWeek
@@ -51,7 +55,7 @@ import kotlin.math.round
 import kotlin.math.sin
 
 /**
- * Development-only generator for an importable schema 7 backup.
+ * Development-only generator for an importable app backup.
  *
  * It builds [AppBackupSnapshot] rows from the starter catalog and the same
  * entity model the app exports, then encodes them with [AppBackupJson]. Nothing
@@ -61,7 +65,7 @@ import kotlin.math.sin
  * always use [referenceDate] and ignore Gradle properties. Regenerate the file
  * from the repository root. Quote each `-P` on PowerShell:
  *
- * `gradlew.bat :app:testDebugUnitTest --tests app.mymusclemap.dev.DemoTrainingHistoryTest.writesDemoBackupFileWhenRequested "-Pdemo.backup.write=true" "-Pdemo.referenceDate=2026-09-27"`
+ * `gradlew.bat :app:testDebugUnitTest --tests app.mymusclemap.dev.DemoTrainingHistoryTest.writesDemoBackupFileWhenRequested "-Pdemo.backup.write=true" "-Pdemo.referenceDate=2026-10-02"`
  *
  * Omit `-Pdemo.referenceDate` to write the fixed [referenceDate] dataset.
  * Restore that file yourself through Settings. This generator does not seed the app.
@@ -119,7 +123,11 @@ object DemoTrainingHistoryGenerator {
         val weights = buildWeights(calendar)
         val bodyMeasurements = buildBodyMeasurements(calendar)
         val outcomes = assignOutcomes(buildSlots(calendar), calendar)
-        val training = buildTraining(outcomes, calendar, catalog, templates, weights)
+        val training = shapeWeeklyGoalScenario(
+            buildTraining(outcomes, calendar, catalog, templates, weights),
+            calendar,
+            templates
+        )
         val snapshot = AppBackupSnapshot(
             formatVersion = AppBackupFormat.FORMAT_VERSION,
             schemaVersion = AppBackupFormat.SCHEMA_VERSION,
@@ -142,7 +150,8 @@ object DemoTrainingHistoryGenerator {
                 workoutSessionExerciseMuscles = training.sessionMuscles
                     .sortedWith(compareBy({ it.sessionExerciseId }, { it.muscleGroup })),
                 workoutSessionSets = training.sessionSets.sortedBy { it.id },
-                bodyMeasurements = bodyMeasurements.sortedBy { it.id }
+                bodyMeasurements = bodyMeasurements.sortedBy { it.id },
+                weeklyWorkoutGoals = training.goals.sortedBy { it.effectiveWeekStart }
             ),
             settings = AppearanceCodec.encode(AppearanceSettings.Default)
         )
@@ -654,6 +663,411 @@ object DemoTrainingHistoryGenerator {
         val step = ((date.toEpochDay() % 5) - 2) * (shape.noise / 4.0)
         val raw = shape.start + (shape.end - shape.start) * t + wobble + step
         return BodyMeasurementParser.quantize(raw.coerceIn(shape.type.minimum, shape.type.maximum))
+    }
+
+    /**
+     * The last seven weeks, measured from [DemoCalendar.referenceDate], are real
+     * completed sessions and real schedules. The streak is not written down.
+     *
+     * Week offsets are Mondays: -6 success, -5 success, -4 success, -3 success,
+     * -2 miss, -1 success, and the current week 2 completed plus 2 still planned.
+     */
+    private fun shapeWeeklyGoalScenario(
+        training: TrainingRows,
+        calendar: DemoCalendar,
+        templates: TemplateBundle
+    ): TrainingRows {
+        val sessions = training.sessions.toMutableList()
+        val exercises = training.sessionExercises.toMutableList()
+        val muscles = training.sessionMuscles.toMutableList()
+        val sets = training.sessionSets.toMutableList()
+        val scheduled = training.scheduled.toMutableList()
+        var nextSessionId = (sessions.maxOfOrNull { it.id } ?: 0L) + 1L
+        var nextExerciseId = (exercises.maxOfOrNull { it.id } ?: 0L) + 1L
+        var nextSetId = (sets.maxOfOrNull { it.id } ?: 0L) + 1L
+        var nextScheduleId = (scheduled.maxOfOrNull { it.id } ?: 0L) + 1L
+        val currentMonday = calendar.referenceDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val historicalTargets = listOf(-6 to 4, -5 to 5, -4 to 4, -3 to 4, -2 to 2, -1 to 4)
+        historicalTargets.forEach { (offset, target) ->
+            val weekStart = currentMonday.plusWeeks(offset.toLong())
+            shapeCompletedCount(
+                weekStart = weekStart,
+                target = target,
+                mustInclude = null,
+                calendar = calendar,
+                sessions = sessions,
+                exercises = exercises,
+                muscles = muscles,
+                sets = sets,
+                scheduled = scheduled,
+                nextSessionId = { nextSessionId++ },
+                nextExerciseId = { nextExerciseId++ },
+                nextSetId = { nextSetId++ }
+            )
+            cancelOpenPlans(weekStart, sessions, scheduled, calendar)
+        }
+        shapeCompletedCount(
+            weekStart = currentMonday,
+            target = 2,
+            mustInclude = calendar.referenceDate,
+            calendar = calendar,
+            sessions = sessions,
+            exercises = exercises,
+            muscles = muscles,
+            sets = sets,
+            scheduled = scheduled,
+            nextSessionId = { nextSessionId++ },
+            nextExerciseId = { nextExerciseId++ },
+            nextSetId = { nextSetId++ }
+        )
+        addAbandonedSample(
+            weekStart = currentMonday.plusWeeks(-2),
+            calendar = calendar,
+            sessions = sessions,
+            exercises = exercises,
+            muscles = muscles,
+            sets = sets,
+            nextSessionId = { nextSessionId++ },
+            nextExerciseId = { nextExerciseId++ },
+            nextSetId = { nextSetId++ }
+        )
+        shapePlannedCount(
+            weekStart = currentMonday,
+            target = 2,
+            calendar = calendar,
+            templates = templates,
+            sessions = sessions,
+            scheduled = scheduled,
+            nextScheduleId = { nextScheduleId++ }
+        )
+        val goalMonday = currentMonday.plusWeeks(-6)
+        val createdAt = epoch(goalMonday, 8)
+        val goals = listOf(
+            WeeklyWorkoutGoalEntity(
+                id = 1,
+                effectiveWeekStart = goalMonday.toString(),
+                workoutsPerWeek = 4,
+                graceWeek = false,
+                createdAt = createdAt,
+                updatedAt = createdAt
+            )
+        )
+        val counts = sessions
+            .filter { it.status == SessionStatus.COMPLETED.name }
+            .groupingBy { LocalDate.parse(it.workoutDate) }
+            .eachCount()
+        val status = WeeklyGoalLogic.evaluate(
+            goals.map { row ->
+                WeeklyGoalRevision(
+                    effectiveWeekStart = LocalDate.parse(row.effectiveWeekStart),
+                    workoutsPerWeek = row.workoutsPerWeek,
+                    graceWeek = row.graceWeek
+                )
+            },
+            counts,
+            calendar.referenceDate
+        )
+        check(status.current.goal == 4 && status.current.completed == 2 && status.current.streak == 1) {
+            "Current week should be 2/4 with streak 1, was ${status.current}"
+        }
+        check(status.current.verdict == WeekVerdict.InProgress)
+        historicalTargets.forEach { (offset, target) ->
+            val week = status.progressOn(currentMonday.plusWeeks(offset.toLong()))
+            check(week.completed == target) { "Week $offset completed ${week.completed}, expected $target" }
+        }
+        check(status.progressOn(currentMonday.plusWeeks(-6)).streak == 1)
+        check(status.progressOn(currentMonday.plusWeeks(-5)).streak == 2)
+        check(status.progressOn(currentMonday.plusWeeks(-4)).streak == 3)
+        check(status.progressOn(currentMonday.plusWeeks(-3)).streak == 4)
+        check(status.progressOn(currentMonday.plusWeeks(-2)).verdict == WeekVerdict.Missed)
+        check(status.progressOn(currentMonday.plusWeeks(-2)).streak == 0)
+        check(status.progressOn(currentMonday.plusWeeks(-1)).streak == 1)
+        return training.copy(
+            scheduled = scheduled,
+            sessions = sessions,
+            sessionExercises = exercises,
+            sessionMuscles = muscles,
+            sessionSets = sets,
+            goals = goals
+        )
+    }
+
+    private fun shapeCompletedCount(
+        weekStart: LocalDate,
+        target: Int,
+        mustInclude: LocalDate?,
+        calendar: DemoCalendar,
+        sessions: MutableList<WorkoutSessionEntity>,
+        exercises: MutableList<WorkoutSessionExerciseEntity>,
+        muscles: MutableList<WorkoutSessionExerciseMuscleEntity>,
+        sets: MutableList<WorkoutSessionSetEntity>,
+        scheduled: MutableList<ScheduledWorkoutEntity>,
+        nextSessionId: () -> Long,
+        nextExerciseId: () -> Long,
+        nextSetId: () -> Long
+    ) {
+        val weekEnd = weekStart.plusDays(6)
+        fun inWeek(date: LocalDate) = !date.isBefore(weekStart) && !date.isAfter(weekEnd)
+        fun completedInWeek() = sessions.filter {
+            it.status == SessionStatus.COMPLETED.name && inWeek(LocalDate.parse(it.workoutDate))
+        }
+        val chosen = linkedSetOf<Long>()
+        val byDate = completedInWeek().groupBy { LocalDate.parse(it.workoutDate) }
+        if (mustInclude != null) {
+            byDate[mustInclude].orEmpty().minByOrNull { it.id }?.let { chosen += it.id }
+        }
+        val eligibleDays = (0L..6L).map { weekStart.plusDays(it) }
+            .filter { !it.isAfter(calendar.referenceDate) }
+        for (date in eligibleDays) {
+            if (chosen.size == target) break
+            byDate[date].orEmpty().filter { it.id !in chosen }.minByOrNull { it.id }?.let { chosen += it.id }
+        }
+        for (date in eligibleDays) {
+            if (chosen.size == target) break
+            byDate[date].orEmpty().filter { it.id !in chosen }.forEach { extra ->
+                if (chosen.size < target) chosen += extra.id
+            }
+        }
+        completedInWeek().filter { it.id !in chosen }.forEach { extra ->
+            dropCompletedSession(extra, sessions, exercises, muscles, sets, scheduled, calendar)
+        }
+        if (mustInclude != null && completedInWeek().none { LocalDate.parse(it.workoutDate) == mustInclude }) {
+            val source = sessions.first { it.status == SessionStatus.COMPLETED.name }
+            addCopiedSession(
+                source = source,
+                date = mustInclude,
+                status = SessionStatus.COMPLETED,
+                sessions = sessions,
+                exercises = exercises,
+                muscles = muscles,
+                sets = sets,
+                nextSessionId = nextSessionId,
+                nextExerciseId = nextExerciseId,
+                nextSetId = nextSetId
+            )
+        }
+        while (completedInWeek().size > target) {
+            val extra = completedInWeek().first { LocalDate.parse(it.workoutDate) != mustInclude }
+            dropCompletedSession(extra, sessions, exercises, muscles, sets, scheduled, calendar)
+        }
+        while (completedInWeek().size < target) {
+            val occupied = completedInWeek().map { LocalDate.parse(it.workoutDate) }.toSet()
+            val date = eligibleDays.firstOrNull { it !in occupied } ?: eligibleDays.first()
+            val source = sessions.first { it.status == SessionStatus.COMPLETED.name }
+            addCopiedSession(
+                source = source,
+                date = date,
+                status = SessionStatus.COMPLETED,
+                sessions = sessions,
+                exercises = exercises,
+                muscles = muscles,
+                sets = sets,
+                nextSessionId = nextSessionId,
+                nextExerciseId = nextExerciseId,
+                nextSetId = nextSetId
+            )
+        }
+    }
+
+    private fun addAbandonedSample(
+        weekStart: LocalDate,
+        calendar: DemoCalendar,
+        sessions: MutableList<WorkoutSessionEntity>,
+        exercises: MutableList<WorkoutSessionExerciseEntity>,
+        muscles: MutableList<WorkoutSessionExerciseMuscleEntity>,
+        sets: MutableList<WorkoutSessionSetEntity>,
+        nextSessionId: () -> Long,
+        nextExerciseId: () -> Long,
+        nextSetId: () -> Long
+    ) {
+        val date = (0L..6L).map { weekStart.plusDays(it) }
+            .last { !it.isAfter(calendar.referenceDate) }
+        val source = sessions.first { it.status == SessionStatus.COMPLETED.name }
+        addCopiedSession(
+            source = source,
+            date = date,
+            status = SessionStatus.ABANDONED,
+            sessions = sessions,
+            exercises = exercises,
+            muscles = muscles,
+            sets = sets,
+            nextSessionId = nextSessionId,
+            nextExerciseId = nextExerciseId,
+            nextSetId = nextSetId
+        )
+    }
+
+    private fun cancelOpenPlans(
+        weekStart: LocalDate,
+        sessions: List<WorkoutSessionEntity>,
+        scheduled: MutableList<ScheduledWorkoutEntity>,
+        calendar: DemoCalendar
+    ) {
+        val weekEnd = weekStart.plusDays(6)
+        val completedScheduleIds = sessions
+            .filter { it.status == SessionStatus.COMPLETED.name }
+            .mapNotNull { it.scheduledWorkoutId }
+            .toSet()
+        scheduled.indices.forEach { index ->
+            val row = scheduled[index]
+            val date = LocalDate.parse(row.scheduledDate)
+            if (row.cancelledAt == null &&
+                !date.isBefore(weekStart) &&
+                !date.isAfter(weekEnd) &&
+                row.id !in completedScheduleIds
+            ) {
+                scheduled[index] = row.copy(cancelledAt = epoch(calendar.referenceDate, 21))
+            }
+        }
+    }
+
+    private fun shapePlannedCount(
+        weekStart: LocalDate,
+        target: Int,
+        calendar: DemoCalendar,
+        templates: TemplateBundle,
+        sessions: List<WorkoutSessionEntity>,
+        scheduled: MutableList<ScheduledWorkoutEntity>,
+        nextScheduleId: () -> Long
+    ) {
+        val weekEnd = weekStart.plusDays(6)
+        val completedScheduleIds = sessions
+            .filter { it.status == SessionStatus.COMPLETED.name }
+            .mapNotNull { it.scheduledWorkoutId }
+            .toSet()
+        fun isOpen(row: ScheduledWorkoutEntity): Boolean {
+            val date = LocalDate.parse(row.scheduledDate)
+            return row.cancelledAt == null &&
+                !date.isBefore(weekStart) &&
+                !date.isAfter(weekEnd) &&
+                row.id !in completedScheduleIds
+        }
+        val openIndexes = scheduled.indices.filter { isOpen(scheduled[it]) }
+        val ranked = openIndexes.sortedWith(
+            compareBy<Int> { index ->
+                val date = LocalDate.parse(scheduled[index].scheduledDate)
+                if (date.isAfter(calendar.referenceDate)) 0 else 1
+            }.thenBy { index -> scheduled[index].scheduledDate }
+        )
+        val distinctDays = ranked.distinctBy { scheduled[it].scheduledDate }
+        val keep = (if (distinctDays.size >= target) distinctDays.take(target) else ranked.take(target)).toSet()
+        ranked.filter { it !in keep }.forEach { index ->
+            val row = scheduled[index]
+            scheduled[index] = row.copy(cancelledAt = epoch(LocalDate.parse(row.scheduledDate), 21))
+        }
+        var missing = target - keep.size
+        val usedDates = keep.map { LocalDate.parse(scheduled[it].scheduledDate) }.toMutableSet()
+        val completedDates = sessions
+            .filter {
+                it.status == SessionStatus.COMPLETED.name &&
+                    !LocalDate.parse(it.workoutDate).isBefore(weekStart) &&
+                    !LocalDate.parse(it.workoutDate).isAfter(weekEnd)
+            }
+            .map { LocalDate.parse(it.workoutDate) }
+            .toSet()
+        val candidates = (0L..6L).map { weekStart.plusDays(it) }.sortedBy { date ->
+            when {
+                date.isAfter(calendar.referenceDate) -> 0
+                date !in completedDates -> 1
+                else -> 2
+            }
+        }
+        for (date in candidates) {
+            if (missing == 0) break
+            if (date in usedDates) continue
+            val template = templates.ids.entries.firstOrNull { (_, templateId) ->
+                scheduled.none {
+                    it.cancelledAt == null &&
+                        it.scheduledDate == date.toString() &&
+                        it.templateId == templateId
+                }
+            } ?: continue
+            scheduled += ScheduledWorkoutEntity(
+                id = nextScheduleId(),
+                scheduledDate = date.toString(),
+                originalScheduledDate = date.toString(),
+                templateId = template.value,
+                templateName = templateName(template.key),
+                createdAt = epoch(calendar.referenceDate, 8),
+                cancelledAt = null
+            )
+            usedDates += date
+            missing -= 1
+        }
+        check(missing == 0) { "Could not place $target planned workouts in the current week" }
+    }
+
+    private fun dropCompletedSession(
+        session: WorkoutSessionEntity,
+        sessions: MutableList<WorkoutSessionEntity>,
+        exercises: MutableList<WorkoutSessionExerciseEntity>,
+        muscles: MutableList<WorkoutSessionExerciseMuscleEntity>,
+        sets: MutableList<WorkoutSessionSetEntity>,
+        scheduled: MutableList<ScheduledWorkoutEntity>,
+        calendar: DemoCalendar
+    ) {
+        val exerciseIds = exercises.filter { it.sessionId == session.id }.map { it.id }.toSet()
+        sets.removeAll { it.sessionExerciseId in exerciseIds }
+        muscles.removeAll { it.sessionExerciseId in exerciseIds }
+        exercises.removeAll { it.sessionId == session.id }
+        sessions.removeAll { it.id == session.id }
+        val scheduleId = session.scheduledWorkoutId ?: return
+        val index = scheduled.indexOfFirst { it.id == scheduleId }
+        if (index >= 0 && scheduled[index].cancelledAt == null) {
+            scheduled[index] = scheduled[index].copy(cancelledAt = epoch(calendar.referenceDate, 21))
+        }
+    }
+
+    private fun addCopiedSession(
+        source: WorkoutSessionEntity,
+        date: LocalDate,
+        status: SessionStatus,
+        sessions: MutableList<WorkoutSessionEntity>,
+        exercises: MutableList<WorkoutSessionExerciseEntity>,
+        muscles: MutableList<WorkoutSessionExerciseMuscleEntity>,
+        sets: MutableList<WorkoutSessionSetEntity>,
+        nextSessionId: () -> Long,
+        nextExerciseId: () -> Long,
+        nextSetId: () -> Long
+    ) {
+        val sessionId = nextSessionId()
+        val startedAt = epoch(date, WORKOUT_START_HOUR)
+        val endedAt = startedAt + 45L * 60_000L
+        sessions += source.copy(
+            id = sessionId,
+            status = status.name,
+            workoutDate = date.toString(),
+            startedAt = startedAt,
+            finishedAt = if (status == SessionStatus.COMPLETED) endedAt else null,
+            abandonedAt = if (status == SessionStatus.ABANDONED) endedAt else null,
+            notes = if (status == SessionStatus.ABANDONED) "Abandoned" else source.notes,
+            createdAt = endedAt,
+            updatedAt = endedAt,
+            activeLock = null,
+            importFingerprint = null,
+            scheduledWorkoutId = null
+        )
+        val copiedExercises = exercises.filter { it.sessionId == source.id }
+        copiedExercises.forEach { exercise ->
+            val exerciseId = nextExerciseId()
+            val copiedSets = sets.filter { it.sessionExerciseId == exercise.id }
+            exercises += exercise.copy(id = exerciseId, sessionId = sessionId)
+            muscles += muscles.filter { it.sessionExerciseId == exercise.id }.map { muscle ->
+                muscle.copy(sessionExerciseId = exerciseId)
+            }
+            sets += copiedSets.map { set ->
+                set.copy(
+                    id = nextSetId(),
+                    sessionExerciseId = exerciseId,
+                    status = if (status == SessionStatus.ABANDONED) {
+                        SessionSetStatus.PENDING.name
+                    } else {
+                        set.status
+                    },
+                    completedAt = if (status == SessionStatus.COMPLETED) endedAt else null
+                )
+            }
+        }
     }
 
     private fun buildSlots(calendar: DemoCalendar): List<PlannedSlot> {
@@ -1418,7 +1832,8 @@ object DemoTrainingHistoryGenerator {
         val sessions: List<WorkoutSessionEntity>,
         val sessionExercises: List<WorkoutSessionExerciseEntity>,
         val sessionMuscles: List<WorkoutSessionExerciseMuscleEntity>,
-        val sessionSets: List<WorkoutSessionSetEntity>
+        val sessionSets: List<WorkoutSessionSetEntity>,
+        val goals: List<WeeklyWorkoutGoalEntity> = emptyList()
     )
 
     private data class LoadProfile(

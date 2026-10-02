@@ -527,3 +527,23 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `weekly_workout_goals` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `effectiveWeekStart` TEXT NOT NULL,
+                `workoutsPerWeek` INTEGER,
+                `graceWeek` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_weekly_workout_goals_effectiveWeekStart` ON `weekly_workout_goals` (`effectiveWeekStart`)"
+        )
+    }
+}
+

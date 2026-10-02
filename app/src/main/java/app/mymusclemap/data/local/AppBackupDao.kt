@@ -81,6 +81,12 @@ abstract class AppBackupDao {
     @Query("DELETE FROM body_measurements")
     abstract suspend fun deleteBodyMeasurements()
 
+    @Query("SELECT * FROM weekly_workout_goals ORDER BY effectiveWeekStart ASC, id ASC")
+    abstract suspend fun getWeeklyWorkoutGoals(): List<WeeklyWorkoutGoalEntity>
+
+    @Query("DELETE FROM weekly_workout_goals")
+    abstract suspend fun deleteWeeklyWorkoutGoals()
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertWeightMeasurements(rows: List<WeightMeasurementEntity>)
 
@@ -117,6 +123,9 @@ abstract class AppBackupDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertWorkoutSessionSets(rows: List<WorkoutSessionSetEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertWeeklyWorkoutGoals(rows: List<WeeklyWorkoutGoalEntity>)
+
     @Transaction
     open suspend fun loadTables(): AppBackupTables {
         return AppBackupTables(
@@ -131,7 +140,8 @@ abstract class AppBackupDao {
             workoutSessionExercises = getWorkoutSessionExercises(),
             workoutSessionExerciseMuscles = getWorkoutSessionExerciseMuscles(),
             workoutSessionSets = getWorkoutSessionSets(),
-            bodyMeasurements = getBodyMeasurements()
+            bodyMeasurements = getBodyMeasurements(),
+            weeklyWorkoutGoals = getWeeklyWorkoutGoals()
         )
     }
 
@@ -148,6 +158,7 @@ abstract class AppBackupDao {
         deleteExerciseMuscles()
         deleteExercises()
         deleteBodyMeasurements()
+        deleteWeeklyWorkoutGoals()
         deleteWeightMeasurements()
         if (tables.weightMeasurements.isNotEmpty()) {
             insertWeightMeasurements(tables.weightMeasurements)
@@ -184,6 +195,9 @@ abstract class AppBackupDao {
         }
         if (tables.workoutSessionSets.isNotEmpty()) {
             insertWorkoutSessionSets(tables.workoutSessionSets)
+        }
+        if (tables.weeklyWorkoutGoals.isNotEmpty()) {
+            insertWeeklyWorkoutGoals(tables.weeklyWorkoutGoals)
         }
     }
 }

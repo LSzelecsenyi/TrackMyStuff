@@ -6,6 +6,7 @@ import app.mymusclemap.data.repository.OnboardingRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
+import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.DashboardAssembler
 import app.mymusclemap.domain.DashboardSnapshot
@@ -37,6 +38,8 @@ import app.mymusclemap.domain.workout.ScheduledWorkoutUiLogic
 import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.workout.TemplateListItem
 import app.mymusclemap.domain.workout.UnscheduleWorkoutResult
+import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import app.mymusclemap.domain.workout.WeeklyGoalStatus
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
 import app.mymusclemap.ui.components.EditorUiState
 import app.mymusclemap.ui.components.UserMessage
@@ -48,6 +51,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -91,7 +95,8 @@ data class DashboardUiState(
     val onboardingWeightInput: String = "",
     val onboardingWeightError: WeightParseError? = null,
     val openWeightDetailsForOnboarding: Boolean = false,
-    val lockedFeature: AppFeature? = null
+    val lockedFeature: AppFeature? = null,
+    val weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(LocalDate.of(1970, 1, 1))
 )
 
 private data class DashboardChrome(
@@ -146,7 +151,8 @@ class DashboardViewModel(
     private val scheduledWorkoutRepository: ScheduledWorkoutRepository,
     private val templateRepository: WorkoutTemplateRepository,
     private val onboardingRepository: OnboardingRepository? = null,
-    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
+    private val weeklyGoalRepository: WeeklyGoalRepository? = null
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
     private val editor = MutableStateFlow<EditorUiState?>(null)
@@ -168,6 +174,17 @@ class DashboardViewModel(
     private val onboardingWeightError = MutableStateFlow<WeightParseError?>(null)
     private val openWeightDetailsForOnboarding = MutableStateFlow(false)
     private val onboardingGuide = onboardingRepository?.observe() ?: flowOf(OnboardingGuide.Inactive)
+    private val weeklyGoalStatus = if (weeklyGoalRepository == null) {
+        dateProvider.observeToday().map { WeeklyGoalStatus.none(it) }
+    } else {
+        combine(
+            weeklyGoalRepository.observe(),
+            sessionRepository.observeAllCompletedCounts(),
+            dateProvider.observeToday()
+        ) { history, counts, today ->
+            WeeklyGoalLogic.evaluate(history, counts, today)
+        }
+    }
 
     private val chrome = combine(
         chartRange,
@@ -314,8 +331,9 @@ class DashboardViewModel(
         },
         sessionRepository.observeHeatmapExercises(),
         dialogs,
-        onboardingChrome
-    ) { state, exercises, dialogState, onboardingState ->
+        onboardingChrome,
+        weeklyGoalStatus
+    ) { state, exercises, dialogState, onboardingState, goal ->
         state.copy(
             heatmap = MuscleHeatmapAssembler.assemble(exercises, state.today),
             schedulePickerVisible = dialogState.pickerVisible,
@@ -329,7 +347,8 @@ class DashboardViewModel(
             onboarding = onboardingState.guide,
             onboardingWeightInput = onboardingState.weightInput,
             onboardingWeightError = onboardingState.weightError,
-            openWeightDetailsForOnboarding = onboardingState.openWeightDetails
+            openWeightDetailsForOnboarding = onboardingState.openWeightDetails,
+            weeklyGoal = goal
         )
     }.stateIn(
         scope = viewModelScope,
@@ -361,6 +380,20 @@ class DashboardViewModel(
 
     fun onNextMonth() {
         displayedMonth.value = displayedMonth.value.plusMonths(1)
+    }
+
+    fun setWeeklyGoal(workoutsPerWeek: Int) {
+        val repository = weeklyGoalRepository ?: return
+        viewModelScope.launch {
+            repository.setGoal(dateProvider.today(), workoutsPerWeek)
+        }
+    }
+
+    fun disableWeeklyGoal() {
+        val repository = weeklyGoalRepository ?: return
+        viewModelScope.launch {
+            repository.disable(dateProvider.today())
+        }
     }
 
     fun showMonth(month: YearMonth) {

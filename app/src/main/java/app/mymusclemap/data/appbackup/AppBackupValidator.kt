@@ -1,5 +1,6 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MovementPattern
@@ -11,6 +12,8 @@ import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
+import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import java.time.DayOfWeek
 import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -36,6 +39,15 @@ object AppBackupValidator {
             "body_measurements.source_externalId",
             errors
         )
+        requireUnique(tables.weeklyWorkoutGoals.map { it.id }, "weekly_workout_goals.id", errors)
+        requireUnique(
+            tables.weeklyWorkoutGoals.map { it.effectiveWeekStart },
+            "weekly_workout_goals.effectiveWeekStart",
+            errors
+        )
+        tables.weeklyWorkoutGoals.forEach { row ->
+            validateWeeklyGoal(row, errors)
+        }
         requireUnique(tables.exercises.map { it.id }, "exercises.id", errors)
         requireUnique(tables.exercises.map { it.normalizedName }, "exercises.normalizedName", errors)
         requireUnique(
@@ -281,6 +293,20 @@ object AppBackupValidator {
             }
         }
         return errors.distinct()
+    }
+
+    private fun validateWeeklyGoal(row: WeeklyWorkoutGoalEntity, errors: MutableList<AppBackupError>) {
+        val date = runCatching { LocalDate.parse(row.effectiveWeekStart) }.getOrNull()
+        if (date == null || date.dayOfWeek != DayOfWeek.MONDAY) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidValue, "weekly_workout_goals.effectiveWeekStart")
+        }
+        val workouts = row.workoutsPerWeek
+        if (workouts != null && workouts !in WeeklyGoalLogic.MIN_GOAL..WeeklyGoalLogic.MAX_GOAL) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidValue, "weekly_workout_goals.workoutsPerWeek")
+        }
+        if (workouts == null && row.graceWeek) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidValue, "weekly_workout_goals.graceWeek")
+        }
     }
 
     private fun requireIsoDate(value: String, field: String, errors: MutableList<AppBackupError>) {

@@ -201,7 +201,9 @@ class OnboardingNavigationTest {
                             step = step,
                             onContinue = onboardingViewModel::onContinue,
                             onCreatePlan = onboardingViewModel::onCreatePlan,
-                            onSkip = onboardingViewModel::onSkip
+                            onSkip = onboardingViewModel::onSkip,
+                            onSetWeeklyGoal = onboardingViewModel::onWeeklyGoalSet,
+                            onSkipWeeklyGoal = onboardingViewModel::onWeeklyGoalSkipped
                         )
                     } else {
                         WeightTrackerNavHost(
@@ -216,6 +218,8 @@ class OnboardingNavigationTest {
         }
         composeRule.onNodeWithTag(ONBOARDING_SCREEN).assertIsDisplayed()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
+        composeRule.onNodeWithText("Set a weekly workout goal").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_SKIP).performClick()
         composeRule.onNodeWithText("Create workout plan").assertIsDisplayed()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -252,7 +256,9 @@ class OnboardingNavigationTest {
                             step = step,
                             onContinue = onboardingViewModel::onContinue,
                             onCreatePlan = onboardingViewModel::onCreatePlan,
-                            onSkip = onboardingViewModel::onSkip
+                            onSkip = onboardingViewModel::onSkip,
+                            onSetWeeklyGoal = onboardingViewModel::onWeeklyGoalSet,
+                            onSkipWeeklyGoal = onboardingViewModel::onWeeklyGoalSkipped
                         )
                     } else {
                         WeightTrackerNavHost(
@@ -266,6 +272,7 @@ class OnboardingNavigationTest {
             }
         }
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
+        composeRule.onNodeWithText("Not now").performClick()
         composeRule.onNodeWithTag(ONBOARDING_SKIP).performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag(ONBOARDING_REMINDER).fetchSemanticsNodes().isNotEmpty()

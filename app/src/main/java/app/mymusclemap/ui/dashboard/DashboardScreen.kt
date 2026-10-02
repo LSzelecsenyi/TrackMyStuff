@@ -74,6 +74,7 @@ import app.mymusclemap.ui.components.DayDetailsSheet
 import app.mymusclemap.ui.components.DeleteMeasurementDialog
 import app.mymusclemap.ui.components.MeasurementEditorSheet
 import app.mymusclemap.ui.components.OverviewCalendar
+import app.mymusclemap.ui.components.WeeklyGoalEditorSheet
 import app.mymusclemap.ui.components.RescheduleDateSheet
 import app.mymusclemap.ui.components.ScheduleWorkoutPickerSheet
 import app.mymusclemap.ui.components.UiFormatters
@@ -153,9 +154,12 @@ fun DashboardScreen(
     onDismissLocked: () -> Unit = {},
     health: HealthCardState = HealthCardState.Quiet(HealthQuietStatus.NotConnected),
     onOpenHealthSettings: () -> Unit = {},
-    onOpenHealthDetails: () -> Unit = {}
+    onOpenHealthDetails: () -> Unit = {},
+    onSetWeeklyGoal: (Int) -> Unit = {},
+    onDisableWeeklyGoal: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
     val resources = LocalResources.current
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
@@ -259,6 +263,8 @@ fun DashboardScreen(
                 onNextMonth = onNextMonth,
                 onDayClick = onDaySelected,
                 onTodayBounds = reportTodayBounds,
+                weeklyGoal = state.weeklyGoal,
+                onConfigureGoal = { weeklyGoalEditorOpen = true },
                 modifier = Modifier.onGloballyPositioned { coordinates ->
                     calendarSize = coordinates.size
                     calendarYInContent = coordinates.positionInParent().y.roundToInt()
@@ -299,6 +305,14 @@ fun DashboardScreen(
             onUnschedule = onOpenRemove,
             onDismiss = onDismissDaySheet,
             busy = state.scheduleBusy
+        )
+    }
+    if (weeklyGoalEditorOpen) {
+        WeeklyGoalEditorSheet(
+            status = state.weeklyGoal,
+            onSave = onSetWeeklyGoal,
+            onDisable = onDisableWeeklyGoal,
+            onDismiss = { weeklyGoalEditorOpen = false }
         )
     }
     if (state.schedulePickerVisible) {

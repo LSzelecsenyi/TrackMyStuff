@@ -19,6 +19,9 @@ import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
+import app.mymusclemap.domain.workout.WeekVerdict
+import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import app.mymusclemap.domain.workout.WeeklyGoalRevision
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -190,10 +193,17 @@ class DemoTrainingHistoryTest {
             kotlin.math.round(100.0 * analysis.adherenceCompleted / analysis.adherencePlanned).toInt()
         )
 
+        val abandoned = tables.workoutSessions.filter { it.status == SessionStatus.ABANDONED.name }
+        assertEquals(1, abandoned.size)
         tables.workoutSessions.forEach { session ->
             assertFalse(LocalDate.parse(session.workoutDate).isAfter(today))
-            assertEquals(SessionStatus.COMPLETED.name, session.status)
             assertNull(session.activeLock)
+            if (session.status == SessionStatus.ABANDONED.name) {
+                assertNull(session.scheduledWorkoutId)
+                assertEquals("Abandoned", session.notes)
+                return@forEach
+            }
+            assertEquals(SessionStatus.COMPLETED.name, session.status)
             val scheduledId = session.scheduledWorkoutId ?: return@forEach
             val scheduled = scheduledById.getValue(scheduledId)
             assertNull(scheduled.cancelledAt)
@@ -219,7 +229,9 @@ class DemoTrainingHistoryTest {
         val rescheduled = analysis.examples.single { it.label == "rescheduled" }
         assertFalse(rescheduled.originalScheduledDate == rescheduled.scheduledDate)
         assertEquals(rescheduled.scheduledDate, rescheduled.workoutDate)
-        val unplanned = tables.workoutSessions.filter { it.scheduledWorkoutId == null }
+        val unplanned = tables.workoutSessions.filter {
+            it.scheduledWorkoutId == null && it.status == SessionStatus.COMPLETED.name
+        }
         assertEquals(analysis.unplannedWorkouts, unplanned.size)
         unplanned.forEach { session ->
             assertNull(session.scheduledWorkoutId)
@@ -355,13 +367,100 @@ class DemoTrainingHistoryTest {
     }
 
     @Test
-    fun checkedInDemoBackupMatchesSeptember272026Reference() {
-        val checkedInDate = LocalDate.of(2026, 9, 27)
+    fun octoberReferenceHasTheImportableGoalWindow() {
+        val today = LocalDate.of(2026, 10, 2)
+        val snapshot = DemoTrainingHistoryGenerator.generate(today)
+        val completed = snapshot.tables.workoutSessions
+            .filter { it.status == SessionStatus.COMPLETED.name }
+            .groupingBy { it.workoutDate }
+            .eachCount()
+        assertEquals(1, completed["2026-08-17"])
+        assertEquals(2, completed["2026-08-20"])
+        assertEquals(1, completed["2026-08-21"])
+        assertEquals(1, completed["2026-08-24"])
+        assertEquals(1, completed["2026-08-28"])
+        assertEquals(1, completed["2026-09-14"])
+        assertEquals(1, completed["2026-09-15"])
+        assertEquals(1, completed["2026-09-29"])
+        assertEquals(1, completed["2026-10-02"])
+        val open = snapshot.tables.scheduledWorkouts
+            .filter { row ->
+                row.cancelledAt == null &&
+                    row.scheduledDate >= "2026-09-28" &&
+                    row.scheduledDate <= "2026-10-04" &&
+                    snapshot.tables.workoutSessions.none {
+                        it.scheduledWorkoutId == row.id && it.status == SessionStatus.COMPLETED.name
+                    }
+            }
+            .map { it.scheduledDate }
+            .sorted()
+        assertEquals(listOf("2026-10-03", "2026-10-04"), open)
+        assertEquals(
+            listOf("2026-09-20"),
+            snapshot.tables.workoutSessions
+                .filter { it.status == SessionStatus.ABANDONED.name }
+                .map { it.workoutDate }
+        )
+        assertEquals("2026-08-17", snapshot.tables.weeklyWorkoutGoals.single().effectiveWeekStart)
+        assertEquals(4, snapshot.tables.weeklyWorkoutGoals.single().workoutsPerWeek)
+    }
+
+    @Test
+    fun recentWeeksFollowTheWeeklyGoalStreak() {
+        val today = DemoTrainingHistoryGenerator.referenceDate
+        val monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val revisions = snapshot.tables.weeklyWorkoutGoals.map { row ->
+            WeeklyGoalRevision(
+                effectiveWeekStart = LocalDate.parse(row.effectiveWeekStart),
+                workoutsPerWeek = row.workoutsPerWeek,
+                graceWeek = row.graceWeek
+            )
+        }
+        val counts = snapshot.tables.workoutSessions
+            .filter { it.status == SessionStatus.COMPLETED.name }
+            .groupingBy { LocalDate.parse(it.workoutDate) }
+            .eachCount()
+        val status = WeeklyGoalLogic.evaluate(revisions, counts, today)
+        val expected = listOf(
+            -6 to (4 to 1),
+            -5 to (5 to 2),
+            -4 to (4 to 3),
+            -3 to (4 to 4),
+            -2 to (2 to 0),
+            -1 to (4 to 1)
+        )
+        expected.forEach { (offset, result) ->
+            val week = status.progressOn(monday.plusWeeks(offset.toLong()))
+            assertEquals(4, week.goal)
+            assertEquals(result.first, week.completed)
+            assertEquals(result.second, week.streak)
+        }
+        assertEquals(WeekVerdict.Missed, status.progressOn(monday.plusWeeks(-2)).verdict)
+        assertEquals(2, status.current.completed)
+        assertEquals(1, status.current.streak)
+        assertEquals(WeekVerdict.InProgress, status.current.verdict)
+        val abandoned = snapshot.tables.workoutSessions.filter { it.status == SessionStatus.ABANDONED.name }
+        assertTrue(abandoned.isNotEmpty())
+        val weekEnd = monday.plusDays(6)
+        val openPlans = snapshot.tables.scheduledWorkouts.filter { row ->
+            row.cancelledAt == null &&
+                !LocalDate.parse(row.scheduledDate).isBefore(monday) &&
+                !LocalDate.parse(row.scheduledDate).isAfter(weekEnd) &&
+                snapshot.tables.workoutSessions.none {
+                    it.scheduledWorkoutId == row.id && it.status == SessionStatus.COMPLETED.name
+                }
+        }
+        assertEquals(2, openPlans.map { it.scheduledDate }.distinct().size)
+    }
+
+    @Test
+    fun checkedInDemoBackupMatchesOctober22026Reference() {
+        val checkedInDate = LocalDate.of(2026, 10, 2)
         val file = DemoTrainingHistoryPaths.backupFile()
         assertTrue(
             "Missing ${file.absolutePath}. Regenerate with gradlew.bat :app:testDebugUnitTest " +
                 "--tests app.mymusclemap.dev.DemoTrainingHistoryTest.writesDemoBackupFileWhenRequested " +
-                "\"-Pdemo.backup.write=true\" \"-Pdemo.referenceDate=2026-09-27\"",
+                "\"-Pdemo.backup.write=true\" \"-Pdemo.referenceDate=2026-10-02\"",
             file.isFile
         )
         val text = file.readText().replace("\r\n", "\n")

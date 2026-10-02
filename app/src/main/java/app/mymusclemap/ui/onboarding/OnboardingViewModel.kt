@@ -3,12 +3,15 @@ package app.mymusclemap.ui.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.FirstRunCoordinator
+import app.mymusclemap.data.repository.WeeklyGoalRepository
+import app.mymusclemap.domain.DateProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 enum class OnboardingStep {
     Welcome,
+    WeeklyGoal,
     CreatePlan
 }
 
@@ -18,7 +21,9 @@ enum class OnboardingExit {
 }
 
 class OnboardingViewModel(
-    private val firstRunCoordinator: FirstRunCoordinator
+    private val firstRunCoordinator: FirstRunCoordinator,
+    private val weeklyGoalRepository: WeeklyGoalRepository? = null,
+    private val dateProvider: DateProvider? = null
 ) : ViewModel() {
     private val stepState = MutableStateFlow(OnboardingStep.Welcome)
     private val exitState = MutableStateFlow<OnboardingExit?>(null)
@@ -27,7 +32,21 @@ class OnboardingViewModel(
     val exit: StateFlow<OnboardingExit?> = exitState
 
     fun onContinue() {
+        stepState.value = OnboardingStep.WeeklyGoal
+    }
+
+    fun onWeeklyGoalSkipped() {
         stepState.value = OnboardingStep.CreatePlan
+    }
+
+    fun onWeeklyGoalSet(workoutsPerWeek: Int) {
+        viewModelScope.launch {
+            val today = dateProvider?.today()
+            if (today != null) {
+                weeklyGoalRepository?.setGoal(today, workoutsPerWeek)
+            }
+            stepState.value = OnboardingStep.CreatePlan
+        }
     }
 
     fun onCreatePlan() {

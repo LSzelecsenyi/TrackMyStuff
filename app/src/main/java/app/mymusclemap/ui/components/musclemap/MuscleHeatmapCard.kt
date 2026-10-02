@@ -247,10 +247,10 @@ internal fun MuscleRecencyBand.labelRes(): Int {
 }
 
 private const val LegendScale = 1f
-private val NarrowOverviewFigureHeight = 300.dp
 
-// The empty explanation adds a line. Short phones give that height back from the figures
-// so the week calendar still fits. A trained heatmap keeps the taller cap.
-private val NarrowOverviewEmptyFigureHeight = 260.dp
+// Short phones also show the weekly-goal line under the calendar heading. These caps
+// give that line back so the collapsed week still fits above the bottom bar.
+private val NarrowOverviewFigureHeight = 260.dp
+private val NarrowOverviewEmptyFigureHeight = 220.dp
 private val LegendDotSize = 8.dp * LegendScale
 private val LegendDotLabelGap = 4.dp * LegendScale

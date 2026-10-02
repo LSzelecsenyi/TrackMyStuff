@@ -16,6 +16,7 @@ import app.mymusclemap.data.repository.ProgressPhotoRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
+import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.WorkoutImportFileReader
 import app.mymusclemap.domain.DateProvider
@@ -57,7 +58,8 @@ class WeightViewModelFactory(
     private val onboardingRepository: OnboardingRepository,
     private val progressPhotoRepository: ProgressPhotoRepository,
     private val healthRepository: HealthRepository,
-    private val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
+    private val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements,
+    private val weeklyGoalRepository: WeeklyGoalRepository? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -70,7 +72,8 @@ class WeightViewModelFactory(
                     scheduledWorkoutRepository,
                     workoutTemplateRepository,
                     onboardingRepository,
-                    featureEntitlements
+                    featureEntitlements,
+                    weeklyGoalRepository
                 )
             }
             modelClass.isAssignableFrom(WeightDetailsViewModel::class.java) -> {
@@ -101,10 +104,16 @@ class WeightViewModelFactory(
                 )
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
-                SettingsViewModel(weightRepository, themePreferences, dateProvider, appBackupRepository)
+                SettingsViewModel(
+                    weightRepository,
+                    themePreferences,
+                    dateProvider,
+                    appBackupRepository,
+                    weeklyGoalRepository
+                )
             }
             modelClass.isAssignableFrom(OnboardingViewModel::class.java) -> {
-                OnboardingViewModel(firstRunCoordinator)
+                OnboardingViewModel(firstRunCoordinator, weeklyGoalRepository, dateProvider)
             }
             modelClass.isAssignableFrom(OnboardingGuideViewModel::class.java) -> {
                 OnboardingGuideViewModel(onboardingRepository)

@@ -45,6 +45,27 @@ class OnboardingScreenLayoutTest {
     }
 
     @Test
+    fun weeklyGoalStepIsOptionalAndDoesNotChooseADefault() {
+        var saved: Int? = null
+        var skipped = 0
+        render(
+            OnboardingStep.WeeklyGoal,
+            onSetWeeklyGoal = { saved = it },
+            onSkipWeeklyGoal = { skipped += 1 }
+        )
+        composeRule.onNodeWithText("Set a weekly workout goal").assertIsDisplayed()
+        composeRule.onNodeWithText("How many workouts would you like to complete each week?").assertIsDisplayed()
+        composeRule.onNodeWithText("Meet your weekly goal to build your workout streak.").assertIsDisplayed()
+        composeRule.onNodeWithText("Not now").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_PRIMARY).assertIsDisplayed()
+        composeRule.onNodeWithTag("$ONBOARDING_GOAL_CHIP-4").performClick()
+        composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
+        assertEquals(4, saved)
+        composeRule.onNodeWithTag(ONBOARDING_SKIP).performClick()
+        assertEquals(1, skipped)
+    }
+
+    @Test
     fun setupStepGuidesUserToExistingWorkoutPlanCreation() {
         var createPlan = 0
         var skip = 0
@@ -70,7 +91,9 @@ class OnboardingScreenLayoutTest {
         step: OnboardingStep,
         onContinue: () -> Unit = {},
         onCreatePlan: () -> Unit = {},
-        onSkip: () -> Unit = {}
+        onSkip: () -> Unit = {},
+        onSetWeeklyGoal: (Int) -> Unit = {},
+        onSkipWeeklyGoal: () -> Unit = {}
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -87,7 +110,9 @@ class OnboardingScreenLayoutTest {
                             step = step,
                             onContinue = onContinue,
                             onCreatePlan = onCreatePlan,
-                            onSkip = onSkip
+                            onSkip = onSkip,
+                            onSetWeeklyGoal = onSetWeeklyGoal,
+                            onSkipWeeklyGoal = onSkipWeeklyGoal
                         )
                     }
                 }

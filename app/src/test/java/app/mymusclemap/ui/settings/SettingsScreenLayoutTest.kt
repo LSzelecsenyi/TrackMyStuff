@@ -32,6 +32,8 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import app.mymusclemap.domain.workout.WeeklyGoalRevision
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.theme.PaletteDraftLogic
 import app.mymusclemap.domain.theme.PaletteSession
@@ -48,12 +50,53 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w360dp-h2000dp")
 class SettingsScreenLayoutTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun weeklyGoalRowShowsNotSetWhenNothingIsConfigured() {
+        render()
+        composeRule.onNodeWithTag(SETTINGS_WEEKLY_GOAL).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.weekly_goal_not_set)).assertIsDisplayed()
+    }
+
+    @Test
+    fun weeklyGoalRowShowsAPendingNextMondayChange() {
+        val today = LocalDate.of(2026, 3, 12)
+        val status = WeeklyGoalLogic.evaluate(
+            listOf(
+                WeeklyGoalRevision(LocalDate.of(2026, 3, 9), 3, graceWeek = true),
+                WeeklyGoalRevision(LocalDate.of(2026, 3, 16), 5, graceWeek = false)
+            ),
+            emptyMap(),
+            today
+        )
+        render(state = SettingsUiState(weeklyGoal = status))
+        composeRule.onNodeWithText(testString(R.string.weekly_goal_pending_summary, 5))
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun weeklyGoalRowShowsThatADisableStartsNextMonday() {
+        val status = WeeklyGoalLogic.evaluate(
+            listOf(
+                WeeklyGoalRevision(LocalDate.of(2026, 3, 9), 4, graceWeek = false),
+                WeeklyGoalRevision(LocalDate.of(2026, 3, 16), null, graceWeek = false)
+            ),
+            emptyMap(),
+            LocalDate.of(2026, 3, 12)
+        )
+        render(state = SettingsUiState(weeklyGoal = status))
+        composeRule.onNodeWithText(testString(R.string.weekly_goal_turns_off_next_monday))
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
 
     @Test
     fun givenSystemThemeWhenScreenAppearsThenSystemRowIsSelected() {

@@ -73,7 +73,9 @@ class MainActivity : ComponentActivity() {
                                 step = step,
                                 onContinue = viewModel::onContinue,
                                 onCreatePlan = viewModel::onCreatePlan,
-                                onSkip = viewModel::onSkip
+                                onSkip = viewModel::onSkip,
+                                onSetWeeklyGoal = viewModel::onWeeklyGoalSet,
+                                onSkipWeeklyGoal = viewModel::onWeeklyGoalSkipped
                             )
                         }
                         FirstRunDecision.Ready -> WeightTrackerNavHost(

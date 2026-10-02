@@ -107,6 +107,12 @@ class WorkoutSessionRepository(
         }
     }
 
+    fun observeAllCompletedCounts(): Flow<Map<LocalDate, Int>> {
+        return sessionDao.observeAllCompletedCounts().map { rows ->
+            rows.associate { LocalDate.parse(it.date) to it.completedCount }
+        }
+    }
+
     fun observeSummariesBetween(start: LocalDate, end: LocalDate): Flow<List<WorkoutSessionSummary>> {
         return combine(
             sessionDao.observeBetween(start.toString(), end.toString()),

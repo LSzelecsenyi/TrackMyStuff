@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FileDownload
@@ -94,6 +95,8 @@ import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.health.HealthSettingsState
 import app.mymusclemap.ui.components.CompactEditorDivider
+import app.mymusclemap.domain.workout.PendingWeeklyGoal
+import app.mymusclemap.ui.components.WeeklyGoalEditorSheet
 import app.mymusclemap.ui.health.HealthConnectSettingsSection
 import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.PaletteSwatch
@@ -128,6 +131,7 @@ internal const val SETTINGS_HELP_TIPS = "settings-help-tips"
 internal const val SETTINGS_SEND_FEEDBACK = "settings-send-feedback"
 internal const val SETTINGS_PRIVACY_POLICY = "settings-privacy-policy"
 internal const val SETTINGS_APP_VERSION = "settings-app-version"
+internal const val SETTINGS_WEEKLY_GOAL = "settings-weekly-goal"
 
 internal fun settingsColorRowTag(field: SeedField): String = "settings-color-${field.name.lowercase(Locale.US)}"
 
@@ -167,9 +171,12 @@ fun SettingsScreen(
     onBack: () -> Unit,
     health: HealthSettingsState = HealthSettingsState.NotConnected,
     onHealthAction: () -> Unit = {},
-    onOpenHealthDetails: () -> Unit = {}
+    onOpenHealthDetails: () -> Unit = {},
+    onSetWeeklyGoal: (Int) -> Unit = {},
+    onDisableWeeklyGoal: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     var lastSaveAt by remember { mutableLongStateOf(Long.MIN_VALUE / 2) }
     val saveOnce: () -> Unit = {
@@ -238,6 +245,11 @@ fun SettingsScreen(
                     onResetCustomDraft = onResetCustomDraft
                 )
                 CompactEditorDivider()
+                TrainingSection(
+                    state = state,
+                    onOpenGoal = { weeklyGoalEditorOpen = true }
+                )
+                CompactEditorDivider()
                 DataSection(
                     onExportClick = onExportClick,
                     onImportClick = onImportClick
@@ -270,6 +282,14 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+    if (weeklyGoalEditorOpen) {
+        WeeklyGoalEditorSheet(
+            status = state.weeklyGoal,
+            onSave = onSetWeeklyGoal,
+            onDisable = onDisableWeeklyGoal,
+            onDismiss = { weeklyGoalEditorOpen = false }
+        )
     }
     if (state.showImportExplanation) {
         AlertDialog(
@@ -814,6 +834,32 @@ private fun ChoiceRow(
                 modifier = Modifier.size(20.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun TrainingSection(
+    state: SettingsUiState,
+    onOpenGoal: () -> Unit
+) {
+    val subtitle = when (val pending = state.weeklyGoal.pending) {
+        is PendingWeeklyGoal.Update -> stringResource(
+            R.string.weekly_goal_pending_summary,
+            pending.workoutsPerWeek
+        )
+        is PendingWeeklyGoal.Disable -> stringResource(R.string.weekly_goal_turns_off_next_monday)
+        null -> state.weeklyGoal.current.goal?.let { goal ->
+            stringResource(R.string.weekly_goal_summary, goal)
+        } ?: stringResource(R.string.weekly_goal_not_set)
+    }
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.training_title))) {
+        DataActionRow(
+            icon = Icons.Filled.EmojiEvents,
+            title = stringResource(R.string.weekly_goal_title),
+            subtitle = subtitle,
+            testTag = SETTINGS_WEEKLY_GOAL,
+            onClick = onOpenGoal
+        )
     }
 }
 

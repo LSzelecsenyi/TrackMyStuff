@@ -11,6 +11,7 @@ import app.mymusclemap.data.local.WorkoutSessionExerciseMuscleEntity
 import app.mymusclemap.data.local.WorkoutSessionSetEntity
 import app.mymusclemap.data.local.WorkoutTemplateEntity
 import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
+import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
 import org.json.JSONArray
 import org.json.JSONException
@@ -66,6 +67,22 @@ object AppBackupJson {
                             .put("value", row.value)
                             .put("source", row.source)
                             .put("externalId", nullable(row.externalId))
+                            .put("createdAt", row.createdAt)
+                            .put("updatedAt", row.updatedAt)
+                    )
+                }
+            }
+        )
+        tables.put(
+            AppBackupFormat.TABLE_WEEKLY_WORKOUT_GOALS,
+            JSONArray().also { array ->
+                snapshot.tables.weeklyWorkoutGoals.sortedBy { it.effectiveWeekStart }.forEach { row ->
+                    array.put(
+                        JSONObject()
+                            .put("id", row.id)
+                            .put("effectiveWeekStart", row.effectiveWeekStart)
+                            .put("workoutsPerWeek", nullable(row.workoutsPerWeek))
+                            .put("graceWeek", row.graceWeek)
                             .put("createdAt", row.createdAt)
                             .put("updatedAt", row.updatedAt)
                     )
@@ -373,6 +390,7 @@ object AppBackupJson {
                 parseWeight(it, errors)
             },
             bodyMeasurements = parseOptionalBodyMeasurements(tablesObject, errors),
+            weeklyWorkoutGoals = parseOptionalWeeklyGoals(tablesObject, errors),
             exercises = parseArray(tablesObject, AppBackupFormat.TABLE_EXERCISES, errors) {
                 parseExercise(it, errors)
             },
@@ -509,6 +527,47 @@ object AppBackupJson {
             return emptyList()
         }
         return parseArray(tables, AppBackupFormat.TABLE_BODY_MEASUREMENTS, errors) { parseBodyMeasurement(it, errors) }
+    }
+
+    private fun parseOptionalWeeklyGoals(
+        tables: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): List<WeeklyWorkoutGoalEntity> {
+        if (!tables.has(AppBackupFormat.TABLE_WEEKLY_WORKOUT_GOALS) ||
+            tables.isNull(AppBackupFormat.TABLE_WEEKLY_WORKOUT_GOALS)
+        ) {
+            return emptyList()
+        }
+        if (tables.opt(AppBackupFormat.TABLE_WEEKLY_WORKOUT_GOALS) !is JSONArray) {
+            errors += AppBackupError(
+                AppBackupErrorCode.InvalidType,
+                "tables.${AppBackupFormat.TABLE_WEEKLY_WORKOUT_GOALS}"
+            )
+            return emptyList()
+        }
+        return parseArray(tables, AppBackupFormat.TABLE_WEEKLY_WORKOUT_GOALS, errors) {
+            parseWeeklyGoal(it, errors)
+        }
+    }
+
+    private fun parseWeeklyGoal(
+        obj: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): WeeklyWorkoutGoalEntity? {
+        val id = obj.requiredId("id", errors) ?: return null
+        val effectiveWeekStart = obj.requiredString("effectiveWeekStart", errors) ?: return null
+        val workoutsPerWeek = obj.optionalNullableInt("workoutsPerWeek", errors)
+        val graceWeek = obj.requiredBoolean("graceWeek", errors) ?: return null
+        val createdAt = obj.requiredLong("createdAt", errors) ?: return null
+        val updatedAt = obj.requiredLong("updatedAt", errors) ?: return null
+        return WeeklyWorkoutGoalEntity(
+            id = id,
+            effectiveWeekStart = effectiveWeekStart,
+            workoutsPerWeek = workoutsPerWeek,
+            graceWeek = graceWeek,
+            createdAt = createdAt,
+            updatedAt = updatedAt
+        )
     }
 
     private fun parseBodyMeasurement(
