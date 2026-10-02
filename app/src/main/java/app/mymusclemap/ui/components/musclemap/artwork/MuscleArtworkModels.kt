@@ -1,18 +1,6 @@
 /*
- * Adapted anatomical SVG path data from body-muscles.
- *
- * Original project: Body Muscles
- * Repository: https://github.com/vulovix/body-muscles
- * Homepage: https://vulovix.github.io/body-muscles/
- * npm package: body-muscles@1.0.0
- * Source commit (npm gitHead): 38216b99c7c67518579a2eb71895886621c864ca
- * Copyright 2024 Ivan Vulović
- * Licensed under the Apache License, Version 2.0
- *
- * This file was converted for native Android / Jetpack Compose rendering.
- * We did not create the original anatomical artwork.
- *
- * TODO: Revalidate artwork provenance or replace this data before any public distribution.
+ * Region model for the adapted body-muscles artwork.
+ * Provenance, revision, and modifications are recorded on BodyMusclesArtwork.
  */
 package app.mymusclemap.ui.components.musclemap.artwork
 

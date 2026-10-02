@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
@@ -130,6 +131,7 @@ internal const val SETTINGS_APP_BACKUP_RESTORE = "settings-app-backup-restore"
 internal const val SETTINGS_HELP_TIPS = "settings-help-tips"
 internal const val SETTINGS_SEND_FEEDBACK = "settings-send-feedback"
 internal const val SETTINGS_PRIVACY_POLICY = "settings-privacy-policy"
+internal const val SETTINGS_OPEN_SOURCE_LICENSES = "settings-open-source-licenses"
 internal const val SETTINGS_APP_VERSION = "settings-app-version"
 internal const val SETTINGS_WEEKLY_GOAL = "settings-weekly-goal"
 
@@ -167,6 +169,7 @@ fun SettingsScreen(
     onSendFeedback: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
     onOpenHelp: () -> Unit,
+    onOpenOpenSourceLicenses: () -> Unit = {},
     onMessageConsumed: () -> Unit,
     onBack: () -> Unit,
     health: HealthSettingsState = HealthSettingsState.NotConnected,
@@ -278,7 +281,8 @@ fun SettingsScreen(
                     state = state,
                     onSendFeedback = onSendFeedback,
                     onOpenPrivacyPolicy = onOpenPrivacyPolicy,
-                    onOpenHelp = onOpenHelp
+                    onOpenHelp = onOpenHelp,
+                    onOpenOpenSourceLicenses = onOpenOpenSourceLicenses
                 )
             }
         }
@@ -920,7 +924,8 @@ private fun AboutSection(
     state: SettingsUiState,
     onSendFeedback: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
-    onOpenHelp: () -> Unit
+    onOpenHelp: () -> Unit,
+    onOpenOpenSourceLicenses: () -> Unit
 ) {
     val usesExternalPrivacyPolicy = !state.privacyPolicyUrl.isNullOrBlank()
     CompactEditorSection(title = settingsKicker(stringResource(R.string.about_title))) {
@@ -944,6 +949,13 @@ private fun AboutSection(
             subtitle = stringResource(R.string.action_send_feedback_subtitle),
             testTag = SETTINGS_SEND_FEEDBACK,
             onClick = onSendFeedback
+        )
+        DataActionRow(
+            icon = Icons.Outlined.Description,
+            title = stringResource(R.string.action_open_source_licenses),
+            subtitle = stringResource(R.string.action_open_source_licenses_subtitle),
+            testTag = SETTINGS_OPEN_SOURCE_LICENSES,
+            onClick = onOpenOpenSourceLicenses
         )
         DataActionRow(
             icon = Icons.Outlined.Policy,

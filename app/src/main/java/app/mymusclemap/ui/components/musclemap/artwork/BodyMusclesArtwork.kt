@@ -1,22 +1,24 @@
 /*
- * Adapted anatomical SVG path data from body-muscles.
+ * Anatomical path data adapted from body-muscles.
  *
- * Original project: Body Muscles
- * Repository: https://github.com/vulovix/body-muscles
- * Homepage: https://vulovix.github.io/body-muscles/
- * npm package: body-muscles@1.0.0
- * Source commit (npm gitHead): 38216b99c7c67518579a2eb71895886621c864ca
- * Published equivalents: dist/data/muscles.front.js, dist/data/muscles.back.js
+ * Upstream project: Body Muscles (npm package body-muscles)
+ * Upstream URL: https://github.com/vulovix/body-muscles
+ * Upstream revision: 38216b99c7c67518579a2eb71895886621c864ca
+ * Upstream release: 1.0.0 (package.json version and gitHead at that revision)
+ * Upstream files: src/data/muscles.front.ts, src/data/muscles.back.ts
  * Copyright 2024 Ivan Vulović
- * Licensed under the Apache License, Version 2.0
- * http://www.apache.org/licenses/LICENSE-2.0
+ * License: Apache License, Version 2.0
+ * The upstream LICENSE and NOTICE are packaged at assets/third_party/body-muscles/.
  *
- * This file was converted for native Android / Jetpack Compose rendering
- * and later adapted by extracting compound abdominal subpaths into
- * independent region records. Contour vertices were not redrawn.
- * We did not create the original anatomical artwork.
- *
- * TODO: Revalidate artwork provenance or replace this data before any public distribution.
+ * Modifications in this file:
+ * - TypeScript path strings were copied into Kotlin region records for Compose.
+ * - serratus-anterior-left, serratus-anterior-right, obliques-left, and
+ *   obliques-right were split into separate region records. Subpaths that
+ *   continued with a relative "m" were given an absolute "M" so the isolated
+ *   contour keeps the upstream position. Those vertices are the upstream vertices.
+ * - shoulder-front-left, shoulder-front-right, and the extra absolute subpaths
+ *   on shoulder-side-left and shoulder-side-right are not verbatim upstream
+ *   path strings. See the TODO on those records.
  */
 package app.mymusclemap.ui.components.musclemap.artwork
 
@@ -59,6 +61,11 @@ internal object BodyMusclesArtwork {
             muscleGroup = MuscleGroup.NECK,
             pathData = "m 18.385135,11.910505 -1.64975,2.35202 -0.74538,2.62234 1.73486,-1.38354 0.86649,-2.97104 z"
         ),
+        // TODO: These four shoulder contours are not verbatim copies of
+        // src/data/muscles.front.ts at 38216b99. The side regions keep the
+        // upstream path and then append an absolute polygon. The front regions
+        // replace the upstream path. Those extra vertices were not found in the
+        // verified upstream files or in any other third-party asset in this repo.
         MuscleArtworkRegion(
             id = "shoulder-front-left",
             view = MuscleMapView.FRONT,

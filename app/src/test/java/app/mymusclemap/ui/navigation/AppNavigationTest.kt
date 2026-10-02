@@ -62,6 +62,16 @@ class AppNavigationTest {
     }
 
     @Test
+    fun openSourceLicensesOpensFromSettingsWithoutDuplicatingAndHidesBottomBar() {
+        val navigation = AppNavigation.openOpenSourceLicenses(AppRoutes.SETTINGS)
+        assertEquals(AppRoutes.OPEN_SOURCE_LICENSES, navigation.targetRoute)
+        assertEquals(AppRoutes.SETTINGS, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.openOpenSourceLicenses(AppRoutes.OPEN_SOURCE_LICENSES).shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.OPEN_SOURCE_LICENSES))
+    }
+
+    @Test
     fun privacyOpensFromSettingsWithoutDuplicatingAndHidesBottomBar() {
         val navigation = AppNavigation.openPrivacy(AppRoutes.SETTINGS)
         assertEquals(AppRoutes.PRIVACY, navigation.targetRoute)

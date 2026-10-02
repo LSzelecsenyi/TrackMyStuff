@@ -70,6 +70,7 @@ import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingHeatmapSpotlight
 import app.mymusclemap.ui.onboarding.OnboardingWorkoutSpotlight
 import app.mymusclemap.ui.settings.HelpTipsScreen
+import app.mymusclemap.ui.settings.OpenSourceLicensesScreen
 import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.pro.ProInfoScreen
 import app.mymusclemap.ui.pro.ProInfoSheet
@@ -524,6 +525,9 @@ fun WeightTrackerNavHost(
                     onBack = { navController.popBackStack() },
                     onOpenHelp = { navController.navigateInternal(AppRoutes.HELP) },
                     onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) },
+                    onOpenOpenSourceLicenses = {
+                        navController.navigateInternal(AppRoutes.OPEN_SOURCE_LICENSES)
+                    },
                     onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) }
                 )
             }
@@ -541,6 +545,9 @@ fun WeightTrackerNavHost(
             }
             composable(AppRoutes.PRIVACY) {
                 PrivacyPolicyScreen(onBack = { navController.popBackStack() })
+            }
+            composable(AppRoutes.OPEN_SOURCE_LICENSES) {
+                OpenSourceLicensesScreen(onBack = { navController.popBackStack() })
             }
             composable(AppRoutes.PRO_INFO) {
                 ProInfoScreen(onBack = { navController.popBackStack() })
@@ -1205,6 +1212,7 @@ private fun SettingsRoute(
     onBack: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenPrivacy: () -> Unit,
+    onOpenOpenSourceLicenses: () -> Unit,
     onOpenHealthDetails: () -> Unit
 ) {
     val launchHealthPermissions = rememberHealthConnectPermissionLaunch(onHealthRefresh)
@@ -1343,6 +1351,7 @@ private fun SettingsRoute(
             }
         },
         onOpenHelp = onOpenHelp,
+        onOpenOpenSourceLicenses = onOpenOpenSourceLicenses,
         onMessageConsumed = viewModel::consumeMessage,
         onSetWeeklyGoal = viewModel::setWeeklyGoal,
         onDisableWeeklyGoal = viewModel::disableWeeklyGoal,

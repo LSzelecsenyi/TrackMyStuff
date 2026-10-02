@@ -207,6 +207,11 @@
     <string name="about_title">About My Muscle Map</string>
     <string name="about_version">Version %1$s</string>
     <string name="action_help_tips">Help &amp; tips</string>
+    <string name="action_open_source_licenses">Open source licenses</string>
+    <string name="action_open_source_licenses_subtitle">Third-party notices included in this app</string>
+    <string name="open_source_licenses_title">Open source licenses</string>
+    <string name="open_source_body_muscles_summary">Portions of the anatomical body artwork are adapted from body-muscles by Ivan Vulović, licensed under the Apache License, Version 2.0. The paths were converted for this app. Compound abdominal paths were split into separate regions. The front and side shoulder outlines include additional contours that are not verbatim copies of the upstream path data. The license and notice below are the upstream texts shipped with this app.</string>
+    <string name="open_source_notices_unavailable">The bundled license text could not be read.</string>
     <string name="action_help_tips_subtitle">Workouts, heatmap, weight, calendar, and backup</string>
     <string name="help_title">Help &amp; tips</string>
     <string name="help_workout_title">Starting a workout</string>

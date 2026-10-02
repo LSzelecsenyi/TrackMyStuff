@@ -1,0 +1,14 @@
+body-muscles
+https://github.com/vulovix/body-muscles
+Revision 38216b99c7c67518579a2eb71895886621c864ca (npm body-muscles 1.0.0)
+
+This application includes anatomical path data adapted from
+src/data/muscles.front.ts and src/data/muscles.back.ts in that revision.
+The upstream LICENSE and NOTICE files in this directory are unmodified copies.
+
+Changes made in this application:
+- The path strings were converted from TypeScript into Kotlin records used by Jetpack Compose.
+- The compound paths serratus-anterior-left, serratus-anterior-right, obliques-left, and obliques-right were split into separate regions. Where a later subpath began with a relative move, that move was rewritten as an absolute move so the separated contour stays in the same place. The vertices of those regions are the upstream vertices.
+- shoulder-front-left and shoulder-front-right replace the upstream path strings.
+- shoulder-side-left and shoulder-side-right keep the upstream path and add a further absolute contour.
+  Those additional shoulder vertices are not present in the verified upstream files.

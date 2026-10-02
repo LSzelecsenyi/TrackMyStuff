@@ -35,7 +35,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.mymusclemap"
+        applicationId = "com.strictworkout.app"
         minSdk = 26
         targetSdk = 37
         versionCode = 1
