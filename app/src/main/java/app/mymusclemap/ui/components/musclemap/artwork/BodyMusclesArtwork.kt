@@ -16,9 +16,10 @@
  *   obliques-right were split into separate region records. Subpaths that
  *   continued with a relative "m" were given an absolute "M" so the isolated
  *   contour keeps the upstream position. Those vertices are the upstream vertices.
- * - shoulder-front-left, shoulder-front-right, and the extra absolute subpaths
- *   on shoulder-side-left and shoulder-side-right are not verbatim upstream
- *   path strings. See the TODO on those records.
+ * - shoulder-side-left and shoulder-side-right keep the upstream path and add
+ *   local geometry. shoulder-front-left and shoulder-front-right use locally
+ *   reworked geometry derived from that adaptation. These are our modifications
+ *   of the upstream artwork, not geometry from another third party.
  */
 package app.mymusclemap.ui.components.musclemap.artwork
 
@@ -61,11 +62,11 @@ internal object BodyMusclesArtwork {
             muscleGroup = MuscleGroup.NECK,
             pathData = "m 18.385135,11.910505 -1.64975,2.35202 -0.74538,2.62234 1.73486,-1.38354 0.86649,-2.97104 z"
         ),
-        // TODO: These four shoulder contours are not verbatim copies of
-        // src/data/muscles.front.ts at 38216b99. The side regions keep the
-        // upstream path and then append an absolute polygon. The front regions
-        // replace the upstream path. Those extra vertices were not found in the
-        // verified upstream files or in any other third-party asset in this repo.
+        // Local modifications of the body-muscles shoulder regions for this
+        // app's front and side deltoid model. Side regions keep the upstream
+        // path and add local geometry. Front regions use reworked local
+        // geometry. Not taken from another third-party asset. Further visual
+        // refinement is still expected before public release.
         MuscleArtworkRegion(
             id = "shoulder-front-left",
             view = MuscleMapView.FRONT,
