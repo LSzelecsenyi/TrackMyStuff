@@ -117,6 +117,44 @@ class WeeklyGoalBackupTest {
         assertEquals(0, status.current.streak)
     }
 
+    @Test
+    fun firstGoalHistoryWithAGraceWeekDerivesTheSameStreakAfterRestore() = runTest {
+        val history = WeeklyGoalLogic.planFirstGoal(
+            LocalDate.of(2026, 3, 12),
+            4,
+            LocalDate.of(2026, 2, 23)
+        )
+        val sessions = listOf(
+            session(1, "2026-02-23", SessionStatus.COMPLETED),
+            session(2, "2026-02-24", SessionStatus.COMPLETED),
+            session(3, "2026-02-25", SessionStatus.COMPLETED),
+            session(4, "2026-02-26", SessionStatus.COMPLETED),
+            session(5, "2026-03-02", SessionStatus.COMPLETED),
+            session(6, "2026-03-03", SessionStatus.COMPLETED),
+            session(7, "2026-03-04", SessionStatus.COMPLETED),
+            session(8, "2026-03-05", SessionStatus.COMPLETED),
+            session(9, "2026-03-10", SessionStatus.COMPLETED),
+            session(10, "2026-03-10", SessionStatus.ABANDONED)
+        )
+        val tables = emptyTables().copy(
+            weeklyWorkoutGoals = history.mapIndexed { index, revision ->
+                goal(index + 1L, revision.effectiveWeekStart.toString(), revision.workoutsPerWeek, revision.graceWeek)
+            },
+            workoutSessions = sessions
+        )
+        sourceDb.appBackupDao().replaceAll(tables)
+        val json = AppBackupRepository(sourceDb, themePreferences)
+            .exportJson(AppBackupSource("app.mymusclemap.debug", "1.0-debug"))
+        val restored = AppBackupRepository(targetDb, themePreferences).restoreJson(json)
+        assertEquals(AppBackupRestoreResult.Success, restored)
+        val loaded = targetDb.appBackupDao().loadTables()
+        val before = evaluate(tables.weeklyWorkoutGoals, tables.workoutSessions)
+        val after = evaluate(loaded.weeklyWorkoutGoals, loaded.workoutSessions)
+        assertEquals(2, before.current.streak)
+        assertEquals(before.current.streak, after.current.streak)
+        assertEquals(before.weeks.mapValues { it.value.verdict }, after.weeks.mapValues { it.value.verdict })
+    }
+
     private fun evaluate(
         goals: List<WeeklyWorkoutGoalEntity>,
         sessions: List<WorkoutSessionEntity>

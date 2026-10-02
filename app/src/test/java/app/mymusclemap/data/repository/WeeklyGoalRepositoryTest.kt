@@ -107,6 +107,32 @@ class WeeklyGoalRepositoryTest {
         assertEquals(0, status.current.streak)
     }
 
+    @Test
+    fun firstGoalUsesOnlyCompletedSessionsAndSurvivesANewRepository() = runTest {
+        insertSession(SessionStatus.COMPLETED, "2026-03-02")
+        insertSession(SessionStatus.COMPLETED, "2026-03-03")
+        insertSession(SessionStatus.COMPLETED, "2026-03-04")
+        insertSession(SessionStatus.COMPLETED, "2026-03-04")
+        insertSession(SessionStatus.COMPLETED, "2026-03-05")
+        insertSession(SessionStatus.ABANDONED, "2026-03-06")
+        insertSession(SessionStatus.IN_PROGRESS, "2026-03-06", activeLock = 1)
+        val aware = WeeklyGoalRepository(database.weeklyWorkoutGoalDao(), clock) {
+            database.workoutSessionDao().earliestCompletedWorkoutDate()?.let(LocalDate::parse)
+        }
+        aware.setGoal(thursday, 4)
+        val stored = aware.observe().first()
+        assertEquals(LocalDate.of(2026, 3, 2), stored.first().effectiveWeekStart)
+        assertEquals(false, stored.first().graceWeek)
+        val counts = database.workoutSessionDao().observeAllCompletedCounts().first()
+            .associate { LocalDate.parse(it.date) to it.completedCount }
+        assertEquals(2, counts[LocalDate.of(2026, 3, 4)])
+        assertNull(counts[LocalDate.of(2026, 3, 6)])
+        val reopened = WeeklyGoalRepository(database.weeklyWorkoutGoalDao(), clock)
+        val status = WeeklyGoalLogic.evaluate(reopened.observe().first(), counts, thursday)
+        assertEquals(5, status.progressOn(LocalDate.of(2026, 3, 2)).completed)
+        assertEquals(1, status.current.streak)
+    }
+
     private suspend fun insertSession(status: SessionStatus, date: String, activeLock: Int? = null) {
         database.workoutSessionDao().insertSession(
             WorkoutSessionEntity(

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -121,6 +119,7 @@ fun OverviewCalendar(
             WeekCalendarHeader(
                 weekStart = weekStart,
                 isCurrentWeek = weekOffset == 0,
+                streak = weeklyGoal.progressOn(weekStart).streak,
                 onExpand = {
                     if (!WeekCalendar.fitsInMonth(displayedMonth, weekStart)) {
                         onDisplayedMonthChange(WeekCalendar.primaryMonth(weekStart))
@@ -161,6 +160,7 @@ fun OverviewCalendar(
 private fun WeekCalendarHeader(
     weekStart: LocalDate,
     isCurrentWeek: Boolean,
+    streak: Int,
     onExpand: () -> Unit,
     onReturnToToday: () -> Unit
 ) {
@@ -172,14 +172,26 @@ private fun WeekCalendarHeader(
     }
     val expandLabel = stringResource(R.string.calendar_show_month)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 32.dp)
-            .clickable(onClick = onExpand)
-            .semantics { contentDescription = expandLabel }
-            .testTag("overview-calendar-expand"),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (streak > 0) {
+            WeekStreakBadge(
+                streak = streak,
+                modifier = Modifier
+                    .padding(end = 8.dp)
+                    .testTag("overview-weekly-streak")
+            )
+        }
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = 32.dp)
+                .clickable(onClick = onExpand)
+                .semantics { contentDescription = expandLabel }
+                .testTag("overview-calendar-expand"),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         Text(
             text = heading,
             style = AppTypeTokens.sectionTitle,
@@ -207,6 +219,7 @@ private fun WeekCalendarHeader(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp)
         )
+        }
     }
 }
 
@@ -240,27 +253,6 @@ private fun WeekGoalLine(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("overview-weekly-goal")
             )
-            if (progress.streak > 0) {
-                Icon(
-                    imageVector = Icons.Filled.EmojiEvents,
-                    contentDescription = pluralStringResource(
-                        R.plurals.weekly_goal_streak,
-                        progress.streak,
-                        progress.streak
-                    ),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(14.dp)
-                        .testTag("overview-weekly-streak")
-                )
-                Text(
-                    text = progress.streak.toString(),
-                    style = AppTypeTokens.statCaption,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 2.dp)
-                )
-            }
         }
     }
 }

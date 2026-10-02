@@ -24,6 +24,7 @@ import app.mymusclemap.domain.SystemDateProvider
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import java.time.Clock
+import java.time.LocalDate
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -67,7 +68,10 @@ class AppContainer(context: Context) {
     )
     val weeklyGoalRepository = WeeklyGoalRepository(
         dao = database.weeklyWorkoutGoalDao(),
-        clock = clock
+        clock = clock,
+        earliestCompletedDate = {
+            database.workoutSessionDao().earliestCompletedWorkoutDate()?.let(LocalDate::parse)
+        }
     )
     val themePreferences = ThemePreferences(appContext)
     val appBackupRepository = AppBackupRepository(database, themePreferences)

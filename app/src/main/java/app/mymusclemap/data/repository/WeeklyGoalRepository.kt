@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.map
 
 class WeeklyGoalRepository(
     private val dao: WeeklyWorkoutGoalDao,
-    private val clock: Clock
+    private val clock: Clock,
+    private val earliestCompletedDate: suspend () -> LocalDate? = { null }
 ) {
     fun observe(): Flow<List<WeeklyGoalRevision>> {
         return dao.observeAll().map { rows -> rows.map { it.toRevision() } }
@@ -28,8 +29,15 @@ class WeeklyGoalRepository(
     private suspend fun save(today: LocalDate, workoutsPerWeek: Int?) {
         val existing = dao.getAll()
         val history = existing.map { it.toRevision() }
-        val proposal = WeeklyGoalLogic.propose(history, today, workoutsPerWeek) ?: return
-        val updated = WeeklyGoalLogic.apply(history, proposal)
+        val planned = if (workoutsPerWeek != null && history.none { it.workoutsPerWeek != null }) {
+            WeeklyGoalLogic.planFirstGoal(today, workoutsPerWeek, earliestCompletedDate())
+        } else {
+            listOfNotNull(WeeklyGoalLogic.propose(history, today, workoutsPerWeek))
+        }
+        if (planned.isEmpty()) return
+        val updated = planned.fold(history) { current, proposal ->
+            WeeklyGoalLogic.apply(current, proposal)
+        }
         if (updated == history) return
         val now = clock.millis()
         val previousByWeek = existing.associateBy { it.effectiveWeekStart }

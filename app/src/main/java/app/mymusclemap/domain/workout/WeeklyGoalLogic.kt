@@ -115,10 +115,44 @@ object WeeklyGoalLogic {
     }
 
     /**
+     * Revisions stored for the first goal a person has ever configured.
+     *
+     * Completed weeks before this one are evaluated against that same goal,
+     * starting at the Monday of the earliest completed workout. The current
+     * week is still a grace week when the goal is set after Monday, so missing
+     * it does not wipe the streak those earlier weeks already earned.
+     * A later edit must use [propose], which never moves this start date.
+     */
+    fun planFirstGoal(
+        today: LocalDate,
+        workoutsPerWeek: Int,
+        earliestCompleted: LocalDate?
+    ): List<WeeklyGoalRevision> {
+        if (workoutsPerWeek !in MIN_GOAL..MAX_GOAL) return emptyList()
+        val thisWeek = WeekCalendar.start(today)
+        val historyStart = earliestCompleted
+            ?.let { WeekCalendar.start(it) }
+            ?.takeIf { it.isBefore(thisWeek) }
+        val grace = today != thisWeek
+        val opening = WeeklyGoalRevision(
+            effectiveWeekStart = historyStart ?: thisWeek,
+            workoutsPerWeek = workoutsPerWeek,
+            graceWeek = historyStart == null && grace
+        )
+        return if (historyStart != null && grace) {
+            listOf(opening, WeeklyGoalRevision(thisWeek, workoutsPerWeek, graceWeek = true))
+        } else {
+            listOf(opening)
+        }
+    }
+
+    /**
      * The revision to store for this edit.
      * An already-active goal changes on the next Monday.
-     * The first goal in a gap, including the very first goal, starts this week.
-     * Mid-week activation is a grace week. Monday activation is a full week.
+     * Turning a goal back on after a gap starts this week and does not
+     * re-score older weeks. Mid-week activation is a grace week.
+     * Monday activation is a full week.
+     * The very first goal is [planFirstGoal], not this function.
      */
     fun propose(
         history: List<WeeklyGoalRevision>,

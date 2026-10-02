@@ -285,5 +285,142 @@ class WeeklyGoalLogicTest {
     fun goalOutsideTheSupportedRangeIsRejected() {
         assertNull(WeeklyGoalLogic.propose(emptyList(), LocalDate.of(2026, 3, 9), 0))
         assertNull(WeeklyGoalLogic.propose(emptyList(), LocalDate.of(2026, 3, 9), 8))
+        assertTrue(WeeklyGoalLogic.planFirstGoal(LocalDate.of(2026, 3, 12), 0, null).isEmpty())
+    }
+
+    @Test
+    fun firstGoalWithNoHistoryStartsAtZero() {
+        val thursday = LocalDate.of(2026, 3, 12)
+        val history = WeeklyGoalLogic.planFirstGoal(thursday, 4, earliestCompleted = null)
+        val status = WeeklyGoalLogic.evaluate(history, emptyMap(), thursday)
+        assertEquals(1, history.size)
+        assertEquals(LocalDate.of(2026, 3, 9), history.single().effectiveWeekStart)
+        assertTrue(history.single().graceWeek)
+        assertEquals(0, status.current.streak)
+        assertEquals(WeekVerdict.InProgress, status.current.verdict)
+    }
+
+    @Test
+    fun firstGoalRecognizesOneSuccessfulPreviousWeek() {
+        val status = firstGoal(earliest = LocalDate.of(2026, 3, 3), counts = weekCounts(LocalDate.of(2026, 3, 2), 4))
+        assertEquals(1, status.progressOn(LocalDate.of(2026, 3, 2)).streak)
+        assertEquals(1, status.current.streak)
+    }
+
+    @Test
+    fun firstGoalRecognizesTwoConsecutivePreviousWeeks() {
+        val status = firstGoal(
+            earliest = LocalDate.of(2026, 2, 24),
+            counts = weekCounts(LocalDate.of(2026, 2, 23), 4) + weekCounts(LocalDate.of(2026, 3, 2), 4)
+        )
+        assertEquals(2, status.current.streak)
+        assertEquals(2, status.progressOn(LocalDate.of(2026, 3, 2)).streak)
+    }
+
+    @Test
+    fun firstGoalKeepsOnlyTheSuccessfulTailAfterAMiss() {
+        val status = firstGoal(
+            earliest = LocalDate.of(2026, 2, 16),
+            counts = weekCounts(LocalDate.of(2026, 2, 16), 4) +
+                weekCounts(LocalDate.of(2026, 2, 23), 4) +
+                weekCounts(LocalDate.of(2026, 3, 2), 1)
+        )
+        assertEquals(WeekVerdict.Missed, status.progressOn(LocalDate.of(2026, 3, 2)).verdict)
+        assertEquals(0, status.current.streak)
+    }
+
+    @Test
+    fun firstGoalMidWeekKeepsTheHistoricalStreakUntilTheCurrentTargetIsMet() {
+        val counts = weekCounts(LocalDate.of(2026, 2, 23), 4) +
+            weekCounts(LocalDate.of(2026, 3, 2), 5) +
+            mapOf(LocalDate.of(2026, 3, 10) to 2)
+        val below = firstGoal(earliest = LocalDate.of(2026, 2, 23), counts = counts)
+        assertEquals(2, below.current.streak)
+        assertEquals(2, below.current.completed)
+        assertEquals(WeekVerdict.InProgress, below.current.verdict)
+
+        val reached = firstGoal(
+            earliest = LocalDate.of(2026, 2, 23),
+            counts = counts + mapOf(LocalDate.of(2026, 3, 11) to 2)
+        )
+        assertEquals(4, reached.current.completed)
+        assertEquals(3, reached.current.streak)
+        assertEquals(WeekVerdict.Achieved, reached.current.verdict)
+    }
+
+    @Test
+    fun failedGraceWeekDoesNotEraseTheRecognizedHistoricalStreak() {
+        val counts = weekCounts(LocalDate.of(2026, 2, 23), 4) + weekCounts(LocalDate.of(2026, 3, 2), 4)
+        val history = WeeklyGoalLogic.planFirstGoal(LocalDate.of(2026, 3, 12), 4, LocalDate.of(2026, 2, 23))
+        val after = WeeklyGoalLogic.evaluate(history, counts, LocalDate.of(2026, 3, 16))
+        assertEquals(WeekVerdict.GraceMiss, after.progressOn(LocalDate.of(2026, 3, 9)).verdict)
+        assertEquals(2, after.progressOn(LocalDate.of(2026, 3, 9)).streak)
+        assertEquals(2, after.current.streak)
+        assertEquals(WeekVerdict.InProgress, after.current.verdict)
+    }
+
+    @Test
+    fun laterGoalChangeDoesNotRescoreWeeksBeforeNextMonday() {
+        val first = WeeklyGoalLogic.planFirstGoal(LocalDate.of(2026, 3, 12), 4, LocalDate.of(2026, 3, 2))
+        val changed = WeeklyGoalLogic.apply(
+            first,
+            WeeklyGoalLogic.propose(first, LocalDate.of(2026, 3, 12), 3)!!
+        )
+        val counts = weekCounts(LocalDate.of(2026, 3, 2), 3) + mapOf(LocalDate.of(2026, 3, 10) to 3)
+        val status = WeeklyGoalLogic.evaluate(changed, counts, LocalDate.of(2026, 3, 12))
+        assertEquals(4, status.progressOn(LocalDate.of(2026, 3, 2)).goal)
+        assertEquals(WeekVerdict.Missed, status.progressOn(LocalDate.of(2026, 3, 2)).verdict)
+        assertEquals(4, status.current.goal)
+        assertEquals(3, status.pending?.let { (it as PendingWeeklyGoal.Update).workoutsPerWeek })
+        val next = WeeklyGoalLogic.evaluate(changed, counts + weekCounts(LocalDate.of(2026, 3, 16), 3), LocalDate.of(2026, 3, 18))
+        assertEquals(3, next.current.goal)
+        assertEquals(1, next.current.streak)
+    }
+
+    @Test
+    fun reenablingDoesNotBridgeTheDisabledWeeksOrRewriteTheOldGoal() {
+        val first = WeeklyGoalLogic.planFirstGoal(LocalDate.of(2026, 3, 12), 4, LocalDate.of(2026, 2, 23))
+        val disabled = WeeklyGoalLogic.apply(first, WeeklyGoalLogic.propose(first, LocalDate.of(2026, 3, 12), null)!!)
+        val resumed = WeeklyGoalLogic.apply(
+            disabled,
+            WeeklyGoalLogic.propose(disabled, LocalDate.of(2026, 3, 25), 3)!!
+        )
+        assertEquals(4, WeeklyGoalLogic.applicableGoal(resumed, LocalDate.of(2026, 3, 2)))
+        assertNull(WeeklyGoalLogic.applicableGoal(resumed, LocalDate.of(2026, 3, 16)))
+        assertEquals(3, WeeklyGoalLogic.applicableGoal(resumed, LocalDate.of(2026, 3, 23)))
+        val counts = weekCounts(LocalDate.of(2026, 2, 23), 4) +
+            weekCounts(LocalDate.of(2026, 3, 2), 4) +
+            weekCounts(LocalDate.of(2026, 3, 16), 4) +
+            weekCounts(LocalDate.of(2026, 3, 23), 3)
+        val status = WeeklyGoalLogic.evaluate(resumed, counts, LocalDate.of(2026, 3, 25))
+        assertEquals(2, status.progressOn(LocalDate.of(2026, 3, 2)).streak)
+        assertEquals(0, status.progressOn(LocalDate.of(2026, 3, 16)).streak)
+        assertEquals(WeekVerdict.NoGoal, status.progressOn(LocalDate.of(2026, 3, 16)).verdict)
+        assertEquals(1, status.current.streak)
+    }
+
+    @Test
+    fun severalCompletionsOnOneDayCountTowardTheInheritedWeek() {
+        val monday = LocalDate.of(2026, 3, 2)
+        val status = firstGoal(
+            earliest = monday,
+            counts = mapOf(monday to 4)
+        )
+        assertEquals(4, status.progressOn(monday).completed)
+        assertEquals(1, status.progressOn(monday).streak)
+    }
+
+    private fun firstGoal(
+        earliest: LocalDate,
+        counts: Map<LocalDate, Int>,
+        today: LocalDate = LocalDate.of(2026, 3, 12)
+    ) = WeeklyGoalLogic.evaluate(
+        WeeklyGoalLogic.planFirstGoal(today, 4, earliest),
+        counts,
+        today
+    )
+
+    private fun weekCounts(monday: LocalDate, sessions: Int): Map<LocalDate, Int> {
+        return (0 until sessions).associate { offset -> monday.plusDays(offset.toLong()) to 1 }
     }
 }

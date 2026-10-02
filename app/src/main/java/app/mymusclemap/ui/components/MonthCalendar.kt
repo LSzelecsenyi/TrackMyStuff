@@ -165,7 +165,33 @@ fun MonthCalendar(
     }
 }
 
-private val StreakColumnWidth = 40.dp
+private val StreakColumnWidth = 52.dp
+internal val WeeklyStreakIconSize = 22.dp
+
+@Composable
+internal fun WeekStreakBadge(
+    streak: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.EmojiEvents,
+            contentDescription = pluralStringResource(R.plurals.weekly_goal_streak, streak, streak),
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(WeeklyStreakIconSize)
+        )
+        Text(
+            text = streak.toString(),
+            style = AppTypeTokens.sectionTitle,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1
+        )
+    }
+}
 
 @Composable
 private fun WeekStreakMark(streak: Int) {
@@ -173,27 +199,12 @@ private fun WeekStreakMark(streak: Int) {
         modifier = Modifier
             .width(StreakColumnWidth)
             .height(AppDimens.calendarCell)
+            .padding(start = 4.dp, end = 2.dp)
             .testTag("calendar-week-streak"),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.CenterEnd
     ) {
         if (streak > 0) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.EmojiEvents,
-                    contentDescription = pluralStringResource(R.plurals.weekly_goal_streak, streak, streak),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = streak.toString(),
-                    style = AppTypeTokens.statCaption,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1
-                )
-            }
+            WeekStreakBadge(streak)
         }
     }
 }
