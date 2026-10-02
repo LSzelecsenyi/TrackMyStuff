@@ -41,6 +41,32 @@ class ProgressPhotoStore(
             .orEmpty()
     }
 
+    fun stagingDirectory(): File {
+        val parent = directory.parentFile ?: directory
+        return File(parent, "${directory.name}_restore_staging")
+    }
+
+    fun restoreMarker(): File {
+        val parent = directory.parentFile ?: directory
+        return File(parent, "${directory.name}_restore_marker.json")
+    }
+
+    fun copyFrom(fileName: String, source: File): Boolean {
+        val target = resolve(fileName) ?: return false
+        if (source.canonicalFile == target.canonicalFile) return true
+        prepare()
+        source.inputStream().use { input ->
+            target.outputStream().use { output -> input.copyTo(output) }
+        }
+        return target.isFile
+    }
+
+    fun deleteJpegsExcept(keep: Set<String>) {
+        ownedFileNames()
+            .filter { it !in keep }
+            .forEach(::deleteOwned)
+    }
+
     companion object {
         const val DIRECTORY_NAME = "progress_photos"
         private val FILE_NAME = Regex(
@@ -49,5 +75,7 @@ class ProgressPhotoStore(
         private val OWNED_NAME = Regex(
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.jpg(\\.part)?"
         )
+
+        fun isPortableFileName(name: String): Boolean = FILE_NAME.matches(name)
     }
 }

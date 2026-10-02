@@ -61,7 +61,8 @@ import kotlin.math.sin
  * entity model the app exports, then encodes them with [AppBackupJson]. Nothing
  * here is referenced from production source, and it never opens the app database.
  *
- * The checked-in example is [DemoTrainingHistoryPaths.backupFile]. Normal tests
+ * The checked-in example is [DemoTrainingHistoryPaths.backupFile], under
+ * `app/src/test/resources`, because `/dev` is gitignored. Normal tests
  * always use [referenceDate] and ignore Gradle properties. Regenerate the file
  * from the repository root. Quote each `-P` on PowerShell:
  *
@@ -1888,7 +1889,7 @@ object DemoTrainingHistoryPaths {
             File(cwd, "src/test").isDirectory -> cwd.parentFile
             else -> error("Cannot locate the repository root from $cwd")
         }
-        return File(repoRoot, "dev/$FILE_NAME")
+        return File(repoRoot, "app/src/test/resources/$FILE_NAME")
     }
 }
 

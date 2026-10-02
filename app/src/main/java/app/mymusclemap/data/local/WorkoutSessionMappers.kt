@@ -8,6 +8,7 @@ import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
+import app.mymusclemap.domain.workout.SetDraftCodec
 import app.mymusclemap.domain.workout.WorkoutSession
 import java.time.LocalDate
 
@@ -76,7 +77,8 @@ fun WorkoutSessionSetEntity.toModel(): SessionSet {
         actualDistanceMeters = actualDistanceMeters,
         status = runCatching { SessionSetStatus.valueOf(status) }.getOrDefault(SessionSetStatus.PENDING),
         completedAt = completedAt,
-        addedDuringWorkout = addedDuringWorkout
+        addedDuringWorkout = addedDuringWorkout,
+        draft = SetDraftCodec.decode(draftPayload)
     )
 }
 

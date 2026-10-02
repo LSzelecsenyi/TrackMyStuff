@@ -1,6 +1,7 @@
 package app.mymusclemap.data.appbackup
 
 import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
+import app.mymusclemap.data.progress.ProgressPhotoStore
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MovementPattern
@@ -290,6 +291,22 @@ object AppBackupValidator {
         tables.workoutSessionSets.forEach { row ->
             if (row.sessionExerciseId !in sessionExerciseIds) {
                 errors += AppBackupError(AppBackupErrorCode.MissingRelation, "workout_session_sets.sessionExerciseId")
+            }
+        }
+        if (tables.replacesProgressPhotos) {
+            requireUnique(tables.progressPhotos.map { it.id }, "progress_photos.id", errors)
+            requireUnique(tables.progressPhotos.map { it.fileName }, "progress_photos.fileName", errors)
+            if (tables.progressPhotos.size > AppBackupFormat.MAX_PROGRESS_PHOTOS) {
+                errors += AppBackupError(AppBackupErrorCode.FileTooLarge, "progress_photos")
+            }
+            tables.progressPhotos.forEach { row ->
+                requireIsoDate(row.date, "progress_photos.date", errors)
+                if (!ProgressPhotoStore.isPortableFileName(row.fileName)) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_photos.fileName")
+                }
+                if (row.createdAt < 0 || row.updatedAt < 0) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_photos.timestamp")
+                }
             }
         }
         return errors.distinct()

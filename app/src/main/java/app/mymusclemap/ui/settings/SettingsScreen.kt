@@ -1038,11 +1038,26 @@ private fun csvErrorText(error: WeightCsv.RowError): String {
 private fun restoreErrorText(error: AppBackupError): String {
     val reason = when (error.code) {
         AppBackupErrorCode.UnsupportedFormatVersion,
-        AppBackupErrorCode.UnsupportedSchemaVersion ->
+        AppBackupErrorCode.UnsupportedSchemaVersion,
+        AppBackupErrorCode.UnsupportedContainerVersion ->
             stringResource(R.string.restore_app_backup_error_unsupported)
+        AppBackupErrorCode.CorruptBackup,
+        AppBackupErrorCode.InvalidPhoto,
+        AppBackupErrorCode.InvalidJson ->
+            stringResource(R.string.restore_app_backup_error_corrupt)
+        AppBackupErrorCode.IncompleteBackup,
+        AppBackupErrorCode.MissingField ->
+            stringResource(R.string.restore_app_backup_error_incomplete)
+        AppBackupErrorCode.RestoreFailed ->
+            stringResource(R.string.restore_app_backup_error_failed)
         else -> stringResource(R.string.restore_app_backup_error_invalid)
     }
-    return if (error.detail.isNullOrBlank()) reason else "$reason (${error.detail})"
+    val safeDetail = error.code == AppBackupErrorCode.InvalidValue ||
+        error.code == AppBackupErrorCode.InvalidType ||
+        error.code == AppBackupErrorCode.DuplicateKey ||
+        error.code == AppBackupErrorCode.MissingRelation ||
+        error.code == AppBackupErrorCode.FileTooLarge
+    return if (!safeDetail || error.detail.isNullOrBlank()) reason else "$reason (${error.detail})"
 }
 
 @Composable

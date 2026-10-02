@@ -1,6 +1,7 @@
 package app.mymusclemap.ui.workout
 
 import android.content.Context
+import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.MainDispatcherRule
@@ -28,8 +29,11 @@ import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
 import app.mymusclemap.domain.workout.TemplateSaveResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import androidx.lifecycle.viewModelScope
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -53,6 +57,8 @@ class WorkoutHubViewModelTest {
 
     private lateinit var database: WeightDatabase
     private lateinit var repository: ExerciseRepository
+    private val viewModelStore = ViewModelStore()
+    private val viewModels = mutableListOf<WorkoutHubViewModel>()
     private lateinit var templates: WorkoutTemplateRepository
     private lateinit var weights: WeightRepository
     private val today = LocalDate.parse("2026-09-15")
@@ -78,7 +84,12 @@ class WorkoutHubViewModelTest {
 
     @After
     fun tearDown() {
+        val jobs = viewModels.map { it.viewModelScope.coroutineContext[Job]!! }
+        viewModelStore.clear()
+        runBlocking { jobs.forEach { it.join() } }
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
         database.close()
+        viewModels.clear()
     }
 
     @Test
@@ -424,7 +435,7 @@ class WorkoutHubViewModelTest {
         sessionRepository: WorkoutSessionRepository = sessions(),
         dateProvider: app.mymusclemap.domain.DateProvider = FixedDateProvider(today)
     ): WorkoutHubViewModel {
-        return WorkoutHubViewModel(
+        val viewModel = WorkoutHubViewModel(
             repository,
             templates,
             sessionRepository,
@@ -436,6 +447,9 @@ class WorkoutHubViewModelTest {
             ),
             dateProvider
         )
+        viewModelStore.put("hub-${viewModels.size}", viewModel)
+        viewModels += viewModel
+        return viewModel
     }
 
     private fun scheduled(): ScheduledWorkoutRepository {

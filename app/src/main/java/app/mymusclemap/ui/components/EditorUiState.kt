@@ -32,6 +32,7 @@ sealed interface UserMessage {
     data object ExportFailed : UserMessage
     data object ImportReadFailed : UserMessage
     data object AppBackupExportSucceeded : UserMessage
+    data class AppBackupExportSkippedPhotos(val count: Int) : UserMessage
     data object AppBackupExportFailed : UserMessage
     data object AppBackupRestoreSucceeded : UserMessage
     data object AppBackupReadFailed : UserMessage

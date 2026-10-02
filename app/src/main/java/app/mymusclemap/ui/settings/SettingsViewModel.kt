@@ -6,6 +6,7 @@ import app.mymusclemap.BuildConfig
 import app.mymusclemap.data.appbackup.AppBackupError
 import app.mymusclemap.data.appbackup.AppBackupRestoreResult
 import app.mymusclemap.data.appbackup.AppBackupSource
+import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
@@ -32,7 +33,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.InputStream
+import java.io.OutputStream
 
 data class SettingsUiState(
     val appearance: AppearanceSettings = AppearanceSettings.Default,
@@ -300,11 +306,20 @@ class SettingsViewModel(
         return appBackupRepository.exportJson(source)
     }
 
-    fun onAppBackupExportFinished(success: Boolean) {
-        userMessage.value = if (success) {
-            UserMessage.AppBackupExportSucceeded
-        } else {
-            UserMessage.AppBackupExportFailed
+    suspend fun writeAppBackup(source: AppBackupSource, output: OutputStream): AppBackupWriteResult {
+        return appBackupRepository.exportArchive(source, output)
+    }
+
+    fun onAppBackupExportFinished(result: AppBackupWriteResult) {
+        userMessage.value = when (result) {
+            is AppBackupWriteResult.Written -> {
+                if (result.skippedMissingPhotos > 0) {
+                    UserMessage.AppBackupExportSkippedPhotos(result.skippedMissingPhotos)
+                } else {
+                    UserMessage.AppBackupExportSucceeded
+                }
+            }
+            AppBackupWriteResult.Failed -> UserMessage.AppBackupExportFailed
         }
     }
 
@@ -326,6 +341,28 @@ class SettingsViewModel(
 
     fun restoreAppBackup(bytes: ByteArray) {
         restoreParsed { appBackupRepository.restoreBytes(bytes) }
+    }
+
+    fun restoreAppBackup(open: () -> InputStream) {
+        viewModelScope.launch {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    open().use { appBackupRepository.restore(it) }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            when (result) {
+                AppBackupRestoreResult.Success -> {
+                    restoreErrors.value = emptyList()
+                    userMessage.value = UserMessage.AppBackupRestoreSucceeded
+                }
+                is AppBackupRestoreResult.Invalid -> restoreErrors.value = result.errors
+                null -> userMessage.value = UserMessage.AppBackupReadFailed
+            }
+        }
     }
 
     private fun restoreParsed(restore: suspend () -> AppBackupRestoreResult) {

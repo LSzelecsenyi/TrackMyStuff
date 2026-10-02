@@ -230,7 +230,8 @@ abstract class WorkoutSessionDao {
                     actualDurationSeconds = null,
                     actualDistanceMeters = null,
                     status = "SKIPPED",
-                    completedAt = null
+                    completedAt = null,
+                    draftPayload = null
                 )
             )
         }

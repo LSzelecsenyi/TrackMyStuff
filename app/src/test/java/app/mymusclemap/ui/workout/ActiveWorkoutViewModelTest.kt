@@ -2,6 +2,7 @@ package app.mymusclemap.ui.workout
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.MainDispatcherRule
@@ -58,6 +59,8 @@ class ActiveWorkoutViewModelTest {
     private lateinit var exercises: ExerciseRepository
     private lateinit var templates: WorkoutTemplateRepository
     private lateinit var sessions: WorkoutSessionRepository
+    private val viewModelStore = ViewModelStore()
+    private var viewModelKey = 0
     private val today = LocalDate.parse("2026-09-16")
 
     @Before
@@ -91,6 +94,8 @@ class ActiveWorkoutViewModelTest {
 
     @After
     fun tearDown() {
+        viewModelStore.clear()
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
         database.close()
     }
 
@@ -503,6 +508,57 @@ class ActiveWorkoutViewModelTest {
         assertNull(viewModel.uiState.value.focusEvent)
     }
 
+    @Test
+    fun debouncedEditsKeepTheNewestDraft() = runTest {
+        val viewModel = startSingleSet()
+        val setId = viewModel.loaded().aggregate!!.exercises.single().sets.single().id
+        viewModel.onReps(setId, "6")
+        viewModel.onReps(setId, "11")
+        mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        val payload = awaitDraft(setId)
+        assertTrue(payload.contains("\"reps\":\"11\""))
+        assertFalse(payload.contains("\"reps\":\"6\""))
+        val set = sessions.getAggregate(sessionId)!!.exercises.single().sets.single()
+        assertEquals(SessionSetStatus.PENDING, set.status)
+    }
+
+    @Test
+    fun completingDuringAPendingDraftWriteDoesNotRestoreTheDraft() = runTest {
+        val viewModel = startSingleSet()
+        val setId = viewModel.loaded().aggregate!!.exercises.single().sets.single().id
+        viewModel.onReps(setId, "9")
+        viewModel.completeSet(setId)
+        viewModel.uiState.first {
+            it.aggregate?.exercises?.single()?.sets?.single()?.status == SessionSetStatus.COMPLETED
+        }
+        mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        val row = database.workoutSessionDao().getSet(setId)!!
+        assertEquals(SessionSetStatus.COMPLETED.name, row.status)
+        assertNull(row.draftPayload)
+        assertEquals(9, row.actualReps)
+    }
+
+    private suspend fun awaitDraft(setId: Long): String {
+        lateinit var payload: String
+        withContext(Dispatchers.Default.limitedParallelism(1)) {
+            withTimeout(5_000) {
+                while (true) {
+                    mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
+                    mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+                    val stored = database.workoutSessionDao().getSet(setId)?.draftPayload
+                    if (stored != null) {
+                        payload = stored
+                        return@withTimeout
+                    }
+                    kotlinx.coroutines.delay(20)
+                }
+            }
+        }
+        return payload
+    }
+
     private suspend fun startTwoExercises(): ActiveWorkoutViewModel {
         val pull = savePull()
         val dip = saveDip()
@@ -526,10 +582,12 @@ class ActiveWorkoutViewModelTest {
     }
 
     private fun active(sessionId: Long): ActiveWorkoutViewModel {
-        return ActiveWorkoutViewModel(
+        val viewModel = ActiveWorkoutViewModel(
             SavedStateHandle(mapOf(ActiveWorkoutViewModel.SESSION_ID to sessionId)),
             sessions
         )
+        viewModelStore.put("active-${viewModelKey++}", viewModel)
+        return viewModel
     }
 
     private suspend fun ActiveWorkoutViewModel.loaded(): ActiveWorkoutUiState {

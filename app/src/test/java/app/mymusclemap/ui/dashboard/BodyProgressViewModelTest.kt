@@ -116,8 +116,9 @@ class BodyProgressViewModelTest {
                 current.rows.single { it.type == BodyMeasurementType.CHEST }.latest!!.value == 102.0
             }
             viewModel.openBodyEditor(BodyMeasurementType.CHEST, null)
-            assertEquals(AppFeature.AdvancedBodyMeasurements, viewModel.uiState.value.lockedFeature)
-            assertNull(viewModel.uiState.value.bodyEditor)
+            val locked = viewModel.uiState.first { it.lockedFeature != null || it.bodyEditor != null }
+            assertEquals(AppFeature.AdvancedBodyMeasurements, locked.lockedFeature)
+            assertNull(locked.bodyEditor)
 
             viewModel.showBodyMeasurementLocked(BodyMeasurementType.BODY_FAT)
             assertEquals(AppFeature.AdvancedBodyMeasurements, viewModel.uiState.value.lockedFeature)

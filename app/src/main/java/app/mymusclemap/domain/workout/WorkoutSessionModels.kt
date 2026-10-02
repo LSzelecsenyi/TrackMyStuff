@@ -60,7 +60,8 @@ data class SessionSet(
     val actualDistanceMeters: Double?,
     val status: SessionSetStatus,
     val completedAt: Long?,
-    val addedDuringWorkout: Boolean
+    val addedDuringWorkout: Boolean,
+    val draft: ActualSetDraft? = null
 )
 
 data class SessionExerciseItem(

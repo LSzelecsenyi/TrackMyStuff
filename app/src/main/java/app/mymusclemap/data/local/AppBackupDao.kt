@@ -126,6 +126,15 @@ abstract class AppBackupDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertWeeklyWorkoutGoals(rows: List<WeeklyWorkoutGoalEntity>)
 
+    @Query("SELECT * FROM progress_photos ORDER BY id ASC")
+    abstract suspend fun getProgressPhotos(): List<ProgressPhotoEntity>
+
+    @Query("DELETE FROM progress_photos")
+    abstract suspend fun deleteProgressPhotos()
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertProgressPhotos(rows: List<ProgressPhotoEntity>)
+
     @Transaction
     open suspend fun loadTables(): AppBackupTables {
         return AppBackupTables(
@@ -141,7 +150,8 @@ abstract class AppBackupDao {
             workoutSessionExerciseMuscles = getWorkoutSessionExerciseMuscles(),
             workoutSessionSets = getWorkoutSessionSets(),
             bodyMeasurements = getBodyMeasurements(),
-            weeklyWorkoutGoals = getWeeklyWorkoutGoals()
+            weeklyWorkoutGoals = getWeeklyWorkoutGoals(),
+            progressPhotos = getProgressPhotos()
         )
     }
 
@@ -198,6 +208,12 @@ abstract class AppBackupDao {
         }
         if (tables.weeklyWorkoutGoals.isNotEmpty()) {
             insertWeeklyWorkoutGoals(tables.weeklyWorkoutGoals)
+        }
+        if (tables.replacesProgressPhotos) {
+            deleteProgressPhotos()
+            if (tables.progressPhotos.isNotEmpty()) {
+                insertProgressPhotos(tables.progressPhotos)
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ package app.mymusclemap.data.appbackup
 import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
+import app.mymusclemap.data.local.ProgressPhotoEntity
 import app.mymusclemap.data.local.ScheduledWorkoutEntity
 import app.mymusclemap.data.local.WeightMeasurementEntity
 import app.mymusclemap.data.local.WorkoutSessionEntity
@@ -18,9 +19,22 @@ import java.time.Instant
 object AppBackupFormat {
     const val FORMAT = "my-muscle-map-backup"
     const val FORMAT_VERSION = 1
+    /** Structured JSON still written by the legacy exporter and accepted from old files. */
     const val SCHEMA_VERSION = 8
+    /** Structured JSON stored inside a photo archive. Not accepted as a loose JSON file. */
+    const val ARCHIVE_DATA_SCHEMA_VERSION = 9
+    const val CONTAINER_VERSION = 1
     const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024
+    const val MAX_ARCHIVE_ENTRIES = 2_050
+    const val MAX_PROGRESS_PHOTOS = 2_000
+    const val MAX_PROGRESS_PHOTO_BYTES = 12 * 1024 * 1024
+    const val MAX_PROGRESS_PHOTO_BYTES_TOTAL = 512L * 1024 * 1024
+    const val MAX_PROGRESS_PHOTO_EDGE = 8_000
+
+    const val ARCHIVE_MANIFEST = "manifest.json"
+    const val ARCHIVE_DATA = "data.json"
+    const val ARCHIVE_PHOTO_DIRECTORY = "progress_photos/"
 
     const val TABLE_WEIGHT_MEASUREMENTS = "weight_measurements"
     const val TABLE_BODY_MEASUREMENTS = "body_measurements"
@@ -35,6 +49,7 @@ object AppBackupFormat {
     const val TABLE_WORKOUT_SESSION_EXERCISE_MUSCLES = "workout_session_exercise_muscles"
     const val TABLE_WORKOUT_SESSION_SETS = "workout_session_sets"
     const val TABLE_WEEKLY_WORKOUT_GOALS = "weekly_workout_goals"
+    const val TABLE_PROGRESS_PHOTOS = "progress_photos"
 
     val TABLE_NAMES: List<String> = listOf(
         TABLE_WEIGHT_MEASUREMENTS,
@@ -69,7 +84,9 @@ data class AppBackupTables(
     val workoutSessionExerciseMuscles: List<WorkoutSessionExerciseMuscleEntity>,
     val workoutSessionSets: List<WorkoutSessionSetEntity>,
     val bodyMeasurements: List<BodyMeasurementEntity> = emptyList(),
-    val weeklyWorkoutGoals: List<WeeklyWorkoutGoalEntity> = emptyList()
+    val weeklyWorkoutGoals: List<WeeklyWorkoutGoalEntity> = emptyList(),
+    val progressPhotos: List<ProgressPhotoEntity> = emptyList(),
+    val replacesProgressPhotos: Boolean = false
 )
 
 data class AppBackupSnapshot(
@@ -97,7 +114,17 @@ enum class AppBackupErrorCode {
     InvalidType,
     InvalidValue,
     DuplicateKey,
-    MissingRelation
+    MissingRelation,
+    UnsupportedContainerVersion,
+    CorruptBackup,
+    IncompleteBackup,
+    InvalidPhoto,
+    RestoreFailed
+}
+
+sealed class AppBackupWriteResult {
+    data class Written(val skippedMissingPhotos: Int) : AppBackupWriteResult()
+    data object Failed : AppBackupWriteResult()
 }
 
 sealed class AppBackupParseResult {

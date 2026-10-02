@@ -41,6 +41,7 @@ import androidx.navigation.navArgument
 import app.mymusclemap.R
 import app.mymusclemap.WeightViewModelFactory
 import app.mymusclemap.data.appbackup.AppBackupSource
+import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.reports.ReportPeriod
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
@@ -1247,43 +1248,34 @@ private fun SettingsRoute(
         }
     }
     val appBackupExportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
+        contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val json = viewModel.buildAppBackupJson(
-                AppBackupSource(
-                    applicationId = context.packageName,
-                    versionName = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-                )
+            val source = AppBackupSource(
+                applicationId = context.packageName,
+                versionName = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
             )
-            val success = withContext(Dispatchers.IO) {
-                runCatching {
+            val result = withContext(Dispatchers.IO) {
+                try {
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        stream.write(json.toByteArray(StandardCharsets.UTF_8))
-                    } ?: error("missing stream")
-                }.isSuccess
+                        viewModel.writeAppBackup(source, stream)
+                    } ?: AppBackupWriteResult.Failed
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    AppBackupWriteResult.Failed
+                }
             }
-            viewModel.onAppBackupExportFinished(success)
+            viewModel.onAppBackupExportFinished(result)
         }
     }
     val appBackupImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val bytes = withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        stream.readBytes()
-                    }
-                }.getOrNull()
-            }
-            if (bytes == null) {
-                viewModel.onAppBackupReadFailed()
-            } else {
-                viewModel.restoreAppBackup(bytes)
-            }
+        viewModel.restoreAppBackup {
+            context.contentResolver.openInputStream(uri) ?: error("missing stream")
         }
     }
     SettingsScreen(
@@ -1303,7 +1295,7 @@ private fun SettingsRoute(
         },
         onImportClick = viewModel::onImportClicked,
         onAppBackupExportClick = {
-            appBackupExportLauncher.launch("my_muscle_map_backup_${today}.json")
+            appBackupExportLauncher.launch("strict-backup-$today.zip")
         },
         onRestoreClick = viewModel::onRestoreClicked,
         onConfirmImportExplanation = {
@@ -1314,7 +1306,15 @@ private fun SettingsRoute(
         onDismissImportErrors = viewModel::dismissImportErrors,
         onConfirmRestoreExplanation = {
             viewModel.confirmRestoreExplanation()
-            appBackupImportLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/*"))
+            appBackupImportLauncher.launch(
+                arrayOf(
+                    "application/zip",
+                    "application/json",
+                    "application/octet-stream",
+                    "text/*",
+                    "*/*"
+                )
+            )
         },
         onDismissRestoreExplanation = viewModel::dismissRestoreExplanation,
         onDismissRestoreErrors = viewModel::dismissRestoreErrors,

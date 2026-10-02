@@ -27,6 +27,7 @@ import app.mymusclemap.domain.workout.SessionMutationResult
 import app.mymusclemap.domain.workout.SessionProgressLogic
 import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
+import app.mymusclemap.domain.workout.SetDraftCodec
 import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.musclemap.MuscleTrainingExercise
 import app.mymusclemap.domain.workout.WorkoutSession
@@ -451,6 +452,31 @@ class WorkoutSessionRepository(
         }
     }
 
+    suspend fun saveSetDraft(setId: Long, draft: ActualSetDraft): SessionMutationResult =
+        saveSetDraft(setId) { draft }
+
+    /**
+     * [resolveDraft] runs inside the session mutex. Return null to skip the write when a newer
+     * edit, completion, or deletion has already superseded this attempt.
+     */
+    suspend fun saveSetDraft(
+        setId: Long,
+        resolveDraft: () -> ActualSetDraft?
+    ): SessionMutationResult = mutex.withLock {
+        val draft = resolveDraft() ?: return SessionMutationResult.NotActive
+        val set = sessionDao.getSet(setId) ?: return SessionMutationResult.NotFound
+        if (set.status != SessionSetStatus.PENDING.name) {
+            return SessionMutationResult.NotActive
+        }
+        val exercise = sessionDao.getExercise(set.sessionExerciseId) ?: return SessionMutationResult.NotFound
+        val session = sessionDao.getById(exercise.sessionId) ?: return SessionMutationResult.NotFound
+        if (session.status != SessionStatus.IN_PROGRESS.name) {
+            return SessionMutationResult.NotActive
+        }
+        sessionDao.updateSet(set.copy(draftPayload = SetDraftCodec.encode(draft)))
+        SessionMutationResult.Updated
+    }
+
     suspend fun completeSet(setId: Long, draft: ActualSetDraft): SessionMutationResult = mutex.withLock {
         mutateActiveSet(setId) { set, exercise, now ->
             val (values, errors) = ActualSetLogic.parse(
@@ -470,7 +496,8 @@ class WorkoutSessionRepository(
                     actualDurationSeconds = values.durationSeconds,
                     actualDistanceMeters = values.distanceMeters,
                     status = SessionSetStatus.COMPLETED.name,
-                    completedAt = completedAt
+                    completedAt = completedAt,
+                    draftPayload = null
                 )
             )
             SessionMutationResult.Updated
@@ -487,7 +514,8 @@ class WorkoutSessionRepository(
                     actualDurationSeconds = null,
                     actualDistanceMeters = null,
                     status = SessionSetStatus.SKIPPED.name,
-                    completedAt = null
+                    completedAt = null,
+                    draftPayload = null
                 )
             )
             SessionMutationResult.Updated
@@ -507,7 +535,8 @@ class WorkoutSessionRepository(
                     actualDurationSeconds = set.plannedDurationSeconds,
                     actualDistanceMeters = set.plannedDistanceMeters,
                     status = SessionSetStatus.PENDING.name,
-                    completedAt = null
+                    completedAt = null,
+                    draftPayload = null
                 )
             )
             SessionMutationResult.Updated

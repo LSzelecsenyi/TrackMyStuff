@@ -148,5 +148,6 @@ data class WorkoutSessionSetEntity(
     val actualDistanceMeters: Double?,
     val status: String,
     val completedAt: Long?,
-    val addedDuringWorkout: Boolean
+    val addedDuringWorkout: Boolean,
+    val draftPayload: String? = null
 )

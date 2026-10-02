@@ -35,8 +35,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import java.time.Clock
 
 data class WorkoutFocusEvent(
@@ -111,6 +113,8 @@ class ActiveWorkoutViewModel(
     private val focusedSetId = MutableStateFlow<Long?>(null)
     private val expandedIds = MutableStateFlow<Set<Long>>(emptySet())
     private var focusGeneration = 0L
+    private val draftJobs = mutableMapOf<Long, Job>()
+    private val draftEpoch = ConcurrentHashMap<Long, Long>()
 
     private data class Dialogs(
         val now: Long,
@@ -308,6 +312,7 @@ class ActiveWorkoutViewModel(
         if (discarding.value || setId in completingIds.value) {
             return
         }
+        cancelDraftPersist(setId)
         val snapshot = uiState.value
         val draft = snapshot.drafts[setId] ?: return
         val currentStatus = snapshot.aggregate
@@ -329,6 +334,7 @@ class ActiveWorkoutViewModel(
                     }
                     is SessionMutationResult.Invalid -> {
                         setErrors.value = setErrors.value + (setId to result.errors)
+                        scheduleDraftSave(setId)
                     }
                     SessionMutationResult.NotFound,
                     SessionMutationResult.NotActive,
@@ -350,6 +356,7 @@ class ActiveWorkoutViewModel(
         if (discarding.value || setId in completingIds.value) {
             return
         }
+        cancelDraftPersist(setId)
         completingIds.value = completingIds.value + setId
         viewModelScope.launch {
             try {
@@ -400,6 +407,7 @@ class ActiveWorkoutViewModel(
         if (discarding.value) {
             return
         }
+        cancelDraftPersist(setId)
         viewModelScope.launch {
             when (sessionRepository.removeExtraSet(setId)) {
                 SessionMutationResult.Updated -> message.value = ActiveWorkoutMessage.ExtraRemoved
@@ -561,6 +569,31 @@ class ActiveWorkoutViewModel(
         dirtyIds.value = dirtyIds.value + setId
         drafts.value = uiState.value.drafts + (setId to transform(current))
         setErrors.value = setErrors.value - setId
+        scheduleDraftSave(setId)
+    }
+
+    private fun scheduleDraftSave(setId: Long) {
+        val epoch = (draftEpoch[setId] ?: 0L) + 1L
+        draftEpoch[setId] = epoch
+        draftJobs.remove(setId)?.cancel()
+        draftJobs[setId] = viewModelScope.launch {
+            delay(DRAFT_PERSIST_DELAY_MS)
+            sessionRepository.saveSetDraft(setId) {
+                if (draftEpoch[setId] != epoch) {
+                    null
+                } else {
+                    drafts.value[setId]
+                }
+            }
+            if (draftEpoch[setId] == epoch) {
+                draftJobs.remove(setId)
+            }
+        }
+    }
+
+    private fun cancelDraftPersist(setId: Long) {
+        draftEpoch[setId] = (draftEpoch[setId] ?: 0L) + 1L
+        draftJobs.remove(setId)?.cancel()
     }
 
     private fun mergeDrafts(
@@ -582,5 +615,6 @@ class ActiveWorkoutViewModel(
     companion object {
         const val SESSION_ID = "sessionId"
         const val SELECTED_INDEX = "selectedIndex"
+        const val DRAFT_PERSIST_DELAY_MS = 400L
     }
 }

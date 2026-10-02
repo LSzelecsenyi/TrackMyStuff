@@ -76,16 +76,20 @@ class AppContainer(context: Context) {
         }
     )
     val themePreferences = ThemePreferences(appContext)
+    val progressPhotoStore = ProgressPhotoStore(
+        File(appContext.filesDir, ProgressPhotoStore.DIRECTORY_NAME)
+    )
     val appBackupRepository = AppBackupRepository(
         database,
         themePreferences,
+        progressPhotoStore = progressPhotoStore,
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) }
     )
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
     val progressPhotoRepository = ProgressPhotoRepository(
         dao = database.progressPhotoDao(),
-        store = ProgressPhotoStore(File(appContext.filesDir, ProgressPhotoStore.DIRECTORY_NAME)),
+        store = progressPhotoStore,
         clock = clock,
         dateProvider = dateProvider
     )

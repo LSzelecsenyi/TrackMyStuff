@@ -182,6 +182,9 @@ object ActualSetLogic {
     fun clearActualsOnSkip(): Boolean = true
 
     fun draftFromSet(set: SessionSet): ActualSetDraft {
+        if (set.status == SessionSetStatus.PENDING && set.draft != null) {
+            return set.draft
+        }
         val sourceKind = set.actualLoadKind ?: set.plannedLoadKind
         val sourceReps = set.actualReps ?: set.plannedMinReps
         val sourceWeight = set.actualWeightKg ?: set.plannedWeightKg

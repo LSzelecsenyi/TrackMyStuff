@@ -3,6 +3,7 @@ package app.mymusclemap.data.appbackup
 import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
+import app.mymusclemap.data.local.ProgressPhotoEntity
 import app.mymusclemap.data.local.ScheduledWorkoutEntity
 import app.mymusclemap.data.local.WeightMeasurementEntity
 import app.mymusclemap.data.local.WorkoutSessionEntity
@@ -286,6 +287,23 @@ object AppBackupJson {
                 }
             }
         )
+        if (snapshot.schemaVersion >= AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION) {
+            tables.put(
+                AppBackupFormat.TABLE_PROGRESS_PHOTOS,
+                JSONArray().also { array ->
+                    snapshot.tables.progressPhotos.sortedBy { it.id }.forEach { row ->
+                        array.put(
+                            JSONObject()
+                                .put("id", row.id)
+                                .put("date", row.date)
+                                .put("fileName", row.fileName)
+                                .put("createdAt", row.createdAt)
+                                .put("updatedAt", row.updatedAt)
+                        )
+                    }
+                }
+            )
+        }
         root.put("tables", tables)
         val settings = JSONObject()
         snapshot.settings.toSortedMap().forEach { (key, value) ->
@@ -307,7 +325,10 @@ object AppBackupJson {
         return parse(text)
     }
 
-    fun parse(content: String): AppBackupParseResult {
+    fun parse(
+        content: String,
+        maxSchemaVersion: Int = AppBackupFormat.SCHEMA_VERSION
+    ): AppBackupParseResult {
         val text = content.removePrefix("\uFEFF")
         if (text.isBlank()) {
             return AppBackupParseResult.Failure(listOf(AppBackupError(AppBackupErrorCode.EmptyFile)))
@@ -342,7 +363,7 @@ object AppBackupJson {
         val schemaVersion = root.optionalInt("schemaVersion")
         if (schemaVersion == null) {
             errors += AppBackupError(AppBackupErrorCode.MissingField, "schemaVersion")
-        } else if (schemaVersion !in AppBackupFormat.MIN_SUPPORTED_SCHEMA_VERSION..AppBackupFormat.SCHEMA_VERSION) {
+        } else if (schemaVersion !in AppBackupFormat.MIN_SUPPORTED_SCHEMA_VERSION..maxSchemaVersion) {
             errors += AppBackupError(
                 AppBackupErrorCode.UnsupportedSchemaVersion,
                 schemaVersion.toString()
@@ -380,6 +401,22 @@ object AppBackupJson {
                 errors += AppBackupError(AppBackupErrorCode.MissingField, "tables.$name")
             } else if (tablesObject.opt(name) !is JSONArray) {
                 errors += AppBackupError(AppBackupErrorCode.InvalidType, "tables.$name")
+            }
+        }
+        val replacesProgressPhotos = schemaVersion == AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION
+        if (replacesProgressPhotos) {
+            if (!tablesObject.has(AppBackupFormat.TABLE_PROGRESS_PHOTOS) ||
+                tablesObject.isNull(AppBackupFormat.TABLE_PROGRESS_PHOTOS)
+            ) {
+                errors += AppBackupError(
+                    AppBackupErrorCode.MissingField,
+                    "tables.${AppBackupFormat.TABLE_PROGRESS_PHOTOS}"
+                )
+            } else if (tablesObject.opt(AppBackupFormat.TABLE_PROGRESS_PHOTOS) !is JSONArray) {
+                errors += AppBackupError(
+                    AppBackupErrorCode.InvalidType,
+                    "tables.${AppBackupFormat.TABLE_PROGRESS_PHOTOS}"
+                )
             }
         }
         if (errors.isNotEmpty()) {
@@ -432,7 +469,15 @@ object AppBackupJson {
                 tablesObject,
                 AppBackupFormat.TABLE_WORKOUT_SESSION_SETS,
                 errors
-            ) { parseSessionSet(it, errors) }
+            ) { parseSessionSet(it, errors) },
+            progressPhotos = if (replacesProgressPhotos) {
+                parseArray(tablesObject, AppBackupFormat.TABLE_PROGRESS_PHOTOS, errors) {
+                    parseProgressPhoto(it, errors)
+                }
+            } else {
+                emptyList()
+            },
+            replacesProgressPhotos = replacesProgressPhotos
         )
         val tables = parsedTables.copy(
             scheduledWorkouts = hydrateScheduledTemplateNames(
@@ -706,6 +751,24 @@ object AppBackupJson {
             templateName = templateName,
             createdAt = createdAt,
             cancelledAt = cancelledAt
+        )
+    }
+
+    private fun parseProgressPhoto(
+        obj: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): ProgressPhotoEntity? {
+        val id = obj.requiredId("id", errors) ?: return null
+        val date = obj.requiredString("date", errors) ?: return null
+        val fileName = obj.requiredString("fileName", errors) ?: return null
+        val createdAt = obj.requiredLong("createdAt", errors) ?: return null
+        val updatedAt = obj.requiredLong("updatedAt", errors) ?: return null
+        return ProgressPhotoEntity(
+            id = id,
+            date = date,
+            fileName = fileName,
+            createdAt = createdAt,
+            updatedAt = updatedAt
         )
     }
 
