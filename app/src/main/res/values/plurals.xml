@@ -52,4 +52,44 @@
         <item quantity="one">%d day</item>
         <item quantity="other">%d days</item>
     </plurals>
+    <plurals name="founder_challenge_workouts">
+        <item quantity="one">Complete %d qualifying Strict workout</item>
+        <item quantity="other">Complete %d qualifying Strict workouts</item>
+    </plurals>
+    <plurals name="founder_challenge_days">
+        <item quantity="one">Train on at least %d different day</item>
+        <item quantity="other">Train on at least %d different days</item>
+    </plurals>
+    <plurals name="founder_challenge_window">
+        <item quantity="one">Complete everything within %d day</item>
+        <item quantity="other">Complete everything within %d days</item>
+    </plurals>
+    <plurals name="founder_temporary_pro_offer">
+        <item quantity="one">Complete your first qualifying workout to unlock Temporary Pro while you continue the program.</item>
+        <item quantity="other">Complete your first %d qualifying workouts to unlock Temporary Pro while you continue the program.</item>
+    </plurals>
+    <plurals name="founder_unlock_temporary_pro">
+        <item quantity="one">Complete %d qualifying workout to unlock Temporary Pro.</item>
+        <item quantity="other">Complete %d qualifying workouts to unlock Temporary Pro.</item>
+    </plurals>
+    <plurals name="founder_next_workouts">
+        <item quantity="one">Next step: Complete %d more qualifying workout.</item>
+        <item quantity="other">Next step: Complete %d more qualifying workouts.</item>
+    </plurals>
+    <plurals name="founder_next_days">
+        <item quantity="one">Next step: Train on %d more day.</item>
+        <item quantity="other">Next step: Train on %d more days.</item>
+    </plurals>
+    <plurals name="founder_progress_workouts">
+        <item quantity="one">%1$d of %2$d qualifying workout</item>
+        <item quantity="other">%1$d of %2$d qualifying workouts</item>
+    </plurals>
+    <plurals name="founder_progress_days">
+        <item quantity="one">%1$d of %2$d training day</item>
+        <item quantity="other">%1$d of %2$d training days</item>
+    </plurals>
+    <plurals name="founder_progress_temporary_pro">
+        <item quantity="one">%1$d of %2$d workout toward Temporary Pro</item>
+        <item quantity="other">%1$d of %2$d workouts toward Temporary Pro</item>
+    </plurals>
 </resources>

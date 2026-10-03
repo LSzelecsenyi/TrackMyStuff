@@ -5,6 +5,12 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+data class NativeCompletedWorkoutRow(
+    val id: Long,
+    val workoutDate: String,
+    val templateName: String
+)
+
 @Entity(
     tableName = "workout_sessions",
     foreignKeys = [

@@ -16,6 +16,9 @@ import java.time.LocalDate
 /**
  * Local Founder-program record. It is not part of the portable backup.
  * Clearing app data or uninstalling may drop it. That is accepted for the pilot.
+ *
+ * Milestone acknowledgement lives in [FounderMilestoneAcknowledgementStore].
+ * Those flags are not read here and are not part of this record.
  */
 private val Context.founderProgramDataStore: DataStore<Preferences> by preferencesDataStore(
     name = FounderProgramStore.PREFERENCES_NAME
@@ -40,6 +43,16 @@ class FounderProgramStore(context: Context) {
             testerAnalyticsReportSubmitted = prefs[KEY_ANALYTICS_REPORT] == true,
             rejectionReason = prefs[KEY_REJECTION_REASON]
         )
+    }
+
+    suspend fun loadFeedbackText(): String {
+        return dataStore.data.first()[KEY_FEEDBACK_TEXT].orEmpty()
+    }
+
+    suspend fun saveFeedbackText(text: String) {
+        dataStore.edit { prefs ->
+            prefs[KEY_FEEDBACK_TEXT] = text
+        }
     }
 
     suspend fun save(state: FounderProgramState) {
@@ -68,5 +81,6 @@ class FounderProgramStore(context: Context) {
         private val KEY_FEEDBACK = booleanPreferencesKey("feedback_recorded")
         private val KEY_ANALYTICS_REPORT = booleanPreferencesKey("tester_analytics_report_submitted")
         private val KEY_REJECTION_REASON = stringPreferencesKey("rejection_reason")
+        private val KEY_FEEDBACK_TEXT = stringPreferencesKey("feedback_text")
     }
 }

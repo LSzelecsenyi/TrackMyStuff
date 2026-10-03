@@ -1,16 +1,21 @@
 package app.mymusclemap.domain.entitlement
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+
 /**
  * Application code asks whether a capability is available. Implementations must not expose
  * Google Play Billing types, product IDs, or purchase objects.
  *
  * Product rules live in [FeatureAccessPolicy]. [PolicyBackedEntitlements] answers these
  * checks from that policy. [OpenFeatureEntitlements] remains the test and preview default
- * that grants every capability. The development composition root uses
- * [DevelopmentSubscriptionProvider] so the app stays fully usable until a store provider exists.
+ * that grants every capability. [changes] emits when the resolved entitlement may have
+ * changed, so screens can re-read [hasAccess] without a process restart.
  */
 interface FeatureEntitlements {
     fun hasAccess(feature: AppFeature): Boolean
+
+    fun changes(): Flow<Int> = flowOf(0)
 }
 
 /**

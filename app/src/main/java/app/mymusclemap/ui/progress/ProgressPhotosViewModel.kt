@@ -68,8 +68,9 @@ class ProgressPhotosViewModel(
         },
         combine(message, lockedFeature, selectingCompare, selectedIds) { note, locked, selecting, selected ->
             PhotoChromeInputs(note, locked, selecting, selected)
-        }
-    ) { list, chrome ->
+        },
+        entitlements.changes()
+    ) { list, chrome, _ ->
         val canAdd = ProgressPhotoAccess.canAdd(entitlements::hasAccess)
         ProgressPhotosUiState(
             photos = list.items,

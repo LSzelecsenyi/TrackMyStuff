@@ -516,11 +516,15 @@ fun WeightTrackerNavHost(
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
                 val healthViewModel: HealthConnectViewModel = viewModel(factory = factory)
                 val health by healthViewModel.settings.collectAsStateWithLifecycle()
+                val founderViewModel: app.mymusclemap.ui.founder.FounderProgramViewModel =
+                    viewModel(factory = factory)
+                val founder by founderViewModel.uiState.collectAsStateWithLifecycle()
                 SettingsRoute(
                     viewModel = viewModel,
                     state = state,
                     today = dateProvider.today(),
                     health = health,
+                    showFounderBadge = founder.founderBadge,
                     onHealthRefresh = healthViewModel::refresh,
                     onBack = { navController.popBackStack() },
                     onOpenHelp = { navController.navigateInternal(AppRoutes.HELP) },
@@ -528,7 +532,27 @@ fun WeightTrackerNavHost(
                     onOpenOpenSourceLicenses = {
                         navController.navigateInternal(AppRoutes.OPEN_SOURCE_LICENSES)
                     },
+                    onOpenFounderProgram = {
+                        navController.navigateInternal(AppRoutes.FOUNDER_PROGRAM)
+                    },
                     onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) }
+                )
+            }
+            composable(AppRoutes.FOUNDER_PROGRAM) {
+                val viewModel: app.mymusclemap.ui.founder.FounderProgramViewModel =
+                    viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                app.mymusclemap.ui.founder.FounderProgramRoute(
+                    state = state,
+                    reportText = viewModel::reportText,
+                    onBack = { navController.popBackStack() },
+                    onEnroll = viewModel::enroll,
+                    onFeedbackChange = viewModel::onFeedbackChange,
+                    onSaveFeedback = viewModel::saveFeedback,
+                    onReportShareResult = viewModel::onReportShareResult,
+                    onAcknowledgeMilestone = viewModel::acknowledgeMilestone,
+                    onApprove = viewModel::approve,
+                    onReject = viewModel::reject
                 )
             }
             composable(AppRoutes.HEALTH_CONNECT) {
@@ -1219,6 +1243,8 @@ private fun SettingsRoute(
     onOpenHelp: () -> Unit,
     onOpenPrivacy: () -> Unit,
     onOpenOpenSourceLicenses: () -> Unit,
+    onOpenFounderProgram: () -> Unit,
+    showFounderBadge: Boolean,
     onOpenHealthDetails: () -> Unit
 ) {
     val launchHealthPermissions = rememberHealthConnectPermissionLaunch(onHealthRefresh)
@@ -1358,6 +1384,8 @@ private fun SettingsRoute(
         },
         onOpenHelp = onOpenHelp,
         onOpenOpenSourceLicenses = onOpenOpenSourceLicenses,
+        onOpenFounderProgram = onOpenFounderProgram,
+        showFounderBadge = showFounderBadge,
         onMessageConsumed = viewModel::consumeMessage,
         onSetWeeklyGoal = viewModel::setWeeklyGoal,
         onDisableWeeklyGoal = viewModel::disableWeeklyGoal,

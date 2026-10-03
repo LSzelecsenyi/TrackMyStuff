@@ -2,15 +2,21 @@ package app.mymusclemap.domain.entitlement
 
 import app.mymusclemap.domain.reports.ReportKind
 import app.mymusclemap.domain.statistics.StatisticsRange
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Adapts [FeatureAccessPolicy] to the existing capability checks used by screens.
  * Muscle heatmap stays available on Free, matching the product matrix.
  */
 class PolicyBackedEntitlements(
-    private val policySource: () -> FeatureAccessPolicy
+    private val policySource: () -> FeatureAccessPolicy,
+    private val revisions: StateFlow<Int> = MutableStateFlow(0)
 ) : FeatureEntitlements {
     constructor(policy: FeatureAccessPolicy) : this({ policy })
+
+    override fun changes(): Flow<Int> = revisions
 
     override fun hasAccess(feature: AppFeature): Boolean {
         val policy = policySource()

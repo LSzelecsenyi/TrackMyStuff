@@ -67,7 +67,7 @@ class ReportsViewModel(
         dateProvider.observeToday(),
         selectedKind,
         previewKind,
-        lockedFeature
+        combine(lockedFeature, entitlements.changes()) { locked, _ -> locked }
     ) { persisted, today, kindName, preview, locked ->
         val historyStart = ReportHistory.earliestDate(
             ReportHistoryEvidence.fromPersisted(

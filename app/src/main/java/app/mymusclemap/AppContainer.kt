@@ -4,6 +4,8 @@ import android.content.Context
 import app.mymusclemap.data.health.HealthConnectGateway
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.founder.FounderProgramCoordinator
+import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
@@ -23,13 +25,13 @@ import app.mymusclemap.data.workoutimport.ContentWorkoutImportFileReader
 import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.SystemDateProvider
-import app.mymusclemap.domain.entitlement.DevelopmentSubscriptionProvider
 import app.mymusclemap.domain.entitlement.EntitlementComposer
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.FounderProgramRules
-import app.mymusclemap.domain.entitlement.FounderProgramState
 import app.mymusclemap.domain.entitlement.InactiveFounderLifetimeProvider
+import app.mymusclemap.domain.entitlement.InactiveSubscriptionProvider
 import app.mymusclemap.domain.entitlement.PolicyBackedEntitlements
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.Clock
 import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicReference
@@ -48,6 +50,7 @@ class AppContainer(context: Context) {
         clock = clock
     )
     private val customExerciseCreate = AtomicReference<(Int) -> Boolean> { true }
+    private val nativeWorkoutCompleted = AtomicReference<suspend () -> Unit> { }
     val exerciseRepository = ExerciseRepository(
         dao = database.exerciseDao(),
         clock = clock,
@@ -75,7 +78,8 @@ class AppContainer(context: Context) {
         weightRepository = weightRepository,
         clock = clock,
         dateProvider = dateProvider,
-        onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) }
+        onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
+        onNativeWorkoutCompleted = { nativeWorkoutCompleted.get().invoke() }
     )
     val weeklyGoalRepository = WeeklyGoalRepository(
         dao = database.weeklyWorkoutGoalDao(),
@@ -97,27 +101,37 @@ class AppContainer(context: Context) {
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     val founderProgramRules: FounderProgramRules = FounderProgramRuleSelection.rules
     val founderProgramStore = FounderProgramStore(appContext)
-    private val founderProgramState = AtomicReference(FounderProgramState())
-    val subscriptionProvider = DevelopmentSubscriptionProvider
+    val founderMilestoneAcknowledgements = FounderMilestoneAcknowledgementStore(appContext)
+    private val entitlementRevision = MutableStateFlow(0)
+    val subscriptionProvider = InactiveSubscriptionProvider
     val founderLifetimeProvider = InactiveFounderLifetimeProvider
+    val founderProgram = FounderProgramCoordinator(
+        store = founderProgramStore,
+        sessions = database.workoutSessionDao(),
+        dateProvider = dateProvider,
+        rules = founderProgramRules,
+        onEntitlementChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+    )
     val entitlementComposer = EntitlementComposer(
         subscriptionProvider = subscriptionProvider,
         founderLifetimeProvider = founderLifetimeProvider,
         clock = clock,
-        founderProgram = founderProgramState::get
+        founderProgram = founderProgram::currentState
     )
-    val featureEntitlements: FeatureEntitlements = PolicyBackedEntitlements {
-        entitlementComposer.policy()
-    }
+    val featureEntitlements: FeatureEntitlements = PolicyBackedEntitlements(
+        policySource = { entitlementComposer.policy() },
+        revisions = entitlementRevision
+    )
 
     init {
         customExerciseCreate.set { count ->
             entitlementComposer.policy().customExercises(count).canCreate
         }
+        nativeWorkoutCompleted.set { founderProgram.onNativeWorkoutCompleted() }
     }
 
     suspend fun refreshFounderProgramFromStore() {
-        founderProgramState.set(founderProgramStore.load())
+        founderProgram.refresh()
     }
     val progressPhotoRepository = ProgressPhotoRepository(
         dao = database.progressPhotoDao(),
@@ -154,6 +168,9 @@ class AppContainer(context: Context) {
         progressPhotoRepository = progressPhotoRepository,
         healthRepository = healthRepository,
         featureEntitlements = featureEntitlements,
-        weeklyGoalRepository = weeklyGoalRepository
+        weeklyGoalRepository = weeklyGoalRepository,
+        founderProgram = founderProgram,
+        founderRules = founderProgramRules,
+        founderMilestoneAcknowledgements = founderMilestoneAcknowledgements
     )
 }

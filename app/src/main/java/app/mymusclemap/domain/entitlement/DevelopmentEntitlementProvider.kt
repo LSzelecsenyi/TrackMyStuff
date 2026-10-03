@@ -3,9 +3,9 @@ package app.mymusclemap.domain.entitlement
 import java.time.Instant
 
 /**
- * Isolated development entitlement. The shipping app has no Billing client yet, and
- * unfinished Pro features must stay usable. Feature code must not branch on build type;
- * only the composition root should reference this provider.
+ * Isolated subscription stand-in for tests. The running app uses
+ * [InactiveSubscriptionProvider] until Billing exists, so Founder Temporary Pro is
+ * observable. Feature code must not branch on build type.
  *
  * A later store provider replaces this object. It is not a product id and not a
  * persisted Pro flag.

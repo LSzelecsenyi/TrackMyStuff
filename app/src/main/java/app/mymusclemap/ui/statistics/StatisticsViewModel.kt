@@ -42,7 +42,7 @@ class StatisticsViewModel(
         scheduledWorkoutRepository.observeHistorical(),
         dateProvider.observeToday(),
         selectedRange,
-        lockedFeature
+        combine(lockedFeature, entitlements.changes()) { locked, _ -> locked }
     ) { aggregates, scheduled, today, rangeName, locked ->
         val requested = resolvedRange(rangeName)
         StatisticsUiState(

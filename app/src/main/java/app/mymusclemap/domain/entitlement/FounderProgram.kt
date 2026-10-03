@@ -46,14 +46,20 @@ data class FounderQualification(
     val temporaryProUnlocked: Boolean
         get() = nativeCompletedWorkouts >= rules.temporaryProWorkoutCount
 
+    val founderWorkoutsMet: Boolean
+        get() = nativeCompletedWorkouts >= rules.founderWorkoutCount
+
+    val distinctDaysMet: Boolean
+        get() = distinctNativeWorkoutDays >= rules.requiredDistinctWorkoutDays
+
+    val feedbackMet: Boolean
+        get() = !rules.feedbackRequired || feedbackRecorded
+
+    val reportMet: Boolean
+        get() = !rules.testerAnalyticsReportRequired || testerAnalyticsReportSubmitted
+
     val testerRequirementsComplete: Boolean
-        get() {
-            val workoutsMet = nativeCompletedWorkouts >= rules.founderWorkoutCount &&
-                distinctNativeWorkoutDays >= rules.requiredDistinctWorkoutDays
-            val feedbackMet = !rules.feedbackRequired || feedbackRecorded
-            val reportMet = !rules.testerAnalyticsReportRequired || testerAnalyticsReportSubmitted
-            return workoutsMet && feedbackMet && reportMet
-        }
+        get() = founderWorkoutsMet && distinctDaysMet && feedbackMet && reportMet
 }
 
 /**
@@ -135,7 +141,12 @@ class FounderProgramLogic(
         if (!acceptsTesterInput(state.status) || text.isBlank()) {
             return FounderProgramResult.Unchanged(state)
         }
-        return advance(state.copy(feedbackRecorded = true), workouts, today)
+        val advanced = advance(state.copy(feedbackRecorded = true), workouts, today)
+        return if (advanced.state == state) {
+            FounderProgramResult.Unchanged(state)
+        } else {
+            FounderProgramResult.Changed(advanced.state)
+        }
     }
 
     fun submitTesterAnalyticsReport(
@@ -146,7 +157,12 @@ class FounderProgramLogic(
         if (!acceptsTesterInput(state.status)) {
             return FounderProgramResult.Unchanged(state)
         }
-        return advance(state.copy(testerAnalyticsReportSubmitted = true), workouts, today)
+        val advanced = advance(state.copy(testerAnalyticsReportSubmitted = true), workouts, today)
+        return if (advanced.state == state) {
+            FounderProgramResult.Unchanged(state)
+        } else {
+            FounderProgramResult.Changed(advanced.state)
+        }
     }
 
     fun refresh(state: FounderProgramState, workouts: List<CompletedWorkout>, today: LocalDate): FounderProgramResult {

@@ -170,6 +170,8 @@ fun SettingsScreen(
     onOpenPrivacyPolicy: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenOpenSourceLicenses: () -> Unit = {},
+    onOpenFounderProgram: () -> Unit = {},
+    showFounderBadge: Boolean = false,
     onMessageConsumed: () -> Unit,
     onBack: () -> Unit,
     health: HealthSettingsState = HealthSettingsState.NotConnected,
@@ -279,10 +281,12 @@ fun SettingsScreen(
                 CompactEditorDivider()
                 AboutSection(
                     state = state,
+                    showFounderBadge = showFounderBadge,
                     onSendFeedback = onSendFeedback,
                     onOpenPrivacyPolicy = onOpenPrivacyPolicy,
                     onOpenHelp = onOpenHelp,
-                    onOpenOpenSourceLicenses = onOpenOpenSourceLicenses
+                    onOpenOpenSourceLicenses = onOpenOpenSourceLicenses,
+                    onOpenFounderProgram = onOpenFounderProgram
                 )
             }
         }
@@ -922,20 +926,34 @@ private fun AppBackupSection(
 @Composable
 private fun AboutSection(
     state: SettingsUiState,
+    showFounderBadge: Boolean,
     onSendFeedback: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
     onOpenHelp: () -> Unit,
-    onOpenOpenSourceLicenses: () -> Unit
+    onOpenOpenSourceLicenses: () -> Unit,
+    onOpenFounderProgram: () -> Unit
 ) {
     val usesExternalPrivacyPolicy = !state.privacyPolicyUrl.isNullOrBlank()
     CompactEditorSection(title = settingsKicker(stringResource(R.string.about_title))) {
-        Text(
-            text = stringResource(R.string.about_version, state.appVersionName),
-            style = AppTypeTokens.statSecondary,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.testTag(SETTINGS_APP_VERSION)
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.about_version, state.appVersionName),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(SETTINGS_APP_VERSION)
+            )
+            if (showFounderBadge) {
+                app.mymusclemap.ui.founder.FounderBadge()
+            }
+        }
         Spacer(Modifier.height(AppDimens.itemGap))
+        DataActionRow(
+            icon = Icons.Filled.EmojiEvents,
+            title = stringResource(R.string.founder_open),
+            subtitle = stringResource(R.string.founder_open_subtitle),
+            testTag = "settings-founder-program",
+            onClick = onOpenFounderProgram
+        )
         DataActionRow(
             icon = Icons.AutoMirrored.Outlined.HelpOutline,
             title = stringResource(R.string.action_help_tips),

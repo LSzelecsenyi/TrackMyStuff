@@ -59,7 +59,8 @@ class WorkoutSessionRepository(
     private val weightRepository: WeightRepository,
     private val clock: Clock,
     private val dateProvider: DateProvider,
-    private val onHeatmapDataChanged: () -> Unit = {}
+    private val onHeatmapDataChanged: () -> Unit = {},
+    private val onNativeWorkoutCompleted: suspend () -> Unit = {}
 ) {
     private val mutex = Mutex()
 
@@ -637,6 +638,12 @@ class WorkoutSessionRepository(
             when (outcome) {
                 1 -> {
                     onHeatmapDataChanged()
+                    try {
+                        onNativeWorkoutCompleted()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                    }
                     FinishWorkoutResult.Finished
                 }
                 -1 -> FinishWorkoutResult.AlreadyTerminal

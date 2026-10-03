@@ -76,7 +76,7 @@ class TemplateListViewModel(
                 text, filter, currentMessage, delete, blocked ->
             Controls(text, filter, currentMessage, delete, blocked)
         },
-        lockedFeature
+        combine(lockedFeature, entitlements.changes()) { locked, _ -> locked }
     ) { items, referenced, planCount, controls, locked ->
         val visible = TemplateCatalogLogic.filter(
             items = items,

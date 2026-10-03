@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.health.HealthRepository
+import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
@@ -21,10 +23,12 @@ import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.WorkoutImportFileReader
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.ui.dashboard.DashboardViewModel
 import app.mymusclemap.ui.dashboard.WeightDetailsViewModel
+import app.mymusclemap.ui.founder.FounderProgramViewModel
 import app.mymusclemap.ui.exercises.ExerciseEditorViewModel
 import app.mymusclemap.ui.exercises.ExerciseListViewModel
 import app.mymusclemap.ui.exercises.labelRes
@@ -59,7 +63,10 @@ class WeightViewModelFactory(
     private val progressPhotoRepository: ProgressPhotoRepository,
     private val healthRepository: HealthRepository,
     private val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements,
-    private val weeklyGoalRepository: WeeklyGoalRepository? = null
+    private val weeklyGoalRepository: WeeklyGoalRepository? = null,
+    private val founderProgram: FounderProgramCoordinator? = null,
+    private val founderRules: FounderProgramRules? = null,
+    private val founderMilestoneAcknowledgements: FounderMilestoneAcknowledgementStore? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -176,6 +183,14 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(ProgressPhotosViewModel::class.java) -> {
                 ProgressPhotosViewModel(progressPhotoRepository, featureEntitlements)
+            }
+            modelClass.isAssignableFrom(FounderProgramViewModel::class.java) -> {
+                FounderProgramViewModel(
+                    coordinator = checkNotNull(founderProgram),
+                    rules = checkNotNull(founderRules),
+                    versionName = BuildConfig.VERSION_NAME,
+                    milestoneAcknowledgements = checkNotNull(founderMilestoneAcknowledgements)
+                )
             }
             modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {
                 HealthConnectViewModel(healthRepository, dateProvider)

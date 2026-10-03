@@ -102,6 +102,15 @@ abstract class WorkoutSessionDao {
 
     @Query(
         """
+        SELECT id, workoutDate, templateName FROM workout_sessions
+        WHERE status = 'COMPLETED' AND importFingerprint IS NULL
+        ORDER BY workoutDate ASC, id ASC
+        """
+    )
+    abstract suspend fun completedNativeWorkouts(): List<NativeCompletedWorkoutRow>
+
+    @Query(
+        """
         SELECT e.* FROM workout_session_exercises e
         INNER JOIN workout_sessions s ON s.id = e.sessionId
         WHERE s.status = 'COMPLETED'
