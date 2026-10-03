@@ -16,6 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
@@ -96,6 +100,8 @@ import app.mymusclemap.ui.templates.TemplateEditorScreen
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
 import app.mymusclemap.ui.templates.TemplateListScreen
 import app.mymusclemap.ui.templates.TemplateListViewModel
+import app.mymusclemap.ui.workout.ActiveWorkoutNotificationCoordinator
+import app.mymusclemap.ui.workout.ActiveWorkoutNotificationPermissionRequest
 import app.mymusclemap.ui.workout.ActiveWorkoutScreen
 import app.mymusclemap.ui.workout.ActiveWorkoutViewModel
 import app.mymusclemap.ui.workout.WorkoutCompletionScreen
@@ -217,7 +223,10 @@ fun WeightTrackerNavHost(
     onOpenedFounderProgram: () -> Unit = {},
     openPrivacyPolicy: Boolean = false,
     onOpenedPrivacyPolicy: () -> Unit = {},
-    openOverviewRequest: Int = 0
+    openOverviewRequest: Int = 0,
+    openActiveWorkoutSessionId: Long? = null,
+    openActiveWorkoutGeneration: Int = 0,
+    activeWorkoutNotifications: ActiveWorkoutNotificationCoordinator? = null
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -236,6 +245,15 @@ fun WeightTrackerNavHost(
     var chartBounds by remember { mutableStateOf(Rect.Zero) }
     LaunchedEffect(openOverviewRequest) {
         if (openOverviewRequest > 0) {
+            navController.navigateRoot(AppRoutes.OVERVIEW)
+        }
+    }
+    LaunchedEffect(openActiveWorkoutGeneration) {
+        if (openActiveWorkoutGeneration <= 0) return@LaunchedEffect
+        val sessionId = openActiveWorkoutSessionId
+        if (sessionId != null) {
+            navController.openActiveWorkout(sessionId)
+        } else {
             navController.navigateRoot(AppRoutes.OVERVIEW)
         }
     }
@@ -1062,6 +1080,23 @@ fun WeightTrackerNavHost(
             ) {
                 val viewModel: ActiveWorkoutViewModel = viewModel(factory = factory)
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner, viewModel) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_STOP) {
+                            viewModel.flushDirtyDrafts()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+                if (activeWorkoutNotifications != null) {
+                    ActiveWorkoutNotificationPermissionRequest(
+                        hasAsked = activeWorkoutNotifications::hasAskedForPermission,
+                        markAsked = activeWorkoutNotifications::markPermissionAsked,
+                        onFinished = activeWorkoutNotifications::refresh
+                    )
+                }
                 ActiveWorkoutScreen(
                     state = state,
                     onBack = { navController.popBackStack() },

@@ -1125,4 +1125,14 @@
     <string name="founder_debug_approve">Approve Founder</string>
     <string name="founder_debug_reject">Reject</string>
     <string name="founder_debug_reject_reason">Reason</string>
+    <string name="notification_channel_active_workout">Active workout</string>
+    <string name="notification_channel_active_workout_description">Shows the current set while a workout is in progress.</string>
+    <string name="notification_complete_set">Complete set</string>
+    <string name="notification_set_of">Set %1$d of %2$d</string>
+    <string name="notification_reps">%1$d reps</string>
+    <string name="notification_distance_meters">%1$s m</string>
+    <string name="notification_open_to_enter_set">Open Strict to enter this set</string>
+    <string name="notification_all_sets_logged">All sets logged</string>
+    <string name="notification_finish_in_app">Finish workout in Strict</string>
+    <string name="notification_workout_in_progress">Workout in progress</string>
 </resources>

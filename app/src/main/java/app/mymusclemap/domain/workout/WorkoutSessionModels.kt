@@ -158,6 +158,17 @@ sealed class SessionMutationResult {
     data class Invalid(val errors: List<TemplateFieldError>) : SessionMutationResult()
 }
 
+/**
+ * Result of completing the set a workout notification was rendered for.
+ * Anything other than [Updated] leaves persisted workout state unchanged.
+ */
+sealed class NotificationSetCompletion {
+    data object Updated : NotificationSetCompletion()
+    data object Stale : NotificationSetCompletion()
+    data object Invalid : NotificationSetCompletion()
+    data object NotFound : NotificationSetCompletion()
+}
+
 sealed class FinishWorkoutResult {
     data object Finished : FinishWorkoutResult()
     data object AlreadyTerminal : FinishWorkoutResult()

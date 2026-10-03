@@ -15,6 +15,7 @@ class WeightTrackerApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.activeWorkoutNotifications.start()
         applicationScope.launch {
             container.refreshFounderProgramFromStore()
             container.appBackupRepository.recoverInterruptedPhotoRestore()

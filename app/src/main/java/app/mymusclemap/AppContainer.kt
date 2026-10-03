@@ -31,6 +31,10 @@ import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.InactiveFounderLifetimeProvider
 import app.mymusclemap.domain.entitlement.InactiveSubscriptionProvider
 import app.mymusclemap.domain.entitlement.PolicyBackedEntitlements
+import app.mymusclemap.ui.workout.ActiveWorkoutNotificationCoordinator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.Clock
 import java.time.LocalDate
@@ -80,6 +84,11 @@ class AppContainer(context: Context) {
         dateProvider = dateProvider,
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
         onNativeWorkoutCompleted = { nativeWorkoutCompleted.get().invoke() }
+    )
+    val activeWorkoutNotifications = ActiveWorkoutNotificationCoordinator(
+        context = appContext,
+        repository = workoutSessionRepository,
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     )
     val weeklyGoalRepository = WeeklyGoalRepository(
         dao = database.weeklyWorkoutGoalDao(),

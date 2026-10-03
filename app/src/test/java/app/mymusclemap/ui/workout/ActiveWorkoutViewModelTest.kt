@@ -21,6 +21,7 @@ import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.workout.ElapsedTime
+import app.mymusclemap.domain.workout.NotificationSetCompletion
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedSetDraft
 import app.mymusclemap.domain.workout.SessionSetStatus
@@ -521,6 +522,62 @@ class ActiveWorkoutViewModelTest {
         assertFalse(payload.contains("\"reps\":\"6\""))
         val set = sessions.getAggregate(sessionId)!!.exercises.single().sets.single()
         assertEquals(SessionSetStatus.PENDING, set.status)
+    }
+
+    @Test
+    fun flushBeforeStopPersistsTheNewestDraftForNotificationCompletion() = runTest {
+        val viewModel = startSingleSet()
+        val setId = viewModel.loaded().aggregate!!.exercises.single().sets.single().id
+        viewModel.onReps(setId, "11")
+        viewModel.flushDirtyDrafts()
+        val payload = database.workoutSessionDao().getSet(setId)!!.draftPayload
+        assertTrue(payload!!.contains("\"reps\":\"11\""))
+        assertEquals(
+            NotificationSetCompletion.Updated,
+            sessions.completeCurrentPendingSetFromNotification(sessionId, setId)
+        )
+        assertEquals(11, sessions.getAggregate(sessionId)!!.exercises.single().sets.single().actualReps)
+        mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        val row = database.workoutSessionDao().getSet(setId)!!
+        assertEquals(SessionSetStatus.COMPLETED.name, row.status)
+        assertNull(row.draftPayload)
+        assertEquals(11, row.actualReps)
+    }
+
+    @Test
+    fun externalCompletionClearsDirtyStateAndFocusesTheNextSet() = runTest {
+        val viewModel = startTwoExercises()
+        val loaded = viewModel.loaded()
+        val exerciseId = loaded.aggregate!!.exercises[0].exercise.id
+        val first = loaded.aggregate!!.exercises[0].sets[0]
+        val next = loaded.aggregate!!.exercises[0].sets[1]
+        viewModel.onReps(first.id, "6")
+        assertTrue(first.id in viewModel.uiState.value.dirtySetIds)
+        assertEquals(
+            NotificationSetCompletion.Updated,
+            sessions.completeCurrentPendingSetFromNotification(sessionId, first.id)
+        )
+        assertEquals(8, sessions.getAggregate(sessionId)!!.exercises[0].sets[0].actualReps)
+        val state = awaitReal {
+            viewModel.uiState.first {
+                it.currentSetId == next.id && first.id !in it.dirtySetIds && it.focusEvent != null
+            }
+        }
+        assertEquals(WorkoutFocusTarget.Set(next.id, exerciseId), state.focusEvent!!.target)
+        assertTrue(exerciseId in state.expandedExerciseIds)
+        assertEquals("8", state.drafts[first.id]?.repsText)
+    }
+
+    @Test
+    fun inAppCompletionEmitsOneFocusEvent() = runTest {
+        val viewModel = startTwoExercises()
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.completeSet(first.id)
+        val state = awaitReal { viewModel.uiState.first { it.focusEvent != null } }
+        assertEquals(1L, state.focusEvent!!.generation)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1L, viewModel.uiState.value.focusEvent?.generation)
     }
 
     @Test

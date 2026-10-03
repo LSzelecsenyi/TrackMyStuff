@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.mymusclemap.data.health.HealthConnectGateway
 import app.mymusclemap.data.repository.FirstRunDecision
 import app.mymusclemap.domain.theme.AppearanceSettings
+import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.ui.founder.AppLaunchStage
 import app.mymusclemap.ui.founder.FounderInvitationScreen
 import app.mymusclemap.ui.founder.appLaunchStage
@@ -38,12 +39,17 @@ import app.mymusclemap.ui.theme.WeightTrackerTheme
 class MainActivity : ComponentActivity() {
     private val openPrivacyPolicy = mutableStateOf(false)
     private val overviewRequest = mutableIntStateOf(0)
+    private val activeWorkoutSessionId = mutableStateOf<Long?>(null)
+    private val activeWorkoutGeneration = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         openPrivacyPolicy.value = HealthConnectGateway.isPermissionUsage(intent)
         acceptOverviewRequest(intent)
+        if (savedInstanceState == null) {
+            acceptActiveWorkoutRequest(intent)
+        }
         val container = (application as WeightTrackerApplication).container
         setContent {
             val appearance by container.themePreferences.appearance.collectAsStateWithLifecycle(
@@ -51,6 +57,8 @@ class MainActivity : ComponentActivity() {
             )
             val openPrivacy by openPrivacyPolicy
             val openOverviewRequest by overviewRequest
+            val openActiveSessionId by activeWorkoutSessionId
+            val openActiveGeneration by activeWorkoutGeneration
             var stage by remember { mutableStateOf<AppLaunchStage?>(null) }
             var openNewTemplate by rememberSaveable { mutableStateOf(false) }
             var openFounderProgram by rememberSaveable { mutableStateOf(false) }
@@ -141,7 +149,10 @@ class MainActivity : ComponentActivity() {
                             onOpenedFounderProgram = { openFounderProgram = false },
                             openPrivacyPolicy = openPrivacy,
                             onOpenedPrivacyPolicy = { openPrivacyPolicy.value = false },
-                            openOverviewRequest = openOverviewRequest
+                            openOverviewRequest = openOverviewRequest,
+                            openActiveWorkoutSessionId = openActiveSessionId,
+                            openActiveWorkoutGeneration = openActiveGeneration,
+                            activeWorkoutNotifications = container.activeWorkoutNotifications
                         )
                     }
                 }
@@ -152,6 +163,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         val container = (application as WeightTrackerApplication).container
+        container.activeWorkoutNotifications.refresh()
         lifecycleScope.launch {
             container.refreshFounderProgramFromStore()
         }
@@ -164,6 +176,20 @@ class MainActivity : ComponentActivity() {
             openPrivacyPolicy.value = true
         }
         acceptOverviewRequest(intent)
+        acceptActiveWorkoutRequest(intent)
+    }
+
+    private fun acceptActiveWorkoutRequest(intent: Intent?) {
+        if (intent == null || !intent.hasExtra(EXTRA_OPEN_ACTIVE_WORKOUT)) return
+        val sessionId = intent.getLongExtra(EXTRA_OPEN_ACTIVE_WORKOUT, -1L)
+        intent.removeExtra(EXTRA_OPEN_ACTIVE_WORKOUT)
+        if (sessionId <= 0L) return
+        val container = (application as WeightTrackerApplication).container
+        lifecycleScope.launch {
+            val status = container.workoutSessionRepository.getAggregate(sessionId)?.session?.status
+            activeWorkoutSessionId.value = if (status == SessionStatus.IN_PROGRESS) sessionId else null
+            activeWorkoutGeneration.intValue += 1
+        }
     }
 
     private fun acceptOverviewRequest(intent: Intent?) {
@@ -174,5 +200,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_OVERVIEW = "app.mymusclemap.OPEN_OVERVIEW"
+        const val EXTRA_OPEN_ACTIVE_WORKOUT = "app.mymusclemap.OPEN_ACTIVE_WORKOUT"
     }
 }

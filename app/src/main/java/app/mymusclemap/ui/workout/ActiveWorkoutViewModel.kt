@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import java.time.Clock
@@ -115,6 +116,9 @@ class ActiveWorkoutViewModel(
     private var focusGeneration = 0L
     private val draftJobs = mutableMapOf<Long, Job>()
     private val draftEpoch = ConcurrentHashMap<Long, Long>()
+    private val locallyResolving = mutableSetOf<Long>()
+    private var statusesInitialized = false
+    private var knownStatuses = emptyMap<Long, SessionSetStatus>()
 
     private data class Dialogs(
         val now: Long,
@@ -250,6 +254,30 @@ class ActiveWorkoutViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            sessionRepository.observeAggregate(sessionId).collect { aggregate ->
+                if (aggregate != null) {
+                    reconcileAuthoritativeSets(aggregate)
+                }
+            }
+        }
+    }
+
+    /**
+     * Writes dirty in-memory drafts immediately. Called when the workout screen stops, so a
+     * lock-screen completion sees the values the user just typed instead of the debounced copy.
+     */
+    fun flushDirtyDrafts() {
+        val snapshot = dirtyIds.value.mapNotNull { setId ->
+            drafts.value[setId]?.let { draft -> setId to draft }
+        }
+        if (snapshot.isEmpty()) return
+        snapshot.forEach { (setId, _) -> cancelDraftPersist(setId) }
+        runBlocking(Dispatchers.IO + NonCancellable) {
+            snapshot.forEach { (setId, draft) ->
+                sessionRepository.saveSetDraft(setId, draft)
+            }
+        }
     }
 
     fun selectExercise(index: Int) {
@@ -321,6 +349,9 @@ class ActiveWorkoutViewModel(
             ?.firstOrNull { it.id == setId }
             ?.status
             ?: return
+        if (currentStatus == SessionSetStatus.PENDING) {
+            locallyResolving.add(setId)
+        }
         completingIds.value = completingIds.value + setId
         viewModelScope.launch {
             try {
@@ -330,21 +361,27 @@ class ActiveWorkoutViewModel(
                         setErrors.value = setErrors.value - setId
                         if (currentStatus == SessionSetStatus.PENDING) {
                             advanceAfterResolved(setId)
+                        } else {
+                            locallyResolving.remove(setId)
                         }
                     }
                     is SessionMutationResult.Invalid -> {
+                        locallyResolving.remove(setId)
                         setErrors.value = setErrors.value + (setId to result.errors)
                         scheduleDraftSave(setId)
                     }
                     SessionMutationResult.NotFound,
                     SessionMutationResult.NotActive,
                     SessionMutationResult.OriginalSetProtected -> {
+                        locallyResolving.remove(setId)
                         message.value = ActiveWorkoutMessage.SaveFailed
                     }
                 }
             } catch (cancelled: CancellationException) {
+                locallyResolving.remove(setId)
                 throw cancelled
             } catch (_: Exception) {
+                locallyResolving.remove(setId)
                 message.value = ActiveWorkoutMessage.SaveFailed
             } finally {
                 completingIds.value = completingIds.value - setId
@@ -357,6 +394,7 @@ class ActiveWorkoutViewModel(
             return
         }
         cancelDraftPersist(setId)
+        locallyResolving.add(setId)
         completingIds.value = completingIds.value + setId
         viewModelScope.launch {
             try {
@@ -369,13 +407,16 @@ class ActiveWorkoutViewModel(
                     SessionMutationResult.NotFound,
                     SessionMutationResult.NotActive,
                     SessionMutationResult.OriginalSetProtected -> {
+                        locallyResolving.remove(setId)
                         message.value = ActiveWorkoutMessage.SaveFailed
                     }
-                    is SessionMutationResult.Invalid -> Unit
+                    is SessionMutationResult.Invalid -> locallyResolving.remove(setId)
                 }
             } catch (cancelled: CancellationException) {
+                locallyResolving.remove(setId)
                 throw cancelled
             } catch (_: Exception) {
+                locallyResolving.remove(setId)
                 message.value = ActiveWorkoutMessage.SaveFailed
             } finally {
                 completingIds.value = completingIds.value - setId
@@ -541,6 +582,57 @@ class ActiveWorkoutViewModel(
 
     fun draftFor(set: SessionSet): ActualSetDraft {
         return uiState.value.drafts[set.id] ?: ActualSetLogic.draftFromSet(set)
+    }
+
+    private fun reconcileAuthoritativeSets(aggregate: WorkoutSessionAggregate) {
+        val current = aggregate.exercises
+            .flatMap { it.sets }
+            .associate { it.id to it.status }
+        if (!statusesInitialized) {
+            knownStatuses = current
+            statusesInitialized = true
+            locallyResolving.removeAll { id -> current[id] != SessionSetStatus.PENDING }
+            return
+        }
+        if (aggregate.session.status != SessionStatus.IN_PROGRESS) {
+            knownStatuses = current
+            return
+        }
+        val newlyResolved = knownStatuses.filter { (id, status) ->
+            status == SessionSetStatus.PENDING &&
+                current[id] != null &&
+                current[id] != SessionSetStatus.PENDING
+        }
+        knownStatuses = current
+        if (newlyResolved.isEmpty()) return
+        newlyResolved.keys.forEach { setId -> cancelDraftPersist(setId) }
+        dirtyIds.value = dirtyIds.value - newlyResolved.keys
+        setErrors.value = setErrors.value - newlyResolved.keys
+        drafts.value = drafts.value - newlyResolved.keys
+        val external = newlyResolved.keys.filter { it !in locallyResolving }
+        locallyResolving.removeAll(newlyResolved.keys)
+        if (external.isNotEmpty() && !discarding.value && !finished.value) {
+            focusAuthoritative(aggregate)
+        }
+    }
+
+    private fun focusAuthoritative(aggregate: WorkoutSessionAggregate) {
+        val pending = SessionFocusLogic.currentPendingSet(aggregate)
+        if (pending == null) {
+            focusedSetId.value = null
+            emitFocus(WorkoutFocusTarget.Finish)
+            return
+        }
+        val index = aggregate.exercises.indexOfFirst { item ->
+            item.sets.any { it.id == pending.id }
+        }
+        if (index >= 0) {
+            savedStateHandle[SELECTED_INDEX] = index
+            expandedIds.value = expandedIds.value + aggregate.exercises[index].exercise.id
+        }
+        focusedSetId.value = pending.id
+        val exerciseId = aggregate.exercises.getOrNull(index)?.exercise?.id ?: return
+        emitFocus(WorkoutFocusTarget.Set(pending.id, exerciseId))
     }
 
     private fun advanceAfterResolved(setId: Long) {

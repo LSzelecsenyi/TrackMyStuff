@@ -22,7 +22,9 @@ import app.mymusclemap.domain.workout.BodyWeightProposal
 import app.mymusclemap.domain.workout.BodyWeightSnapshotLogic
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.FinishWorkoutResult
+import app.mymusclemap.domain.workout.NotificationSetCompletion
 import app.mymusclemap.domain.workout.SessionExerciseItem
+import app.mymusclemap.domain.workout.SessionFocusLogic
 import app.mymusclemap.domain.workout.SessionMutationResult
 import app.mymusclemap.domain.workout.SessionProgressLogic
 import app.mymusclemap.domain.workout.SessionSetStatus
@@ -42,8 +44,11 @@ import app.mymusclemap.domain.workoutimport.WorkoutImportResolvedWorkout
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -200,6 +205,19 @@ class WorkoutSessionRepository(
         ) { session, exercises, sets, muscles ->
             session?.let { toSummary(it, exercises, sets, muscles) }
         }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeActiveAggregate(): Flow<WorkoutSessionAggregate?> {
+        return sessionDao.observeInProgress().flatMapLatest { sessions ->
+            val sessionId = sessions.firstOrNull()?.id ?: return@flatMapLatest flowOf(null)
+            observeAggregate(sessionId)
+        }
+    }
+
+    suspend fun activeAggregate(): WorkoutSessionAggregate? {
+        val session = sessionDao.getInProgress() ?: return null
+        return getAggregate(session.id)
     }
 
     fun observeAggregate(sessionId: Long): Flow<WorkoutSessionAggregate?> {
@@ -480,28 +498,52 @@ class WorkoutSessionRepository(
 
     suspend fun completeSet(setId: Long, draft: ActualSetDraft): SessionMutationResult = mutex.withLock {
         mutateActiveSet(setId) { set, exercise, now ->
-            val (values, errors) = ActualSetLogic.parse(
-                draft,
-                ExerciseEnumCodec.measurement(exercise.measurementType),
-                ExerciseEnumCodec.resistance(exercise.resistanceBasis)
-            )
-            if (values == null) {
-                return@mutateActiveSet SessionMutationResult.Invalid(errors)
+            writeCompletedSet(set, exercise, draft, now)
+        }
+    }
+
+    /**
+     * Completes a set from a notification action.
+     *
+     * The write is the same row update as [completeSet], but it runs only when [setId] is still
+     * [SessionFocusLogic.currentPendingSet] for [sessionId] inside this repository's mutex.
+     * A stale or repeated action therefore cannot complete a later set, and this entry point
+     * does not edit an already completed set.
+     */
+    suspend fun completeCurrentPendingSetFromNotification(
+        sessionId: Long,
+        setId: Long
+    ): NotificationSetCompletion = mutex.withLock {
+        val aggregate = getAggregate(sessionId) ?: return@withLock NotificationSetCompletion.NotFound
+        if (aggregate.session.status != SessionStatus.IN_PROGRESS) {
+            return@withLock NotificationSetCompletion.Stale
+        }
+        val current = SessionFocusLogic.currentPendingSet(aggregate)
+            ?: return@withLock NotificationSetCompletion.Stale
+        if (current.id != setId || current.status != SessionSetStatus.PENDING) {
+            return@withLock NotificationSetCompletion.Stale
+        }
+        val set = sessionDao.getSet(setId) ?: return@withLock NotificationSetCompletion.NotFound
+        if (set.status != SessionSetStatus.PENDING.name) {
+            return@withLock NotificationSetCompletion.Stale
+        }
+        val exercise = sessionDao.getExercise(set.sessionExerciseId)
+            ?: return@withLock NotificationSetCompletion.NotFound
+        if (exercise.sessionId != sessionId) {
+            return@withLock NotificationSetCompletion.Stale
+        }
+        val now = clock.millis()
+        when (val written = writeCompletedSet(set, exercise, ActualSetLogic.draftFromSet(current), now)) {
+            SessionMutationResult.Updated -> {
+                val session = sessionDao.getById(sessionId)
+                    ?: return@withLock NotificationSetCompletion.NotFound
+                touchSession(session, now)
+                NotificationSetCompletion.Updated
             }
-            val completedAt = set.completedAt ?: now
-            sessionDao.updateSet(
-                set.copy(
-                    actualReps = values.reps,
-                    actualLoadKind = values.loadKind.name,
-                    actualWeightKg = values.weightKg,
-                    actualDurationSeconds = values.durationSeconds,
-                    actualDistanceMeters = values.distanceMeters,
-                    status = SessionSetStatus.COMPLETED.name,
-                    completedAt = completedAt,
-                    draftPayload = null
-                )
-            )
-            SessionMutationResult.Updated
+            is SessionMutationResult.Invalid -> NotificationSetCompletion.Invalid
+            SessionMutationResult.NotFound -> NotificationSetCompletion.NotFound
+            SessionMutationResult.NotActive,
+            SessionMutationResult.OriginalSetProtected -> NotificationSetCompletion.Stale
         }
     }
 
@@ -703,6 +745,35 @@ class WorkoutSessionRepository(
         return sessionDao.getCompletedDateNames().map { row ->
             LocalDate.parse(row.date) to row.name
         }
+    }
+
+    private suspend fun writeCompletedSet(
+        set: WorkoutSessionSetEntity,
+        exercise: WorkoutSessionExerciseEntity,
+        draft: ActualSetDraft,
+        now: Long
+    ): SessionMutationResult {
+        val (values, errors) = ActualSetLogic.parse(
+            draft,
+            ExerciseEnumCodec.measurement(exercise.measurementType),
+            ExerciseEnumCodec.resistance(exercise.resistanceBasis)
+        )
+        if (values == null) {
+            return SessionMutationResult.Invalid(errors)
+        }
+        sessionDao.updateSet(
+            set.copy(
+                actualReps = values.reps,
+                actualLoadKind = values.loadKind.name,
+                actualWeightKg = values.weightKg,
+                actualDurationSeconds = values.durationSeconds,
+                actualDistanceMeters = values.distanceMeters,
+                status = SessionSetStatus.COMPLETED.name,
+                completedAt = set.completedAt ?: now,
+                draftPayload = null
+            )
+        )
+        return SessionMutationResult.Updated
     }
 
     private suspend fun mutateActiveSet(
