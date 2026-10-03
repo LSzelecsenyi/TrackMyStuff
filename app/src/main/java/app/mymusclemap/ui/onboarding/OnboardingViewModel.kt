@@ -2,16 +2,20 @@ package app.mymusclemap.ui.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.entitlement.FounderProgramAvailability
+import app.mymusclemap.ui.founder.shouldOfferFounderOnboardingInvitation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 enum class OnboardingStep {
     Welcome,
+    FounderInvitation,
     WeeklyGoal,
     CreatePlan
 }
@@ -25,8 +29,11 @@ class OnboardingViewModel(
     private val firstRunCoordinator: FirstRunCoordinator,
     private val weeklyGoalRepository: WeeklyGoalRepository? = null,
     private val dateProvider: DateProvider? = null,
-    private val founderInvitations: FounderMilestoneAcknowledgementStore? = null
+    private val founderInvitations: FounderMilestoneAcknowledgementStore? = null,
+    private val founderProgram: FounderProgramCoordinator? = null,
+    private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open
 ) : ViewModel() {
+    private var founderChoiceStarted = false
     private val stepState = MutableStateFlow(OnboardingStep.Welcome)
     private val exitState = MutableStateFlow<OnboardingExit?>(null)
 
@@ -34,7 +41,51 @@ class OnboardingViewModel(
     val exit: StateFlow<OnboardingExit?> = exitState
 
     fun onContinue() {
-        stepState.value = OnboardingStep.WeeklyGoal
+        val invitations = founderInvitations
+        val program = founderProgram
+        if (
+            invitations == null ||
+            program == null ||
+            founderAvailability != FounderProgramAvailability.Open
+        ) {
+            stepState.value = OnboardingStep.WeeklyGoal
+            return
+        }
+        viewModelScope.launch {
+            program.refresh()
+            val offer = shouldOfferFounderOnboardingInvitation(
+                availability = founderAvailability,
+                status = program.currentState().status,
+                acknowledgements = invitations.load()
+            )
+            stepState.value = if (offer) {
+                OnboardingStep.FounderInvitation
+            } else {
+                OnboardingStep.WeeklyGoal
+            }
+        }
+    }
+
+    fun onJoinFounder() {
+        if (founderChoiceStarted || stepState.value != OnboardingStep.FounderInvitation) return
+        founderChoiceStarted = true
+        viewModelScope.launch {
+            val program = founderProgram
+            if (program != null && founderAvailability == FounderProgramAvailability.Open) {
+                program.enroll()
+            }
+            founderInvitations?.markInvitationHandled()
+            stepState.value = OnboardingStep.WeeklyGoal
+        }
+    }
+
+    fun onDeclineFounder() {
+        if (founderChoiceStarted || stepState.value != OnboardingStep.FounderInvitation) return
+        founderChoiceStarted = true
+        viewModelScope.launch {
+            founderInvitations?.markInvitationHandled()
+            stepState.value = OnboardingStep.WeeklyGoal
+        }
     }
 
     fun onWeeklyGoalSkipped() {
@@ -62,7 +113,6 @@ class OnboardingViewModel(
     private fun finish(exit: OnboardingExit) {
         viewModelScope.launch {
             firstRunCoordinator.markOnboardingStarted()
-            founderInvitations?.markInvitationPending()
             exitState.value = exit
         }
     }

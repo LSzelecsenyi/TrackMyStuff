@@ -14,9 +14,14 @@ import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.FirstRunDecision
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.entitlement.EntitlementResolver
+import app.mymusclemap.domain.entitlement.EntitlementSources
+import app.mymusclemap.domain.entitlement.EntitlementTier
+import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.FounderProgramState
 import app.mymusclemap.domain.entitlement.FounderProgramStatus
+import app.mymusclemap.ui.onboarding.OnboardingStep
 import app.mymusclemap.ui.onboarding.OnboardingViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -101,144 +106,118 @@ class FounderInvitationHandoffTest {
     }
 
     @Test
-    fun onboardingCompletesBeforeTheInvitationAndOnlyForNotEnrolled() = runTest {
-        val pending = FounderMilestoneAcknowledgements(invitationPending = true)
-        assertEquals(
-            AppLaunchStage.Onboarding,
-            appLaunchStage(FirstRunDecision.ShowOnboarding, FounderProgramStatus.NotEnrolled, pending)
-        )
-        assertEquals(
-            AppLaunchStage.FounderInvitation,
-            appLaunchStage(FirstRunDecision.Ready, FounderProgramStatus.NotEnrolled, pending)
-        )
-        assertEquals(
-            AppLaunchStage.FounderInvitation,
-            appLaunchStage(FirstRunDecision.Ready, FounderProgramStatus.NotEnrolled, pending)
-        )
-        assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(
-                FirstRunDecision.Ready,
-                FounderProgramStatus.NotEnrolled,
-                FounderMilestoneAcknowledgements()
-            )
-        )
-        assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(
-                FirstRunDecision.Ready,
-                FounderProgramStatus.NotEnrolled,
-                pending.copy(invitationHandled = true)
-            )
-        )
-        FounderProgramStatus.values().filter { it != FounderProgramStatus.NotEnrolled }.forEach { status ->
-            assertEquals(
-                status.name,
-                AppLaunchStage.App,
-                appLaunchStage(FirstRunDecision.Ready, status, pending)
-            )
-        }
-        assertEquals(5, FounderProgramRules.Production.temporaryProWorkoutCount)
-        assertEquals(10, FounderProgramRules.Production.founderWorkoutCount)
-        assertEquals(6, FounderProgramRules.Production.requiredDistinctWorkoutDays)
-        assertEquals(45, FounderProgramRules.Production.qualificationWindowDays)
-        assertTrue(FounderProgramRules.Production.feedbackRequired)
-        assertTrue(FounderProgramRules.Production.testerAnalyticsReportRequired)
-    }
-
-    @Test
-    fun cleanInstallShowsOnboardingThenTheInvitation() = runTest {
-        val before = firstRun.prepare()
-        assertEquals(FirstRunDecision.ShowOnboarding, before)
-        assertEquals(
-            AppLaunchStage.Onboarding,
-            appLaunchStage(before, founder.currentState().status, acknowledgements.load())
-        )
-        val viewModel = OnboardingViewModel(firstRun, founderInvitations = acknowledgements)
+    fun closedOnboardingSkipsTheFounderStepAndStillFinishes() = runTest {
+        assertEquals(FirstRunDecision.ShowOnboarding, firstRun.prepare())
+        assertEquals(AppLaunchStage.Onboarding, appLaunchStage(FirstRunDecision.ShowOnboarding))
+        val viewModel = onboardingViewModel(FounderProgramAvailability.Closed)
+        assertEquals(OnboardingStep.Welcome, viewModel.step.value)
         viewModel.onContinue()
+        assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.value)
         viewModel.onWeeklyGoalSkipped()
-        viewModel.onCreatePlan()
+        assertEquals(OnboardingStep.CreatePlan, viewModel.step.value)
+        viewModel.onSkip()
         viewModel.exit.first { it != null }
-        val armed = acknowledgements.load()
-        assertTrue(armed.invitationPending)
-        assertFalse(armed.invitationHandled)
-        val after = firstRun.prepare()
-        assertEquals(FirstRunDecision.Ready, after)
         assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
-        assertEquals(AppLaunchStage.FounderInvitation, appLaunchStage(after, founder.currentState().status, armed))
+        assertFalse(acknowledgements.load().invitationHandled)
+        assertEquals(AppLaunchStage.App, appLaunchStage(firstRun.prepare()))
     }
 
     @Test
-    fun joinUsesEnrollmentOnceAndLandsActiveFree() = runTest {
-        finishOnboarding()
-        var joins = 0
-        suspend fun join() {
-            if (joins > 0) return
-            joins += 1
-            founder.enroll()
-            acknowledgements.markInvitationHandled()
-        }
-        join()
-        join()
-        assertEquals(1, joins)
+    fun openOnboardingOffersTheInvitationBeforeTheWeeklyGoal() = runTest {
+        assertEquals(FirstRunDecision.ShowOnboarding, firstRun.prepare())
+        val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
+        viewModel.onContinue()
+        assertEquals(OnboardingStep.FounderInvitation, viewModel.step.first { it != OnboardingStep.Welcome })
+        assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
+        viewModel.onDeclineFounder()
+        assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.first { it == OnboardingStep.WeeklyGoal })
+        viewModel.onWeeklyGoalSkipped()
+        assertEquals(OnboardingStep.CreatePlan, viewModel.step.value)
+    }
+
+    @Test
+    fun joinEnrollsOnceAndContinuesOnboarding() = runTest {
+        firstRun.prepare()
+        val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
+        viewModel.onContinue()
+        viewModel.step.first { it == OnboardingStep.FounderInvitation }
+        viewModel.onJoinFounder()
+        viewModel.onJoinFounder()
+        assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.first { it == OnboardingStep.WeeklyGoal })
         val enrolled = founder.currentState()
         assertEquals(FounderProgramStatus.ActiveFree, enrolled.status)
         assertEquals(today, enrolled.enrolledOn)
-        assertEquals(today.plusDays(rules.qualificationWindowDays.toLong()), enrolled.deadline)
+        assertEquals(today.plusDays(45), enrolled.deadline)
         founder.enroll()
         assertEquals(enrolled, founder.currentState())
-        val restarted = appLaunchStage(firstRun.prepare(), founder.currentState().status, acknowledgements.load())
-        assertEquals(AppLaunchStage.App, restarted)
+        assertTrue(acknowledgements.load().invitationHandled)
+        assertEquals(AppLaunchStage.App, appLaunchStage(FirstRunDecision.Ready))
     }
 
     @Test
-    fun notNowLeavesTheTesterUnenrolledAndSettingsCanStillEnroll() = runTest {
-        finishOnboarding()
-        acknowledgements.markInvitationHandled()
+    fun notNowLeavesEnrollmentAvailableFromSettingsWhileOpen() = runTest {
+        firstRun.prepare()
+        val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
+        viewModel.onContinue()
+        viewModel.step.first { it == OnboardingStep.FounderInvitation }
+        viewModel.onDeclineFounder()
+        viewModel.step.first { it == OnboardingStep.WeeklyGoal }
         assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
-        assertFalse(acknowledgements.load().invitationPending)
-        val restarted = appLaunchStage(firstRun.prepare(), founder.currentState().status, acknowledgements.load())
-        assertEquals(AppLaunchStage.App, restarted)
-        founder.enroll()
-        assertEquals(FounderProgramStatus.ActiveFree, founder.currentState().status)
+        assertTrue(acknowledgements.load().invitationHandled)
+        val restarted = onboardingViewModel(FounderProgramAvailability.Open)
+        restarted.onContinue()
+        assertEquals(OnboardingStep.WeeklyGoal, restarted.step.first { it != OnboardingStep.Welcome })
+        val settings = FounderProgramViewModel(
+            founder,
+            rules,
+            "0.1.0-debug",
+            acknowledgements,
+            FounderProgramAvailability.Open
+        )
+        settings.enroll()
         assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(firstRun.prepare(), founder.currentState().status, acknowledgements.load())
+            FounderProgramStatus.ActiveFree,
+            founder.view.first { it.state.status == FounderProgramStatus.ActiveFree }.state.status
         )
     }
 
     @Test
-    fun alreadyEnrolledPendingAndApprovedTestersSkipTheInvitation() = runTest {
-        finishOnboarding()
-        founder.enroll()
-        assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(FirstRunDecision.Ready, founder.currentState().status, acknowledgements.load())
+    fun closedSettingsCannotEnrollAndExistingParticipantsKeepTheirStatus() = runTest {
+        val blocked = FounderProgramViewModel(
+            founder,
+            rules,
+            "0.1.0-debug",
+            acknowledgements,
+            FounderProgramAvailability.Closed
         )
+        blocked.enroll()
+        assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
         programStore.save(
             FounderProgramState(
-                status = FounderProgramStatus.PendingApproval,
+                status = FounderProgramStatus.ActivePro,
                 enrolledOn = today,
                 deadline = today.plusDays(45)
             )
         )
         founder.refresh()
-        assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(FirstRunDecision.Ready, founder.currentState().status, acknowledgements.load())
+        blocked.enroll()
+        assertEquals(FounderProgramStatus.ActivePro, founder.currentState().status)
+        val resolved = EntitlementResolver.resolve(
+            EntitlementSources.of(program = founder.currentState()),
+            Instant.parse("2026-10-03T12:00:00Z")
         )
+        assertTrue(resolved.temporaryTesterPro)
+        assertEquals(EntitlementTier.Pro, resolved.tier)
         programStore.save(
-            FounderProgramState(
-                status = FounderProgramStatus.Approved,
-                enrolledOn = today,
-                deadline = today.plusDays(45)
-            )
+            founder.currentState().copy(status = FounderProgramStatus.Approved)
         )
         founder.refresh()
-        assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(FirstRunDecision.Ready, founder.currentState().status, acknowledgements.load())
+        val lifetime = EntitlementResolver.resolve(
+            EntitlementSources.of(program = founder.currentState()),
+            Instant.parse("2026-10-03T12:00:00Z")
         )
+        assertTrue(lifetime.founderLifetime)
+        assertEquals(EntitlementTier.Pro, lifetime.tier)
     }
 
     @Test
@@ -247,45 +226,17 @@ class FounderInvitationHandoffTest {
         themePreferences.clearOnboardingProgress()
         val decision = firstRun.prepare()
         assertEquals(FirstRunDecision.Ready, decision)
-        assertTrue(themePreferences.isOnboardingCompleted())
+        assertEquals(AppLaunchStage.App, appLaunchStage(decision))
         assertFalse(acknowledgements.load().invitationPending)
-        assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(decision, founder.currentState().status, acknowledgements.load())
-        )
-        themePreferences.clearOnboardingProgress()
-        themePreferences.markOnboardingStarted()
-        acknowledgements.save(FounderMilestoneAcknowledgements())
-        val started = firstRun.prepare()
-        assertEquals(FirstRunDecision.Ready, started)
-        assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(started, FounderProgramStatus.NotEnrolled, acknowledgements.load())
-        )
+        assertFalse(acknowledgements.load().invitationHandled)
     }
 
-    @Test
-    fun onboardingWithoutTheInvitationStoreDoesNotArmTheHandoff() = runTest {
-        assertEquals(FirstRunDecision.ShowOnboarding, firstRun.prepare())
-        val viewModel = OnboardingViewModel(firstRun)
-        viewModel.onContinue()
-        viewModel.onWeeklyGoalSkipped()
-        viewModel.onSkip()
-        viewModel.exit.first { it != null }
-        assertFalse(acknowledgements.load().invitationPending)
-        assertEquals(
-            AppLaunchStage.App,
-            appLaunchStage(firstRun.prepare(), founder.currentState().status, acknowledgements.load())
+    private fun onboardingViewModel(availability: FounderProgramAvailability): OnboardingViewModel {
+        return OnboardingViewModel(
+            firstRunCoordinator = firstRun,
+            founderInvitations = acknowledgements,
+            founderProgram = founder,
+            founderAvailability = availability
         )
-    }
-
-    private suspend fun finishOnboarding() {
-        assertEquals(FirstRunDecision.ShowOnboarding, firstRun.prepare())
-        val viewModel = OnboardingViewModel(firstRun, founderInvitations = acknowledgements)
-        viewModel.onContinue()
-        viewModel.onWeeklyGoalSkipped()
-        viewModel.onSkip()
-        viewModel.exit.first { it != null }
-        assertTrue(acknowledgements.load().invitationPending)
     }
 }

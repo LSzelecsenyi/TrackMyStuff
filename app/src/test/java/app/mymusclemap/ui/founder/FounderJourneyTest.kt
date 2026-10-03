@@ -225,6 +225,44 @@ class FounderJourneyTest {
     }
 
     @Test
+    fun feedbackAndTheReportStayHiddenUntilTrainingIsComplete() {
+        val enrolled = journey(FounderProgramStatus.ActiveFree, fastRules, feedback = true)
+        assertFalse(enrolled.trainingComplete)
+        assertTrue(enrolled.feedbackSaved)
+        assertFalse(enrolled.showFeedback)
+        assertFalse(enrolled.showReport)
+        assertTrue(enrolled.presentedChecklist().none { it.kind == FounderChecklistKind.Feedback })
+
+        val trainingLeft = journey(
+            FounderProgramStatus.ActivePro,
+            fastRules,
+            workouts = 1,
+            days = 1,
+            feedback = true
+        )
+        assertFalse(trainingLeft.trainingComplete)
+        assertFalse(trainingLeft.showFeedback)
+        assertFalse(trainingLeft.showReport)
+        assertEquals(FounderNextAction.QualifyingWorkout, trainingLeft.nextAction)
+
+        val readyForFeedback = journey(FounderProgramStatus.ActivePro, fastRules, workouts = 2, days = 1)
+        assertTrue(readyForFeedback.trainingComplete)
+        assertTrue(readyForFeedback.showFeedback)
+        assertFalse(readyForFeedback.showReport)
+
+        val readyForReport = journey(
+            FounderProgramStatus.ActivePro,
+            fastRules,
+            workouts = 2,
+            days = 1,
+            feedback = true
+        )
+        assertTrue(readyForReport.showFeedback)
+        assertTrue(readyForReport.showReport)
+        assertEquals(FounderNextAction.TesterReport, readyForReport.nextAction)
+    }
+
+    @Test
     fun feedbackAndReportCompletionFollowTheRecordedFlags() {
         val open = journey(FounderProgramStatus.ActivePro, fastRules, workouts = 2, days = 1)
         assertFalse(open.feedbackSaved)

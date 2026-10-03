@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
+import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.FounderProgramStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,7 +41,8 @@ class FounderProgramViewModel(
     private val coordinator: FounderProgramCoordinator,
     private val rules: FounderProgramRules,
     private val versionName: String,
-    private val milestoneAcknowledgements: FounderMilestoneAcknowledgementStore
+    private val milestoneAcknowledgements: FounderMilestoneAcknowledgementStore,
+    private val availability: FounderProgramAvailability = FounderProgramAvailability.Open
 ) : ViewModel() {
     private val feedbackDraft = MutableStateFlow("")
     private val feedbackBlank = MutableStateFlow(false)
@@ -114,6 +116,9 @@ class FounderProgramViewModel(
 
     fun enroll() {
         viewModelScope.launch {
+            if (!founderEnrollmentAllowed(availability, coordinator.currentState().status)) {
+                return@launch
+            }
             coordinator.enroll()
         }
     }

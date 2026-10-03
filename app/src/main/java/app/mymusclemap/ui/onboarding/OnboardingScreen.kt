@@ -37,7 +37,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import app.mymusclemap.ui.founder.FounderInvitationScreen
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
@@ -57,8 +59,19 @@ fun OnboardingScreen(
     onCreatePlan: () -> Unit,
     onSkip: () -> Unit,
     onSetWeeklyGoal: (Int) -> Unit = {},
-    onSkipWeeklyGoal: () -> Unit = {}
+    onSkipWeeklyGoal: () -> Unit = {},
+    founderRules: FounderProgramRules = FounderProgramRules.Production,
+    onJoinFounder: () -> Unit = {},
+    onDeclineFounder: () -> Unit = {}
 ) {
+    if (step == OnboardingStep.FounderInvitation) {
+        FounderInvitationScreen(
+            rules = founderRules,
+            onJoin = onJoinFounder,
+            onNotNow = onDeclineFounder
+        )
+        return
+    }
     var selectedGoal by rememberSaveable { mutableIntStateOf(0) }
     val title = when (step) {
         OnboardingStep.Welcome -> stringResource(R.string.onboarding_welcome_title)

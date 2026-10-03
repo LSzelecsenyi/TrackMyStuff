@@ -128,13 +128,17 @@ fun FounderProgramScreen(
                     FounderWelcomeContent(rules = state.journey.rules, onEnroll = onEnroll)
                 } else {
                     EnrolledSection(state = state)
-                    FeedbackSection(
-                        state = state,
-                        onFeedbackChange = onFeedbackChange,
-                        onSaveFeedback = onSaveFeedback,
-                        onShareFeedback = onShareFeedback
-                    )
-                    ReportSection(state = state, onSubmitReport = onSubmitReport)
+                    if (state.journey.showFeedback) {
+                        FeedbackSection(
+                            state = state,
+                            onFeedbackChange = onFeedbackChange,
+                            onSaveFeedback = onSaveFeedback,
+                            onShareFeedback = onShareFeedback
+                        )
+                    }
+                    if (state.journey.showReport) {
+                        ReportSection(state = state, onSubmitReport = onSubmitReport)
+                    }
                     FounderDebugReview(
                         status = state.status,
                         onApprove = onApprove,
@@ -183,8 +187,6 @@ internal fun FounderWelcomeContent(
         )
         Spacer(Modifier.height(AppDimens.itemGap))
         BodyText(stringResource(R.string.founder_welcome_lead))
-        Spacer(Modifier.height(AppDimens.itemGap))
-        BodyText(stringResource(R.string.founder_welcome_body))
         Spacer(Modifier.height(AppDimens.sectionGap))
         CompactEditorSection(title = stringResource(R.string.founder_challenge_title)) {
             Bullet(pluralStringResource(R.plurals.founder_challenge_workouts, rules.founderWorkoutCount, rules.founderWorkoutCount))
@@ -198,17 +200,19 @@ internal fun FounderWelcomeContent(
             Bullet(pluralStringResource(R.plurals.founder_challenge_window, rules.qualificationWindowDays, rules.qualificationWindowDays))
         }
         Spacer(Modifier.height(AppDimens.sectionGap))
-        BodyText(stringResource(R.string.founder_welcome_native))
-        Spacer(Modifier.height(AppDimens.itemGap))
-        BodyText(stringResource(R.string.founder_welcome_review))
-        Spacer(Modifier.height(AppDimens.itemGap))
-        BodyText(
-            pluralStringResource(
-                R.plurals.founder_temporary_pro_offer,
-                rules.temporaryProWorkoutCount,
-                rules.temporaryProWorkoutCount
+        CompactEditorSection(title = stringResource(R.string.founder_unlock_early_title)) {
+            BodyText(
+                pluralStringResource(
+                    R.plurals.founder_temporary_pro_offer,
+                    rules.temporaryProWorkoutCount,
+                    rules.temporaryProWorkoutCount
+                )
             )
-        )
+        }
+        Spacer(Modifier.height(AppDimens.itemGap))
+        SecondaryText(stringResource(R.string.founder_welcome_review))
+        Spacer(Modifier.height(AppDimens.itemGap))
+        SecondaryText(stringResource(R.string.founder_welcome_native))
         Spacer(Modifier.height(AppDimens.sectionGap))
         Button(
             onClick = onEnroll,
@@ -256,8 +260,27 @@ private fun EnrolledSection(state: FounderProgramUiState) {
         }
     }
     if (journey.phase == FounderJourneyPhase.ActiveFree || journey.phase == FounderJourneyPhase.ActivePro) {
+        if (journey.nextAction == FounderNextAction.Feedback) {
+            Spacer(Modifier.height(AppDimens.sectionGap))
+            Headline(stringResource(R.string.founder_training_complete_title), tag = FOUNDER_STATUS)
+            Spacer(Modifier.height(AppDimens.itemGap))
+            BodyText(stringResource(R.string.founder_training_complete_body))
+        } else if (journey.nextAction == FounderNextAction.TesterReport) {
+            Spacer(Modifier.height(AppDimens.sectionGap))
+            Headline(stringResource(R.string.founder_feedback_complete_title), tag = FOUNDER_STATUS)
+            Spacer(Modifier.height(AppDimens.itemGap))
+            Text(
+                text = stringResource(R.string.founder_report_final),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         Spacer(Modifier.height(AppDimens.sectionGap))
-        ChecklistSection(title = stringResource(R.string.founder_progress_title), rows = journey.checklist)
+        ChecklistSection(
+            title = stringResource(R.string.founder_progress_title),
+            rows = journey.presentedChecklist()
+        )
         if (journey.showDeadline) {
             state.deadline?.let { deadline ->
                 Spacer(Modifier.height(AppDimens.itemGap))
@@ -280,6 +303,11 @@ private fun ActiveFreeCopy(journey: FounderJourney) {
                 .fillMaxWidth()
                 .testTag(FOUNDER_NEXT)
         )
+    }
+    val temporaryPro = journey.checklist.firstOrNull { it.kind == FounderChecklistKind.TemporaryPro }
+    if (temporaryPro != null && temporaryPro.current == 0) {
+        Spacer(Modifier.height(AppDimens.itemGap))
+        BodyText(stringResource(R.string.founder_next_first_workout))
     }
 }
 
@@ -383,7 +411,7 @@ private fun FounderMilestoneDialog(
                         Spacer(Modifier.height(AppDimens.sectionGap))
                         ChecklistSection(
                             title = stringResource(R.string.founder_milestone_next),
-                            rows = state.journey.checklist
+                            rows = state.journey.presentedChecklist()
                         )
                     }
                     FounderMilestone.QualificationComplete -> {
@@ -635,6 +663,16 @@ private fun BodyText(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun SecondaryText(text: String) {
+    Text(
+        text = text,
+        style = AppTypeTokens.statSecondary,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth()
     )

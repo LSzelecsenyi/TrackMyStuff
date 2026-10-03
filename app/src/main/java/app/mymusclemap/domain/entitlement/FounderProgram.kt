@@ -52,6 +52,10 @@ data class FounderQualification(
     val distinctDaysMet: Boolean
         get() = distinctNativeWorkoutDays >= rules.requiredDistinctWorkoutDays
 
+    /** Workout count and distinct days. Feedback and the report are separate. */
+    val trainingRequirementsComplete: Boolean
+        get() = founderWorkoutsMet && distinctDaysMet
+
     val feedbackMet: Boolean
         get() = !rules.feedbackRequired || feedbackRecorded
 

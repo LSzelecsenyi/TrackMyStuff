@@ -22,7 +22,7 @@ import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.ui.theme.AppDimens
 
 /**
- * Post-onboarding handoff. The welcome copy and enrollment button are [FounderWelcomeContent].
+ * Onboarding step. The welcome copy and enrollment button are [FounderWelcomeContent].
  * Choosing either action is one-shot for this composition so a second tap cannot enroll twice.
  */
 @Composable

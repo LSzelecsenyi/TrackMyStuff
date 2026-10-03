@@ -1,5 +1,6 @@
 package app.mymusclemap
 
+import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -16,5 +17,6 @@ class FounderProgramRuleSelectionTest {
         assertEquals(true, rules.testerAnalyticsReportRequired)
         assertEquals(false, rules == FounderProgramRules.Production)
         assertEquals(true, FounderDebugReviewAccess.available)
+        assertEquals(FounderProgramAvailability.Open, FounderProgramAvailabilitySelection.availability)
     }
 }

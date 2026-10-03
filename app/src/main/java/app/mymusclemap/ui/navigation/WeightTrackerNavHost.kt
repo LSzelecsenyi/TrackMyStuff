@@ -226,7 +226,9 @@ fun WeightTrackerNavHost(
     openOverviewRequest: Int = 0,
     openActiveWorkoutSessionId: Long? = null,
     openActiveWorkoutGeneration: Int = 0,
-    activeWorkoutNotifications: ActiveWorkoutNotificationCoordinator? = null
+    activeWorkoutNotifications: ActiveWorkoutNotificationCoordinator? = null,
+    founderAvailability: app.mymusclemap.domain.entitlement.FounderProgramAvailability =
+        app.mymusclemap.domain.entitlement.FounderProgramAvailability.Open
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -549,6 +551,11 @@ fun WeightTrackerNavHost(
                     state = state,
                     today = dateProvider.today(),
                     health = health,
+                    showFounderProgram = app.mymusclemap.ui.founder.founderSettingsEntryVisible(
+                        availability = founderAvailability,
+                        status = founder.status,
+                        programReady = !founder.loading
+                    ),
                     showFounderBadge = founder.founderBadge,
                     onHealthRefresh = healthViewModel::refresh,
                     onBack = { navController.popBackStack() },
@@ -1286,6 +1293,7 @@ private fun SettingsRoute(
     onOpenPrivacy: () -> Unit,
     onOpenOpenSourceLicenses: () -> Unit,
     onOpenFounderProgram: () -> Unit,
+    showFounderProgram: Boolean,
     showFounderBadge: Boolean,
     onOpenHealthDetails: () -> Unit
 ) {
@@ -1427,6 +1435,7 @@ private fun SettingsRoute(
         onOpenHelp = onOpenHelp,
         onOpenOpenSourceLicenses = onOpenOpenSourceLicenses,
         onOpenFounderProgram = onOpenFounderProgram,
+        showFounderProgram = showFounderProgram,
         showFounderBadge = showFounderBadge,
         onMessageConsumed = viewModel::consumeMessage,
         onSetWeeklyGoal = viewModel::setWeeklyGoal,

@@ -23,6 +23,7 @@ import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.WorkoutImportFileReader
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.exercise.MuscleGroup
@@ -66,7 +67,8 @@ class WeightViewModelFactory(
     private val weeklyGoalRepository: WeeklyGoalRepository? = null,
     private val founderProgram: FounderProgramCoordinator? = null,
     private val founderRules: FounderProgramRules? = null,
-    private val founderMilestoneAcknowledgements: FounderMilestoneAcknowledgementStore? = null
+    private val founderMilestoneAcknowledgements: FounderMilestoneAcknowledgementStore? = null,
+    private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -124,7 +126,9 @@ class WeightViewModelFactory(
                     firstRunCoordinator,
                     weeklyGoalRepository,
                     dateProvider,
-                    founderMilestoneAcknowledgements
+                    founderMilestoneAcknowledgements,
+                    founderProgram,
+                    founderAvailability
                 )
             }
             modelClass.isAssignableFrom(OnboardingGuideViewModel::class.java) -> {
@@ -194,7 +198,8 @@ class WeightViewModelFactory(
                     coordinator = checkNotNull(founderProgram),
                     rules = checkNotNull(founderRules),
                     versionName = BuildConfig.VERSION_NAME,
-                    milestoneAcknowledgements = checkNotNull(founderMilestoneAcknowledgements)
+                    milestoneAcknowledgements = checkNotNull(founderMilestoneAcknowledgements),
+                    availability = founderAvailability
                 )
             }
             modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {

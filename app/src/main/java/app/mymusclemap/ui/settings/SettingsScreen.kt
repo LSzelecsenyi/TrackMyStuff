@@ -171,6 +171,7 @@ fun SettingsScreen(
     onOpenHelp: () -> Unit,
     onOpenOpenSourceLicenses: () -> Unit = {},
     onOpenFounderProgram: () -> Unit = {},
+    showFounderProgram: Boolean = true,
     showFounderBadge: Boolean = false,
     onMessageConsumed: () -> Unit,
     onBack: () -> Unit,
@@ -281,6 +282,7 @@ fun SettingsScreen(
                 CompactEditorDivider()
                 AboutSection(
                     state = state,
+                    showFounderProgram = showFounderProgram,
                     showFounderBadge = showFounderBadge,
                     onSendFeedback = onSendFeedback,
                     onOpenPrivacyPolicy = onOpenPrivacyPolicy,
@@ -926,6 +928,7 @@ private fun AppBackupSection(
 @Composable
 private fun AboutSection(
     state: SettingsUiState,
+    showFounderProgram: Boolean,
     showFounderBadge: Boolean,
     onSendFeedback: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
@@ -947,13 +950,15 @@ private fun AboutSection(
             }
         }
         Spacer(Modifier.height(AppDimens.itemGap))
-        DataActionRow(
-            icon = Icons.Filled.EmojiEvents,
-            title = stringResource(R.string.founder_open),
-            subtitle = stringResource(R.string.founder_open_subtitle),
-            testTag = "settings-founder-program",
-            onClick = onOpenFounderProgram
-        )
+        if (showFounderProgram) {
+            DataActionRow(
+                icon = Icons.Filled.EmojiEvents,
+                title = stringResource(R.string.founder_open),
+                subtitle = stringResource(R.string.founder_open_subtitle),
+                testTag = "settings-founder-program",
+                onClick = onOpenFounderProgram
+            )
+        }
         DataActionRow(
             icon = Icons.AutoMirrored.Outlined.HelpOutline,
             title = stringResource(R.string.action_help_tips),

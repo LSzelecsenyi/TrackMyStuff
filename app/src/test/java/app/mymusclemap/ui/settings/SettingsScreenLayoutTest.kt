@@ -345,6 +345,13 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
+    fun givenFounderProgramHiddenThenAboutHasNoEnrollmentRow() {
+        render(showFounderProgram = false)
+        composeRule.onNodeWithTag("settings-founder-program").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_open)).assertDoesNotExist()
+    }
+
+    @Test
     fun givenAboutSectionThenFounderProgramEntryOpensOnce() {
         val opens = intArrayOf(0)
         render(onOpenFounderProgram = { opens[0] += 1 })
@@ -537,6 +544,7 @@ class SettingsScreenLayoutTest {
         onOpenPrivacyPolicy: () -> Unit = {},
         onOpenHelp: () -> Unit = {},
         onOpenFounderProgram: () -> Unit = {},
+        showFounderProgram: Boolean = true,
         onBack: () -> Unit = {}
     ) {
         composeRule.setContent {
@@ -577,6 +585,7 @@ class SettingsScreenLayoutTest {
                             onOpenPrivacyPolicy = onOpenPrivacyPolicy,
                             onOpenHelp = onOpenHelp,
                             onOpenFounderProgram = onOpenFounderProgram,
+                            showFounderProgram = showFounderProgram,
                             onMessageConsumed = {},
                             onBack = onBack
                         )

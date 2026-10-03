@@ -1065,8 +1065,13 @@
     <string name="founder_mark_content_description">Founding Tester program</string>
     <string name="founder_bullet">• %1$s</string>
     <string name="founder_welcome_title">Welcome to the Founding Tester Program</string>
-    <string name="founder_welcome_lead">Help shape Strict before its public launch.</string>
-    <string name="founder_welcome_body">Complete the testing requirements, share your feedback, and qualify for Founding Member status and Lifetime Pro.</string>
+    <string name="founder_welcome_lead">Help shape Strict before launch and qualify for Founding Member status with Lifetime Pro.</string>
+    <string name="founder_unlock_early_title">Unlock Pro early</string>
+    <string name="founder_next_first_workout">Next step: Complete your first workout in Strict.</string>
+    <string name="founder_training_complete_title">Training complete</string>
+    <string name="founder_training_complete_body">You\'ve completed the workout part of the Founding Tester Program. Now we\'d love to hear what you think.</string>
+    <string name="founder_feedback_complete_title">Feedback complete</string>
+    <string name="founder_report_final">Final step</string>
     <string name="founder_challenge_title">Your challenge</string>
     <string name="founder_challenge_feedback">Share your feedback</string>
     <string name="founder_challenge_report">Share your Tester Analytics Report</string>

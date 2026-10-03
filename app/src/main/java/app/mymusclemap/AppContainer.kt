@@ -109,6 +109,7 @@ class AppContainer(context: Context) {
     )
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     val founderProgramRules: FounderProgramRules = FounderProgramRuleSelection.rules
+    val founderProgramAvailability = FounderProgramAvailabilitySelection.availability
     val founderProgramStore = FounderProgramStore(appContext)
     val founderMilestoneAcknowledgements = FounderMilestoneAcknowledgementStore(appContext)
     private val entitlementRevision = MutableStateFlow(0)
@@ -180,6 +181,7 @@ class AppContainer(context: Context) {
         weeklyGoalRepository = weeklyGoalRepository,
         founderProgram = founderProgram,
         founderRules = founderProgramRules,
-        founderMilestoneAcknowledgements = founderMilestoneAcknowledgements
+        founderMilestoneAcknowledgements = founderMilestoneAcknowledgements,
+        founderAvailability = founderProgramAvailability
     )
 }

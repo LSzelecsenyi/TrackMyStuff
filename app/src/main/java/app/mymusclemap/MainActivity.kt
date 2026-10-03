@@ -6,9 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
@@ -27,8 +25,6 @@ import app.mymusclemap.data.repository.FirstRunDecision
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.ui.founder.AppLaunchStage
-import app.mymusclemap.ui.founder.FounderInvitationScreen
-import app.mymusclemap.ui.founder.appLaunchStage
 import app.mymusclemap.ui.navigation.WeightTrackerNavHost
 import app.mymusclemap.ui.onboarding.OnboardingExit
 import app.mymusclemap.ui.onboarding.OnboardingScreen
@@ -61,22 +57,13 @@ class MainActivity : ComponentActivity() {
             val openActiveGeneration by activeWorkoutGeneration
             var stage by remember { mutableStateOf<AppLaunchStage?>(null) }
             var openNewTemplate by rememberSaveable { mutableStateOf(false) }
-            var openFounderProgram by rememberSaveable { mutableStateOf(false) }
-            var onboardingExit by rememberSaveable { mutableStateOf<String?>(null) }
-            var invitationBusy by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 val firstRun = container.firstRunCoordinator.prepare()
-                if (firstRun == FirstRunDecision.ShowOnboarding) {
-                    stage = AppLaunchStage.Onboarding
-                    return@LaunchedEffect
+                stage = if (firstRun == FirstRunDecision.ShowOnboarding) {
+                    AppLaunchStage.Onboarding
+                } else {
+                    AppLaunchStage.App
                 }
-                container.founderProgram.refresh()
-                val acknowledgements = container.founderMilestoneAcknowledgements.load()
-                stage = appLaunchStage(
-                    firstRun,
-                    container.founderProgram.currentState().status,
-                    acknowledgements
-                )
             }
             CompositionLocalProvider(
                 LocalFeatureEntitlements provides container.featureEntitlements
@@ -93,14 +80,8 @@ class MainActivity : ComponentActivity() {
                             val exit by viewModel.exit.collectAsStateWithLifecycle()
                             LaunchedEffect(exit) {
                                 val chosen = exit ?: return@LaunchedEffect
-                                onboardingExit = chosen.name
-                                container.founderProgram.refresh()
-                                val acknowledgements = container.founderMilestoneAcknowledgements.load()
-                                stage = appLaunchStage(
-                                    FirstRunDecision.Ready,
-                                    container.founderProgram.currentState().status,
-                                    acknowledgements
-                                )
+                                openNewTemplate = chosen == OnboardingExit.OpenTemplateEditor
+                                stage = AppLaunchStage.App
                             }
                             OnboardingScreen(
                                 step = step,
@@ -108,51 +89,24 @@ class MainActivity : ComponentActivity() {
                                 onCreatePlan = viewModel::onCreatePlan,
                                 onSkip = viewModel::onSkip,
                                 onSetWeeklyGoal = viewModel::onWeeklyGoalSet,
-                                onSkipWeeklyGoal = viewModel::onWeeklyGoalSkipped
+                                onSkipWeeklyGoal = viewModel::onWeeklyGoalSkipped,
+                                founderRules = container.founderProgramRules,
+                                onJoinFounder = viewModel::onJoinFounder,
+                                onDeclineFounder = viewModel::onDeclineFounder
                             )
                         }
-                        AppLaunchStage.FounderInvitation -> FounderInvitationScreen(
-                            rules = container.founderProgramRules,
-                            onJoin = {
-                                if (invitationBusy) return@FounderInvitationScreen
-                                invitationBusy = true
-                                lifecycleScope.launch {
-                                    withContext(NonCancellable) {
-                                        container.founderProgram.enroll()
-                                        container.founderMilestoneAcknowledgements.markInvitationHandled()
-                                    }
-                                    openFounderProgram = true
-                                    openNewTemplate = false
-                                    stage = AppLaunchStage.App
-                                }
-                            },
-                            onNotNow = {
-                                if (invitationBusy) return@FounderInvitationScreen
-                                invitationBusy = true
-                                val openTemplate = onboardingExit == OnboardingExit.OpenTemplateEditor.name
-                                lifecycleScope.launch {
-                                    withContext(NonCancellable) {
-                                        container.founderMilestoneAcknowledgements.markInvitationHandled()
-                                    }
-                                    openNewTemplate = openTemplate
-                                    openFounderProgram = false
-                                    stage = AppLaunchStage.App
-                                }
-                            }
-                        )
                         AppLaunchStage.App -> WeightTrackerNavHost(
                             factory = container.viewModelFactory,
                             dateProvider = container.dateProvider,
                             openNewTemplate = openNewTemplate,
                             onOpenedNewTemplate = { openNewTemplate = false },
-                            openFounderProgram = openFounderProgram,
-                            onOpenedFounderProgram = { openFounderProgram = false },
                             openPrivacyPolicy = openPrivacy,
                             onOpenedPrivacyPolicy = { openPrivacyPolicy.value = false },
                             openOverviewRequest = openOverviewRequest,
                             openActiveWorkoutSessionId = openActiveSessionId,
                             openActiveWorkoutGeneration = openActiveGeneration,
-                            activeWorkoutNotifications = container.activeWorkoutNotifications
+                            activeWorkoutNotifications = container.activeWorkoutNotifications,
+                            founderAvailability = container.founderProgramAvailability
                         )
                     }
                 }

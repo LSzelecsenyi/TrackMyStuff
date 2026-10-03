@@ -62,6 +62,9 @@ data class FounderJourney(
     val feedbackSaved: Boolean,
     val reportShared: Boolean,
     val acceptsContribution: Boolean,
+    val trainingComplete: Boolean,
+    val showFeedback: Boolean,
+    val showReport: Boolean,
     val rules: FounderProgramRules
 )
 
@@ -71,6 +74,15 @@ fun founderJourney(
     acknowledgements: FounderMilestoneAcknowledgements
 ): FounderJourney {
     val next = nextAction(status, qualification)
+    val acceptsContribution = status == FounderProgramStatus.ActiveFree || status == FounderProgramStatus.ActivePro
+    val trainingComplete = qualification.trainingRequirementsComplete
+    val showFeedback = acceptsContribution &&
+        trainingComplete &&
+        (qualification.rules.feedbackRequired || qualification.feedbackRecorded)
+    val showReport = acceptsContribution &&
+        trainingComplete &&
+        qualification.feedbackMet &&
+        (qualification.rules.testerAnalyticsReportRequired || qualification.testerAnalyticsReportSubmitted)
     return FounderJourney(
         phase = phase(status),
         milestone = milestone(status, acknowledgements),
@@ -81,9 +93,23 @@ fun founderJourney(
         temporaryProActive = status.grantsTemporaryPro(),
         feedbackSaved = qualification.feedbackRecorded,
         reportShared = qualification.testerAnalyticsReportSubmitted,
-        acceptsContribution = status == FounderProgramStatus.ActiveFree || status == FounderProgramStatus.ActivePro,
+        acceptsContribution = acceptsContribution,
+        trainingComplete = trainingComplete,
+        showFeedback = showFeedback,
+        showReport = showReport,
         rules = qualification.rules
     )
+}
+
+/** Training rows stay visible. Feedback and the report appear only at their stages. */
+fun FounderJourney.presentedChecklist(): List<FounderChecklistRow> {
+    return checklist.filter { row ->
+        when (row.kind) {
+            FounderChecklistKind.Feedback -> showFeedback
+            FounderChecklistKind.TesterReport -> showReport
+            else -> true
+        }
+    }
 }
 
 private fun phase(status: FounderProgramStatus): FounderJourneyPhase {
