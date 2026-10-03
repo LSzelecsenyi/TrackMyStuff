@@ -379,6 +379,13 @@ private fun FounderMilestoneDialog(
     onAcknowledge: () -> Unit
 ) {
     val milestone = state.journey.milestone ?: return
+    if (milestone == FounderMilestone.TemporaryProUnlocked) {
+        FounderProUnlockedDialog(
+            checklist = state.journey.presentedChecklist(),
+            onAcknowledge = onAcknowledge
+        )
+        return
+    }
     val prominent = milestone == FounderMilestone.FounderApproved
     AlertDialog(
         onDismissRequest = onAcknowledge,
@@ -406,14 +413,7 @@ private fun FounderMilestoneDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 when (milestone) {
-                    FounderMilestone.TemporaryProUnlocked -> {
-                        BodyText(stringResource(R.string.founder_milestone_pro_body))
-                        Spacer(Modifier.height(AppDimens.sectionGap))
-                        ChecklistSection(
-                            title = stringResource(R.string.founder_milestone_next),
-                            rows = state.journey.presentedChecklist()
-                        )
-                    }
+                    FounderMilestone.TemporaryProUnlocked -> Unit
                     FounderMilestone.QualificationComplete -> {
                         BodyText(stringResource(R.string.founder_milestone_qualified_body))
                         Spacer(Modifier.height(AppDimens.itemGap))
@@ -429,6 +429,58 @@ private fun FounderMilestoneDialog(
                         FounderBadge(modifier = Modifier.align(Alignment.CenterHorizontally))
                     }
                 }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onAcknowledge,
+                modifier = Modifier.testTag(FOUNDER_MILESTONE_CONTINUE)
+            ) {
+                Text(stringResource(R.string.founder_milestone_continue))
+            }
+        }
+    )
+}
+
+/**
+ * The one Temporary Pro milestone. Overview and the Founder screen both present this dialog.
+ */
+@Composable
+internal fun FounderProUnlockedDialog(
+    checklist: List<FounderChecklistRow>,
+    onAcknowledge: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onAcknowledge,
+        title = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                FounderProgramMark()
+                Spacer(Modifier.height(AppDimens.itemGap))
+                Text(
+                    text = stringResource(R.string.founder_milestone_pro_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(FOUNDER_MILESTONE)
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                BodyText(stringResource(R.string.founder_milestone_pro_body))
+                Spacer(Modifier.height(AppDimens.sectionGap))
+                ChecklistSection(
+                    title = stringResource(R.string.founder_milestone_next),
+                    rows = checklist
+                )
             }
         },
         confirmButton = {

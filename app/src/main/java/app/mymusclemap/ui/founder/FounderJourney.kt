@@ -124,6 +124,20 @@ private fun phase(status: FounderProgramStatus): FounderJourneyPhase {
     }
 }
 
+/**
+ * Whether the existing Temporary Pro milestone is still unacknowledged.
+ *
+ * Overview and the Founder screen both use this. It is presentation metadata:
+ * persisted program status plus the acknowledgement survive process death, and
+ * neither flag grants or removes Pro.
+ */
+fun temporaryProMilestonePending(
+    status: FounderProgramStatus,
+    acknowledgements: FounderMilestoneAcknowledgements
+): Boolean {
+    return status == FounderProgramStatus.ActivePro && !acknowledgements.temporaryProUnlocked
+}
+
 private fun milestone(
     status: FounderProgramStatus,
     acknowledgements: FounderMilestoneAcknowledgements
@@ -134,7 +148,11 @@ private fun milestone(
         FounderProgramStatus.PendingApproval ->
             if (acknowledgements.qualificationComplete) null else FounderMilestone.QualificationComplete
         FounderProgramStatus.ActivePro ->
-            if (acknowledgements.temporaryProUnlocked) null else FounderMilestone.TemporaryProUnlocked
+            if (temporaryProMilestonePending(status, acknowledgements)) {
+                FounderMilestone.TemporaryProUnlocked
+            } else {
+                null
+            }
         else -> null
     }
 }

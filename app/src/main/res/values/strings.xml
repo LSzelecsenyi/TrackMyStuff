@@ -1103,6 +1103,13 @@
     <string name="founder_pending_review">Review pending</string>
     <string name="founder_pending_body">Temporary Pro stays active while your application is being reviewed. You do not need to complete more qualification requirements.</string>
     <string name="founder_lifetime_pro">Lifetime Pro</string>
+    <string name="membership_badge_pro">PRO</string>
+    <string name="membership_badge_founder">Founder</string>
+    <string name="membership_badge_pro_description">Strict Pro</string>
+    <string name="membership_pro_title">Strict Pro</string>
+    <string name="membership_temporary_pro_body">Temporary Pro is active through the Founding Tester Program.</string>
+    <string name="membership_pending_pro_body">Temporary Pro stays active while your Founder application is being reviewed.</string>
+    <string name="membership_generic_pro_body">Pro access is active.</string>
     <string name="founder_expired_title">Qualification window ended</string>
     <string name="founder_expired_body">The qualification window ended before every requirement was completed. Your workouts and notes are still in Strict.</string>
     <string name="founder_expired_open">Still open when the window ended</string>

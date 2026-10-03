@@ -47,6 +47,19 @@ import app.mymusclemap.WeightViewModelFactory
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.entitlement.EffectiveEntitlement
+import app.mymusclemap.domain.entitlement.EntitlementTier
+import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
+import app.mymusclemap.domain.entitlement.FounderProgramRules
+import app.mymusclemap.domain.entitlement.FounderProgramStatus
+import app.mymusclemap.ui.founder.FounderMilestone
+import app.mymusclemap.ui.founder.FounderProgramUiState
+import app.mymusclemap.ui.founder.FounderProgramViewModel
+import app.mymusclemap.ui.founder.founderJourney
+import app.mymusclemap.ui.founder.presentedChecklist
+import app.mymusclemap.ui.membership.membershipPresentation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import app.mymusclemap.domain.reports.ReportPeriod
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
@@ -214,6 +227,25 @@ private fun workoutDetailRoute(sessionId: Long): String {
 }
 
 @Composable
+private fun rememberFounderUiState(viewModel: FounderProgramViewModel?): FounderProgramUiState {
+    if (viewModel == null) {
+        val rules = FounderProgramRules.Production
+        val journey = founderJourney(
+            status = FounderProgramStatus.NotEnrolled,
+            qualification = rules.qualify(
+                workouts = emptyList(),
+                feedbackRecorded = false,
+                testerAnalyticsReportSubmitted = false
+            ),
+            acknowledgements = FounderMilestoneAcknowledgements()
+        ).copy(milestone = null)
+        return FounderProgramUiState(loading = true, rules = rules, journey = journey)
+    }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    return state
+}
+
+@Composable
 fun WeightTrackerNavHost(
     factory: WeightViewModelFactory,
     dateProvider: DateProvider,
@@ -228,7 +260,17 @@ fun WeightTrackerNavHost(
     openActiveWorkoutGeneration: Int = 0,
     activeWorkoutNotifications: ActiveWorkoutNotificationCoordinator? = null,
     founderAvailability: app.mymusclemap.domain.entitlement.FounderProgramAvailability =
-        app.mymusclemap.domain.entitlement.FounderProgramAvailability.Open
+        app.mymusclemap.domain.entitlement.FounderProgramAvailability.Open,
+    founderProgram: FounderProgramViewModel? = null,
+    currentEntitlement: () -> EffectiveEntitlement = {
+        EffectiveEntitlement(
+            tier = EntitlementTier.Free,
+            subscriptionValid = false,
+            founderLifetime = false,
+            temporaryTesterPro = false
+        )
+    },
+    entitlementChanges: Flow<Int> = flowOf(0)
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -236,6 +278,13 @@ fun WeightTrackerNavHost(
     val showBottomBar = AppNavigation.showsBottomBar(currentRoute)
     val workoutHubViewModel: WorkoutHubViewModel = viewModel(factory = factory)
     val hubState by workoutHubViewModel.uiState.collectAsStateWithLifecycle()
+    val founderViewModel = founderProgram
+    val founder = rememberFounderUiState(founderViewModel)
+    val entitlementRevision by entitlementChanges.collectAsStateWithLifecycle(initialValue = 0)
+    val membership = remember(entitlementRevision, founder.status) {
+        membershipPresentation(currentEntitlement(), founder.status)
+    }
+    val deliverTemporaryPro = founder.journey.milestone == FounderMilestone.TemporaryProUnlocked
     val onboardingGuideViewModel: OnboardingGuideViewModel = viewModel(factory = factory)
     val onboardingGuide by onboardingGuideViewModel.guide.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -445,7 +494,11 @@ fun WeightTrackerNavHost(
                             chartBounds = bounds
                         }
                     },
-                    onDashboardTargetRevealed = onboardingGuideViewModel::markDashboardTargetReady
+                    onDashboardTargetRevealed = onboardingGuideViewModel::markDashboardTargetReady,
+                    membership = membership,
+                    showTemporaryProMilestone = deliverTemporaryPro,
+                    temporaryProChecklist = founder.journey.presentedChecklist(),
+                    onAcknowledgeTemporaryPro = { founderViewModel?.acknowledgeMilestone() }
                 )
                 LaunchedEffect(state.startedSessionId) {
                     val sessionId = state.startedSessionId ?: return@LaunchedEffect
@@ -543,9 +596,6 @@ fun WeightTrackerNavHost(
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
                 val healthViewModel: HealthConnectViewModel = viewModel(factory = factory)
                 val health by healthViewModel.settings.collectAsStateWithLifecycle()
-                val founderViewModel: app.mymusclemap.ui.founder.FounderProgramViewModel =
-                    viewModel(factory = factory)
-                val founder by founderViewModel.uiState.collectAsStateWithLifecycle()
                 SettingsRoute(
                     viewModel = viewModel,
                     state = state,
@@ -571,20 +621,20 @@ fun WeightTrackerNavHost(
                 )
             }
             composable(AppRoutes.FOUNDER_PROGRAM) {
-                val viewModel: app.mymusclemap.ui.founder.FounderProgramViewModel =
-                    viewModel(factory = factory)
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
                 app.mymusclemap.ui.founder.FounderProgramRoute(
-                    state = state,
-                    reportText = viewModel::reportText,
+                    state = founder,
+                    reportText = { founderViewModel?.reportText().orEmpty() },
                     onBack = { navController.popBackStack() },
-                    onEnroll = viewModel::enroll,
-                    onFeedbackChange = viewModel::onFeedbackChange,
-                    onSaveFeedback = viewModel::saveFeedback,
-                    onReportShareResult = viewModel::onReportShareResult,
-                    onAcknowledgeMilestone = viewModel::acknowledgeMilestone,
-                    onApprove = viewModel::approve,
-                    onReject = viewModel::reject
+                    onEnroll = { founderViewModel?.enroll() },
+                    onFeedbackChange = { founderViewModel?.onFeedbackChange(it) },
+                    onSaveFeedback = { founderViewModel?.saveFeedback() },
+                    onReportShareResult = { shared ->
+                        founderViewModel?.onReportShareResult(shared)
+                        Unit
+                    },
+                    onAcknowledgeMilestone = { founderViewModel?.acknowledgeMilestone() },
+                    onApprove = { founderViewModel?.approve() },
+                    onReject = { founderViewModel?.reject(it) }
                 )
             }
             composable(AppRoutes.HEALTH_CONNECT) {

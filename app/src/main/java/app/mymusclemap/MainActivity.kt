@@ -25,6 +25,7 @@ import app.mymusclemap.data.repository.FirstRunDecision
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.ui.founder.AppLaunchStage
+import app.mymusclemap.ui.founder.FounderProgramViewModel
 import app.mymusclemap.ui.navigation.WeightTrackerNavHost
 import app.mymusclemap.ui.onboarding.OnboardingExit
 import app.mymusclemap.ui.onboarding.OnboardingScreen
@@ -95,19 +96,26 @@ class MainActivity : ComponentActivity() {
                                 onDeclineFounder = viewModel::onDeclineFounder
                             )
                         }
-                        AppLaunchStage.App -> WeightTrackerNavHost(
-                            factory = container.viewModelFactory,
-                            dateProvider = container.dateProvider,
-                            openNewTemplate = openNewTemplate,
-                            onOpenedNewTemplate = { openNewTemplate = false },
-                            openPrivacyPolicy = openPrivacy,
-                            onOpenedPrivacyPolicy = { openPrivacyPolicy.value = false },
-                            openOverviewRequest = openOverviewRequest,
-                            openActiveWorkoutSessionId = openActiveSessionId,
-                            openActiveWorkoutGeneration = openActiveGeneration,
-                            activeWorkoutNotifications = container.activeWorkoutNotifications,
-                            founderAvailability = container.founderProgramAvailability
-                        )
+                        AppLaunchStage.App -> {
+                            val founderViewModel: FounderProgramViewModel =
+                                viewModel(factory = container.viewModelFactory)
+                            WeightTrackerNavHost(
+                                factory = container.viewModelFactory,
+                                dateProvider = container.dateProvider,
+                                openNewTemplate = openNewTemplate,
+                                onOpenedNewTemplate = { openNewTemplate = false },
+                                openPrivacyPolicy = openPrivacy,
+                                onOpenedPrivacyPolicy = { openPrivacyPolicy.value = false },
+                                openOverviewRequest = openOverviewRequest,
+                                openActiveWorkoutSessionId = openActiveSessionId,
+                                openActiveWorkoutGeneration = openActiveGeneration,
+                                activeWorkoutNotifications = container.activeWorkoutNotifications,
+                                founderAvailability = container.founderProgramAvailability,
+                                founderProgram = founderViewModel,
+                                currentEntitlement = container.entitlementComposer::resolve,
+                                entitlementChanges = container.featureEntitlements.changes()
+                            )
+                        }
                     }
                 }
             }

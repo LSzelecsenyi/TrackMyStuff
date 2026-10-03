@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,12 +26,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -44,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -62,6 +66,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.ui.founder.FounderChecklistRow
+import app.mymusclemap.ui.founder.FounderProUnlockedDialog
+import app.mymusclemap.ui.membership.MembershipBadge
+import app.mymusclemap.ui.membership.MembershipDetail
+import app.mymusclemap.ui.membership.MembershipPresentation
 import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.DashboardSnapshot
 import app.mymusclemap.domain.WeeklyOverview
@@ -101,6 +110,8 @@ internal const val OVERVIEW_OVERFLOW_MENU = "overview-overflow-menu"
 internal const val OVERVIEW_OVERFLOW_TEMPLATES = "overview-overflow-templates"
 internal const val OVERVIEW_OVERFLOW_EXERCISES = "overview-overflow-exercises"
 internal const val OVERVIEW_OVERFLOW_SETTINGS = "overview-overflow-settings"
+internal const val OVERVIEW_MEMBERSHIP_BADGE = "overview-membership-badge"
+internal const val OVERVIEW_MEMBERSHIP_INFO = "overview-membership-info"
 private val HeatmapCoachCalloutSpace = 176.dp
 
 @Composable
@@ -156,10 +167,15 @@ fun DashboardScreen(
     onOpenHealthSettings: () -> Unit = {},
     onOpenHealthDetails: () -> Unit = {},
     onSetWeeklyGoal: (Int) -> Unit = {},
-    onDisableWeeklyGoal: () -> Unit = {}
+    onDisableWeeklyGoal: () -> Unit = {},
+    membership: MembershipPresentation = MembershipPresentation.None,
+    showTemporaryProMilestone: Boolean = false,
+    temporaryProChecklist: List<FounderChecklistRow> = emptyList(),
+    onAcknowledgeTemporaryPro: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
+    var membershipInfoOpen by remember { mutableStateOf(false) }
     val resources = LocalResources.current
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
@@ -229,6 +245,8 @@ fun DashboardScreen(
             OverviewHeader(
                 overview = state.weeklyOverview,
                 today = state.today,
+                membership = membership,
+                onMembershipClick = { membershipInfoOpen = true },
                 onOpenSettings = onOpenSettings,
                 onOpenTemplates = onOpenTemplates,
                 onOpenCatalog = onOpenCatalog
@@ -372,6 +390,19 @@ fun DashboardScreen(
             onDismiss = onDismissLocked
         )
     }
+    if (showTemporaryProMilestone) {
+        FounderProUnlockedDialog(
+            checklist = temporaryProChecklist,
+            onAcknowledge = onAcknowledgeTemporaryPro
+        )
+    }
+    val membershipDetail = membership.detail
+    if (membershipInfoOpen && membershipDetail != null) {
+        MembershipInfoDialog(
+            detail = membershipDetail,
+            onDismiss = { membershipInfoOpen = false }
+        )
+    }
 }
 
 @Composable
@@ -496,6 +527,8 @@ private fun CompactStat(
 private fun OverviewHeader(
     overview: WeeklyOverview,
     today: LocalDate,
+    membership: MembershipPresentation,
+    onMembershipClick: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTemplates: () -> Unit,
     onOpenCatalog: () -> Unit
@@ -551,11 +584,17 @@ private fun OverviewHeader(
                     modifier = Modifier.testTag("dashboard_weekly_range")
                 )
             }
-            OverviewOverflowMenu(
-                onOpenTemplates = onOpenTemplates,
-                onOpenCatalog = onOpenCatalog,
-                onOpenSettings = onOpenSettings
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MembershipBadgeChip(
+                    presentation = membership,
+                    onClick = onMembershipClick
+                )
+                OverviewOverflowMenu(
+                    onOpenTemplates = onOpenTemplates,
+                    onOpenCatalog = onOpenCatalog,
+                    onOpenSettings = onOpenSettings
+                )
+            }
         }
         Row(
             modifier = Modifier
@@ -586,6 +625,78 @@ private fun OverviewHeader(
             )
         }
     }
+}
+
+/**
+ * Compact membership mark in the Overview header.
+ *
+ * TODO: Replace the Founder label with the final Strict Founder artwork during the planned branding pass.
+ * This chip is not a final logo and does not grant Pro.
+ */
+@Composable
+private fun MembershipBadgeChip(
+    presentation: MembershipPresentation,
+    onClick: () -> Unit
+) {
+    val badge = presentation.badge
+    if (badge == MembershipBadge.None || presentation.detail == null) return
+    val label = when (badge) {
+        MembershipBadge.Pro -> stringResource(R.string.membership_badge_pro)
+        MembershipBadge.Founder -> stringResource(R.string.membership_badge_founder)
+        MembershipBadge.None -> return
+    }
+    val description = when (badge) {
+        MembershipBadge.Pro -> stringResource(R.string.membership_badge_pro_description)
+        MembershipBadge.Founder -> stringResource(R.string.founder_badge)
+        MembershipBadge.None -> label
+    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier
+            .padding(end = 2.dp)
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .clickable(role = Role.Button, onClick = onClick)
+            .testTag(OVERVIEW_MEMBERSHIP_BADGE)
+            .semantics { contentDescription = description }
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    )
+}
+
+@Composable
+private fun MembershipInfoDialog(
+    detail: MembershipDetail,
+    onDismiss: () -> Unit
+) {
+    val title = when (detail) {
+        MembershipDetail.FoundingMember -> stringResource(R.string.founder_badge)
+        MembershipDetail.TemporaryFounderPro,
+        MembershipDetail.PendingFounderReview,
+        MembershipDetail.Pro -> stringResource(R.string.membership_pro_title)
+    }
+    val body = when (detail) {
+        MembershipDetail.TemporaryFounderPro -> stringResource(R.string.membership_temporary_pro_body)
+        MembershipDetail.PendingFounderReview -> stringResource(R.string.membership_pending_pro_body)
+        MembershipDetail.FoundingMember -> stringResource(R.string.founder_lifetime_pro)
+        MembershipDetail.Pro -> stringResource(R.string.membership_generic_pro_body)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Text(
+                text = body,
+                modifier = Modifier.testTag(OVERVIEW_MEMBERSHIP_INFO)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_ok))
+            }
+        }
+    )
 }
 
 @Composable
