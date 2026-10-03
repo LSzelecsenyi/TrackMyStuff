@@ -1058,6 +1058,7 @@
     <string name="reports_muscles_empty">No completed sets in this report.</string>
     <string name="founder_program_title">Founding Tester</string>
     <string name="founder_enroll">Join the Founding Tester Program</string>
+    <string name="founder_invitation_not_now">Not now</string>
     <string name="founder_open">Founding Tester program</string>
     <string name="founder_open_subtitle">See qualification progress</string>
     <string name="founder_badge">Founding Member</string>

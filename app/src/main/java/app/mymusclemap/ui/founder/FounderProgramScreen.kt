@@ -59,6 +59,8 @@ internal const val FOUNDER_NEXT = "founder-next"
 internal const val FOUNDER_FEEDBACK = "founder-feedback"
 internal const val FOUNDER_REPORT = "founder-report"
 internal const val FOUNDER_STATUS = "founder-status"
+internal const val FOUNDER_INVITATION = "founder-invitation"
+internal const val FOUNDER_INVITATION_NOT_NOW = "founder-invitation-not-now"
 
 @Composable
 fun FounderProgramScreen(
@@ -123,7 +125,7 @@ fun FounderProgramScreen(
                     .padding(horizontal = AppDimens.screenPadding)
             ) {
                 if (state.journey.phase == FounderJourneyPhase.Welcome) {
-                    WelcomeSection(rules = state.journey.rules, onEnroll = onEnroll)
+                    FounderWelcomeContent(rules = state.journey.rules, onEnroll = onEnroll)
                 } else {
                     EnrolledSection(state = state)
                     FeedbackSection(
@@ -158,9 +160,11 @@ fun FounderBadge(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun WelcomeSection(
+internal fun FounderWelcomeContent(
     rules: FounderProgramRules,
-    onEnroll: () -> Unit
+    onEnroll: () -> Unit,
+    onDecline: (() -> Unit)? = null,
+    actionsEnabled: Boolean = true
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -208,11 +212,24 @@ private fun WelcomeSection(
         Spacer(Modifier.height(AppDimens.sectionGap))
         Button(
             onClick = onEnroll,
+            enabled = actionsEnabled,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(FOUNDER_ENROLL)
         ) {
             Text(stringResource(R.string.founder_enroll))
+        }
+        if (onDecline != null) {
+            Spacer(Modifier.height(AppDimens.itemGap))
+            TextButton(
+                onClick = onDecline,
+                enabled = actionsEnabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(FOUNDER_INVITATION_NOT_NOW)
+            ) {
+                Text(stringResource(R.string.founder_invitation_not_now))
+            }
         }
         Spacer(Modifier.height(AppDimens.sectionGap))
     }

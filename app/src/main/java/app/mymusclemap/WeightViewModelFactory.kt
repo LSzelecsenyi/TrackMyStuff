@@ -120,7 +120,12 @@ class WeightViewModelFactory(
                 )
             }
             modelClass.isAssignableFrom(OnboardingViewModel::class.java) -> {
-                OnboardingViewModel(firstRunCoordinator, weeklyGoalRepository, dateProvider)
+                OnboardingViewModel(
+                    firstRunCoordinator,
+                    weeklyGoalRepository,
+                    dateProvider,
+                    founderMilestoneAcknowledgements
+                )
             }
             modelClass.isAssignableFrom(OnboardingGuideViewModel::class.java) -> {
                 OnboardingGuideViewModel(onboardingRepository)

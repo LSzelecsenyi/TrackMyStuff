@@ -2,6 +2,7 @@ package app.mymusclemap.ui.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.domain.DateProvider
@@ -23,7 +24,8 @@ enum class OnboardingExit {
 class OnboardingViewModel(
     private val firstRunCoordinator: FirstRunCoordinator,
     private val weeklyGoalRepository: WeeklyGoalRepository? = null,
-    private val dateProvider: DateProvider? = null
+    private val dateProvider: DateProvider? = null,
+    private val founderInvitations: FounderMilestoneAcknowledgementStore? = null
 ) : ViewModel() {
     private val stepState = MutableStateFlow(OnboardingStep.Welcome)
     private val exitState = MutableStateFlow<OnboardingExit?>(null)
@@ -60,6 +62,7 @@ class OnboardingViewModel(
     private fun finish(exit: OnboardingExit) {
         viewModelScope.launch {
             firstRunCoordinator.markOnboardingStarted()
+            founderInvitations?.markInvitationPending()
             exitState.value = exit
         }
     }

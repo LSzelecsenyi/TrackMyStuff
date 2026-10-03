@@ -74,6 +74,7 @@ class FounderProgramScreenTest {
         composeRule.onNodeWithText(offer(fastRules.temporaryProWorkoutCount)).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_enroll)).performScrollTo().assertIsDisplayed().performClick()
         assertTrue(enrolled)
+        composeRule.onNodeWithText(testString(R.string.founder_invitation_not_now)).assertDoesNotExist()
         composeRule.onNodeWithText("Approved").assertDoesNotExist()
     }
 

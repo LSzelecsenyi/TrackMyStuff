@@ -213,6 +213,8 @@ fun WeightTrackerNavHost(
     dateProvider: DateProvider,
     openNewTemplate: Boolean = false,
     onOpenedNewTemplate: () -> Unit = {},
+    openFounderProgram: Boolean = false,
+    onOpenedFounderProgram: () -> Unit = {},
     openPrivacyPolicy: Boolean = false,
     onOpenedPrivacyPolicy: () -> Unit = {},
     openOverviewRequest: Int = 0
@@ -277,6 +279,11 @@ fun WeightTrackerNavHost(
             navController.navigateInternal(templateEditorRoute(null))
         }
         onOpenedNewTemplate()
+    }
+    LaunchedEffect(openFounderProgram) {
+        if (!openFounderProgram) return@LaunchedEffect
+        navController.navigateInternal(AppRoutes.FOUNDER_PROGRAM)
+        onOpenedFounderProgram()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

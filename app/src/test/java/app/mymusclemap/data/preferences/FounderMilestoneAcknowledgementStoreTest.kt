@@ -133,4 +133,59 @@ class FounderMilestoneAcknowledgementStoreTest {
         assertEquals(EntitlementTier.Free, resolved.tier)
         assertFalse(resolved.temporaryTesterPro)
     }
+
+    @Test
+    fun invitationMetadataDoesNotEnrollGrantProOrTravelInBackup() = runTest {
+        val program = FounderProgramStore(context)
+        program.save(FounderProgramState())
+        val acknowledgements = FounderMilestoneAcknowledgementStore(context)
+        acknowledgements.save(
+            FounderMilestoneAcknowledgements(
+                founderApproved = true,
+                invitationPending = true,
+                invitationHandled = true
+            )
+        )
+        val untouched = program.load()
+        assertEquals(FounderProgramStatus.NotEnrolled, untouched.status)
+        val sources = EntitlementSources.of(program = untouched)
+        assertEquals(FounderProgramStatus.NotEnrolled, sources.founderProgram.status)
+        val resolved = EntitlementResolver.resolve(sources, now)
+        assertEquals(EntitlementTier.Free, resolved.tier)
+        assertFalse(resolved.temporaryTesterPro)
+        assertFalse(resolved.founderLifetime)
+        assertFalse(AppBackupFormat.TABLE_NAMES.contains(FounderMilestoneAcknowledgementStore.PREFERENCES_NAME))
+
+        val approved = FounderProgramState(
+            status = FounderProgramStatus.Approved,
+            enrolledOn = LocalDate.of(2026, 8, 1),
+            deadline = LocalDate.of(2026, 9, 15)
+        )
+        program.save(approved)
+        acknowledgements.save(FounderMilestoneAcknowledgements())
+        val restored = program.load()
+        assertEquals(FounderProgramStatus.Approved, restored.status)
+        assertEquals(FounderMilestoneAcknowledgements(), acknowledgements.load())
+        val stillApproved = EntitlementResolver.resolve(EntitlementSources.of(program = restored), now)
+        assertTrue(stillApproved.founderLifetime)
+        assertEquals(EntitlementTier.Pro, stillApproved.tier)
+    }
+
+    @Test
+    fun invitationPendingStaysArmedUntilHandledAndDoesNotClearMilestones() = runTest {
+        val acknowledgements = FounderMilestoneAcknowledgementStore(context)
+        acknowledgements.save(FounderMilestoneAcknowledgements(temporaryProUnlocked = true))
+        acknowledgements.markInvitationPending()
+        acknowledgements.markInvitationPending()
+        val pending = acknowledgements.load()
+        assertTrue(pending.invitationPending)
+        assertFalse(pending.invitationHandled)
+        assertTrue(pending.temporaryProUnlocked)
+        acknowledgements.markInvitationHandled()
+        acknowledgements.markInvitationPending()
+        val handled = acknowledgements.load()
+        assertFalse(handled.invitationPending)
+        assertTrue(handled.invitationHandled)
+        assertTrue(handled.temporaryProUnlocked)
+    }
 }

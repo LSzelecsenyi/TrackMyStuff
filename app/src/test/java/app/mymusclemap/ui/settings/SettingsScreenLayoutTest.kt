@@ -345,6 +345,16 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
+    fun givenAboutSectionThenFounderProgramEntryOpensOnce() {
+        val opens = intArrayOf(0)
+        render(onOpenFounderProgram = { opens[0] += 1 })
+        composeRule.onNodeWithTag("settings-founder-program").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_open)).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-founder-program").performClick()
+        assertEquals(1, opens[0])
+    }
+
+    @Test
     fun givenAppVersionThenAboutSectionShowsDynamicVersion() {
         render(state = SettingsUiState(appVersionName = "9.9.9-debug"))
         composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).assertIsDisplayed()
@@ -526,6 +536,7 @@ class SettingsScreenLayoutTest {
         onSendFeedback: () -> Unit = {},
         onOpenPrivacyPolicy: () -> Unit = {},
         onOpenHelp: () -> Unit = {},
+        onOpenFounderProgram: () -> Unit = {},
         onBack: () -> Unit = {}
     ) {
         composeRule.setContent {
@@ -565,6 +576,7 @@ class SettingsScreenLayoutTest {
                             onSendFeedback = onSendFeedback,
                             onOpenPrivacyPolicy = onOpenPrivacyPolicy,
                             onOpenHelp = onOpenHelp,
+                            onOpenFounderProgram = onOpenFounderProgram,
                             onMessageConsumed = {},
                             onBack = onBack
                         )
