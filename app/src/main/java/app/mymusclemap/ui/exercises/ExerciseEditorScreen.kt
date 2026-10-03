@@ -57,6 +57,7 @@ import app.mymusclemap.ui.components.CompactDropdown
 import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.CompactTextField
+import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
@@ -93,7 +94,8 @@ fun ExerciseEditorScreen(
     onSave: () -> Unit,
     onDismissDiscard: () -> Unit,
     onConfirmDiscard: () -> Unit,
-    onFinished: (saved: Boolean, created: Boolean) -> Unit
+    onFinished: (saved: Boolean, created: Boolean) -> Unit,
+    onDismissLocked: () -> Unit = {}
 ) {
     BackHandler { onBack() }
     LaunchedEffect(state.finished) {
@@ -361,6 +363,12 @@ fun ExerciseEditorScreen(
                     Text(stringResource(R.string.action_cancel))
                 }
             }
+        )
+    }
+    state.lockedFeature?.let { feature ->
+        ProInfoSheet(
+            feature = feature,
+            onDismiss = onDismissLocked
         )
     }
 }

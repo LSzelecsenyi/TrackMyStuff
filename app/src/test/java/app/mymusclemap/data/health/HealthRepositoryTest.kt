@@ -1,6 +1,9 @@
 package app.mymusclemap.data.health
 
 import app.mymusclemap.domain.FixedDateProvider
+import app.mymusclemap.domain.entitlement.CompletedWorkout
+import app.mymusclemap.domain.entitlement.FounderProgramRules
+import app.mymusclemap.domain.entitlement.WorkoutOrigin
 import app.mymusclemap.domain.health.HealthAvailability
 import app.mymusclemap.domain.health.HealthExerciseKind
 import app.mymusclemap.domain.health.HealthExerciseSession
@@ -322,6 +325,61 @@ class HealthRepositoryTest {
         assertTrue(repository.readings.value.exercise.isEmpty())
         assertTrue(repository.readings.value.hrv.isEmpty())
         assertTrue(repository.readings.value.sleep.isEmpty())
+    }
+
+    @Test
+    fun freeStillReadsStepsAndRestingHeartRateAndSkipsExternalWorkoutImport() = runTest {
+        val gated = HealthRepository(source, FixedDateProvider(today)) { false }
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = true, restingHeartRate = true, exercise = true)
+        source.steps = listOf(HealthMetricBucket(today, 4_200))
+        source.heart = listOf(HealthMetricBucket(today, 58))
+        val start = today.atTime(8, 0).toInstant(ZoneOffset.UTC)
+        source.exercise = listOf(
+            HealthExerciseSession(start, start.plus(Duration.ofMinutes(40)), ZoneOffset.UTC, HealthExerciseKind.STRENGTH)
+        )
+        gated.refresh()
+        assertTrue(gated.access.value.checked)
+        assertEquals(HealthAvailability.Available, gated.access.value.availability)
+        assertTrue(gated.access.value.stepsGranted)
+        assertTrue(gated.access.value.restingHeartRateGranted)
+        assertEquals(4_200L, gated.readings.value.steps.single().steps)
+        assertEquals(58L, gated.readings.value.restingHeartRate.single().beatsPerMinute)
+        assertTrue(gated.readings.value.exercise.isEmpty())
+        assertEquals(0, source.exerciseReads)
+        assertEquals(1, source.stepReads)
+        assertEquals(1, source.heartReads)
+    }
+
+    @Test
+    fun proImportsExternalWorkoutsAndALaterFreeRefreshKeepsThemWithoutReadingAgain() = runTest {
+        var allowImport = true
+        val gated = HealthRepository(source, FixedDateProvider(today)) { allowImport }
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(steps = true, restingHeartRate = true, exercise = true)
+        source.steps = listOf(HealthMetricBucket(today, 1_000))
+        source.heart = listOf(HealthMetricBucket(today, 60))
+        val start = today.atTime(18, 0).toInstant(ZoneOffset.UTC)
+        source.exercise = listOf(
+            HealthExerciseSession(start, start.plus(Duration.ofMinutes(30)), ZoneOffset.UTC, HealthExerciseKind.CYCLING)
+        )
+        gated.refresh()
+        assertEquals(1, source.exerciseReads)
+        assertEquals(1, gated.readings.value.exercise.single().cycling.sessions)
+        allowImport = false
+        source.steps = listOf(HealthMetricBucket(today, 1_500))
+        gated.refresh()
+        assertEquals(1, source.exerciseReads)
+        assertEquals(1, gated.readings.value.exercise.single().cycling.sessions)
+        assertEquals(1_500L, gated.readings.value.steps.single().steps)
+        assertEquals(60L, gated.readings.value.restingHeartRate.single().beatsPerMinute)
+        val qualification = FounderProgramRules.Production.qualify(
+            workouts = listOf(CompletedWorkout(today, WorkoutOrigin.HealthConnect)),
+            feedbackRecorded = true,
+            testerAnalyticsReportSubmitted = true
+        )
+        assertEquals(0, qualification.nativeCompletedWorkouts)
+        assertEquals(0, qualification.distinctNativeWorkoutDays)
     }
 
     private class FakeHealthSource : HealthSource {

@@ -866,7 +866,11 @@ fun WeightTrackerNavHost(
                 ExerciseListScreen(
                     state = state,
                     onBack = { navController.popBackStack() },
-                    onAdd = { navController.navigate(editorRoute(null)) },
+                    onAdd = {
+                        viewModel.requestCreate {
+                            navController.navigate(editorRoute(null))
+                        }
+                    },
                     onEdit = { id -> navController.navigate(editorRoute(id)) },
                     onQueryChange = viewModel::onQueryChange,
                     onCategoryFilter = viewModel::onCategoryFilter,
@@ -878,7 +882,8 @@ fun WeightTrackerNavHost(
                     onRequestDelete = viewModel::requestDelete,
                     onDismissDelete = viewModel::dismissDelete,
                     onConfirmDelete = viewModel::confirmDelete,
-                    onMessageConsumed = viewModel::consumeMessage
+                    onMessageConsumed = viewModel::consumeMessage,
+                    onDismissLocked = viewModel::consumeLockedFeature
                 )
             }
             composable(
@@ -914,7 +919,8 @@ fun WeightTrackerNavHost(
                                 ?.set(KEY_CATALOG_SAVED, if (created) "created" else "updated")
                         }
                         navController.popBackStack()
-                    }
+                    },
+                    onDismissLocked = viewModel::consumeLockedFeature
                 )
             }
             composable(AppRoutes.TEMPLATES) { entry ->

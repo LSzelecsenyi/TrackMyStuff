@@ -31,6 +31,9 @@ abstract class ExerciseDao {
     @Query("SELECT COUNT(*) FROM exercises")
     abstract suspend fun countAll(): Int
 
+    @Query("SELECT COUNT(*) FROM exercises WHERE custom = 1 AND archived = 0")
+    abstract suspend fun countActiveCustom(): Int
+
     @Query("SELECT * FROM exercises ORDER BY name COLLATE NOCASE ASC, id ASC")
     abstract suspend fun getAll(): List<ExerciseEntity>
 

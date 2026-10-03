@@ -19,6 +19,8 @@ fun AppFeature.titleRes(): Int {
         AppFeature.AdvancedPlanning -> R.string.pro_feature_advanced_planning
         AppFeature.AdvancedBodyMeasurements -> R.string.pro_feature_advanced_body_measurements
         AppFeature.ProgressPhotos -> R.string.pro_feature_progress_photos
+        AppFeature.UnlimitedCustomExercises -> R.string.pro_feature_unlimited_custom_exercises
+        AppFeature.ExternalWorkoutImport -> R.string.pro_feature_external_workouts
     }
 }
 
@@ -68,6 +70,24 @@ fun AppFeature?.proInfoCopy(): ProInfoCopy {
                 R.string.pro_info_progress_photos_compare,
                 R.string.pro_info_progress_photos_private,
                 R.string.pro_info_progress_photos_existing_stay
+            )
+        )
+        AppFeature.UnlimitedCustomExercises -> ProInfoCopy(
+            titleRes = R.string.pro_info_custom_exercises_title,
+            bodyRes = R.string.pro_info_custom_exercises_body,
+            highlights = listOf(
+                R.string.pro_info_custom_exercises_limit,
+                R.string.pro_info_custom_exercises_existing,
+                R.string.pro_info_custom_exercises_unlimited
+            )
+        )
+        AppFeature.ExternalWorkoutImport -> ProInfoCopy(
+            titleRes = R.string.pro_info_external_workouts_title,
+            bodyRes = R.string.pro_info_external_workouts_body,
+            highlights = listOf(
+                R.string.pro_info_external_workouts_steps,
+                R.string.pro_info_external_workouts_import,
+                R.string.pro_info_external_workouts_existing
             )
         )
         AppFeature.AdvancedPlanning -> ProInfoCopy(

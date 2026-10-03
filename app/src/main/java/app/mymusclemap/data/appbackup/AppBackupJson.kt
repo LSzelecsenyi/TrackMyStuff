@@ -14,6 +14,7 @@ import app.mymusclemap.data.local.WorkoutTemplateEntity
 import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
 import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
+import app.mymusclemap.domain.exercise.StarterCatalog
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -106,6 +107,7 @@ object AppBackupJson {
                             .put("weightInterpretation", row.weightInterpretation)
                             .put("notes", nullable(row.notes))
                             .put("archived", row.archived)
+                            .put("custom", row.custom)
                             .put("createdAt", row.createdAt)
                             .put("updatedAt", row.updatedAt)
                     )
@@ -650,6 +652,11 @@ object AppBackupJson {
         val weightInterpretation = obj.requiredString("weightInterpretation", errors) ?: return null
         val notes = obj.optionalNullableString("notes", errors)
         val archived = obj.requiredBoolean("archived", errors) ?: return null
+        val custom = if (!obj.has("custom") || obj.isNull("custom")) {
+            normalizedName !in StarterCatalog.normalizedNames
+        } else {
+            obj.requiredBoolean("custom", errors) ?: return null
+        }
         val createdAt = obj.requiredLong("createdAt", errors) ?: return null
         val updatedAt = obj.requiredLong("updatedAt", errors) ?: return null
         if (errors.any { it.detail?.startsWith("notes") == true && it.code == AppBackupErrorCode.InvalidType }) {
@@ -667,7 +674,8 @@ object AppBackupJson {
             notes,
             archived,
             createdAt,
-            updatedAt
+            updatedAt,
+            custom
         )
     }
 

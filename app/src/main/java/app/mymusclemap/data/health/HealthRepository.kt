@@ -19,11 +19,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * In-memory Health Connect session. Readings are never written to Room, backup, or weight storage.
+ * In-memory Health Connect session. Readings are never written to Room, backup, or workout history.
+ * Blocking external-workout import skips a new exercise read and keeps readings already loaded.
+ * It does not delete workouts. Steps and resting heart rate stay readable.
  */
 class HealthRepository(
     private val source: HealthSource,
-    private val dateProvider: DateProvider
+    private val dateProvider: DateProvider,
+    private val canImportExternalWorkouts: () -> Boolean = { true }
 ) {
     private val mutex = Mutex()
     private val accessState = MutableStateFlow(HealthAccess())
@@ -88,8 +91,12 @@ class HealthRepository(
                     today
                 )
             }
-            val exercise = readMetric(grants.exercise, HealthMetric.EXERCISE, failed) {
-                HealthExerciseAggregator.daily(source.readExerciseSessions(start, endExclusive), today)
+            val exercise = if (canImportExternalWorkouts()) {
+                readMetric(grants.exercise, HealthMetric.EXERCISE, failed) {
+                    HealthExerciseAggregator.daily(source.readExerciseSessions(start, endExclusive), today)
+                }
+            } else {
+                readingsState.value.exercise
             }
             val hrv = readMetric(grants.hrv, HealthMetric.HRV, failed) {
                 HealthHrvAggregator.daily(source.readHrvSamples(start, endExclusive), today)

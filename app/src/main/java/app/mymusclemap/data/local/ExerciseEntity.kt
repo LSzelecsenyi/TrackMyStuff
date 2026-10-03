@@ -1,5 +1,6 @@
 package app.mymusclemap.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -26,7 +27,9 @@ data class ExerciseEntity(
     val notes: String?,
     val archived: Boolean,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    @ColumnInfo(defaultValue = "1")
+    val custom: Boolean = true
 )
 
 @Entity(

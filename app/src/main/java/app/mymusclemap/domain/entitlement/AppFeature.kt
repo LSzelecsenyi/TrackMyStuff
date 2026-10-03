@@ -11,5 +11,7 @@ enum class AppFeature {
     UnlimitedWorkoutPlans,
     AdvancedPlanning,
     AdvancedBodyMeasurements,
-    ProgressPhotos
+    ProgressPhotos,
+    UnlimitedCustomExercises,
+    ExternalWorkoutImport
 }

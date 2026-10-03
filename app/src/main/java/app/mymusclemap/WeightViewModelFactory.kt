@@ -119,7 +119,7 @@ class WeightViewModelFactory(
                 OnboardingGuideViewModel(onboardingRepository)
             }
             modelClass.isAssignableFrom(ExerciseListViewModel::class.java) -> {
-                ExerciseListViewModel(exerciseRepository)
+                ExerciseListViewModel(exerciseRepository, featureEntitlements)
             }
             modelClass.isAssignableFrom(ExerciseEditorViewModel::class.java) -> {
                 val application = extras[APPLICATION_KEY]

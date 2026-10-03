@@ -472,7 +472,8 @@ object DemoTrainingHistoryGenerator {
                     notes = null,
                     archived = false,
                     createdAt = createdAt,
-                    updatedAt = createdAt
+                    updatedAt = createdAt,
+                    custom = false
                 ),
                 muscles = muscles
             )

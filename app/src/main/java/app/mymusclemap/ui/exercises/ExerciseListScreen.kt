@@ -68,6 +68,7 @@ import app.mymusclemap.domain.exercise.ExerciseDraftLogic
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
 import app.mymusclemap.ui.components.CompactDropdown
+import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.ui.components.CompactSearchBar
 import app.mymusclemap.ui.components.SegmentedControl
 import app.mymusclemap.ui.theme.AppDimens
@@ -106,7 +107,8 @@ fun ExerciseListScreen(
     onRequestDelete: (Exercise) -> Unit,
     onDismissDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
-    onMessageConsumed: () -> Unit
+    onMessageConsumed: () -> Unit,
+    onDismissLocked: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -302,6 +304,12 @@ fun ExerciseListScreen(
                     Text(stringResource(R.string.action_ok))
                 }
             }
+        )
+    }
+    state.lockedFeature?.let { feature ->
+        ProInfoSheet(
+            feature = feature,
+            onDismiss = onDismissLocked
         )
     }
 }

@@ -3,6 +3,10 @@ package app.mymusclemap.ui.exercises
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.ExerciseRepository
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.CustomExerciseAccess
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.exercise.ArchiveFilter
 import app.mymusclemap.domain.exercise.Exercise
 import app.mymusclemap.domain.exercise.ExerciseCatalogLogic
@@ -28,7 +32,8 @@ data class ExerciseListUiState(
     val message: CatalogMessage? = null,
     val pendingDelete: Exercise? = null,
     val pendingBlocked: Exercise? = null,
-    val referencedIds: Set<Long> = emptySet()
+    val referencedIds: Set<Long> = emptySet(),
+    val lockedFeature: AppFeature? = null
 )
 
 enum class CatalogEmptyKind {
@@ -64,7 +69,8 @@ private data class ListCore(
 )
 
 class ExerciseListViewModel(
-    private val repository: ExerciseRepository
+    private val repository: ExerciseRepository,
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val category = MutableStateFlow<ExerciseCategory?>(null)
@@ -73,6 +79,7 @@ class ExerciseListViewModel(
     private val message = MutableStateFlow<CatalogMessage?>(null)
     private val pendingDelete = MutableStateFlow<Exercise?>(null)
     private val pendingBlocked = MutableStateFlow<Exercise?>(null)
+    private val lockedFeature = MutableStateFlow<AppFeature?>(null)
 
     private val filters = combine(query, category, muscle, archiveFilter) { text, cat, mus, archive ->
         ListQuery(text, cat, mus, archive)
@@ -83,8 +90,9 @@ class ExerciseListViewModel(
                 exercises, current, currentMessage, delete, blocked ->
             ListCore(exercises, current, currentMessage, delete, blocked)
         },
+        lockedFeature,
         repository.observeReferencedExerciseIds()
-    ) { core, referenced ->
+    ) { core, locked, referenced ->
         val visible = ExerciseCatalogLogic.filter(
             exercises = core.exercises,
             query = core.current.query,
@@ -117,7 +125,8 @@ class ExerciseListViewModel(
             message = core.currentMessage,
             pendingDelete = core.delete,
             pendingBlocked = core.blocked,
-            referencedIds = referenced
+            referencedIds = referenced,
+            lockedFeature = locked
         )
     }.stateIn(
         scope = viewModelScope,
@@ -146,6 +155,20 @@ class ExerciseListViewModel(
         category.value = null
         muscle.value = null
         archiveFilter.value = ArchiveFilter.ACTIVE
+    }
+
+    fun requestCreate(onAllowed: () -> Unit) {
+        viewModelScope.launch {
+            if (CustomExerciseAccess.canCreateAnother(repository.activeCustomCount(), entitlements)) {
+                onAllowed()
+            } else {
+                lockedFeature.value = AppFeature.UnlimitedCustomExercises
+            }
+        }
+    }
+
+    fun consumeLockedFeature() {
+        lockedFeature.value = null
     }
 
     fun archive(id: Long) {

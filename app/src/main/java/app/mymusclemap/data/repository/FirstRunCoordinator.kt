@@ -57,7 +57,7 @@ class FirstRunCoordinator(
                 return@withTransaction false
             }
             StarterCatalog.drafts.forEach { draft ->
-                val result = exerciseRepository.save(draft)
+                val result = exerciseRepository.save(draft, asStarter = true)
                 check(result is ExerciseSaveResult.Created) {
                     "Starter catalog seed failed for ${draft.name}: $result"
                 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.ExerciseRepository
+import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.ExerciseDraft
 import app.mymusclemap.domain.exercise.ExerciseDraftLogic
@@ -32,7 +33,8 @@ data class ExerciseEditorUiState(
     val showDiscardConfirm: Boolean = false,
     val finished: Boolean = false,
     val created: Boolean = false,
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    val lockedFeature: AppFeature? = null
 ) {
     val weightInterpretationVisible: Boolean
         get() = ExerciseDraftLogic.isWeightInterpretationVisible(
@@ -176,8 +178,20 @@ class ExerciseEditorViewModel(
                 ExerciseSaveResult.NotFound -> {
                     _uiState.update { it.copy(saving = false, finished = true) }
                 }
+                ExerciseSaveResult.CreationLimited -> {
+                    _uiState.update {
+                        it.copy(
+                            saving = false,
+                            lockedFeature = AppFeature.UnlimitedCustomExercises
+                        )
+                    }
+                }
             }
         }
+    }
+
+    fun consumeLockedFeature() {
+        _uiState.update { it.copy(lockedFeature = null) }
     }
 
     fun requestLeave() {

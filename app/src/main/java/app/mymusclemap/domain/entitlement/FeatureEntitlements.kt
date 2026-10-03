@@ -4,9 +4,10 @@ package app.mymusclemap.domain.entitlement
  * Application code asks whether a capability is available. Implementations must not expose
  * Google Play Billing types, product IDs, or purchase objects.
  *
- * Alpha and local development use [OpenFeatureEntitlements], which grants every capability
- * so existing functionality stays available. A Billing-backed implementation can replace
- * that object in [app.mymusclemap.AppContainer] without changing UI call sites.
+ * Product rules live in [FeatureAccessPolicy]. [PolicyBackedEntitlements] answers these
+ * checks from that policy. [OpenFeatureEntitlements] remains the test and preview default
+ * that grants every capability. The development composition root uses
+ * [DevelopmentSubscriptionProvider] so the app stays fully usable until a store provider exists.
  */
 interface FeatureEntitlements {
     fun hasAccess(feature: AppFeature): Boolean

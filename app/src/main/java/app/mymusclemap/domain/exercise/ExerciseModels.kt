@@ -18,7 +18,8 @@ data class Exercise(
     val notes: String?,
     val archived: Boolean,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val custom: Boolean = true
 )
 
 data class ExerciseDraft(
@@ -49,6 +50,7 @@ sealed class ExerciseSaveResult {
     data class Invalid(val errors: List<ExerciseFieldError>) : ExerciseSaveResult()
     data object DuplicateName : ExerciseSaveResult()
     data object NotFound : ExerciseSaveResult()
+    data object CreationLimited : ExerciseSaveResult()
 }
 
 sealed class ExerciseDeleteResult {

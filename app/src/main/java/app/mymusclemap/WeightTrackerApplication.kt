@@ -16,6 +16,7 @@ class WeightTrackerApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
         applicationScope.launch {
+            container.refreshFounderProgramFromStore()
             container.appBackupRepository.recoverInterruptedPhotoRestore()
         }
     }

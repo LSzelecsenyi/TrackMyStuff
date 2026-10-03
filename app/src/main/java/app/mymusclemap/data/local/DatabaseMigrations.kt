@@ -2,6 +2,7 @@ package app.mymusclemap.data.local
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import app.mymusclemap.domain.exercise.StarterCatalog
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -550,6 +551,21 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
 val MIGRATION_10_11 = object : Migration(10, 11) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE workout_session_sets ADD COLUMN draftPayload TEXT")
+    }
+}
+
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE exercises ADD COLUMN custom INTEGER NOT NULL DEFAULT 1")
+        val starterNames = StarterCatalog.normalizedNames.toTypedArray()
+        if (starterNames.isEmpty()) {
+            return
+        }
+        val placeholders = starterNames.joinToString(",") { "?" }
+        db.execSQL(
+            "UPDATE exercises SET custom = 0 WHERE normalizedName IN ($placeholders)",
+            starterNames
+        )
     }
 }
 

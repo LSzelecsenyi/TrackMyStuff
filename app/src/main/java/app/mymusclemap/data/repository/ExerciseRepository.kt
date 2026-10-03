@@ -23,7 +23,8 @@ class ExerciseRepository(
     private val dao: ExerciseDao,
     private val clock: Clock,
     private val templateDao: WorkoutTemplateDao? = null,
-    private val sessionDao: WorkoutSessionDao? = null
+    private val sessionDao: WorkoutSessionDao? = null,
+    private val allowCustomCreate: (activeCustomCount: Int) -> Boolean = { true }
 ) {
     fun observeAll(): Flow<List<Exercise>> {
         return combine(dao.observeAll(), dao.observeMuscles()) { exercises, muscles ->
@@ -53,7 +54,9 @@ class ExerciseRepository(
         return entity.toModel(dao.getMuscles(id))
     }
 
-    suspend fun save(draft: ExerciseDraft): ExerciseSaveResult {
+    suspend fun activeCustomCount(): Int = dao.countActiveCustom()
+
+    suspend fun save(draft: ExerciseDraft, asStarter: Boolean = false): ExerciseSaveResult {
         val prepared = draft.copy(
             secondaryMuscles = ExerciseDraftLogic.normalizeSecondary(
                 draft.primaryMuscle,
@@ -83,6 +86,10 @@ class ExerciseRepository(
         if (prepared.id != null && existing == null) {
             return ExerciseSaveResult.NotFound
         }
+        val creatingCustom = existing == null && !asStarter
+        if (creatingCustom && !allowCustomCreate(dao.countActiveCustom())) {
+            return ExerciseSaveResult.CreationLimited
+        }
         val entity = ExerciseEntity(
             id = existing?.id ?: 0L,
             name = name,
@@ -95,7 +102,8 @@ class ExerciseRepository(
             notes = notes,
             archived = existing?.archived ?: false,
             createdAt = existing?.createdAt ?: now,
-            updatedAt = now
+            updatedAt = now,
+            custom = existing?.custom ?: !asStarter
         )
         val muscles = buildList {
             add(

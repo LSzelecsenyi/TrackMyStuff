@@ -1,6 +1,10 @@
 package app.mymusclemap.domain.exercise
 
 object StarterCatalog {
+    val normalizedNames: Set<String> by lazy {
+        drafts.map { ExerciseNaming.normalize(it.name) }.toSet()
+    }
+
     val drafts: List<ExerciseDraft> = listOf(
         strength(
             name = "Squat",

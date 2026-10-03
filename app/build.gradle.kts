@@ -107,9 +107,22 @@ android {
     }
 }
 
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variant ->
+        (variant as com.android.build.api.variant.HasUnitTestBuilder).enableUnitTest = true
+    }
+}
+
 // Forwards the development-only demo backup writer flag into unit tests.
 // Production builds never read this property.
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    // Release unit tests exist to execute the production Founder-rule selection.
+    // Other release Robolectric layout tests are not part of this project's supported run.
+    if (name == "testReleaseUnitTest") {
+        filter {
+            includeTestsMatching("app.mymusclemap.FounderProgramRuleSelectionTest")
+        }
+    }
     systemProperty("demo.backup.write", (findProperty("demo.backup.write") ?: "false").toString())
     findProperty("demo.referenceDate")?.let { value ->
         systemProperty("demo.referenceDate", value.toString())

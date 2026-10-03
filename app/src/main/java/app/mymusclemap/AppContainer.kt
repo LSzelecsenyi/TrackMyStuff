@@ -4,6 +4,7 @@ import android.content.Context
 import app.mymusclemap.data.health.HealthConnectGateway
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
@@ -22,10 +23,16 @@ import app.mymusclemap.data.workoutimport.ContentWorkoutImportFileReader
 import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.SystemDateProvider
+import app.mymusclemap.domain.entitlement.DevelopmentSubscriptionProvider
+import app.mymusclemap.domain.entitlement.EntitlementComposer
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
-import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.FounderProgramRules
+import app.mymusclemap.domain.entitlement.FounderProgramState
+import app.mymusclemap.domain.entitlement.InactiveFounderLifetimeProvider
+import app.mymusclemap.domain.entitlement.PolicyBackedEntitlements
 import java.time.Clock
 import java.time.LocalDate
+import java.util.concurrent.atomic.AtomicReference
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -40,11 +47,13 @@ class AppContainer(context: Context) {
         dao = database.bodyMeasurementDao(),
         clock = clock
     )
+    private val customExerciseCreate = AtomicReference<(Int) -> Boolean> { true }
     val exerciseRepository = ExerciseRepository(
         dao = database.exerciseDao(),
         clock = clock,
         templateDao = database.workoutTemplateDao(),
-        sessionDao = database.workoutSessionDao()
+        sessionDao = database.workoutSessionDao(),
+        allowCustomCreate = { count -> customExerciseCreate.get().invoke(count) }
     )
     val workoutTemplateRepository = WorkoutTemplateRepository(
         templateDao = database.workoutTemplateDao(),
@@ -86,7 +95,30 @@ class AppContainer(context: Context) {
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) }
     )
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
-    val featureEntitlements: FeatureEntitlements = OpenFeatureEntitlements
+    val founderProgramRules: FounderProgramRules = FounderProgramRuleSelection.rules
+    val founderProgramStore = FounderProgramStore(appContext)
+    private val founderProgramState = AtomicReference(FounderProgramState())
+    val subscriptionProvider = DevelopmentSubscriptionProvider
+    val founderLifetimeProvider = InactiveFounderLifetimeProvider
+    val entitlementComposer = EntitlementComposer(
+        subscriptionProvider = subscriptionProvider,
+        founderLifetimeProvider = founderLifetimeProvider,
+        clock = clock,
+        founderProgram = founderProgramState::get
+    )
+    val featureEntitlements: FeatureEntitlements = PolicyBackedEntitlements {
+        entitlementComposer.policy()
+    }
+
+    init {
+        customExerciseCreate.set { count ->
+            entitlementComposer.policy().customExercises(count).canCreate
+        }
+    }
+
+    suspend fun refreshFounderProgramFromStore() {
+        founderProgramState.set(founderProgramStore.load())
+    }
     val progressPhotoRepository = ProgressPhotoRepository(
         dao = database.progressPhotoDao(),
         store = progressPhotoStore,
@@ -95,7 +127,10 @@ class AppContainer(context: Context) {
     )
     val healthRepository = HealthRepository(
         source = HealthConnectGateway(appContext),
-        dateProvider = dateProvider
+        dateProvider = dateProvider,
+        canImportExternalWorkouts = {
+            entitlementComposer.policy().healthConnect().canImportExternalWorkouts
+        }
     )
     val onboardingRepository = OnboardingRepository(
         themePreferences = themePreferences,
