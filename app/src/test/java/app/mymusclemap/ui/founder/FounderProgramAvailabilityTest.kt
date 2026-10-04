@@ -106,20 +106,33 @@ class FounderProgramAvailabilityTest {
             deadline = deadline
         )
         val lifetime = EntitlementResolver.resolve(EntitlementSources.of(program = approved), now)
-        assertTrue(lifetime.founderLifetime)
-        assertEquals(EntitlementTier.Pro, lifetime.tier)
+        assertFalse(lifetime.founderLifetime)
+        assertEquals(EntitlementTier.Free, lifetime.tier)
         assertEquals(FounderProgramStatus.Approved, EntitlementSources.of(program = approved).founderProgram.status)
 
         val activePro = approved.copy(status = FounderProgramStatus.ActivePro)
         val temporary = EntitlementResolver.resolve(EntitlementSources.of(program = activePro), now)
-        assertTrue(temporary.temporaryTesterPro)
-        assertEquals(EntitlementTier.Pro, temporary.tier)
+        assertFalse(temporary.temporaryTesterPro)
+        assertEquals(EntitlementTier.Free, temporary.tier)
         assertFalse(temporary.founderLifetime)
 
         val pending = approved.copy(status = FounderProgramStatus.PendingApproval)
         val reviewing = EntitlementResolver.resolve(EntitlementSources.of(program = pending), now)
-        assertTrue(reviewing.temporaryTesterPro)
-        assertEquals(EntitlementTier.Pro, reviewing.tier)
+        assertFalse(reviewing.temporaryTesterPro)
+        assertEquals(EntitlementTier.Free, reviewing.tier)
+
+        val granted = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                program = activePro,
+                backendFounder = app.mymusclemap.domain.entitlement.BackendFounderEntitlement(
+                    temporaryFounderPro = true,
+                    validUntil = now.plusSeconds(60)
+                )
+            ),
+            now
+        )
+        assertTrue(granted.temporaryTesterPro)
+        assertEquals(EntitlementTier.Pro, granted.tier)
 
         val activeFree = approved.copy(status = FounderProgramStatus.ActiveFree)
         val free = EntitlementResolver.resolve(EntitlementSources.of(program = activeFree), now)

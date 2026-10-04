@@ -18,6 +18,8 @@ class WeightTrackerApplication : Application() {
         container.activeWorkoutNotifications.start()
         applicationScope.launch {
             container.refreshFounderProgramFromStore()
+            container.restoreFounderEntitlementCache()
+            container.refreshFounderAuthority()
             container.appBackupRepository.recoverInterruptedPhotoRestore()
         }
     }

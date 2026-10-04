@@ -85,3 +85,20 @@ sealed interface FounderEnrollmentCall {
     data object Rejected : FounderEnrollmentCall
     data object Unavailable : FounderEnrollmentCall
 }
+
+sealed interface FounderSnapshotCall {
+    data class Loaded(val snapshot: BackendFounderSnapshot) : FounderSnapshotCall
+    data object NoSession : FounderSnapshotCall
+    data object Unauthenticated : FounderSnapshotCall
+    data object Unavailable : FounderSnapshotCall
+}
+
+sealed interface FounderEntitlementCall {
+    data class Loaded(
+        val temporaryFounderPro: Boolean,
+        val founderLifetime: Boolean
+    ) : FounderEntitlementCall
+    data object NoSession : FounderEntitlementCall
+    data object Unauthenticated : FounderEntitlementCall
+    data object Unavailable : FounderEntitlementCall
+}

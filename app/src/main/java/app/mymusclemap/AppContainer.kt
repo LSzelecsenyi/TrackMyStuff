@@ -11,8 +11,17 @@ import app.mymusclemap.data.auth.strictOkHttpClient
 import app.mymusclemap.data.health.HealthConnectGateway
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.auth.FounderEntitlementCall
+import app.mymusclemap.data.auth.FounderSnapshotCall
+import app.mymusclemap.data.founder.BackendFounderSnapshot
 import app.mymusclemap.data.founder.FounderJoinCoordinator
 import app.mymusclemap.data.founder.FounderProgramCoordinator
+import app.mymusclemap.data.founder.FounderWorkoutFlush
+import app.mymusclemap.data.founder.FounderWorkoutOutbox
+import app.mymusclemap.data.founder.FounderWorkoutSync
+import app.mymusclemap.data.founder.FounderWorkoutSyncScheduler
+import app.mymusclemap.data.founder.NativeFounderWorkout
+import app.mymusclemap.data.preferences.FounderEntitlementCache
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
@@ -46,6 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicReference
@@ -125,6 +135,13 @@ class AppContainer(context: Context) {
     val founderProgramStore = FounderProgramStore(appContext)
     val founderMilestoneAcknowledgements = FounderMilestoneAcknowledgementStore(appContext)
     private val entitlementRevision = MutableStateFlow(0)
+    private val founderCacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val strictSessionRevision = MutableStateFlow(0)
+    val founderEntitlementCache = FounderEntitlementCache(
+        context = appContext,
+        scope = founderCacheScope,
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+    )
     val subscriptionProvider = InactiveSubscriptionProvider
     val founderLifetimeProvider = InactiveFounderLifetimeProvider
     val founderProgram = FounderProgramCoordinator(
@@ -138,7 +155,8 @@ class AppContainer(context: Context) {
         subscriptionProvider = subscriptionProvider,
         founderLifetimeProvider = founderLifetimeProvider,
         clock = clock,
-        founderProgram = founderProgram::currentState
+        founderProgram = founderProgram::currentState,
+        backendFounder = founderEntitlementCache::current
     )
     val featureEntitlements: FeatureEntitlements = PolicyBackedEntitlements(
         policySource = { entitlementComposer.policy() },
@@ -149,11 +167,49 @@ class AppContainer(context: Context) {
         customExerciseCreate.set { count ->
             entitlementComposer.policy().customExercises(count).canCreate
         }
-        nativeWorkoutCompleted.set { clientWorkoutId -> founderProgram.onNativeWorkoutCompleted(clientWorkoutId) }
+        nativeWorkoutCompleted.set { clientWorkoutId ->
+            val state = founderProgram.currentState()
+            if (FounderWorkoutSync.accepts(state.status, state.backendOwned)) {
+                founderWorkoutSync.onNativeWorkoutCompleted(clientWorkoutId)
+            } else {
+                founderProgram.onNativeWorkoutCompleted(clientWorkoutId)
+            }
+        }
     }
 
     suspend fun refreshFounderProgramFromStore() {
         founderProgram.refresh()
+    }
+
+    suspend fun restoreFounderEntitlementCache() {
+        founderEntitlementCache.load()
+    }
+
+    suspend fun refreshFounderAuthority() {
+        if (!founderProgram.currentState().backendOwned) {
+            return
+        }
+        when (val current = strictAccount.api.currentFounder(founderZone)) {
+            is FounderSnapshotCall.Loaded -> founderProgram.applyBackendEnrollment(current.snapshot)
+            FounderSnapshotCall.Unauthenticated -> founderEntitlementCache.drop()
+            else -> Unit
+        }
+        when (val entitlements = strictAccount.api.currentEntitlements()) {
+            is FounderEntitlementCall.Loaded -> founderEntitlementCache.save(
+                temporaryFounderPro = entitlements.temporaryFounderPro,
+                founderLifetime = entitlements.founderLifetime,
+                validUntil = clock.instant().plus(FounderEntitlementCache.TRUST)
+            )
+            FounderEntitlementCall.Unauthenticated -> founderEntitlementCache.drop()
+            else -> Unit
+        }
+        if (founderWorkoutOutbox.pending().isNotEmpty()) {
+            FounderWorkoutSyncScheduler.enqueue(appContext)
+        }
+    }
+
+    suspend fun flushFounderWorkoutOutbox(): FounderWorkoutFlush {
+        return founderWorkoutSync.flush()
     }
     val progressPhotoRepository = ProgressPhotoRepository(
         dao = database.progressPhotoDao(),
@@ -170,6 +226,13 @@ class AppContainer(context: Context) {
     )
     private val strictAccount by lazy {
         val sessions = EncryptedFileStrictSessionStore.create(appContext)
+        sessions.onCleared = {
+            founderEntitlementCache.drop()
+            strictSessionRevision.value = strictSessionRevision.value + 1
+        }
+        sessions.onWritten = {
+            strictSessionRevision.value = strictSessionRevision.value + 1
+        }
         val google = ActivityBoundGoogleIdentityProvider(
             serverClientId = BuildConfig.STRICT_GOOGLE_SERVER_CLIENT_ID
         )
@@ -189,6 +252,64 @@ class AppContainer(context: Context) {
             )
         )
     }
+
+    private val founderZone = ZoneId.systemDefault()
+    private val founderWorkoutOutbox = FounderWorkoutOutbox(appContext)
+    private val founderWorkoutSync by lazy {
+        FounderWorkoutSync(
+            outbox = founderWorkoutOutbox,
+            accepting = {
+                val state = founderProgram.currentState()
+                FounderWorkoutSync.accepts(state.status, state.backendOwned)
+            },
+            lookup = { clientWorkoutId ->
+                val session = database.workoutSessionDao().getByClientWorkoutId(clientWorkoutId)
+                val finishedAt = session?.finishedAt
+                if (session == null || finishedAt == null) {
+                    null
+                } else {
+                    NativeFounderWorkout(
+                        clientWorkoutId = session.clientWorkoutId,
+                        completedAtEpochMilli = finishedAt,
+                        localDate = session.workoutDate,
+                        imported = !session.importFingerprint.isNullOrBlank()
+                    )
+                }
+            },
+            submit = { event ->
+                strictAccount.api.submitFounderWorkout(
+                    clientWorkoutId = event.clientWorkoutId,
+                    completedAt = Instant.ofEpochMilli(event.completedAtEpochMilli),
+                    localDate = LocalDate.parse(event.localDate),
+                    zone = founderZone
+                )
+            },
+            onAccepted = { snapshot -> publishFounderSnapshot(snapshot) },
+            onUnauthenticated = { founderEntitlementCache.drop() },
+            schedule = { FounderWorkoutSyncScheduler.enqueue(appContext) }
+        )
+    }
+
+    private suspend fun publishFounderSnapshot(snapshot: BackendFounderSnapshot) {
+        founderProgram.applyBackendEnrollment(snapshot)
+        when (val entitlements = strictAccount.api.currentEntitlements()) {
+            is FounderEntitlementCall.Loaded -> founderEntitlementCache.save(
+                temporaryFounderPro = entitlements.temporaryFounderPro,
+                founderLifetime = entitlements.founderLifetime,
+                validUntil = clock.instant().plus(FounderEntitlementCache.TRUST)
+            )
+            FounderEntitlementCall.Unauthenticated -> founderEntitlementCache.drop()
+            else -> {
+                val trusted = founderEntitlementCache.current().trusted(clock.instant())
+                founderEntitlementCache.save(
+                    temporaryFounderPro = snapshot.temporaryProActive,
+                    founderLifetime = trusted.founderLifetime,
+                    validUntil = clock.instant().plus(FounderEntitlementCache.TRUST)
+                )
+            }
+        }
+    }
+
     val strictSessionStore: StrictSessionStore
         get() = strictAccount.sessions
     val strictAuthRepository: StrictAuthRepository
@@ -206,8 +327,15 @@ class AppContainer(context: Context) {
         FounderJoinCoordinator(
             auth = strictAuthRepository,
             api = strictAccount.api,
-            applyEnrollment = { snapshot -> founderProgram.applyBackendEnrollment(snapshot) },
-            zone = ZoneId.systemDefault()
+            applyEnrollment = { snapshot ->
+                publishFounderSnapshot(snapshot)
+                if (founderWorkoutOutbox.pending().isNotEmpty()) {
+                    if (founderWorkoutSync.flush() == FounderWorkoutFlush.Retry) {
+                        FounderWorkoutSyncScheduler.enqueue(appContext)
+                    }
+                }
+            },
+            zone = founderZone
         )
     }
 
@@ -239,7 +367,9 @@ class AppContainer(context: Context) {
         founderMilestoneAcknowledgements = founderMilestoneAcknowledgements,
         founderAvailability = founderProgramAvailability,
         lockScreenSetCompletion = lockScreenSetCompletion,
-        founderJoin = { founderJoin.join() }
+        founderJoin = { founderJoin.join() },
+        founderSessionRevision = strictSessionRevision,
+        founderSessionPresent = { strictSessionStore.read() != null }
     )
 }
 

@@ -17,7 +17,8 @@ public record FounderView(
             int qualifyingWorkouts,
             int requiredWorkouts,
             int distinctWorkoutDays,
-            int requiredDistinctWorkoutDays
+            int requiredDistinctWorkoutDays,
+            int temporaryProRequiredWorkouts
     ) {
     }
 

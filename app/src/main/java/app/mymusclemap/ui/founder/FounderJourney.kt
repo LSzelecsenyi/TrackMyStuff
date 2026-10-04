@@ -71,7 +71,8 @@ data class FounderJourney(
 fun founderJourney(
     status: FounderProgramStatus,
     qualification: FounderQualification,
-    acknowledgements: FounderMilestoneAcknowledgements
+    acknowledgements: FounderMilestoneAcknowledgements,
+    authoritative: Boolean = true
 ): FounderJourney {
     val next = nextAction(status, qualification)
     val acceptsContribution = status == FounderProgramStatus.ActiveFree || status == FounderProgramStatus.ActivePro
@@ -83,9 +84,15 @@ fun founderJourney(
         trainingComplete &&
         qualification.feedbackMet &&
         (qualification.rules.testerAnalyticsReportRequired || qualification.testerAnalyticsReportSubmitted)
+    val rawMilestone = milestone(status, acknowledgements)
+    val shownMilestone = if (!authoritative && rawMilestone == FounderMilestone.TemporaryProUnlocked) {
+        null
+    } else {
+        rawMilestone
+    }
     return FounderJourney(
         phase = phase(status),
-        milestone = milestone(status, acknowledgements),
+        milestone = shownMilestone,
         nextAction = next?.first,
         nextRemaining = next?.second ?: 0,
         checklist = checklist(qualification),

@@ -193,8 +193,8 @@ class FounderJourneyTest {
 
         val approved = enrolled.copy(status = FounderProgramStatus.Approved)
         val lifetime = EntitlementResolver.resolve(EntitlementSources.of(program = approved), now)
-        assertTrue(lifetime.founderLifetime)
-        assertEquals(EntitlementTier.Pro, lifetime.tier)
+        assertFalse(lifetime.founderLifetime)
+        assertEquals(EntitlementTier.Free, lifetime.tier)
         val forgotten = FounderMilestoneAcknowledgements()
         assertFalse(forgotten.founderApproved)
         assertFalse(forgotten.temporaryProUnlocked)

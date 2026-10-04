@@ -10,13 +10,15 @@ class EntitlementComposer(
     private val subscriptionProvider: SubscriptionEntitlementProvider,
     private val founderLifetimeProvider: FounderLifetimeProvider,
     private val clock: Clock,
-    private val founderProgram: () -> FounderProgramState = { FounderProgramState() }
+    private val founderProgram: () -> FounderProgramState = { FounderProgramState() },
+    private val backendFounder: () -> BackendFounderEntitlement = { BackendFounderEntitlement() }
 ) {
     fun sources(): EntitlementSources {
         return EntitlementSources.of(
             subscription = subscriptionProvider.current(),
             founderLifetime = founderLifetimeProvider.current(),
-            program = founderProgram()
+            program = founderProgram(),
+            backendFounder = backendFounder()
         )
     }
 

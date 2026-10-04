@@ -190,6 +190,22 @@ class FounderProgramCoordinator(
         publish(next, workouts, store.loadFeedbackText())
     }
 
+    private fun displayRules(state: FounderProgramState): FounderProgramRules {
+        if (state.serverRequiredWorkouts < 1 || state.serverRequiredDistinctDays < 1) {
+            return rules
+        }
+        val temporary = if (state.serverTemporaryProWorkouts >= 1) {
+            state.serverTemporaryProWorkouts
+        } else {
+            rules.temporaryProWorkoutCount
+        }
+        return rules.copy(
+            temporaryProWorkoutCount = temporary,
+            founderWorkoutCount = state.serverRequiredWorkouts,
+            requiredDistinctWorkoutDays = state.serverRequiredDistinctDays
+        )
+    }
+
     private suspend fun qualifyingWorkouts(state: FounderProgramState): List<FounderWorkoutRecord> {
         val start = state.enrolledOn ?: return emptyList()
         val end = state.deadline ?: return emptyList()
@@ -217,7 +233,7 @@ class FounderProgramCoordinator(
                     distinctNativeWorkoutDays = state.serverDistinctDays,
                     feedbackRecorded = state.feedbackRecorded,
                     testerAnalyticsReportSubmitted = state.testerAnalyticsReportSubmitted,
-                    rules = rules
+                    rules = displayRules(state)
                 )
             } else {
                 rules.qualify(

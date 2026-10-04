@@ -83,8 +83,29 @@ class FounderMilestoneAcknowledgementStoreTest {
         assertEquals(FounderProgramStatus.Approved, restored.status)
         assertEquals(FounderMilestoneAcknowledgements(), acknowledgements.load())
         val resolved = EntitlementResolver.resolve(EntitlementSources.of(program = restored), now)
-        assertTrue(resolved.founderLifetime)
-        assertEquals(EntitlementTier.Pro, resolved.tier)
+        assertFalse(resolved.founderLifetime)
+        assertEquals(EntitlementTier.Free, resolved.tier)
+        val cached = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                program = restored,
+                backendFounder = app.mymusclemap.domain.entitlement.BackendFounderEntitlement(
+                    founderLifetime = true,
+                    validUntil = now.plusSeconds(60)
+                )
+            ),
+            now
+        )
+        assertTrue(cached.founderLifetime)
+        assertEquals(cached, EntitlementResolver.resolve(
+            EntitlementSources.of(
+                program = restored,
+                backendFounder = app.mymusclemap.domain.entitlement.BackendFounderEntitlement(
+                    founderLifetime = true,
+                    validUntil = now.plusSeconds(60)
+                )
+            ),
+            now
+        ))
     }
 
     @Test
@@ -167,8 +188,8 @@ class FounderMilestoneAcknowledgementStoreTest {
         assertEquals(FounderProgramStatus.Approved, restored.status)
         assertEquals(FounderMilestoneAcknowledgements(), acknowledgements.load())
         val stillApproved = EntitlementResolver.resolve(EntitlementSources.of(program = restored), now)
-        assertTrue(stillApproved.founderLifetime)
-        assertEquals(EntitlementTier.Pro, stillApproved.tier)
+        assertFalse(stillApproved.founderLifetime)
+        assertEquals(EntitlementTier.Free, stillApproved.tier)
     }
 
     @Test

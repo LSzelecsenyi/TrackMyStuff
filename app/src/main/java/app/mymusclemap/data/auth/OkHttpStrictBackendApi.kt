@@ -1,6 +1,7 @@
 package app.mymusclemap.data.auth
 
 import app.mymusclemap.data.founder.BackendFounderSnapshot
+import app.mymusclemap.data.founder.FounderWorkoutSubmission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,6 +10,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
+import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -24,6 +27,14 @@ interface StrictBackendApi {
     suspend fun currentUser(): CurrentUserCall
     suspend fun revokeSession(): RevokeCall
     suspend fun enrollFounder(zone: ZoneId): FounderEnrollmentCall
+    suspend fun currentFounder(zone: ZoneId): FounderSnapshotCall
+    suspend fun submitFounderWorkout(
+        clientWorkoutId: String,
+        completedAt: Instant,
+        localDate: LocalDate,
+        zone: ZoneId
+    ): FounderWorkoutSubmission
+    suspend fun currentEntitlements(): FounderEntitlementCall
 }
 
 class OkHttpStrictBackendApi(
@@ -98,6 +109,81 @@ class OkHttpStrictBackendApi(
         } ?: FounderEnrollmentCall.Unavailable
     }
 
+    override suspend fun currentFounder(zone: ZoneId): FounderSnapshotCall {
+        val session = sessions.read() ?: return FounderSnapshotCall.NoSession
+        val request = Request.Builder()
+            .url("$root/api/v1/founder")
+            .header("Authorization", "Bearer ${session.accessToken.value}")
+            .get()
+            .build()
+        return call(request) { response ->
+            when {
+                response.code == 401 -> {
+                    sessions.clear()
+                    FounderSnapshotCall.Unauthenticated
+                }
+                !response.isSuccessful -> FounderSnapshotCall.Unavailable
+                else -> BackendFounderSnapshot.parse(response.body.string(), zone)
+                    ?.let { FounderSnapshotCall.Loaded(it) }
+                    ?: FounderSnapshotCall.Unavailable
+            }
+        } ?: FounderSnapshotCall.Unavailable
+    }
+
+    override suspend fun submitFounderWorkout(
+        clientWorkoutId: String,
+        completedAt: Instant,
+        localDate: LocalDate,
+        zone: ZoneId
+    ): FounderWorkoutSubmission {
+        val parsed = runCatching { UUID.fromString(clientWorkoutId) }.getOrNull()
+            ?: return FounderWorkoutSubmission.Rejected
+        val session = sessions.read() ?: return FounderWorkoutSubmission.NoSession
+        val body = JSONObject()
+            .put("workoutId", parsed.toString())
+            .put("completedAt", completedAt.toString())
+            .put("localDate", localDate.toString())
+            .toString()
+        val request = Request.Builder()
+            .url("$root/api/v1/founder/workouts")
+            .header("Authorization", "Bearer ${session.accessToken.value}")
+            .post(body.toRequestBody(json))
+            .build()
+        return call(request) { response ->
+            when {
+                response.code == 401 -> {
+                    sessions.clear()
+                    FounderWorkoutSubmission.Unauthenticated
+                }
+                response.code in 400..499 -> FounderWorkoutSubmission.Rejected
+                !response.isSuccessful -> FounderWorkoutSubmission.Unavailable
+                else -> BackendFounderSnapshot.parse(response.body.string(), zone)
+                    ?.let { FounderWorkoutSubmission.Accepted(it) }
+                    ?: FounderWorkoutSubmission.Rejected
+            }
+        } ?: FounderWorkoutSubmission.Unavailable
+    }
+
+    override suspend fun currentEntitlements(): FounderEntitlementCall {
+        val session = sessions.read() ?: return FounderEntitlementCall.NoSession
+        val request = Request.Builder()
+            .url("$root/api/v1/entitlements")
+            .header("Authorization", "Bearer ${session.accessToken.value}")
+            .get()
+            .build()
+        return call(request) { response ->
+            when {
+                response.code == 401 -> {
+                    sessions.clear()
+                    FounderEntitlementCall.Unauthenticated
+                }
+                !response.isSuccessful -> FounderEntitlementCall.Unavailable
+                else -> parseEntitlements(response.body.string())
+                    ?: FounderEntitlementCall.Unavailable
+            }
+        } ?: FounderEntitlementCall.Unavailable
+    }
+
     override suspend fun revokeSession(): RevokeCall {
         val session = sessions.read() ?: return RevokeCall.NoSession
         val request = Request.Builder()
@@ -149,6 +235,17 @@ class OkHttpStrictBackendApi(
         }
         val parsedUserId = runCatching { UUID.fromString(userId).toString() }.getOrNull() ?: return null
         return StoredStrictSession(StrictBearerToken(token), expiresAt, parsedUserId)
+    }
+
+    private fun parseEntitlements(raw: String): FounderEntitlementCall? {
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+        if (!json.has("temporaryFounderPro") || !json.has("founderLifetime")) {
+            return null
+        }
+        return FounderEntitlementCall.Loaded(
+            temporaryFounderPro = json.optBoolean("temporaryFounderPro", false),
+            founderLifetime = json.optBoolean("founderLifetime", false)
+        )
     }
 
     private fun parseUserId(raw: String): String? {

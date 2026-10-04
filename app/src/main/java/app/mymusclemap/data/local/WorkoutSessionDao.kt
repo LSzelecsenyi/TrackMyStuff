@@ -76,6 +76,9 @@ abstract class WorkoutSessionDao {
     @Query("SELECT * FROM workout_sessions WHERE id = :id LIMIT 1")
     abstract suspend fun getById(id: Long): WorkoutSessionEntity?
 
+    @Query("SELECT * FROM workout_sessions WHERE clientWorkoutId = :clientWorkoutId LIMIT 1")
+    abstract suspend fun getByClientWorkoutId(clientWorkoutId: String): WorkoutSessionEntity?
+
     @Query("SELECT workoutDate AS date, templateName AS name FROM workout_sessions WHERE status = 'COMPLETED'")
     abstract suspend fun getCompletedDateNames(): List<ImportedWorkoutName>
 

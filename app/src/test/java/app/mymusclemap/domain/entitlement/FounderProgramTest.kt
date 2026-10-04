@@ -135,12 +135,25 @@ class FounderProgramTest {
         val pending = recordTesterInput(enroll(), qualifyingWorkouts(), enrolledOn.plusDays(12))
         val approved = logic.approve(pending)
         assertEquals(FounderProgramStatus.Approved, approved.state.status)
-        val resolved = EntitlementResolver.resolve(
+        val now = Instant.parse("2026-06-01T00:00:00Z")
+        val local = EntitlementResolver.resolve(
             EntitlementSources.of(program = approved.state),
-            Instant.parse("2026-06-01T00:00:00Z")
+            now
         )
-        assertTrue(resolved.founderLifetime)
-        assertEquals(EntitlementTier.Pro, resolved.tier)
+        assertFalse(local.founderLifetime)
+        assertEquals(EntitlementTier.Free, local.tier)
+        val cached = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                program = approved.state,
+                backendFounder = BackendFounderEntitlement(
+                    founderLifetime = true,
+                    validUntil = now.plusSeconds(60)
+                )
+            ),
+            now
+        )
+        assertTrue(cached.founderLifetime)
+        assertEquals(EntitlementTier.Pro, cached.tier)
         assertTrue(logic.approve(enroll()) is FounderProgramResult.Unchanged)
     }
 

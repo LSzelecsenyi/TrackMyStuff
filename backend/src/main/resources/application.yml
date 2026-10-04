@@ -36,6 +36,8 @@ server:
 strict:
   google:
     client-id: ${STRICT_GOOGLE_CLIENT_ID:}
+  founder:
+    rules: ${STRICT_FOUNDER_RULES:production}
   auth:
     session-lifetime: ${STRICT_AUTH_SESSION_LIFETIME:30d}
   admin:

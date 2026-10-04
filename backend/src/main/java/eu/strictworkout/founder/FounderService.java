@@ -261,7 +261,8 @@ public class FounderService {
                         evaluation.qualifyingWorkouts(),
                         rules.founderWorkoutCount(),
                         evaluation.distinctWorkoutDays(),
-                        rules.requiredDistinctWorkoutDays()
+                        rules.requiredDistinctWorkoutDays(),
+                        rules.temporaryProWorkoutCount()
                 ),
                 evaluation.temporaryProActive(),
                 evaluation.trainingRequirementsComplete(),

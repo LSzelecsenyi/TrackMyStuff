@@ -1059,6 +1059,7 @@
     <string name="founder_program_title">Founding Tester</string>
     <string name="founder_enroll">Join the Founding Tester Program</string>
     <string name="founder_enroll_working">Signing in…</string>
+    <string name="founder_resume_sign_in">Sign in to update Founder progress</string>
     <string name="founder_welcome_account">Joining uses your Google account to create a Strict account. The rest of Strict does not require an account.</string>
     <string name="founder_join_google_failed">Google sign-in did not finish. You can try again.</string>
     <string name="founder_join_unavailable">Strict could not be reached. Your training data is still on this device. You can try again.</string>

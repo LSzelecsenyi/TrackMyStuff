@@ -28,7 +28,9 @@ interface SessionSealer {
  */
 class EncryptedFileStrictSessionStore(
     private val file: File,
-    private val sealer: SessionSealer
+    private val sealer: SessionSealer,
+    var onCleared: (() -> Unit)? = null,
+    var onWritten: (() -> Unit)? = null
 ) : StrictSessionStore {
     override fun read(): StoredStrictSession? {
         if (!file.isFile) {
@@ -50,11 +52,13 @@ class EncryptedFileStrictSessionStore(
             file.writeBytes(temporary.readBytes())
             temporary.delete()
         }
+        onWritten?.invoke()
     }
 
     override fun clear() {
         file.delete()
         File(file.parentFile, "${file.name}.tmp").delete()
+        onCleared?.invoke()
     }
 
     companion object {

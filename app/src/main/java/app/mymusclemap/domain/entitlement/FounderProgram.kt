@@ -37,7 +37,10 @@ data class FounderProgramState(
     /** Set when this record was written from a backend enrollment response. */
     val backendOwned: Boolean = false,
     val serverQualifyingWorkouts: Int = 0,
-    val serverDistinctDays: Int = 0
+    val serverDistinctDays: Int = 0,
+    val serverRequiredWorkouts: Int = 0,
+    val serverRequiredDistinctDays: Int = 0,
+    val serverTemporaryProWorkouts: Int = 0
 )
 
 data class FounderQualification(

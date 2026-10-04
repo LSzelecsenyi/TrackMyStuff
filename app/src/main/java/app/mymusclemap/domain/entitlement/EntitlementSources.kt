@@ -33,18 +33,21 @@ data class FounderProgramSnapshot(
 data class EntitlementSources(
     val subscription: SubscriptionEntitlement = SubscriptionEntitlement(),
     val founderLifetime: FounderLifetimeEntitlement = FounderLifetimeEntitlement(),
-    val founderProgram: FounderProgramSnapshot = FounderProgramSnapshot()
+    val founderProgram: FounderProgramSnapshot = FounderProgramSnapshot(),
+    val backendFounder: BackendFounderEntitlement = BackendFounderEntitlement()
 ) {
     companion object {
         fun of(
             subscription: SubscriptionEntitlement = SubscriptionEntitlement(),
             founderLifetime: FounderLifetimeEntitlement = FounderLifetimeEntitlement(),
-            program: FounderProgramState = FounderProgramState()
+            program: FounderProgramState = FounderProgramState(),
+            backendFounder: BackendFounderEntitlement = BackendFounderEntitlement()
         ): EntitlementSources {
             return EntitlementSources(
                 subscription = subscription,
                 founderLifetime = founderLifetime,
-                founderProgram = FounderProgramSnapshot(program.status)
+                founderProgram = FounderProgramSnapshot(program.status),
+                backendFounder = backendFounder
             )
         }
     }
@@ -65,7 +68,7 @@ object InactiveSubscriptionProvider : SubscriptionEntitlementProvider {
     override fun current(): SubscriptionEntitlement = SubscriptionEntitlement()
 }
 
-/** No store-backed Founder Lifetime grant. Approval still counts inside the resolver. */
+/** No store-backed Founder Lifetime grant. Founder Lifetime comes from a backend entitlement cache. */
 object InactiveFounderLifetimeProvider : FounderLifetimeProvider {
     override fun current(): FounderLifetimeEntitlement = FounderLifetimeEntitlement()
 }

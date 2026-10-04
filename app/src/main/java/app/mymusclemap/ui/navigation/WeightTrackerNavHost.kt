@@ -633,6 +633,7 @@ fun WeightTrackerNavHost(
                     reportText = { founderViewModel?.reportText().orEmpty() },
                     onBack = { navController.popBackStack() },
                     onEnroll = { founderViewModel?.enroll() },
+                    onResumeSession = { founderViewModel?.resumeSession() },
                     onFeedbackChange = { founderViewModel?.onFeedbackChange(it) },
                     onSaveFeedback = { founderViewModel?.saveFeedback() },
                     onReportShareResult = { shared ->

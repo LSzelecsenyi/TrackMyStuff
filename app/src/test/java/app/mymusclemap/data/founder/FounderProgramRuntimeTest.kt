@@ -12,6 +12,7 @@ import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
 import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.BackendFounderEntitlement
 import app.mymusclemap.domain.entitlement.EntitlementComposer
 import app.mymusclemap.domain.entitlement.EntitlementTier
 import app.mymusclemap.domain.entitlement.FounderProgramRules
@@ -75,6 +76,7 @@ class FounderProgramRuntimeTest {
     private lateinit var coordinator: FounderProgramCoordinator
     private lateinit var subscription: MutableSubscription
     private lateinit var composer: EntitlementComposer
+    private var backendEntitlement = BackendFounderEntitlement()
     private lateinit var entitlements: PolicyBackedEntitlements
 
     @Before
@@ -96,11 +98,13 @@ class FounderProgramRuntimeTest {
             onEntitlementChanged = { revisions.value = revisions.value + 1 }
         )
         subscription = MutableSubscription()
+        backendEntitlement = BackendFounderEntitlement()
         composer = EntitlementComposer(
             subscriptionProvider = subscription,
             founderLifetimeProvider = InactiveFounderLifetimeProvider,
             clock = Clock.fixed(Instant.parse("2026-10-03T12:00:00Z"), ZoneOffset.UTC),
-            founderProgram = coordinator::currentState
+            founderProgram = coordinator::currentState,
+            backendFounder = { backendEntitlement }
         )
         entitlements = PolicyBackedEntitlements(
             policySource = { composer.policy() },
@@ -137,9 +141,9 @@ class FounderProgramRuntimeTest {
         coordinator.onNativeWorkoutCompleted()
         assertEquals(FounderProgramStatus.ActivePro, coordinator.currentState().status)
         assertEquals(1, coordinator.view.value.qualification.nativeCompletedWorkouts)
-        assertTrue(composer.resolve().temporaryTesterPro)
-        assertEquals(EntitlementTier.Pro, composer.resolve().tier)
-        assertTrue(entitlements.hasAccess(AppFeature.ProgressPhotos))
+        assertFalse(composer.resolve().temporaryTesterPro)
+        assertEquals(EntitlementTier.Free, composer.resolve().tier)
+        assertFalse(entitlements.hasAccess(AppFeature.ProgressPhotos))
     }
 
     @Test
@@ -198,11 +202,11 @@ class FounderProgramRuntimeTest {
     fun pendingApprovalStaysProAndDoesNotExpire() = runTest {
         completeQualification()
         assertEquals(FounderProgramStatus.PendingApproval, coordinator.currentState().status)
-        assertTrue(composer.resolve().temporaryTesterPro)
+        assertFalse(composer.resolve().temporaryTesterPro)
         today = today.plusDays(90)
         coordinator.refresh()
         assertEquals(FounderProgramStatus.PendingApproval, coordinator.currentState().status)
-        assertEquals(EntitlementTier.Pro, composer.resolve().tier)
+        assertEquals(EntitlementTier.Free, composer.resolve().tier)
     }
 
     @Test
@@ -240,8 +244,8 @@ class FounderProgramRuntimeTest {
         completeQualification()
         coordinator.approve()
         assertEquals(FounderProgramStatus.Approved, coordinator.currentState().status)
-        assertTrue(composer.resolve().founderLifetime)
-        assertEquals(EntitlementTier.Pro, composer.resolve().tier)
+        assertFalse(composer.resolve().founderLifetime)
+        assertEquals(EntitlementTier.Free, composer.resolve().tier)
         val reloaded = FounderProgramCoordinator(
             store = FounderProgramStore(ApplicationProvider.getApplicationContext()),
             sessions = database.workoutSessionDao(),
@@ -289,7 +293,7 @@ class FounderProgramRuntimeTest {
         val viewModel = founderViewModel()
         val shown = ready(viewModel)
         assertEquals(FounderProgramStatus.ActivePro, shown.status)
-        assertEquals(FounderMilestone.TemporaryProUnlocked, shown.journey.milestone)
+        assertNull(shown.journey.milestone)
         assertEquals(1, shown.journey.nextRemaining)
         assertEquals(FounderNextAction.QualifyingWorkout, shown.journey.nextAction)
         viewModel.acknowledgeMilestone()
@@ -299,9 +303,44 @@ class FounderProgramRuntimeTest {
         assertNull(ready(founderViewModel()).journey.milestone)
         acknowledgements.save(FounderMilestoneAcknowledgements())
         val again = ready(founderViewModel())
-        assertEquals(FounderMilestone.TemporaryProUnlocked, again.journey.milestone)
+        assertNull(again.journey.milestone)
         assertEquals(before, composer.resolve())
+        assertFalse(before.temporaryTesterPro)
+    }
+
+    @Test
+    fun backendTemporaryProShowsTheMilestoneWithoutUsingLocalStatusAsAGrant() = runTest {
+        coordinator.applyBackendEnrollment(
+            BackendFounderSnapshot(
+                status = FounderProgramStatus.ActivePro,
+                enrolledOn = today,
+                deadline = today.plusDays(45),
+                qualifyingWorkouts = 1,
+                distinctWorkoutDays = 1,
+                feedbackSubmitted = false,
+                reportSubmitted = false,
+                requiredWorkouts = 2,
+                requiredDistinctDays = 1,
+                temporaryProRequiredWorkouts = 1,
+                temporaryProActive = true
+            )
+        )
+        backendEntitlement = BackendFounderEntitlement(
+            temporaryFounderPro = true,
+            validUntil = Instant.parse("2026-10-04T12:00:00Z")
+        )
+        val before = composer.resolve()
         assertTrue(before.temporaryTesterPro)
+        assertFalse(before.founderLifetime)
+        val viewModel = founderViewModel()
+        val shown = ready(viewModel)
+        assertEquals(FounderMilestone.TemporaryProUnlocked, shown.journey.milestone)
+        viewModel.acknowledgeMilestone()
+        viewModel.uiState.first { !it.loading && it.journey.milestone == null }
+        assertEquals(before, composer.resolve())
+        acknowledgements.save(FounderMilestoneAcknowledgements())
+        assertEquals(FounderMilestone.TemporaryProUnlocked, ready(founderViewModel()).journey.milestone)
+        assertEquals(before, composer.resolve())
     }
 
     @Test
@@ -347,7 +386,7 @@ class FounderProgramRuntimeTest {
         acknowledgements.save(FounderMilestoneAcknowledgements())
         assertEquals(FounderMilestone.FounderApproved, ready(founderViewModel()).journey.milestone)
         assertEquals(before, composer.resolve())
-        assertTrue(before.founderLifetime)
+        assertFalse(before.founderLifetime)
         assertEquals(FounderProgramStatus.Approved, store.load().status)
     }
 
@@ -413,7 +452,7 @@ class FounderProgramRuntimeTest {
         assertEquals(FounderProgramStatus.PendingApproval, coordinator.currentState().status)
         assertEquals(2, coordinator.view.value.qualification.nativeCompletedWorkouts)
         assertEquals(1, coordinator.view.value.qualification.distinctNativeWorkoutDays)
-        assertTrue(composer.resolve().temporaryTesterPro)
+        assertFalse(composer.resolve().temporaryTesterPro)
     }
 
     @Test

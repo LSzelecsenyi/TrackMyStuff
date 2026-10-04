@@ -217,8 +217,8 @@ class FounderInvitationHandoffTest {
             EntitlementSources.of(program = founder.currentState()),
             Instant.parse("2026-10-03T12:00:00Z")
         )
-        assertTrue(resolved.temporaryTesterPro)
-        assertEquals(EntitlementTier.Pro, resolved.tier)
+        assertFalse(resolved.temporaryTesterPro)
+        assertEquals(EntitlementTier.Free, resolved.tier)
         programStore.save(
             founder.currentState().copy(status = FounderProgramStatus.Approved)
         )
@@ -227,8 +227,8 @@ class FounderInvitationHandoffTest {
             EntitlementSources.of(program = founder.currentState()),
             Instant.parse("2026-10-03T12:00:00Z")
         )
-        assertTrue(lifetime.founderLifetime)
-        assertEquals(EntitlementTier.Pro, lifetime.tier)
+        assertFalse(lifetime.founderLifetime)
+        assertEquals(EntitlementTier.Free, lifetime.tier)
     }
 
     @Test

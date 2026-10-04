@@ -9,10 +9,12 @@ import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
 import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.FounderProgramStatus
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -37,6 +39,7 @@ data class FounderProgramUiState(
     val reportShareFailed: Boolean = false,
     val joining: Boolean = false,
     val joinNotice: FounderJoinNotice = FounderJoinNotice.None,
+    val sessionRequired: Boolean = false,
     val journey: FounderJourney
 )
 
@@ -66,7 +69,9 @@ class FounderProgramViewModel(
     private val versionName: String,
     private val milestoneAcknowledgements: FounderMilestoneAcknowledgementStore,
     private val availability: FounderProgramAvailability = FounderProgramAvailability.Open,
-    private val joinFounder: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected }
+    private val joinFounder: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected },
+    private val sessionRevision: Flow<Int> = flowOf(0),
+    private val sessionPresent: () -> Boolean = { true }
 ) : ViewModel() {
     private val feedbackDraft = MutableStateFlow("")
     private val feedbackBlank = MutableStateFlow(false)
@@ -87,7 +92,8 @@ class FounderProgramViewModel(
         val journey = founderJourney(
             status = state.status,
             qualification = qualification,
-            acknowledgements = acks ?: FounderMilestoneAcknowledgements()
+            acknowledgements = acks ?: FounderMilestoneAcknowledgements(),
+            authoritative = state.backendOwned
         ).let { presented ->
             if (acks == null) presented.copy(milestone = null) else presented
         }
@@ -129,9 +135,16 @@ class FounderProgramViewModel(
     val uiState: StateFlow<FounderProgramUiState> = combine(
         programUi,
         joining,
-        joinNotice
-    ) { program, active, notice ->
-        program.copy(joining = active, joinNotice = notice)
+        joinNotice,
+        sessionRevision
+    ) { program, active, notice, _ ->
+        program.copy(
+            joining = active,
+            joinNotice = notice,
+            sessionRequired = program.status != FounderProgramStatus.NotEnrolled &&
+                coordinator.currentState().backendOwned &&
+                !sessionPresent()
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -157,6 +170,29 @@ class FounderProgramViewModel(
             return
         }
         if (!founderEnrollmentAllowed(availability, coordinator.currentState().status)) {
+            return
+        }
+        joining.value = true
+        joinNotice.value = FounderJoinNotice.None
+        viewModelScope.launch {
+            val result = joinFounder()
+            if (result == FounderJoinResult.InProgress) {
+                return@launch
+            }
+            joining.value = false
+            joinNotice.value = result.toNotice()
+        }
+    }
+
+    /**
+     * Explicit sign-in for an enrolled Founder whose bearer is gone.
+     * Completing a workout does not call this.
+     */
+    fun resumeSession() {
+        if (joining.value) {
+            return
+        }
+        if (!coordinator.currentState().backendOwned || sessionPresent()) {
             return
         }
         joining.value = true

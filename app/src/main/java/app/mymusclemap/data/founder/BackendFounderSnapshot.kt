@@ -18,7 +18,11 @@ data class BackendFounderSnapshot(
     val qualifyingWorkouts: Int,
     val distinctWorkoutDays: Int,
     val feedbackSubmitted: Boolean,
-    val reportSubmitted: Boolean
+    val reportSubmitted: Boolean,
+    val requiredWorkouts: Int = 0,
+    val requiredDistinctDays: Int = 0,
+    val temporaryProRequiredWorkouts: Int = 0,
+    val temporaryProActive: Boolean = false
 ) {
     fun toProgramState(): FounderProgramState {
         return FounderProgramState(
@@ -29,7 +33,10 @@ data class BackendFounderSnapshot(
             testerAnalyticsReportSubmitted = reportSubmitted,
             backendOwned = true,
             serverQualifyingWorkouts = qualifyingWorkouts,
-            serverDistinctDays = distinctWorkoutDays
+            serverDistinctDays = distinctWorkoutDays,
+            serverRequiredWorkouts = requiredWorkouts,
+            serverRequiredDistinctDays = requiredDistinctDays,
+            serverTemporaryProWorkouts = temporaryProRequiredWorkouts
         )
     }
 
@@ -54,7 +61,11 @@ data class BackendFounderSnapshot(
                 qualifyingWorkouts = workouts,
                 distinctWorkoutDays = days,
                 feedbackSubmitted = feedback.optBoolean("submitted", false),
-                reportSubmitted = report.optBoolean("submitted", false)
+                reportSubmitted = report.optBoolean("submitted", false),
+                requiredWorkouts = progress.optInt("requiredWorkouts", 0),
+                requiredDistinctDays = progress.optInt("requiredDistinctWorkoutDays", 0),
+                temporaryProRequiredWorkouts = progress.optInt("temporaryProRequiredWorkouts", 0),
+                temporaryProActive = json.optBoolean("temporaryProActive", false)
             )
         }
 

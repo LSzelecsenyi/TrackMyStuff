@@ -7,3 +7,5 @@ spring:
 strict:
   google:
     client-id: ${STRICT_GOOGLE_CLIENT_ID}
+  founder:
+    rules: production

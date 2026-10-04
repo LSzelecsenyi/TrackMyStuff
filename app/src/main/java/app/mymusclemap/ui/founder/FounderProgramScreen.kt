@@ -68,6 +68,7 @@ fun FounderProgramScreen(
     state: FounderProgramUiState,
     onBack: () -> Unit,
     onEnroll: () -> Unit,
+    onResumeSession: () -> Unit = {},
     onFeedbackChange: (String) -> Unit,
     onSaveFeedback: () -> Unit,
     onShareFeedback: () -> Unit,
@@ -134,6 +135,26 @@ fun FounderProgramScreen(
                         joinNotice = state.joinNotice
                     )
                 } else {
+                    if (state.sessionRequired) {
+                        Button(
+                            onClick = onResumeSession,
+                            enabled = !state.joining,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = AppDimens.sectionGap)
+                                .testTag("founder-resume-session")
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (state.joining) {
+                                        R.string.founder_enroll_working
+                                    } else {
+                                        R.string.founder_resume_sign_in
+                                    }
+                                )
+                            )
+                        }
+                    }
                     EnrolledSection(state = state)
                     if (state.journey.showFeedback) {
                         FeedbackSection(
@@ -793,6 +814,7 @@ fun FounderProgramRoute(
     reportText: () -> String,
     onBack: () -> Unit,
     onEnroll: () -> Unit,
+    onResumeSession: () -> Unit = {},
     onFeedbackChange: (String) -> Unit,
     onSaveFeedback: () -> Unit,
     onReportShareResult: suspend (Boolean) -> Unit,
@@ -808,6 +830,7 @@ fun FounderProgramRoute(
         state = state,
         onBack = onBack,
         onEnroll = onEnroll,
+        onResumeSession = onResumeSession,
         onFeedbackChange = onFeedbackChange,
         onSaveFeedback = onSaveFeedback,
         onShareFeedback = {

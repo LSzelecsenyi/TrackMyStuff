@@ -152,6 +152,7 @@ class FounderApiIT {
         assertEquals("ACTIVE_PRO", first.get("status"));
         assertFlag(true, first.get("temporaryProActive"));
         assertCount(1, progress(first).get("qualifyingWorkouts"));
+        assertCount(1, progress(first).get("temporaryProRequiredWorkouts"));
 
         Map<String, Object> retry = parse(ok(post(
                 "/api/v1/founder/workouts",
@@ -374,6 +375,48 @@ class FounderApiIT {
         assertEquals(List.of(200, 200), statuses.stream().sorted().toList());
         assertEquals(1, countSnapshots(userId(token)));
         assertEquals("PENDING_APPROVAL", parse(ok(get("/api/v1/founder", token))).get("status"));
+    }
+
+    @Test
+    void workoutSubmissionRejectsMalformedIdsAndCannotGrantLifetime() {
+        String token = enrolled("workout-authority");
+        ResponseEntity<String> malformed = post(
+                "/api/v1/founder/workouts",
+                "{\"workoutId\":\"not-a-uuid\",\"completedAt\":\"2026-06-01T00:00:00Z\",\"localDate\":\"2026-06-01\"}",
+                token
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, malformed.getStatusCode());
+        assertEquals(0, countEvents(userId(token)));
+
+        String desired = "{"
+                + "\"workoutId\":\"" + UUID.randomUUID() + "\","
+                + "\"completedAt\":\"2026-06-01T00:00:00Z\","
+                + "\"localDate\":\"2026-06-01\","
+                + "\"userId\":\"" + UUID.randomUUID() + "\","
+                + "\"applicationId\":\"" + UUID.randomUUID() + "\","
+                + "\"status\":\"APPROVED\","
+                + "\"founderLifetime\":true,"
+                + "\"tier\":\"PRO\","
+                + "\"origin\":\"HEALTH_CONNECT\","
+                + "\"sets\":[{\"reps\":5,\"weightKg\":100}]"
+                + "}";
+        Map<String, Object> recorded = parse(ok(post("/api/v1/founder/workouts", desired, token)));
+        assertEquals("ACTIVE_PRO", recorded.get("status"));
+        assertCount(1, progress(recorded).get("qualifyingWorkouts"));
+        assertEquals(1, countEvents(userId(token)));
+
+        Map<String, Object> entitlements = parse(ok(get("/api/v1/entitlements", token)));
+        assertFlag(true, entitlements.get("temporaryFounderPro"));
+        assertFlag(false, entitlements.get("founderLifetime"));
+        assertEquals(HttpStatus.NOT_FOUND, post("/api/v1/founder/approval", "{\"status\":\"APPROVED\",\"founderLifetime\":true}", token).getStatusCode());
+
+        String again = login("workout-authority");
+        Map<String, Object> restored = parse(ok(get("/api/v1/founder", again)));
+        assertCount(1, progress(restored).get("qualifyingWorkouts"));
+        assertEquals("ACTIVE_PRO", restored.get("status"));
+        Map<String, Object> restoredEntitlements = parse(ok(get("/api/v1/entitlements", again)));
+        assertFlag(true, restoredEntitlements.get("temporaryFounderPro"));
+        assertFlag(false, restoredEntitlements.get("founderLifetime"));
     }
 
     private void qualify(String token) {

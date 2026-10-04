@@ -49,6 +49,8 @@ import app.mymusclemap.ui.templates.TemplateListViewModel
 import app.mymusclemap.ui.workout.ActiveWorkoutViewModel
 import app.mymusclemap.ui.workout.WorkoutHubViewModel
 import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 class WeightViewModelFactory(
     private val weightRepository: WeightRepository,
@@ -72,7 +74,9 @@ class WeightViewModelFactory(
     private val founderMilestoneAcknowledgements: FounderMilestoneAcknowledgementStore? = null,
     private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open,
     private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off,
-    private val founderJoin: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected }
+    private val founderJoin: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected },
+    private val founderSessionRevision: Flow<Int> = flowOf(0),
+    private val founderSessionPresent: () -> Boolean = { true }
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -206,7 +210,9 @@ class WeightViewModelFactory(
                     versionName = BuildConfig.VERSION_NAME,
                     milestoneAcknowledgements = checkNotNull(founderMilestoneAcknowledgements),
                     availability = founderAvailability,
-                    joinFounder = founderJoin
+                    joinFounder = founderJoin,
+                    sessionRevision = founderSessionRevision,
+                    sessionPresent = founderSessionPresent
                 )
             }
             modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {
