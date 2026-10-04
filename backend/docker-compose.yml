@@ -1,0 +1,23 @@
+name: strict
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: strict-postgres
+    environment:
+      POSTGRES_DB: strict
+      POSTGRES_USER: strict
+      POSTGRES_PASSWORD: strict
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - strict_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U strict -d strict"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  strict_postgres_data:

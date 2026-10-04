@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: strict-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5433/strict
+    username: strict
+    password: strict
+    hikari:
+      connection-init-sql: "SET TIME ZONE 'UTC'"
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  jackson:
+    time-zone: UTC
+  mvc:
+    throw-exception-if-no-handler-found: true
+    problemdetails:
+      enabled: false
+  web:
+    resources:
+      add-mappings: false
+
+server:
+  port: 8082
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSS'Z',UTC} %-5level [%thread] %logger{40} - %msg%n"

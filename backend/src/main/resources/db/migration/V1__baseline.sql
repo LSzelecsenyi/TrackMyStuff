@@ -1,0 +1,4 @@
+-- Strict schema baseline.
+-- Flyway owns schema changes. Hibernate must not create or alter tables.
+-- Later migrations store absolute instants as TIMESTAMPTZ.
+-- This revision intentionally creates no domain tables and does not set a business timezone.
