@@ -16,6 +16,7 @@
         <exclude domain="device_file" path="." />
         <exclude domain="device_database" path="." />
         <exclude domain="device_sharedpref" path="." />
+        <exclude domain="root" path="no_backup" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="root" path="." />
@@ -27,6 +28,7 @@
         <exclude domain="device_file" path="." />
         <exclude domain="device_database" path="." />
         <exclude domain="device_sharedpref" path="." />
+        <exclude domain="root" path="no_backup" />
     </device-transfer>
     <cross-platform-transfer platform="ios">
         <exclude domain="root" path="." />
@@ -38,5 +40,6 @@
         <exclude domain="device_file" path="." />
         <exclude domain="device_database" path="." />
         <exclude domain="device_sharedpref" path="." />
+        <exclude domain="root" path="no_backup" />
     </cross-platform-transfer>
 </data-extraction-rules>

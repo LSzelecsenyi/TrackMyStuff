@@ -1,0 +1,76 @@
+package app.mymusclemap.data.auth
+
+/**
+ * Raw bearer and Google ID token values are redacted from [toString] so a log of the model
+ * cannot print the secret. Callers that need the wire value use [value] and must not log it.
+ */
+@JvmInline
+value class StrictBearerToken(val value: String) {
+    override fun toString(): String = "StrictBearerToken(redacted)"
+}
+
+@JvmInline
+value class GoogleIdTokenValue(val value: String) {
+    override fun toString(): String = "GoogleIdToken(redacted)"
+}
+
+data class StoredStrictSession(
+    val accessToken: StrictBearerToken,
+    val expiresAt: String,
+    val userId: String
+)
+
+sealed interface GoogleIdTokenRequest {
+    data class Issued(val idToken: GoogleIdTokenValue) : GoogleIdTokenRequest
+    data object Cancelled : GoogleIdTokenRequest
+    data object NotConfigured : GoogleIdTokenRequest
+    data object Failed : GoogleIdTokenRequest
+}
+
+sealed interface StrictSignInResult {
+    data class SignedIn(val userId: String) : StrictSignInResult
+    data object Cancelled : StrictSignInResult
+    data object GoogleFailed : StrictSignInResult
+    data object GoogleNotConfigured : StrictSignInResult
+    data object InvalidGoogleToken : StrictSignInResult
+    data object BackendRejected : StrictSignInResult
+    data object Unavailable : StrictSignInResult
+}
+
+sealed interface StrictCurrentUserResult {
+    data class SignedIn(val userId: String) : StrictCurrentUserResult
+    data object SignedOut : StrictCurrentUserResult
+    data object SessionRejected : StrictCurrentUserResult
+    data object Unavailable : StrictCurrentUserResult
+}
+
+sealed interface StrictLogoutResult {
+    /** Local token is gone. The backend confirmed revocation. */
+    data object LoggedOut : StrictLogoutResult
+
+    /**
+     * Local token is gone. The backend session may still be valid until it expires,
+     * because the device could not complete DELETE /api/v1/auth/session.
+     */
+    data object LoggedOutLocallyOnly : StrictLogoutResult
+}
+
+sealed interface GoogleExchangeResult {
+    data class Accepted(val session: StoredStrictSession) : GoogleExchangeResult
+    data object InvalidGoogleToken : GoogleExchangeResult
+    data object Rejected : GoogleExchangeResult
+    data object Unavailable : GoogleExchangeResult
+}
+
+sealed interface CurrentUserCall {
+    data class SignedIn(val userId: String) : CurrentUserCall
+    data object NoSession : CurrentUserCall
+    data object Rejected : CurrentUserCall
+    data object Unavailable : CurrentUserCall
+}
+
+sealed interface RevokeCall {
+    data object Revoked : RevokeCall
+    data object NoSession : RevokeCall
+    data object Failed : RevokeCall
+}

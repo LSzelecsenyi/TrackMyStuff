@@ -1,6 +1,13 @@
 package app.mymusclemap
 
 import android.content.Context
+import app.mymusclemap.BuildConfig
+import app.mymusclemap.data.auth.ActivityBoundGoogleIdentityProvider
+import app.mymusclemap.data.auth.OkHttpStrictBackendApi
+import app.mymusclemap.data.auth.StrictAuthRepository
+import app.mymusclemap.data.auth.StrictSessionStore
+import app.mymusclemap.data.auth.EncryptedFileStrictSessionStore
+import app.mymusclemap.data.auth.strictOkHttpClient
 import app.mymusclemap.data.health.HealthConnectGateway
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.local.WeightDatabase
@@ -159,6 +166,38 @@ class AppContainer(context: Context) {
             entitlementComposer.policy().healthConnect().canImportExternalWorkouts
         }
     )
+    private val strictAccount by lazy {
+        val sessions = EncryptedFileStrictSessionStore.create(appContext)
+        val google = ActivityBoundGoogleIdentityProvider(
+            serverClientId = BuildConfig.STRICT_GOOGLE_SERVER_CLIENT_ID
+        )
+        StrictAccount(
+            sessions = sessions,
+            google = google,
+            repository = StrictAuthRepository(
+                google = google,
+                api = OkHttpStrictBackendApi(
+                    baseUrl = BuildConfig.STRICT_API_BASE_URL,
+                    http = strictOkHttpClient(),
+                    sessions = sessions
+                ),
+                sessions = sessions
+            )
+        )
+    }
+    val strictSessionStore: StrictSessionStore
+        get() = strictAccount.sessions
+    val strictAuthRepository: StrictAuthRepository
+        get() = strictAccount.repository
+
+    fun bindStrictSignIn(uiContext: Context) {
+        strictAccount.google.bind(uiContext)
+    }
+
+    fun unbindStrictSignIn(uiContext: Context) {
+        strictAccount.google.unbind(uiContext)
+    }
+
     val onboardingRepository = OnboardingRepository(
         themePreferences = themePreferences,
         sessionRepository = workoutSessionRepository,
@@ -189,3 +228,9 @@ class AppContainer(context: Context) {
         lockScreenSetCompletion = lockScreenSetCompletion
     )
 }
+
+private class StrictAccount(
+    val sessions: StrictSessionStore,
+    val google: ActivityBoundGoogleIdentityProvider,
+    val repository: StrictAuthRepository
+)

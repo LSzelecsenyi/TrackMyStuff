@@ -7,6 +7,49 @@ plugins {
     alias(libs.plugins.room)
 }
 
+fun optionalBuildValue(propertyName: String, envName: String): String? {
+    System.getenv(envName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    val localFile = rootProject.file("local.properties")
+    if (localFile.isFile) {
+        val props = Properties()
+        localFile.reader(Charsets.UTF_8).use { props.load(it) }
+        props.getProperty(propertyName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    }
+    return null
+}
+
+fun buildConfigString(value: String): String {
+    return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+}
+
+fun requireReleaseStrictApiUrl(url: String) {
+    val normalized = url.trim().lowercase()
+    require(normalized.startsWith("https://")) { "Release Strict API URL must use HTTPS." }
+    require(!normalized.startsWith("http://")) { "Release Strict API URL must not use cleartext HTTP." }
+    require(!normalized.contains("localhost")) { "Release Strict API URL must not target localhost." }
+    require(!normalized.contains("127.0.0.1")) { "Release Strict API URL must not target loopback." }
+    require(!normalized.contains("10.0.2.2")) { "Release Strict API URL must not target the emulator host alias." }
+    require(!normalized.contains("puff")) { "Release Strict API URL must not target Puff." }
+}
+
+fun requireDebugStrictApiUrl(url: String) {
+    val normalized = url.trim().lowercase()
+    require(normalized.startsWith("https://") || normalized.startsWith("http://")) {
+        "Debug Strict API URL must be an HTTP(S) URL."
+    }
+    require(!normalized.contains("puff")) { "Debug Strict API URL must not target Puff." }
+}
+
+val strictReleaseApiUrl = "https://api.strictworkout.eu"
+requireReleaseStrictApiUrl(strictReleaseApiUrl)
+val strictDebugApiUrl = (optionalBuildValue("strict.api.baseUrl", "STRICT_API_BASE_URL")
+    ?: "http://127.0.0.1:8082").trim().trimEnd('/')
+requireDebugStrictApiUrl(strictDebugApiUrl)
+val strictGoogleServerClientId = optionalBuildValue(
+    "strict.google.serverClientId",
+    "STRICT_GOOGLE_SERVER_CLIENT_ID"
+).orEmpty()
+
 fun releaseSigningValue(propertyName: String, envName: String): String? {
     System.getenv(envName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
     val localFile = rootProject.file("local.properties")
@@ -69,11 +112,15 @@ android {
             if (hasCompleteReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            buildConfigField("String", "STRICT_API_BASE_URL", buildConfigString(strictReleaseApiUrl))
+            buildConfigField("String", "STRICT_GOOGLE_SERVER_CLIENT_ID", buildConfigString(strictGoogleServerClientId))
         }
         debug {
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            buildConfigField("String", "STRICT_API_BASE_URL", buildConfigString(strictDebugApiUrl))
+            buildConfigField("String", "STRICT_GOOGLE_SERVER_CLIENT_ID", buildConfigString(strictGoogleServerClientId))
         }
     }
 
@@ -160,6 +207,12 @@ dependencies {
 
     implementation(libs.androidx.health.connect.client)
     implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.google.id)
+    implementation(libs.okhttp)
+
+    testImplementation(libs.okhttp.mockwebserver)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
