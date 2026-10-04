@@ -13,6 +13,7 @@ spring:
       ddl-auto: validate
     properties:
       hibernate.jdbc.time_zone: UTC
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP_WITH_TIMEZONE
   flyway:
     enabled: true
   jackson:
@@ -31,6 +32,12 @@ server:
     include-stacktrace: never
     include-message: never
     include-binding-errors: never
+
+strict:
+  google:
+    client-id: ${STRICT_GOOGLE_CLIENT_ID:}
+  auth:
+    session-lifetime: ${STRICT_AUTH_SESSION_LIFETIME:30d}
 
 logging:
   pattern:

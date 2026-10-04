@@ -1,14 +1,18 @@
 package app.mymusclemap.ui.workout
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import app.mymusclemap.MainActivity
 import app.mymusclemap.R
 import app.mymusclemap.domain.workout.ActiveWorkoutNotificationBody
@@ -16,6 +20,12 @@ import app.mymusclemap.domain.workout.ActiveWorkoutNotificationModel
 import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.domain.workout.notificationLoadLabel
 import app.mymusclemap.domain.workout.notificationValueParts
+
+enum class LockScreenDeliveryBlock {
+    None,
+    Permission,
+    Channel
+}
 
 internal object ActiveWorkoutNotifications {
     const val CHANNEL_ID = "active_workout"
@@ -49,12 +59,57 @@ internal object ActiveWorkoutNotifications {
         notificationId: Int = NOTIFICATION_ID
     ) {
         val manager = NotificationManagerCompat.from(context)
-        if (model == null || !manager.areNotificationsEnabled()) {
+        if (model == null || !canDeliver(context)) {
             manager.cancel(notificationId)
             return
         }
         ensureChannel(context)
         manager.notify(notificationId, build(context, model))
+    }
+
+    fun canDeliver(context: Context): Boolean {
+        return deliveryBlock(context) == LockScreenDeliveryBlock.None
+    }
+
+    fun runtimePermissionGranted(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun deliveryBlock(context: Context): LockScreenDeliveryBlock {
+        if (!runtimePermissionGranted(context) || !NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            return LockScreenDeliveryBlock.Permission
+        }
+        if (channelBlocked(context)) return LockScreenDeliveryBlock.Channel
+        return LockScreenDeliveryBlock.None
+    }
+
+    fun appNotificationSettingsIntent(context: Context): Intent {
+        return Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }
+    }
+
+    fun channelSettingsIntent(context: Context): Intent {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                putExtra(Settings.EXTRA_CHANNEL_ID, CHANNEL_ID)
+            }
+        } else {
+            appNotificationSettingsIntent(context)
+        }
+    }
+
+    private fun channelBlocked(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val channel = context.getSystemService(NotificationManager::class.java)
+            ?.getNotificationChannel(CHANNEL_ID)
+            ?: return false
+        return channel.importance == NotificationManager.IMPORTANCE_NONE
     }
 
     fun cancel(context: Context, notificationId: Int = NOTIFICATION_ID) {

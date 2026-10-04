@@ -10,6 +10,7 @@ import app.mymusclemap.BuildConfig
 import app.mymusclemap.FakeWeightMeasurementDao
 import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.WeightRepository
@@ -181,5 +182,34 @@ class SettingsViewModelTest {
         assertEquals("9.9.9-debug", injected.uiState.value.appVersionName)
         assertEquals("https://example.com/privacy", injected.uiState.value.privacyPolicyUrl)
         assertNull(viewModel.uiState.value.privacyPolicyUrl)
+    }
+
+    @Test
+    fun lockScreenCompletionDefaultsOffAndSurvivesANewStore() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val first = LockScreenSetCompletionPreferences(context)
+        first.setEnabled(false)
+        val settings = SettingsViewModel(
+            repository = WeightRepository(FakeWeightMeasurementDao(), clock),
+            themePreferences = themePreferences,
+            dateProvider = dateProvider,
+            appBackupRepository = AppBackupRepository(database, themePreferences),
+            lockScreenSetCompletion = first
+        )
+        try {
+            assertFalse(settings.uiState.value.lockScreenSetCompletionEnabled)
+            settings.markLockScreenPermissionRequested()
+            settings.uiState.first { it.lockScreenPermissionRequested }
+            assertFalse(settings.uiState.value.lockScreenSetCompletionEnabled)
+            settings.setLockScreenSetCompletion(true)
+            settings.uiState.first { it.lockScreenSetCompletionEnabled }
+            val recreated = LockScreenSetCompletionPreferences(context)
+            assertTrue(recreated.enabled.first())
+            settings.setLockScreenSetCompletion(false)
+            settings.uiState.first { !it.lockScreenSetCompletionEnabled }
+            assertFalse(recreated.enabled.first())
+        } finally {
+            first.setEnabled(false)
+        }
     }
 }

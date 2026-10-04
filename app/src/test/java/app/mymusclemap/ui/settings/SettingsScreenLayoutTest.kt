@@ -44,6 +44,7 @@ import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -57,6 +58,33 @@ import java.time.LocalDate
 class SettingsScreenLayoutTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun lockScreenCompletionIsOffByDefaultAndDoesNotExplainUntilRequested() {
+        var enabled: Boolean? = null
+        render(onLockScreenSetCompletionChange = { enabled = it })
+        composeRule.onNodeWithTag(SETTINGS_LOCK_SCREEN_SETS).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.settings_lock_screen_sets_body)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.settings_lock_screen_sets_permission_reason)).assertCountEquals(0)
+        composeRule.onNodeWithTag(SETTINGS_LOCK_SCREEN_SETS).performClick()
+        assertEquals(true, enabled)
+    }
+
+    @Test
+    fun lockScreenEnableExplanationCanBeDismissedWithoutConfirming() {
+        var confirmed = false
+        var dismissed = false
+        render(
+            lockScreenEnablePrompt = LockScreenEnablePrompt.RequestPermission,
+            onConfirmLockScreenEnable = { confirmed = true },
+            onDismissLockScreenEnable = { dismissed = true }
+        )
+        composeRule.onNodeWithText(testString(R.string.settings_lock_screen_sets_explain), substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.settings_lock_screen_sets_permission_reason), substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_LOCK_SCREEN_NOT_NOW).performClick()
+        assertTrue(dismissed)
+        assertFalse(confirmed)
+    }
 
     @Test
     fun weeklyGoalRowShowsNotSetWhenNothingIsConfigured() {
@@ -545,7 +573,11 @@ class SettingsScreenLayoutTest {
         onOpenHelp: () -> Unit = {},
         onOpenFounderProgram: () -> Unit = {},
         showFounderProgram: Boolean = true,
-        onBack: () -> Unit = {}
+        onBack: () -> Unit = {},
+        onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
+        lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
+        onConfirmLockScreenEnable: () -> Unit = {},
+        onDismissLockScreenEnable: () -> Unit = {}
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -587,7 +619,11 @@ class SettingsScreenLayoutTest {
                             onOpenFounderProgram = onOpenFounderProgram,
                             showFounderProgram = showFounderProgram,
                             onMessageConsumed = {},
-                            onBack = onBack
+                            onBack = onBack,
+                            onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
+                            lockScreenEnablePrompt = lockScreenEnablePrompt,
+                            onConfirmLockScreenEnable = onConfirmLockScreenEnable,
+                            onDismissLockScreenEnable = onDismissLockScreenEnable
                         )
                     }
                 }

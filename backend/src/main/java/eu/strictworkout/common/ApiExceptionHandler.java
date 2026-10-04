@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import eu.strictworkout.identity.UnverifiedIdentityException;
+
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -32,6 +34,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(apiError(status), headers, status);
     }
 
+    @ExceptionHandler(UnverifiedIdentityException.class)
+    public ResponseEntity<ApiError> unverifiedIdentity(UnverifiedIdentityException exception) {
+        log.info("External identity verification failed");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ApiError("INVALID_GOOGLE_TOKEN", "The Google sign-in could not be verified."));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> unexpected(Exception exception) {
         log.error("Unhandled request failure", exception);
@@ -44,6 +53,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 case NOT_FOUND -> new ApiError("NOT_FOUND", "The requested resource was not found.");
                 case METHOD_NOT_ALLOWED -> new ApiError("METHOD_NOT_ALLOWED", "The requested method is not allowed.");
                 case BAD_REQUEST -> new ApiError("BAD_REQUEST", "The request could not be understood.");
+                case UNAUTHORIZED -> new ApiError("UNAUTHENTICATED", "Authentication is required.");
                 default -> status.is5xxServerError()
                         ? internalError()
                         : new ApiError("REQUEST_FAILED", "The request could not be completed.");

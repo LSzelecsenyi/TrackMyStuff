@@ -1147,4 +1147,13 @@
     <string name="notification_all_sets_logged">All sets logged</string>
     <string name="notification_finish_in_app">Finish workout in Strict</string>
     <string name="notification_workout_in_progress">Workout in progress</string>
+    <string name="settings_lock_screen_sets_title">Complete sets from lock screen</string>
+    <string name="settings_lock_screen_sets_body">Mark sets complete without unlocking your phone.</string>
+    <string name="settings_lock_screen_sets_explain">Strict can show your current set on the lock screen so you can mark it complete without unlocking your phone.</string>
+    <string name="settings_lock_screen_sets_permission_reason">Android requires notification permission for this feature.</string>
+    <string name="settings_lock_screen_sets_open_settings_body">Notification permission is turned off. Allow it in Android settings to use this on the lock screen.</string>
+    <string name="settings_lock_screen_sets_permission">Notification permission is required.</string>
+    <string name="settings_lock_screen_sets_channel">Turn workout notifications back on in Android settings to use this on the lock screen.</string>
+    <string name="settings_lock_screen_enable">Enable</string>
+    <string name="settings_lock_screen_not_now">Not now</string>
 </resources>

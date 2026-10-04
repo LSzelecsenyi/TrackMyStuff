@@ -7,6 +7,7 @@ import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderProgramStore
+import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
@@ -85,9 +86,11 @@ class AppContainer(context: Context) {
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
         onNativeWorkoutCompleted = { nativeWorkoutCompleted.get().invoke() }
     )
+    val lockScreenSetCompletion = LockScreenSetCompletionPreferences(appContext)
     val activeWorkoutNotifications = ActiveWorkoutNotificationCoordinator(
         context = appContext,
         repository = workoutSessionRepository,
+        preferences = lockScreenSetCompletion,
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     )
     val weeklyGoalRepository = WeeklyGoalRepository(
@@ -182,6 +185,7 @@ class AppContainer(context: Context) {
         founderProgram = founderProgram,
         founderRules = founderProgramRules,
         founderMilestoneAcknowledgements = founderMilestoneAcknowledgements,
-        founderAvailability = founderProgramAvailability
+        founderAvailability = founderProgramAvailability,
+        lockScreenSetCompletion = lockScreenSetCompletion
     )
 }

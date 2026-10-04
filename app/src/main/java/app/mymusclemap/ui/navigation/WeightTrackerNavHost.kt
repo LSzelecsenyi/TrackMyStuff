@@ -1,6 +1,9 @@
 package app.mymusclemap.ui.navigation
 
+import android.Manifest
+import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -19,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -62,6 +66,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import app.mymusclemap.domain.reports.ReportPeriod
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
+import app.mymusclemap.domain.workout.LockScreenEnableDecision
+import app.mymusclemap.domain.workout.LockScreenEnablePolicy
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
 import app.mymusclemap.ui.dashboard.DashboardScreen
 import app.mymusclemap.ui.dashboard.DashboardViewModel
@@ -113,8 +119,10 @@ import app.mymusclemap.ui.templates.TemplateEditorScreen
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
 import app.mymusclemap.ui.templates.TemplateListScreen
 import app.mymusclemap.ui.templates.TemplateListViewModel
-import app.mymusclemap.ui.workout.ActiveWorkoutNotificationCoordinator
-import app.mymusclemap.ui.workout.ActiveWorkoutNotificationPermissionRequest
+import app.mymusclemap.ui.settings.LockScreenAccessNote
+import app.mymusclemap.ui.settings.LockScreenEnablePrompt
+import app.mymusclemap.ui.workout.ActiveWorkoutNotifications
+import app.mymusclemap.ui.workout.LockScreenDeliveryBlock
 import app.mymusclemap.ui.workout.ActiveWorkoutScreen
 import app.mymusclemap.ui.workout.ActiveWorkoutViewModel
 import app.mymusclemap.ui.workout.WorkoutCompletionScreen
@@ -258,7 +266,6 @@ fun WeightTrackerNavHost(
     openOverviewRequest: Int = 0,
     openActiveWorkoutSessionId: Long? = null,
     openActiveWorkoutGeneration: Int = 0,
-    activeWorkoutNotifications: ActiveWorkoutNotificationCoordinator? = null,
     founderAvailability: app.mymusclemap.domain.entitlement.FounderProgramAvailability =
         app.mymusclemap.domain.entitlement.FounderProgramAvailability.Open,
     founderProgram: FounderProgramViewModel? = null,
@@ -1147,13 +1154,6 @@ fun WeightTrackerNavHost(
                     lifecycleOwner.lifecycle.addObserver(observer)
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
-                if (activeWorkoutNotifications != null) {
-                    ActiveWorkoutNotificationPermissionRequest(
-                        hasAsked = activeWorkoutNotifications::hasAskedForPermission,
-                        markAsked = activeWorkoutNotifications::markPermissionAsked,
-                        onFinished = activeWorkoutNotifications::refresh
-                    )
-                }
                 ActiveWorkoutScreen(
                     state = state,
                     onBack = { navController.popBackStack() },
@@ -1418,6 +1418,45 @@ private fun SettingsRoute(
             context.contentResolver.openInputStream(uri) ?: error("missing stream")
         }
     }
+    var lockScreenPrompt by remember { mutableStateOf<LockScreenEnablePrompt?>(null) }
+    var requestedPermissionLocally by remember { mutableStateOf(false) }
+    var awaitingSettingsGrant by remember { mutableStateOf(false) }
+    var settingsResume by remember { mutableIntStateOf(0) }
+    val settingsLifecycle = LocalLifecycleOwner.current
+    DisposableEffect(settingsLifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                settingsResume += 1
+            }
+        }
+        settingsLifecycle.lifecycle.addObserver(observer)
+        onDispose { settingsLifecycle.lifecycle.removeObserver(observer) }
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.setLockScreenSetCompletion(true)
+        }
+    }
+    LaunchedEffect(settingsResume) {
+        if (!awaitingSettingsGrant || settingsResume == 0) return@LaunchedEffect
+        awaitingSettingsGrant = false
+        if (ActiveWorkoutNotifications.runtimePermissionGranted(context)) {
+            viewModel.setLockScreenSetCompletion(true)
+        }
+    }
+    val lockScreenAccessNote = remember(settingsResume, state.lockScreenSetCompletionEnabled) {
+        if (!state.lockScreenSetCompletionEnabled) {
+            null
+        } else {
+            when (ActiveWorkoutNotifications.deliveryBlock(context)) {
+                LockScreenDeliveryBlock.Permission -> LockScreenAccessNote.Permission
+                LockScreenDeliveryBlock.Channel -> LockScreenAccessNote.Channel
+                LockScreenDeliveryBlock.None -> null
+            }
+        }
+    }
     SettingsScreen(
         state = state,
         onThemeSelected = viewModel::setThemeMode,
@@ -1491,6 +1530,60 @@ private fun SettingsRoute(
         onSetWeeklyGoal = viewModel::setWeeklyGoal,
         onDisableWeeklyGoal = viewModel::disableWeeklyGoal,
         onBack = onBack,
+        lockScreenSetCompletion = state.lockScreenSetCompletionEnabled,
+        lockScreenAccessNote = lockScreenAccessNote,
+        onLockScreenSetCompletionChange = { enabled ->
+            if (!enabled) {
+                lockScreenPrompt = null
+                viewModel.setLockScreenSetCompletion(false)
+            } else {
+                val activity = context as? Activity
+                val decision = LockScreenEnablePolicy.decide(
+                    requiresRuntimePermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+                    permissionGranted = ActiveWorkoutNotifications.runtimePermissionGranted(context),
+                    runtimeDialogAvailable = LockScreenEnablePolicy.runtimeDialogAvailable(
+                        hasRequestedBefore = state.lockScreenPermissionRequested || requestedPermissionLocally,
+                        shouldShowRationale = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            activity?.shouldShowRequestPermissionRationale(
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == true
+                    )
+                )
+                when (decision) {
+                    LockScreenEnableDecision.EnableNow -> viewModel.setLockScreenSetCompletion(true)
+                    LockScreenEnableDecision.ExplainThenRequestPermission -> {
+                        lockScreenPrompt = LockScreenEnablePrompt.RequestPermission
+                    }
+                    LockScreenEnableDecision.ExplainThenOpenSettings -> {
+                        lockScreenPrompt = LockScreenEnablePrompt.OpenSettings
+                    }
+                }
+            }
+        },
+        onOpenLockScreenAccessSettings = {
+            openLockScreenSettings(
+                context,
+                lockScreenAccessNote ?: LockScreenAccessNote.Permission
+            )
+        },
+        lockScreenEnablePrompt = lockScreenPrompt,
+        onConfirmLockScreenEnable = {
+            val prompt = lockScreenPrompt
+            lockScreenPrompt = null
+            when (prompt) {
+                LockScreenEnablePrompt.RequestPermission -> {
+                    requestedPermissionLocally = true
+                    viewModel.markLockScreenPermissionRequested()
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                LockScreenEnablePrompt.OpenSettings -> {
+                    awaitingSettingsGrant = true
+                    openLockScreenSettings(context, LockScreenAccessNote.Permission)
+                }
+                null -> Unit
+            }
+        },
+        onDismissLockScreenEnable = { lockScreenPrompt = null },
         health = health,
         onOpenHealthDetails = onOpenHealthDetails,
         onHealthAction = {
@@ -1508,6 +1601,17 @@ private fun SettingsRoute(
             }
         }
     )
+}
+
+private fun openLockScreenSettings(context: Context, note: LockScreenAccessNote) {
+    val intent = when (note) {
+        LockScreenAccessNote.Channel -> ActiveWorkoutNotifications.channelSettingsIntent(context)
+        LockScreenAccessNote.Permission -> ActiveWorkoutNotifications.appNotificationSettingsIntent(context)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+    }
 }
 
 internal fun NavHostController.navigateRoot(route: String) {

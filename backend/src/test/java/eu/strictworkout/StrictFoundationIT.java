@@ -80,7 +80,12 @@ class StrictFoundationIT {
                 """,
                 String.class
         );
-        assertEquals(List.of("flyway_schema_history"), tables);
+        assertEquals(List.of("app_user", "auth_session", "external_identity", "flyway_schema_history"), tables);
+        Integer baseline = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = true AND version = '2'",
+                Integer.class
+        );
+        assertEquals(1, baseline);
     }
 
     @Test
@@ -106,7 +111,7 @@ class StrictFoundationIT {
     }
 
     @Test
-    void unknownPathReturnsJsonWithoutInternalDetails() {
+    void unknownApiPathWithoutAuthenticationIsRejected() {
         ResponseEntity<String> response = client().get()
                 .uri("/api/v1/missing")
                 .exchange((request, httpResponse) -> {
@@ -116,11 +121,11 @@ class StrictFoundationIT {
                             .body(body);
                 });
 
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         Map<String, Object> json = new BasicJsonParser().parseMap(response.getBody());
         assertEquals(Set.of("errorCode", "message"), json.keySet());
-        assertEquals("NOT_FOUND", json.get("errorCode"));
-        assertEquals("The requested resource was not found.", json.get("message"));
+        assertEquals("UNAUTHENTICATED", json.get("errorCode"));
+        assertEquals("Authentication is required.", json.get("message"));
         String body = response.getBody().toLowerCase();
         assertFalse(body.contains("exception"));
         assertFalse(body.contains("stack"));

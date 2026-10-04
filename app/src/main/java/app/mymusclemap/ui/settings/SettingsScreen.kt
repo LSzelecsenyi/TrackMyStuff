@@ -49,6 +49,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -134,6 +135,19 @@ internal const val SETTINGS_PRIVACY_POLICY = "settings-privacy-policy"
 internal const val SETTINGS_OPEN_SOURCE_LICENSES = "settings-open-source-licenses"
 internal const val SETTINGS_APP_VERSION = "settings-app-version"
 internal const val SETTINGS_WEEKLY_GOAL = "settings-weekly-goal"
+internal const val SETTINGS_LOCK_SCREEN_SETS = "settings-lock-screen-sets"
+internal const val SETTINGS_LOCK_SCREEN_ENABLE = "settings-lock-screen-enable"
+internal const val SETTINGS_LOCK_SCREEN_NOT_NOW = "settings-lock-screen-not-now"
+
+enum class LockScreenEnablePrompt {
+    RequestPermission,
+    OpenSettings
+}
+
+enum class LockScreenAccessNote {
+    Permission,
+    Channel
+}
 
 internal fun settingsColorRowTag(field: SeedField): String = "settings-color-${field.name.lowercase(Locale.US)}"
 
@@ -179,7 +193,14 @@ fun SettingsScreen(
     onHealthAction: () -> Unit = {},
     onOpenHealthDetails: () -> Unit = {},
     onSetWeeklyGoal: (Int) -> Unit = {},
-    onDisableWeeklyGoal: () -> Unit = {}
+    onDisableWeeklyGoal: () -> Unit = {},
+    lockScreenSetCompletion: Boolean = false,
+    lockScreenAccessNote: LockScreenAccessNote? = null,
+    onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
+    onOpenLockScreenAccessSettings: () -> Unit = {},
+    lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
+    onConfirmLockScreenEnable: () -> Unit = {},
+    onDismissLockScreenEnable: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
@@ -253,7 +274,11 @@ fun SettingsScreen(
                 CompactEditorDivider()
                 TrainingSection(
                     state = state,
-                    onOpenGoal = { weeklyGoalEditorOpen = true }
+                    onOpenGoal = { weeklyGoalEditorOpen = true },
+                    lockScreenSetCompletion = lockScreenSetCompletion,
+                    lockScreenAccessNote = lockScreenAccessNote,
+                    onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
+                    onOpenLockScreenAccessSettings = onOpenLockScreenAccessSettings
                 )
                 CompactEditorDivider()
                 DataSection(
@@ -299,6 +324,49 @@ fun SettingsScreen(
             onSave = onSetWeeklyGoal,
             onDisable = onDisableWeeklyGoal,
             onDismiss = { weeklyGoalEditorOpen = false }
+        )
+    }
+    val enablePrompt = lockScreenEnablePrompt
+    if (enablePrompt != null) {
+        AlertDialog(
+            onDismissRequest = onDismissLockScreenEnable,
+            title = { Text(stringResource(R.string.settings_lock_screen_sets_title)) },
+            text = {
+                Text(
+                    stringResource(R.string.settings_lock_screen_sets_explain) + "\n\n" +
+                        stringResource(
+                            if (enablePrompt == LockScreenEnablePrompt.OpenSettings) {
+                                R.string.settings_lock_screen_sets_open_settings_body
+                            } else {
+                                R.string.settings_lock_screen_sets_permission_reason
+                            }
+                        )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = onConfirmLockScreenEnable,
+                    modifier = Modifier.testTag(SETTINGS_LOCK_SCREEN_ENABLE)
+                ) {
+                    Text(
+                        stringResource(
+                            if (enablePrompt == LockScreenEnablePrompt.OpenSettings) {
+                                R.string.action_open_settings
+                            } else {
+                                R.string.settings_lock_screen_enable
+                            }
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = onDismissLockScreenEnable,
+                    modifier = Modifier.testTag(SETTINGS_LOCK_SCREEN_NOT_NOW)
+                ) {
+                    Text(stringResource(R.string.settings_lock_screen_not_now))
+                }
+            }
         )
     }
     if (state.showImportExplanation) {
@@ -850,7 +918,11 @@ private fun ChoiceRow(
 @Composable
 private fun TrainingSection(
     state: SettingsUiState,
-    onOpenGoal: () -> Unit
+    onOpenGoal: () -> Unit,
+    lockScreenSetCompletion: Boolean,
+    lockScreenAccessNote: LockScreenAccessNote?,
+    onLockScreenSetCompletionChange: (Boolean) -> Unit,
+    onOpenLockScreenAccessSettings: () -> Unit
 ) {
     val subtitle = when (val pending = state.weeklyGoal.pending) {
         is PendingWeeklyGoal.Update -> stringResource(
@@ -870,6 +942,62 @@ private fun TrainingSection(
             testTag = SETTINGS_WEEKLY_GOAL,
             onClick = onOpenGoal
         )
+        LockScreenSetCompletionRow(
+            enabled = lockScreenSetCompletion,
+            note = lockScreenAccessNote,
+            onCheckedChange = onLockScreenSetCompletionChange,
+            onOpenSettings = onOpenLockScreenAccessSettings
+        )
+    }
+}
+
+@Composable
+private fun LockScreenSetCompletionRow(
+    enabled: Boolean,
+    note: LockScreenAccessNote?,
+    onCheckedChange: (Boolean) -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_lock_screen_sets_title),
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = stringResource(R.string.settings_lock_screen_sets_body),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.testTag(SETTINGS_LOCK_SCREEN_SETS)
+        )
+    }
+    if (note != null) {
+        Text(
+            text = stringResource(
+                if (note == LockScreenAccessNote.Channel) {
+                    R.string.settings_lock_screen_sets_channel
+                } else {
+                    R.string.settings_lock_screen_sets_permission
+                }
+            ),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = AppDimens.statSecondaryGap)
+        )
+        TextButton(onClick = onOpenSettings) {
+            Text(stringResource(R.string.action_open_settings))
+        }
     }
 }
 

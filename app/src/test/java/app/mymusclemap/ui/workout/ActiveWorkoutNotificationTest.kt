@@ -11,6 +11,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.MainActivity
 import app.mymusclemap.R
+import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.WeightRepository
@@ -39,6 +40,8 @@ import app.mymusclemap.domain.workout.TemplateExerciseDraft
 import app.mymusclemap.domain.workout.TemplateSaveResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -72,6 +75,7 @@ class ActiveWorkoutNotificationTest {
     private lateinit var exercises: ExerciseRepository
     private lateinit var templates: WorkoutTemplateRepository
     private lateinit var scope: CoroutineScope
+    private lateinit var preferences: MemoryLockScreenStore
     private lateinit var coordinator: ActiveWorkoutNotificationCoordinator
 
     @Before
@@ -103,9 +107,11 @@ class ActiveWorkoutNotificationTest {
             FixedDateProvider(LocalDate.parse("2026-09-16"))
         )
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        preferences = MemoryLockScreenStore()
         coordinator = ActiveWorkoutNotificationCoordinator(
             context = context,
             repository = sessions,
+            preferences = preferences,
             scope = scope,
             notificationId = TEST_NOTIFICATION_ID
         )
@@ -186,6 +192,7 @@ class ActiveWorkoutNotificationTest {
     @Test
     fun coordinatorProjectsRoomAndAStaleActionDoesNotCompleteTheNextSet() {
         runBlocking {
+            preferences.setEnabled(true)
             coordinator.start()
             val sessionId = startWorkout()
             val first = awaitNotification()
@@ -209,6 +216,7 @@ class ActiveWorkoutNotificationTest {
     @Test
     fun deniedNotificationPermissionLeavesTheWorkoutUntouched() {
         runBlocking {
+            preferences.setEnabled(true)
             shadowOf(notifications).setNotificationsEnabled(false)
             coordinator.start()
             val sessionId = startWorkout()
@@ -222,13 +230,40 @@ class ActiveWorkoutNotificationTest {
     }
 
     @Test
-    fun promptsAreAskedOnlyOnce() {
-        val prompts = ActiveWorkoutNotificationPrompts(context)
-        assertFalse(prompts.hasAsked())
-        prompts.markAsked()
-        assertTrue(prompts.hasAsked())
-        prompts.markAsked()
-        assertTrue(prompts.hasAsked())
+    fun featureOffSuppressesTheNotificationUntilTheUserEnablesIt() {
+        runBlocking {
+            coordinator.start()
+            val sessionId = startWorkout()
+            withContext(Dispatchers.Default) { delay(150) }
+            assertNull(shadowOf(notifications).getNotification(TEST_NOTIFICATION_ID))
+            assertEquals(SessionStatus.IN_PROGRESS, sessions.getAggregate(sessionId)!!.session.status)
+            preferences.setEnabled(true)
+            val posted = awaitNotification()
+            assertEquals(1, posted.actions.size)
+            preferences.setEnabled(false)
+            awaitCleared()
+            assertEquals(SessionStatus.IN_PROGRESS, sessions.getAggregate(sessionId)!!.session.status)
+        }
+    }
+
+    @Test
+    fun disabledWorkoutChannelDoesNotPostWhenTheFeatureIsOn() {
+        runBlocking {
+            preferences.setEnabled(true)
+            val blocked = android.app.NotificationChannel(
+                ActiveWorkoutNotifications.CHANNEL_ID,
+                "Active workout",
+                NotificationManager.IMPORTANCE_NONE
+            )
+            notifications.deleteNotificationChannel(ActiveWorkoutNotifications.CHANNEL_ID)
+            notifications.createNotificationChannel(blocked)
+            coordinator.start()
+            val sessionId = startWorkout()
+            withContext(Dispatchers.Default) { delay(150) }
+            assertNull(shadowOf(notifications).getNotification(TEST_NOTIFICATION_ID))
+            assertEquals(SessionStatus.IN_PROGRESS, sessions.getAggregate(sessionId)!!.session.status)
+            assertEquals(NotificationManager.IMPORTANCE_NONE, notifications.getNotificationChannel(ActiveWorkoutNotifications.CHANNEL_ID).importance)
+        }
     }
 
     private suspend fun startWorkout(): Long {
@@ -327,5 +362,18 @@ class ActiveWorkoutNotificationTest {
 
     private companion object {
         const val TEST_NOTIFICATION_ID = 41002
+    }
+}
+
+private class MemoryLockScreenStore : LockScreenSetCompletionStore {
+    private val enabledState = MutableStateFlow(false)
+    private val requestedState = MutableStateFlow(false)
+    override val enabled = enabledState.asStateFlow()
+    override val runtimePermissionRequested = requestedState.asStateFlow()
+    override suspend fun setEnabled(enabled: Boolean) {
+        enabledState.value = enabled
+    }
+    override suspend fun markRuntimePermissionRequested() {
+        requestedState.value = true
     }
 }

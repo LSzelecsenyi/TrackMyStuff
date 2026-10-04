@@ -2,11 +2,13 @@ package app.mymusclemap.ui.workout
 
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.SharedPreferences
+import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.domain.workout.ActiveWorkoutNotificationLogic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -15,8 +17,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ActiveWorkoutNotificationCoordinator(
     private val context: Context,
     private val repository: WorkoutSessionRepository,
+    private val preferences: LockScreenSetCompletionStore,
     private val scope: CoroutineScope,
-    private val prompts: ActiveWorkoutNotificationPrompts = ActiveWorkoutNotificationPrompts(context),
     private val notificationId: Int = ActiveWorkoutNotifications.NOTIFICATION_ID
 ) {
     private val started = AtomicBoolean(false)
@@ -25,7 +27,9 @@ class ActiveWorkoutNotificationCoordinator(
     fun start() {
         if (!started.compareAndSet(false, true)) return
         scope.launch {
-            repository.observeActiveAggregate().collect {
+            combine(repository.observeActiveAggregate(), preferences.enabled) { _, _ ->
+                Unit
+            }.collect {
                 publishFromRoom()
             }
         }
@@ -33,12 +37,6 @@ class ActiveWorkoutNotificationCoordinator(
 
     fun refresh() {
         scope.launch { publishFromRoom() }
-    }
-
-    fun hasAskedForPermission(): Boolean = prompts.hasAsked()
-
-    fun markPermissionAsked() {
-        prompts.markAsked()
     }
 
     fun completeFromAction(
@@ -70,6 +68,10 @@ class ActiveWorkoutNotificationCoordinator(
 
     private suspend fun publishFromRoom() {
         renderLock.withLock {
+            if (!preferences.enabled.first()) {
+                ActiveWorkoutNotifications.cancel(context, notificationId)
+                return@withLock
+            }
             val aggregate = repository.activeAggregate()
             ActiveWorkoutNotifications.publish(
                 context,
@@ -77,23 +79,5 @@ class ActiveWorkoutNotificationCoordinator(
                 notificationId
             )
         }
-    }
-}
-
-class ActiveWorkoutNotificationPrompts(context: Context) {
-    private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(
-        PREFS,
-        Context.MODE_PRIVATE
-    )
-
-    fun hasAsked(): Boolean = preferences.getBoolean(KEY_ASKED, false)
-
-    fun markAsked() {
-        preferences.edit().putBoolean(KEY_ASKED, true).apply()
-    }
-
-    private companion object {
-        const val PREFS = "active_workout_notification"
-        const val KEY_ASKED = "permission_requested"
     }
 }

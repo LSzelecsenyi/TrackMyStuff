@@ -7,6 +7,7 @@ import app.mymusclemap.data.appbackup.AppBackupError
 import app.mymusclemap.data.appbackup.AppBackupRestoreResult
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupWriteResult
+import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
@@ -51,7 +52,9 @@ data class SettingsUiState(
     val userMessage: UserMessage? = null,
     val appVersionName: String = "",
     val privacyPolicyUrl: String? = null,
-    val weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(LocalDate.of(1970, 1, 1))
+    val weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(LocalDate.of(1970, 1, 1)),
+    val lockScreenSetCompletionEnabled: Boolean = false,
+    val lockScreenPermissionRequested: Boolean = false
 ) {
     val customEditorVisible: Boolean get() = draft != null
 }
@@ -74,7 +77,8 @@ class SettingsViewModel(
     private val appBackupRepository: AppBackupRepository,
     private val weeklyGoalRepository: WeeklyGoalRepository? = null,
     private val appVersionName: String = BuildConfig.VERSION_NAME,
-    private val privacyPolicyUrl: String? = AboutConfig.privacyPolicyUrl
+    private val privacyPolicyUrl: String? = AboutConfig.privacyPolicyUrl,
+    private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off
 ) : ViewModel() {
     private val appearance = MutableStateFlow(AppearanceSettings.Default)
     private val draft = MutableStateFlow<PaletteDraft?>(null)
@@ -84,6 +88,8 @@ class SettingsViewModel(
     private val showRestoreExplanation = MutableStateFlow(false)
     private val restoreErrors = MutableStateFlow<List<AppBackupError>>(emptyList())
     private val userMessage = MutableStateFlow<UserMessage?>(null)
+    private val lockScreenEnabled = MutableStateFlow(false)
+    private val lockScreenPermissionRequested = MutableStateFlow(false)
 
     private val chrome = combine(appearance, draft, saveError) { current, draftState, error ->
         SettingsChrome(current, draftState, error)
@@ -105,9 +111,12 @@ class SettingsViewModel(
         chrome,
         showImportExplanation,
         importErrors,
-        userMessage,
+        combine(userMessage, lockScreenEnabled, lockScreenPermissionRequested) { message, enabled, requested ->
+            Triple(message, enabled, requested)
+        },
         combine(backupChrome, weeklyGoalStatus) { backup, goal -> backup to goal }
-    ) { chromeState, explanation, errors, message, backupAndGoal ->
+    ) { chromeState, explanation, errors, lockAndMessage, backupAndGoal ->
+        val (message, enabled, requested) = lockAndMessage
         val (backup, goal) = backupAndGoal
         SettingsUiState(
             appearance = chromeState.appearance,
@@ -120,7 +129,9 @@ class SettingsViewModel(
             userMessage = message,
             appVersionName = appVersionName,
             privacyPolicyUrl = privacyPolicyUrl,
-            weeklyGoal = goal
+            weeklyGoal = goal,
+            lockScreenSetCompletionEnabled = enabled,
+            lockScreenPermissionRequested = requested
         )
     }.stateIn(
         scope = viewModelScope,
@@ -130,6 +141,18 @@ class SettingsViewModel(
             privacyPolicyUrl = privacyPolicyUrl
         )
     )
+
+    fun setLockScreenSetCompletion(enabled: Boolean) {
+        viewModelScope.launch {
+            lockScreenSetCompletion.setEnabled(enabled)
+        }
+    }
+
+    fun markLockScreenPermissionRequested() {
+        viewModelScope.launch {
+            lockScreenSetCompletion.markRuntimePermissionRequested()
+        }
+    }
 
     fun setWeeklyGoal(workoutsPerWeek: Int) {
         val repository = weeklyGoalRepository ?: return
@@ -146,6 +169,14 @@ class SettingsViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            lockScreenSetCompletion.enabled.collect { lockScreenEnabled.value = it }
+        }
+        viewModelScope.launch {
+            lockScreenSetCompletion.runtimePermissionRequested.collect {
+                lockScreenPermissionRequested.value = it
+            }
+        }
         viewModelScope.launch {
             themePreferences.appearance.collect { settings ->
                 appearance.value = settings

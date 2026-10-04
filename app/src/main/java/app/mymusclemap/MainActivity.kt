@@ -109,7 +109,6 @@ class MainActivity : ComponentActivity() {
                                 openOverviewRequest = openOverviewRequest,
                                 openActiveWorkoutSessionId = openActiveSessionId,
                                 openActiveWorkoutGeneration = openActiveGeneration,
-                                activeWorkoutNotifications = container.activeWorkoutNotifications,
                                 founderAvailability = container.founderProgramAvailability,
                                 founderProgram = founderViewModel,
                                 currentEntitlement = container.entitlementComposer::resolve,

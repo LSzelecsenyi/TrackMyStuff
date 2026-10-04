@@ -35,6 +35,9 @@ class FoundationConfigurationTest {
         assertFalse(prod.contains("${SPRING_DATASOURCE_URL:"));
         assertFalse(prod.contains("${SPRING_DATASOURCE_USERNAME:"));
         assertFalse(prod.contains("${SPRING_DATASOURCE_PASSWORD:"));
+        assertTrue(prod.contains("${STRICT_GOOGLE_CLIENT_ID}"));
+        assertFalse(prod.contains("${STRICT_GOOGLE_CLIENT_ID:"));
+        assertTrue(local.contains("session-lifetime: ${STRICT_AUTH_SESSION_LIFETIME:30d}"));
     }
 
     private static String resource(String name) throws IOException {

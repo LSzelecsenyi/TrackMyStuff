@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
+import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
@@ -68,7 +69,8 @@ class WeightViewModelFactory(
     private val founderProgram: FounderProgramCoordinator? = null,
     private val founderRules: FounderProgramRules? = null,
     private val founderMilestoneAcknowledgements: FounderMilestoneAcknowledgementStore? = null,
-    private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open
+    private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open,
+    private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -118,7 +120,8 @@ class WeightViewModelFactory(
                     themePreferences,
                     dateProvider,
                     appBackupRepository,
-                    weeklyGoalRepository
+                    weeklyGoalRepository,
+                    lockScreenSetCompletion = lockScreenSetCompletion
                 )
             }
             modelClass.isAssignableFrom(OnboardingViewModel::class.java) -> {
