@@ -30,7 +30,8 @@ fun WorkoutSessionEntity.toModel(): WorkoutSession {
         createdAt = createdAt,
         updatedAt = updatedAt,
         importFingerprint = importFingerprint,
-        scheduledWorkoutId = scheduledWorkoutId
+        scheduledWorkoutId = scheduledWorkoutId,
+        clientWorkoutId = clientWorkoutId
     )
 }
 

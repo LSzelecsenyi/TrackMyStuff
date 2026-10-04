@@ -81,6 +81,10 @@ public class FounderReviewSnapshot {
         this.createdAt = submittedAt;
     }
 
+    public Instant getSubmittedAt() {
+        return submittedAt;
+    }
+
     public String getAppVersion() {
         return appVersion;
     }
@@ -95,6 +99,14 @@ public class FounderReviewSnapshot {
 
     public int getDistinctWorkoutDayCount() {
         return distinctWorkoutDayCount;
+    }
+
+    public Instant getEnrolledAt() {
+        return enrolledAt;
+    }
+
+    public Instant getDeadlineAt() {
+        return deadlineAt;
     }
 
     public String getFeedbackText() {

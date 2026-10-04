@@ -3,6 +3,7 @@ package eu.strictworkout.identity;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import eu.strictworkout.admin.AdminProperties;
 import eu.strictworkout.auth.AuthProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -14,7 +15,7 @@ import java.time.Clock;
 import java.util.List;
 
 @Configuration
-@EnableConfigurationProperties({AuthProperties.class, GoogleProperties.class})
+@EnableConfigurationProperties({AuthProperties.class, GoogleProperties.class, AdminProperties.class})
 class IdentityConfiguration {
 
     @Bean

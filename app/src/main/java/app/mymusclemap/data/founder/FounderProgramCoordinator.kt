@@ -70,7 +70,8 @@ class FounderProgramCoordinator(
         }
     }
 
-    suspend fun onNativeWorkoutCompleted() {
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun onNativeWorkoutCompleted(clientWorkoutId: String = "") {
         refresh()
     }
 

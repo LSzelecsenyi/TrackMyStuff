@@ -51,6 +51,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
+import java.util.UUID
 import kotlin.math.round
 import kotlin.math.sin
 
@@ -1037,6 +1038,7 @@ object DemoTrainingHistoryGenerator {
         val endedAt = startedAt + 45L * 60_000L
         sessions += source.copy(
             id = sessionId,
+            clientWorkoutId = demoClientWorkoutId(sessionId),
             status = status.name,
             workoutDate = date.toString(),
             startedAt = startedAt,
@@ -1265,7 +1267,8 @@ object DemoTrainingHistoryGenerator {
                 updatedAt = finishedAt,
                 activeLock = null,
                 importFingerprint = null,
-                scheduledWorkoutId = event.outcome?.let { scheduledIdByOutcome.getValue(it) }
+                scheduledWorkoutId = event.outcome?.let { scheduledIdByOutcome.getValue(it) },
+                clientWorkoutId = demoClientWorkoutId(sessionId)
             )
             names.forEachIndexed { exerciseIndex, name ->
                 val exercise = byName.getValue(name)
@@ -1757,6 +1760,12 @@ object DemoTrainingHistoryGenerator {
 
     private fun roundToIncrement(value: Double, increment: Double): Double {
         return round(value / increment).toInt() * increment
+    }
+
+    private fun demoClientWorkoutId(sessionId: Long): String {
+        return UUID.nameUUIDFromBytes(
+            "strict-demo-workout-session:$sessionId".toByteArray(Charsets.UTF_8)
+        ).toString()
     }
 
     private fun epoch(date: LocalDate, hour: Int): Long {

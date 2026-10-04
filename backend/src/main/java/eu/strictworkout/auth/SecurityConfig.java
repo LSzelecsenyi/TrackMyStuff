@@ -1,5 +1,7 @@
 package eu.strictworkout.auth;
 
+import eu.strictworkout.admin.AdminBearerAuthenticationFilter;
+import eu.strictworkout.admin.AdminSessionService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -13,7 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, AuthSessionService sessions) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, AuthSessionService sessions, AdminSessionService adminSessions) throws Exception {
         ApiAuthenticationEntryPoint entryPoint = new ApiAuthenticationEntryPoint();
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -29,10 +31,13 @@ class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/google").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/session").permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll()
                 )
-                .addFilterBefore(new OpaqueBearerAuthenticationFilter(sessions), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new OpaqueBearerAuthenticationFilter(sessions), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new AdminBearerAuthenticationFilter(adminSessions), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

@@ -55,7 +55,7 @@ class AppContainer(context: Context) {
         clock = clock
     )
     private val customExerciseCreate = AtomicReference<(Int) -> Boolean> { true }
-    private val nativeWorkoutCompleted = AtomicReference<suspend () -> Unit> { }
+    private val nativeWorkoutCompleted = AtomicReference<suspend (String) -> Unit> { _ -> }
     val exerciseRepository = ExerciseRepository(
         dao = database.exerciseDao(),
         clock = clock,
@@ -84,7 +84,7 @@ class AppContainer(context: Context) {
         clock = clock,
         dateProvider = dateProvider,
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
-        onNativeWorkoutCompleted = { nativeWorkoutCompleted.get().invoke() }
+        onNativeWorkoutCompleted = { clientWorkoutId -> nativeWorkoutCompleted.get().invoke(clientWorkoutId) }
     )
     val lockScreenSetCompletion = LockScreenSetCompletionPreferences(appContext)
     val activeWorkoutNotifications = ActiveWorkoutNotificationCoordinator(
@@ -140,7 +140,7 @@ class AppContainer(context: Context) {
         customExerciseCreate.set { count ->
             entitlementComposer.policy().customExercises(count).canCreate
         }
-        nativeWorkoutCompleted.set { founderProgram.onNativeWorkoutCompleted() }
+        nativeWorkoutCompleted.set { clientWorkoutId -> founderProgram.onNativeWorkoutCompleted(clientWorkoutId) }
     }
 
     suspend fun refreshFounderProgramFromStore() {

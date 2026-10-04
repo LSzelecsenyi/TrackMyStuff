@@ -35,7 +35,8 @@ data class NativeCompletedWorkoutRow(
         Index(value = ["templateId"]),
         Index(value = ["workoutDate"]),
         Index(value = ["importFingerprint"], unique = true),
-        Index(value = ["scheduledWorkoutId"], unique = true)
+        Index(value = ["scheduledWorkoutId"], unique = true),
+        Index(value = ["clientWorkoutId"], unique = true)
     ]
 )
 data class WorkoutSessionEntity(
@@ -55,7 +56,8 @@ data class WorkoutSessionEntity(
     val updatedAt: Long,
     val activeLock: Int?,
     val importFingerprint: String? = null,
-    val scheduledWorkoutId: Long? = null
+    val scheduledWorkoutId: Long? = null,
+    val clientWorkoutId: String = java.util.UUID.randomUUID().toString()
 )
 
 @Entity(

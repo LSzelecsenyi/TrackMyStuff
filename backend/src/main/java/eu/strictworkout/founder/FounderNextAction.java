@@ -6,5 +6,7 @@ public enum FounderNextAction {
     SUBMIT_FEEDBACK,
     SUBMIT_TESTER_REPORT,
     WAIT_FOR_REVIEW,
-    EXPIRED
+    EXPIRED,
+    APPROVED,
+    REJECTED
 }

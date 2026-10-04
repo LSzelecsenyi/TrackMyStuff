@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -39,7 +40,7 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
         try {
@@ -54,6 +55,99 @@ class WeightDatabaseMigrationTest {
             assertTrue(database.weeklyWorkoutGoalDao().getAll().isEmpty())
         } finally {
             database.close()
+        }
+    }
+
+    @Test
+    fun migrationFromVersion12AssignsOneStableClientWorkoutId() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "weight-migration-12.db"
+        context.deleteDatabase(name)
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(name)
+                .callback(Version1Callback())
+                .build()
+        )
+        helper.writableDatabase.apply {
+            listOf(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9,
+                MIGRATION_9_10,
+                MIGRATION_10_11,
+                MIGRATION_11_12
+            ).forEach { it.migrate(this) }
+            execSQL(
+                """
+                INSERT INTO workout_sessions (
+                    templateId, templateName, status, workoutDate, startedAt, finishedAt, abandonedAt,
+                    notes, bodyWeightKg, bodyWeightSource, bodyWeightSourceDate, createdAt, updatedAt,
+                    activeLock, importFingerprint, scheduledWorkoutId
+                ) VALUES (NULL, 'Push', 'COMPLETED', '2026-06-01', 10, 20, NULL, 'keep-me', NULL, 'UNKNOWN', NULL, 10, 20, NULL, NULL, NULL)
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                INSERT INTO workout_sessions (
+                    templateId, templateName, status, workoutDate, startedAt, finishedAt, abandonedAt,
+                    notes, bodyWeightKg, bodyWeightSource, bodyWeightSourceDate, createdAt, updatedAt,
+                    activeLock, importFingerprint, scheduledWorkoutId
+                ) VALUES (NULL, 'Pull', 'IN_PROGRESS', '2026-06-02', 30, NULL, NULL, NULL, NULL, 'UNKNOWN', NULL, 30, 30, 1, NULL, NULL)
+                """.trimIndent()
+            )
+            version = 12
+            close()
+        }
+
+        val database = Room.databaseBuilder(context, WeightDatabase::class.java, name)
+            .addMigrations(
+                MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+                MIGRATION_11_12, MIGRATION_12_13
+            )
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val completed = database.workoutSessionDao().getById(1)!!
+            val active = database.workoutSessionDao().getById(2)!!
+            assertEquals("COMPLETED", completed.status)
+            assertEquals("keep-me", completed.notes)
+            assertEquals("IN_PROGRESS", active.status)
+            assertEquals(1, active.activeLock)
+            assertNotEquals(completed.clientWorkoutId, active.clientWorkoutId)
+            assertEquals(completed.clientWorkoutId, java.util.UUID.fromString(completed.clientWorkoutId).toString())
+            assertEquals(active.clientWorkoutId, java.util.UUID.fromString(active.clientWorkoutId).toString())
+            val first = completed.clientWorkoutId
+            database.close()
+            val reopened = Room.databaseBuilder(context, WeightDatabase::class.java, name)
+                .addMigrations(MIGRATION_12_13)
+                .allowMainThreadQueries()
+                .build()
+            try {
+                assertEquals(first, reopened.workoutSessionDao().getById(1)!!.clientWorkoutId)
+                var duplicateRejected = false
+                try {
+                    reopened.openHelper.writableDatabase.execSQL(
+                        "INSERT INTO workout_sessions (templateName, status, workoutDate, startedAt, bodyWeightSource, createdAt, updatedAt, clientWorkoutId) VALUES ('X', 'ABANDONED', '2026-06-03', 1, 'UNKNOWN', 1, 1, ?)",
+                        arrayOf(first)
+                    )
+                } catch (_: Exception) {
+                    duplicateRejected = true
+                }
+                assertTrue(duplicateRejected)
+            } finally {
+                reopened.close()
+            }
+        } finally {
+            if (database.isOpen) {
+                database.close()
+            }
         }
     }
 
@@ -92,7 +186,7 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, V2_DB)
-            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
         try {
@@ -159,7 +253,7 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, V3_DB)
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
         try {
@@ -260,7 +354,7 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, V4_DB)
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
         try {
@@ -331,7 +425,7 @@ class WeightDatabaseMigrationTest {
         )
         helper.writableDatabase.close()
         val migrated = Room.databaseBuilder(context, WeightDatabase::class.java, MIGRATED_DB)
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
         val fresh = Room.databaseBuilder(context, WeightDatabase::class.java, FRESH_DB)
@@ -438,11 +532,11 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, V5_DB)
-            .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(12, database.openHelper.readableDatabase.version)
+            assertEquals(13, database.openHelper.readableDatabase.version)
             assertEquals(88.3, database.weightMeasurementDao().getByDate("2026-09-15")!!.weightKg, 0.0)
             assertEquals("Húzódzkodás", database.exerciseDao().getById(1)!!.name)
             assertEquals("Push A", database.workoutTemplateDao().getById(1)!!.name)
@@ -613,7 +707,7 @@ class WeightDatabaseMigrationTest {
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(12, reopened.openHelper.readableDatabase.version)
+            assertEquals(13, reopened.openHelper.readableDatabase.version)
             val stored = reopened.exerciseDao().getById(exerciseId)!!
                 .toModel(reopened.exerciseDao().getMuscles(exerciseId))
             assertEquals(MuscleGroup.CHEST, stored.primaryMuscle)
@@ -635,7 +729,7 @@ class WeightDatabaseMigrationTest {
             reopened.exerciseDao().insertMuscles(
                 listOf(ExerciseMuscleEntity(neckId, "NECK", "PRIMARY"))
             )
-            assertEquals(12, reopened.openHelper.readableDatabase.version)
+            assertEquals(13, reopened.openHelper.readableDatabase.version)
             val neck = reopened.exerciseDao().getById(neckId)!!
                 .toModel(reopened.exerciseDao().getMuscles(neckId))
             assertEquals(MuscleGroup.NECK, neck.primaryMuscle)
@@ -714,11 +808,11 @@ class WeightDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, WeightDatabase::class.java, V6_DB)
-            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(12, database.openHelper.readableDatabase.version)
+            assertEquals(13, database.openHelper.readableDatabase.version)
             val pending = database.scheduledWorkoutDao().getEntity(1)!!
             assertEquals("2026-09-10", pending.scheduledDate)
             assertEquals("2026-09-10", pending.originalScheduledDate)
@@ -846,7 +940,7 @@ class WeightDatabaseMigrationTest {
         created.close()
 
         val migrated = Room.databaseBuilder(context, WeightDatabase::class.java, databaseName)
-            .addMigrations(MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
         try {
@@ -862,7 +956,7 @@ class WeightDatabaseMigrationTest {
             assertTrue(custom.moveToFirst())
             assertEquals(0, custom.getInt(0))
             custom.close()
-            assertEquals(12, migrated.openHelper.readableDatabase.version)
+            assertEquals(13, migrated.openHelper.readableDatabase.version)
         } finally {
             migrated.close()
         }

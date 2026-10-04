@@ -126,7 +126,32 @@ Feedback is accepted only after training requirements are complete. It can be re
 
 Stored Founder data is the Strict user (already linked to a Google subject and optional email), enrollment and deadline instants, status timestamps, client workout UUID, completion instant, local workout date, feedback text, app version, platform, and the server-derived counts copied into the review snapshot. Feedback is free text and may contain personal information. The backend does not store an Android id, advertising id, contacts, location, Health Connect content, body measurements, or photos. Request logs record Founder error codes, not feedback or report bodies.
 
-Approval, rejection, and Lifetime Pro are not implemented.
+Approval, rejection, and Lifetime Pro are separate from the mobile Founder routes. A normal bearer token cannot approve an application or create a grant.
+
+Admin sign-in is `POST /api/v1/admin/session` with a Google ID token. The Google subject must be listed in `STRICT_ADMIN_GOOGLE_SUBJECTS` (comma-separated). An empty list allows nobody. There is no password and no default admin. The response is a separate opaque bearer session stored only as a SHA-256 hash in `admin_session`. It is not a cookie, so the admin API does not use CSRF. The mobile session filter ignores `/api/v1/admin/**`, and the admin filter ignores every other route. Logout is `DELETE /api/v1/admin/session`.
+
+```shell
+curl -s -X POST http://localhost:8082/api/v1/admin/session \
+  -H "Content-Type: application/json" \
+  -d "{\"idToken\":\"<google-id-token>\"}"
+
+curl -s http://localhost:8082/api/v1/admin/founder/applications \
+  -H "Authorization: Bearer <admin-token>"
+
+curl -s -X POST http://localhost:8082/api/v1/admin/founder/applications/<application-id>/approval \
+  -H "Authorization: Bearer <admin-token>"
+
+curl -s -X POST http://localhost:8082/api/v1/admin/founder/applications/<application-id>/rejection \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <admin-token>" \
+  -d "{\"reason\":\"The report did not describe the training.\"}"
+```
+
+Repeating the same decision is a success and does not create a second grant or audit row. The opposite decision is 409 `REVIEW_CONFLICT`. Only `PENDING_APPROVAL` can be decided. Approval writes `APPROVED` and one `entitlement_grant` row with source `FOUNDER_LIFETIME` in the same transaction. Rejection stores a mandatory reason and does not create a grant. The reviewer is the `admin_user` id on `founder_review_decision`.
+
+`GET /api/v1/entitlements` is the mobile read model. `access` is `PRO` when Founder Lifetime or Temporary Founder Pro applies. Founder Lifetime is the grant row, not a flag on the user. Temporary Founder Pro still comes from `ACTIVE_PRO` or `PENDING_APPROVAL`, and it is not reported once Lifetime applies. This endpoint does not write.
+
+The admin review payload includes the verified Google email when one is stored, so a reviewer can tell testers apart. It does not include the Google subject or any session secret.
 
 ## Tests
 

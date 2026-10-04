@@ -85,11 +85,15 @@ class StrictFoundationIT {
                 String.class
         );
         assertEquals(List.of(
+                "admin_session",
+                "admin_user",
                 "app_user",
                 "auth_session",
+                "entitlement_grant",
                 "external_identity",
                 "flyway_schema_history",
                 "founder_application",
+                "founder_review_decision",
                 "founder_review_snapshot",
                 "founder_workout_event"
         ), tables);
@@ -98,6 +102,11 @@ class StrictFoundationIT {
                 Integer.class
         );
         assertEquals(1, founderMigration);
+        Integer reviewMigration = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = true AND version = '4'",
+                Integer.class
+        );
+        assertEquals(1, reviewMigration);
         Integer baseline = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success = true AND version = '2'",
                 Integer.class

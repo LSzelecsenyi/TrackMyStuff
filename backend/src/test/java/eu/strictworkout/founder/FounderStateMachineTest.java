@@ -160,6 +160,44 @@ class FounderStateMachineTest {
         assertTrue(TemporaryPro.active(FounderStatus.ACTIVE_PRO));
         assertTrue(TemporaryPro.active(FounderStatus.PENDING_APPROVAL));
         assertFalse(TemporaryPro.active(FounderStatus.EXPIRED));
+        assertFalse(TemporaryPro.active(FounderStatus.APPROVED));
+        assertFalse(TemporaryPro.active(FounderStatus.REJECTED));
+    }
+
+    @Test
+    void reviewedApplicationsStayTerminal() {
+        FounderFacts approved = new FounderFacts(
+                FounderStatus.APPROVED,
+                ENROLLED,
+                FounderWindow.deadline(ENROLLED, PRODUCTION),
+                workouts(10, 6),
+                true,
+                true
+        );
+        FounderEvaluation stillApproved = machine.evaluate(approved, PRODUCTION, ENROLLED.plus(Duration.ofDays(90)));
+        assertEquals(FounderStatus.APPROVED, stillApproved.status());
+        assertFalse(stillApproved.temporaryProActive());
+        assertEquals(FounderNextAction.APPROVED, stillApproved.nextAction());
+
+        FounderFacts rejected = new FounderFacts(
+                FounderStatus.REJECTED,
+                ENROLLED,
+                FounderWindow.deadline(ENROLLED, PRODUCTION),
+                workouts(10, 6),
+                true,
+                true
+        );
+        FounderEvaluation stillRejected = machine.evaluate(rejected, PRODUCTION, ENROLLED.plusSeconds(1));
+        assertEquals(FounderStatus.REJECTED, stillRejected.status());
+        assertFalse(stillRejected.temporaryProActive());
+        assertEquals(ReviewOutcome.APPLY, FounderReviewRules.approve(FounderStatus.PENDING_APPROVAL));
+        assertEquals(ReviewOutcome.IDEMPOTENT, FounderReviewRules.approve(FounderStatus.APPROVED));
+        assertEquals(ReviewOutcome.CONFLICT, FounderReviewRules.approve(FounderStatus.REJECTED));
+        assertEquals(ReviewOutcome.CONFLICT, FounderReviewRules.approve(FounderStatus.ACTIVE_PRO));
+        assertEquals(ReviewOutcome.APPLY, FounderReviewRules.reject(FounderStatus.PENDING_APPROVAL, null, "No"));
+        assertEquals(ReviewOutcome.IDEMPOTENT, FounderReviewRules.reject(FounderStatus.REJECTED, "No", "No"));
+        assertEquals(ReviewOutcome.CONFLICT, FounderReviewRules.reject(FounderStatus.REJECTED, "No", "Different"));
+        assertEquals(ReviewOutcome.CONFLICT, FounderReviewRules.reject(FounderStatus.APPROVED, null, "No"));
     }
 
     private FounderEvaluation evaluate(

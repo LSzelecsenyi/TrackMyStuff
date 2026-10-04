@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface ExternalIdentityRepository extends JpaRepository<ExternalIdentity, UUID> {
 
     Optional<ExternalIdentity> findByProviderAndProviderSubject(IdentityProvider provider, String providerSubject);
+
+    Optional<ExternalIdentity> findByUser_IdAndProvider(UUID userId, IdentityProvider provider);
 }

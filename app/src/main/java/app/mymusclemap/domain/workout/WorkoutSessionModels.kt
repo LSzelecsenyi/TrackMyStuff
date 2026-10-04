@@ -24,7 +24,8 @@ data class WorkoutSession(
     val createdAt: Long,
     val updatedAt: Long,
     val importFingerprint: String? = null,
-    val scheduledWorkoutId: Long? = null
+    val scheduledWorkoutId: Long? = null,
+    val clientWorkoutId: String = ""
 )
 
 data class SessionExercise(

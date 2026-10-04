@@ -55,6 +55,7 @@ class WorkoutSessionRepositoryRoomTest {
     private lateinit var templates: WorkoutTemplateRepository
     private lateinit var weights: WeightRepository
     private lateinit var sessions: WorkoutSessionRepository
+    private var completedClientWorkoutId: String? = null
     private val today = LocalDate.parse("2026-09-15")
 
     @Before
@@ -83,7 +84,8 @@ class WorkoutSessionRepositoryRoomTest {
             database.exerciseDao(),
             weights,
             clock,
-            FixedDateProvider(today)
+            FixedDateProvider(today),
+            onNativeWorkoutCompleted = { clientWorkoutId -> completedClientWorkoutId = clientWorkoutId }
         )
     }
 
@@ -134,6 +136,36 @@ class WorkoutSessionRepositoryRoomTest {
         assertEquals(setOf("NECK", "UPPER_BACK"), stored.map { it.muscleGroup }.toSet())
         assertEquals("PRIMARY", stored.single { it.muscleGroup == "NECK" }.role)
         assertEquals(MuscleGroup.NECK, ExerciseEnumCodec.muscle(stored.single { it.muscleGroup == "NECK" }.muscleGroup))
+    }
+
+    @Test
+    fun clientWorkoutIdIsStableAcrossEditCompletionAndReload() = runTest {
+        val pull = savePull()
+        val firstTemplate = saveTemplate("Push A", listOf(pull to fourSets()))
+        val secondTemplate = saveTemplate("Pull A", listOf(pull to fourSets()))
+        val first = sessions.start(firstTemplate) as StartWorkoutResult.Started
+        val firstId = database.workoutSessionDao().getById(first.sessionId)!!.clientWorkoutId
+        val second = sessions.start(secondTemplate)
+        assertTrue(second is StartWorkoutResult.AlreadyActive)
+        val secondStarted = run {
+            sessions.abandon(first.sessionId)
+            sessions.start(secondTemplate) as StartWorkoutResult.Started
+        }
+        val secondId = database.workoutSessionDao().getById(secondStarted.sessionId)!!.clientWorkoutId
+        assertNotEquals(firstId, secondId)
+        val setId = sessions.getAggregate(secondStarted.sessionId)!!.exercises.first().sets.first().id
+        assertEquals(
+            SessionMutationResult.Updated,
+            sessions.completeSet(setId, ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY))
+        )
+        assertEquals(secondId, database.workoutSessionDao().getById(secondStarted.sessionId)!!.clientWorkoutId)
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(secondStarted.sessionId, skipRemaining = true))
+        assertEquals(secondId, completedClientWorkoutId)
+        val reloaded = database.workoutSessionDao().getById(secondStarted.sessionId)!!
+        assertEquals(secondId, reloaded.clientWorkoutId)
+        assertEquals("COMPLETED", reloaded.status)
+        assertEquals(secondId, java.util.UUID.fromString(secondId).toString())
+        assertEquals(secondId, sessions.getAggregate(secondStarted.sessionId)!!.session.clientWorkoutId)
     }
 
     @Test

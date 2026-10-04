@@ -65,7 +65,7 @@ class WorkoutSessionRepository(
     private val clock: Clock,
     private val dateProvider: DateProvider,
     private val onHeatmapDataChanged: () -> Unit = {},
-    private val onNativeWorkoutCompleted: suspend () -> Unit = {}
+    private val onNativeWorkoutCompleted: suspend (String) -> Unit = { _ -> }
 ) {
     private val mutex = Mutex()
 
@@ -382,7 +382,8 @@ class WorkoutSessionRepository(
             updatedAt = now,
             activeLock = SessionStatus.IN_PROGRESS.activeLock(),
             importFingerprint = null,
-            scheduledWorkoutId = scheduledWorkoutId
+            scheduledWorkoutId = scheduledWorkoutId,
+            clientWorkoutId = java.util.UUID.randomUUID().toString()
         )
         val children = relations.sortedBy { it.position }.mapNotNull { relation ->
             val exercise = exerciseDao.getById(relation.exerciseId) ?: return@mapNotNull null
@@ -681,7 +682,10 @@ class WorkoutSessionRepository(
                 1 -> {
                     onHeatmapDataChanged()
                     try {
-                        onNativeWorkoutCompleted()
+                        val completed = sessionDao.getById(sessionId)
+                        if (completed != null) {
+                            onNativeWorkoutCompleted(completed.clientWorkoutId)
+                        }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
@@ -857,7 +861,8 @@ class WorkoutSessionRepository(
             createdAt = finishedAt,
             updatedAt = finishedAt,
             activeLock = null,
-            importFingerprint = fingerprint
+            importFingerprint = fingerprint,
+            clientWorkoutId = java.util.UUID.randomUUID().toString()
         )
         val children = workout.exercises.map { exercise ->
             val snapshot = exercise.snapshot!!

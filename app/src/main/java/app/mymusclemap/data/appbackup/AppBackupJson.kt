@@ -221,6 +221,7 @@ object AppBackupJson {
                             .put("activeLock", nullable(row.activeLock))
                             .put("importFingerprint", nullable(row.importFingerprint))
                             .put("scheduledWorkoutId", nullable(row.scheduledWorkoutId))
+                            .put("clientWorkoutId", row.clientWorkoutId)
                     )
                 }
             }
@@ -815,6 +816,21 @@ object AppBackupJson {
         val activeLock = obj.optionalNullableInt("activeLock", errors)
         val importFingerprint = obj.optionalNullableString("importFingerprint", errors)
         val scheduledWorkoutId = obj.optionalNullableId("scheduledWorkoutId", errors)
+        val rawClientWorkoutId = if (obj.has("clientWorkoutId") && !obj.isNull("clientWorkoutId")) {
+            obj.optionalNullableString("clientWorkoutId", errors)
+        } else {
+            null
+        }
+        val clientWorkoutId = if (rawClientWorkoutId.isNullOrBlank()) {
+            java.util.UUID.randomUUID().toString()
+        } else {
+            val parsed = runCatching { java.util.UUID.fromString(rawClientWorkoutId) }.getOrNull()
+            if (parsed == null) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "workout_sessions.clientWorkoutId")
+                return null
+            }
+            parsed.toString()
+        }
         return WorkoutSessionEntity(
             id,
             templateId,
@@ -832,7 +848,8 @@ object AppBackupJson {
             updatedAt,
             activeLock,
             importFingerprint,
-            scheduledWorkoutId
+            scheduledWorkoutId,
+            clientWorkoutId
         )
     }
 

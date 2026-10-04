@@ -39,6 +39,8 @@ public final class FounderStateMachine {
         return switch (facts.status()) {
             case PENDING_APPROVAL -> FounderStatus.PENDING_APPROVAL;
             case EXPIRED -> FounderStatus.EXPIRED;
+            case APPROVED -> FounderStatus.APPROVED;
+            case REJECTED -> FounderStatus.REJECTED;
             case ACTIVE_FREE, ACTIVE_PRO -> {
                 if (qualified && !now.isAfter(facts.deadlineAt())) {
                     yield FounderStatus.PENDING_APPROVAL;
@@ -64,6 +66,12 @@ public final class FounderStateMachine {
     ) {
         if (status == FounderStatus.EXPIRED) {
             return FounderNextAction.EXPIRED;
+        }
+        if (status == FounderStatus.APPROVED) {
+            return FounderNextAction.APPROVED;
+        }
+        if (status == FounderStatus.REJECTED) {
+            return FounderNextAction.REJECTED;
         }
         if (status == FounderStatus.PENDING_APPROVAL) {
             return FounderNextAction.WAIT_FOR_REVIEW;

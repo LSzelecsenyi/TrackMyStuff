@@ -111,6 +111,14 @@ public class FounderApplication {
         return testerReportSubmittedAt;
     }
 
+    public Instant getExpiredAt() {
+        return expiredAt;
+    }
+
+    public Instant getPendingAt() {
+        return pendingAt;
+    }
+
     public boolean feedbackSubmitted() {
         return feedbackSubmittedAt != null;
     }
@@ -142,5 +150,16 @@ public class FounderApplication {
         if (next == FounderStatus.EXPIRED && expiredAt == null) {
             this.expiredAt = at;
         }
+    }
+
+    public void markReviewed(FounderStatus decision, Instant at) {
+        if (status != FounderStatus.PENDING_APPROVAL) {
+            throw new IllegalStateException("Only a pending Founder application can be reviewed");
+        }
+        if (decision != FounderStatus.APPROVED && decision != FounderStatus.REJECTED) {
+            throw new IllegalStateException("A review decision must approve or reject");
+        }
+        this.status = decision;
+        this.updatedAt = at;
     }
 }

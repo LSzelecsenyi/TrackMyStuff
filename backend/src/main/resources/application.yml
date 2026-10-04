@@ -38,6 +38,9 @@ strict:
     client-id: ${STRICT_GOOGLE_CLIENT_ID:}
   auth:
     session-lifetime: ${STRICT_AUTH_SESSION_LIFETIME:30d}
+  admin:
+    session-lifetime: ${STRICT_ADMIN_SESSION_LIFETIME:12h}
+    google-subjects: ${STRICT_ADMIN_GOOGLE_SUBJECTS:}
 
 logging:
   pattern:

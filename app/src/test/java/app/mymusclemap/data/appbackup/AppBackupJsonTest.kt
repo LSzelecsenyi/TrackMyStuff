@@ -9,6 +9,7 @@ import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.SessionStatus
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -159,6 +160,37 @@ class AppBackupJsonTest {
             AppBackupJson.parse(AppBackupJson.encode(twoLocks)),
             AppBackupErrorCode.DuplicateKey
         )
+    }
+
+    @Test
+    fun backupRoundTripPreservesClientWorkoutIdAndLegacyBackupReceivesOne() {
+        val id = java.util.UUID.randomUUID().toString()
+        val original = session(id = 4, status = SessionStatus.COMPLETED, activeLock = null)
+            .copy(clientWorkoutId = id, finishedAt = 9L)
+        val encoded = AppBackupJson.encode(emptySnapshot().copy(tables = emptyTables().copy(workoutSessions = listOf(original))))
+        val parsed = AppBackupJson.parse(encoded) as AppBackupParseResult.Success
+        assertEquals(id, parsed.snapshot.tables.workoutSessions.single().clientWorkoutId)
+        assertTrue(encoded.contains(id))
+
+        val legacy = JSONObject(encoded)
+        legacy.getJSONObject("tables").getJSONArray("workout_sessions").getJSONObject(0).remove("clientWorkoutId")
+        val restored = AppBackupJson.parse(legacy.toString()) as AppBackupParseResult.Success
+        val assigned = restored.snapshot.tables.workoutSessions.single().clientWorkoutId
+        assertEquals(assigned, java.util.UUID.fromString(assigned).toString())
+        assertNotEquals(id, assigned)
+        val preserved = AppBackupJson.parse(AppBackupJson.encode(restored.snapshot)) as AppBackupParseResult.Success
+        assertEquals(assigned, preserved.snapshot.tables.workoutSessions.single().clientWorkoutId)
+
+        val shared = id
+        val duplicate = emptySnapshot().copy(
+            tables = emptyTables().copy(
+                workoutSessions = listOf(
+                    original.copy(id = 1, clientWorkoutId = shared),
+                    original.copy(id = 2, clientWorkoutId = shared, activeLock = null, status = SessionStatus.ABANDONED.name)
+                )
+            )
+        )
+        assertHasCode(AppBackupJson.parse(AppBackupJson.encode(duplicate)), AppBackupErrorCode.DuplicateKey)
     }
 
     private fun assertHasCode(result: AppBackupParseResult, code: AppBackupErrorCode) {

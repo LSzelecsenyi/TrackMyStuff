@@ -7905,7 +7905,8 @@
         "updatedAt": 1744020840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 3
+        "scheduledWorkoutId": 3,
+        "clientWorkoutId": "82beb5e8-0f29-33ca-acd5-7692d38f014a"
       },
       {
         "id": 2,
@@ -7924,7 +7925,8 @@
         "updatedAt": 1744279800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 4
+        "scheduledWorkoutId": 4,
+        "clientWorkoutId": "8cc487e5-9aa0-38bf-bd7f-ccf1f426d0b5"
       },
       {
         "id": 3,
@@ -7943,7 +7945,8 @@
         "updatedAt": 1744366320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 5
+        "scheduledWorkoutId": 5,
+        "clientWorkoutId": "b55370d1-fffb-3ac0-90e0-635c2283ca70"
       },
       {
         "id": 4,
@@ -7962,7 +7965,8 @@
         "updatedAt": 1744711800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 6
+        "scheduledWorkoutId": 6,
+        "clientWorkoutId": "1064d68e-c0c9-3e6a-8e8f-9c5f52dcdd01"
       },
       {
         "id": 5,
@@ -7981,7 +7985,8 @@
         "updatedAt": 1744798320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 7
+        "scheduledWorkoutId": 7,
+        "clientWorkoutId": "9c24f677-61fe-344c-9ae5-a17271fb84d9"
       },
       {
         "id": 6,
@@ -8000,7 +8005,8 @@
         "updatedAt": 1744971360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 8
+        "scheduledWorkoutId": 8,
+        "clientWorkoutId": "bbb3a01b-b81b-3831-a0eb-abcf838a8470"
       },
       {
         "id": 7,
@@ -8019,7 +8025,8 @@
         "updatedAt": 1745143800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "0667338b-a4b7-3e43-b595-65fb312f7ade"
       },
       {
         "id": 8,
@@ -8038,7 +8045,8 @@
         "updatedAt": 1745230320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 9
+        "scheduledWorkoutId": 9,
+        "clientWorkoutId": "584caa80-c32f-3874-8559-9eb0f754dad4"
       },
       {
         "id": 9,
@@ -8057,7 +8065,8 @@
         "updatedAt": 1745748840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 11
+        "scheduledWorkoutId": 11,
+        "clientWorkoutId": "8b49010d-5566-318a-bdd9-a80af122f39b"
       },
       {
         "id": 10,
@@ -8076,7 +8085,8 @@
         "updatedAt": 1745835360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 12
+        "scheduledWorkoutId": 12,
+        "clientWorkoutId": "7cebf443-a356-3d46-92b7-f60fba762d46"
       },
       {
         "id": 11,
@@ -8095,7 +8105,8 @@
         "updatedAt": 1746007800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 13
+        "scheduledWorkoutId": 13,
+        "clientWorkoutId": "ee95fe7b-b5db-31d1-b6f4-f02fc1303552"
       },
       {
         "id": 12,
@@ -8114,7 +8125,8 @@
         "updatedAt": 1746180840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 14
+        "scheduledWorkoutId": 14,
+        "clientWorkoutId": "dc310649-56d9-347e-bf32-c79e2c301b40"
       },
       {
         "id": 13,
@@ -8133,7 +8145,8 @@
         "updatedAt": 1746439800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 15
+        "scheduledWorkoutId": 15,
+        "clientWorkoutId": "663f5306-042b-37a3-bf3a-6c4d29f3d381"
       },
       {
         "id": 14,
@@ -8152,7 +8165,8 @@
         "updatedAt": 1746612840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 16
+        "scheduledWorkoutId": 16,
+        "clientWorkoutId": "063b7900-61cc-3043-a6b9-a90820a5ecb3"
       },
       {
         "id": 15,
@@ -8171,7 +8185,8 @@
         "updatedAt": 1746871800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 17
+        "scheduledWorkoutId": 17,
+        "clientWorkoutId": "8b77ff64-ff71-3dba-a2ba-d174877d4e95"
       },
       {
         "id": 16,
@@ -8190,7 +8205,8 @@
         "updatedAt": 1747217880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 19
+        "scheduledWorkoutId": 19,
+        "clientWorkoutId": "97f22812-9260-3341-835b-e15b7ba0ff18"
       },
       {
         "id": 17,
@@ -8209,7 +8225,8 @@
         "updatedAt": 1747390320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 20
+        "scheduledWorkoutId": 20,
+        "clientWorkoutId": "9cc3ae67-524d-3785-b6d6-f07e002c8c1f"
       },
       {
         "id": 18,
@@ -8228,7 +8245,8 @@
         "updatedAt": 1747649880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 21
+        "scheduledWorkoutId": 21,
+        "clientWorkoutId": "eb96b4c4-d4f9-30fb-8d3d-f0b012487813"
       },
       {
         "id": 19,
@@ -8247,7 +8265,8 @@
         "updatedAt": 1747822320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 22
+        "scheduledWorkoutId": 22,
+        "clientWorkoutId": "06cdd237-fd19-3720-8b85-55ac3655ed46"
       },
       {
         "id": 20,
@@ -8266,7 +8285,8 @@
         "updatedAt": 1747995360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 23
+        "scheduledWorkoutId": 23,
+        "clientWorkoutId": "4407be28-098d-3cc9-98b3-de42d40409f4"
       },
       {
         "id": 21,
@@ -8285,7 +8305,8 @@
         "updatedAt": 1748254320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 24
+        "scheduledWorkoutId": 24,
+        "clientWorkoutId": "2fe65d19-19df-38a8-9d72-72351caba669"
       },
       {
         "id": 22,
@@ -8304,7 +8325,8 @@
         "updatedAt": 1748513880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 25
+        "scheduledWorkoutId": 25,
+        "clientWorkoutId": "b6611b72-9631-38c4-a840-a3539fa68802"
       },
       {
         "id": 23,
@@ -8323,7 +8345,8 @@
         "updatedAt": 1748772720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "16222e25-bb33-3783-b8da-fcbaa3fd8938"
       },
       {
         "id": 24,
@@ -8342,7 +8365,8 @@
         "updatedAt": 1748859240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 27
+        "scheduledWorkoutId": 27,
+        "clientWorkoutId": "8f44f08b-e31c-34a5-b5c3-550ce19d531b"
       },
       {
         "id": 25,
@@ -8361,7 +8385,8 @@
         "updatedAt": 1749118200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 28
+        "scheduledWorkoutId": 28,
+        "clientWorkoutId": "da3c4276-30df-311c-9bc2-4d5c45352178"
       },
       {
         "id": 26,
@@ -8380,7 +8405,8 @@
         "updatedAt": 1749204720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 29
+        "scheduledWorkoutId": 29,
+        "clientWorkoutId": "ce66110d-8d33-34e2-ace6-28d5337142ad"
       },
       {
         "id": 27,
@@ -8399,7 +8425,8 @@
         "updatedAt": 1749636720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 31
+        "scheduledWorkoutId": 31,
+        "clientWorkoutId": "b006d53b-da69-3c35-81ec-cf4a1452a26f"
       },
       {
         "id": 28,
@@ -8418,7 +8445,8 @@
         "updatedAt": 1749982200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 32
+        "scheduledWorkoutId": 32,
+        "clientWorkoutId": "1fa260c8-9ce4-34ff-ade3-545696ac319b"
       },
       {
         "id": 29,
@@ -8437,7 +8465,8 @@
         "updatedAt": 1750068720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 33
+        "scheduledWorkoutId": 33,
+        "clientWorkoutId": "2ed07f17-8a35-321a-b199-c26685b8d1a8"
       },
       {
         "id": 30,
@@ -8456,7 +8485,8 @@
         "updatedAt": 1750414200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 35
+        "scheduledWorkoutId": 35,
+        "clientWorkoutId": "b3b5df99-4d2d-3e90-9517-51f7d72928ef"
       },
       {
         "id": 31,
@@ -8475,7 +8505,8 @@
         "updatedAt": 1750673760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 36
+        "scheduledWorkoutId": 36,
+        "clientWorkoutId": "83d031c4-b7a3-39cf-b671-eab4ce6dc88f"
       },
       {
         "id": 32,
@@ -8494,7 +8525,8 @@
         "updatedAt": 1750846200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 37
+        "scheduledWorkoutId": 37,
+        "clientWorkoutId": "8eb7b789-301c-3b44-8e31-bb98c5fd4561"
       },
       {
         "id": 33,
@@ -8513,7 +8545,8 @@
         "updatedAt": 1751019240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 38
+        "scheduledWorkoutId": 38,
+        "clientWorkoutId": "8358507b-c246-3b12-a78a-6039579befc6"
       },
       {
         "id": 34,
@@ -8532,7 +8565,8 @@
         "updatedAt": 1751451240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 40
+        "scheduledWorkoutId": 40,
+        "clientWorkoutId": "056bb4a6-347d-30ad-883d-be7ee020a9bc"
       },
       {
         "id": 35,
@@ -8551,7 +8585,8 @@
         "updatedAt": 1751537760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 39
+        "scheduledWorkoutId": 39,
+        "clientWorkoutId": "6590c2bc-73d4-30ea-9ee1-eae99abe634e"
       },
       {
         "id": 36,
@@ -8570,7 +8605,8 @@
         "updatedAt": 1751624280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 41
+        "scheduledWorkoutId": 41,
+        "clientWorkoutId": "02ed039c-cd4e-38ef-bc72-cf77485c1a4e"
       },
       {
         "id": 37,
@@ -8589,7 +8625,8 @@
         "updatedAt": 1752056280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 43
+        "scheduledWorkoutId": 43,
+        "clientWorkoutId": "e58dd367-9ae8-3590-a856-ff7169748408"
       },
       {
         "id": 38,
@@ -8608,7 +8645,8 @@
         "updatedAt": 1752228720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 44
+        "scheduledWorkoutId": 44,
+        "clientWorkoutId": "6aaa922a-872c-3441-a273-2b504d0e9b6c"
       },
       {
         "id": 39,
@@ -8627,7 +8665,8 @@
         "updatedAt": 1752401760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "91cbfc13-52b4-33f8-9181-2e4f1602a9f9"
       },
       {
         "id": 40,
@@ -8646,7 +8685,8 @@
         "updatedAt": 1752488280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 45
+        "scheduledWorkoutId": 45,
+        "clientWorkoutId": "cbed3deb-3405-3ca5-8aab-f664244fdeea"
       },
       {
         "id": 41,
@@ -8665,7 +8705,8 @@
         "updatedAt": 1752747240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 46
+        "scheduledWorkoutId": 46,
+        "clientWorkoutId": "454b75a4-0569-324e-957b-fbd1ec621dac"
       },
       {
         "id": 42,
@@ -8684,7 +8725,8 @@
         "updatedAt": 1752833760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 47
+        "scheduledWorkoutId": 47,
+        "clientWorkoutId": "b5142751-fc4f-376c-bc14-3e1df233b9b6"
       },
       {
         "id": 43,
@@ -8703,7 +8745,8 @@
         "updatedAt": 1753092720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 48
+        "scheduledWorkoutId": 48,
+        "clientWorkoutId": "0a27fdb4-17cd-39e5-9053-4630d76a2c17"
       },
       {
         "id": 44,
@@ -8722,7 +8765,8 @@
         "updatedAt": 1753265760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 49
+        "scheduledWorkoutId": 49,
+        "clientWorkoutId": "cbfe840f-8e96-3e30-bf67-6393a45bdc35"
       },
       {
         "id": 45,
@@ -8741,7 +8785,8 @@
         "updatedAt": 1753697760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 51
+        "scheduledWorkoutId": 51,
+        "clientWorkoutId": "9c8dbe25-4c41-36e5-a498-81e38d21a055"
       },
       {
         "id": 46,
@@ -8760,7 +8805,8 @@
         "updatedAt": 1753870200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 52
+        "scheduledWorkoutId": 52,
+        "clientWorkoutId": "2674ef9a-9205-3dde-aab7-3a840a37b84e"
       },
       {
         "id": 47,
@@ -8779,7 +8825,8 @@
         "updatedAt": 1754216160000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 53
+        "scheduledWorkoutId": 53,
+        "clientWorkoutId": "c3859155-ac43-3328-8c29-4a44dcbdd46b"
       },
       {
         "id": 48,
@@ -8798,7 +8845,8 @@
         "updatedAt": 1754302680000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 54
+        "scheduledWorkoutId": 54,
+        "clientWorkoutId": "72b16f56-dec7-37ae-80ee-d4a932ca12f0"
       },
       {
         "id": 49,
@@ -8817,7 +8865,8 @@
         "updatedAt": 1754475120000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 55
+        "scheduledWorkoutId": 55,
+        "clientWorkoutId": "a35156fc-6025-31b4-9465-7a9639620dbb"
       },
       {
         "id": 50,
@@ -8836,7 +8885,8 @@
         "updatedAt": 1754648160000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 56
+        "scheduledWorkoutId": 56,
+        "clientWorkoutId": "64d5165e-8f18-37be-9e67-325eddbcfcb8"
       },
       {
         "id": 51,
@@ -8855,7 +8905,8 @@
         "updatedAt": 1754907120000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 57
+        "scheduledWorkoutId": 57,
+        "clientWorkoutId": "f2cf3c8e-0099-384e-9876-11ba92383631"
       },
       {
         "id": 52,
@@ -8874,7 +8925,8 @@
         "updatedAt": 1755771120000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 60
+        "scheduledWorkoutId": 60,
+        "clientWorkoutId": "3e66eafa-a982-3787-9b48-7c5e77a77607"
       },
       {
         "id": 53,
@@ -8893,7 +8945,8 @@
         "updatedAt": 1755771120000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 61
+        "scheduledWorkoutId": 61,
+        "clientWorkoutId": "25febcc8-7395-3235-b89d-939282f911ee"
       },
       {
         "id": 54,
@@ -8912,7 +8965,8 @@
         "updatedAt": 1755857640000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 62
+        "scheduledWorkoutId": 62,
+        "clientWorkoutId": "43cc8a4a-99c9-31c4-ada5-895c757237bf"
       },
       {
         "id": 55,
@@ -8931,7 +8985,8 @@
         "updatedAt": 1756030680000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "37cbafaa-7da1-39cf-acf4-bbd464f62712"
       },
       {
         "id": 56,
@@ -8950,7 +9005,8 @@
         "updatedAt": 1756116600000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 63
+        "scheduledWorkoutId": 63,
+        "clientWorkoutId": "d4ec68cc-631f-34b4-81f7-74bf2a15262e"
       },
       {
         "id": 57,
@@ -8969,7 +9025,8 @@
         "updatedAt": 1756289640000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 64
+        "scheduledWorkoutId": 64,
+        "clientWorkoutId": "2116b93b-daf5-3503-91f8-5415f3077e3a"
       },
       {
         "id": 58,
@@ -8988,7 +9045,8 @@
         "updatedAt": 1756462680000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 65
+        "scheduledWorkoutId": 65,
+        "clientWorkoutId": "c8d25286-b9c4-3c97-99c7-afd9c97ce9b5"
       },
       {
         "id": 59,
@@ -9007,7 +9065,8 @@
         "updatedAt": 1756981080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 67
+        "scheduledWorkoutId": 67,
+        "clientWorkoutId": "de6a5d56-72e3-3024-94ca-f2c1ffdd9346"
       },
       {
         "id": 60,
@@ -9026,7 +9085,8 @@
         "updatedAt": 1757067000000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 68
+        "scheduledWorkoutId": 68,
+        "clientWorkoutId": "f9039454-699e-3d08-b5f7-c8978d642d6c"
       },
       {
         "id": 61,
@@ -9045,7 +9105,8 @@
         "updatedAt": 1757326560000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 69
+        "scheduledWorkoutId": 69,
+        "clientWorkoutId": "db014747-0893-3414-b074-3cf281c22ec3"
       },
       {
         "id": 62,
@@ -9064,7 +9125,8 @@
         "updatedAt": 1757499000000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 70
+        "scheduledWorkoutId": 70,
+        "clientWorkoutId": "29a55a55-68e7-3b18-949d-6e9ace5e1959"
       },
       {
         "id": 63,
@@ -9083,7 +9145,8 @@
         "updatedAt": 1757672040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 71
+        "scheduledWorkoutId": 71,
+        "clientWorkoutId": "ac97520e-570f-3467-b7a0-556130947ccc"
       },
       {
         "id": 64,
@@ -9102,7 +9165,8 @@
         "updatedAt": 1758017520000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 72
+        "scheduledWorkoutId": 72,
+        "clientWorkoutId": "a98e68fb-89f7-3fa1-8e8e-72e1c9166334"
       },
       {
         "id": 65,
@@ -9121,7 +9185,8 @@
         "updatedAt": 1758104040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 73
+        "scheduledWorkoutId": 73,
+        "clientWorkoutId": "417b127d-59b5-3eee-a388-c74c53ed0217"
       },
       {
         "id": 66,
@@ -9140,7 +9205,8 @@
         "updatedAt": 1758536040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 75
+        "scheduledWorkoutId": 75,
+        "clientWorkoutId": "1f4d04e8-e43b-3a50-ba5f-bd0f85ed2724"
       },
       {
         "id": 67,
@@ -9159,7 +9225,8 @@
         "updatedAt": 1758709080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 76
+        "scheduledWorkoutId": 76,
+        "clientWorkoutId": "2bf1a7b7-1234-3c18-bb32-e5f7de4bd423"
       },
       {
         "id": 68,
@@ -9178,7 +9245,8 @@
         "updatedAt": 1758881520000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 77
+        "scheduledWorkoutId": 77,
+        "clientWorkoutId": "9b34d02c-3d94-3346-9b22-a72ba8e28b92"
       },
       {
         "id": 69,
@@ -9197,7 +9265,8 @@
         "updatedAt": 1759141080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 78
+        "scheduledWorkoutId": 78,
+        "clientWorkoutId": "bd57f974-211e-3af3-8bbb-92da1623acad"
       },
       {
         "id": 70,
@@ -9216,7 +9285,8 @@
         "updatedAt": 1759227000000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 79
+        "scheduledWorkoutId": 79,
+        "clientWorkoutId": "f1bfd7df-308e-3a91-8ceb-6ec7f736d77b"
       },
       {
         "id": 71,
@@ -9235,7 +9305,8 @@
         "updatedAt": 1759400040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 80
+        "scheduledWorkoutId": 80,
+        "clientWorkoutId": "2191bbb1-0e59-3f15-9ea0-7e1d636a6c0b"
       },
       {
         "id": 72,
@@ -9254,7 +9325,8 @@
         "updatedAt": 1759659000000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "203554d5-ed8f-312e-8d4c-caba5c73f0f2"
       },
       {
         "id": 73,
@@ -9273,7 +9345,8 @@
         "updatedAt": 1759832040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 81
+        "scheduledWorkoutId": 81,
+        "clientWorkoutId": "0e53d18b-efe7-3ee5-906a-caa26aaf1b7f"
       },
       {
         "id": 74,
@@ -9292,7 +9365,8 @@
         "updatedAt": 1759918560000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 83
+        "scheduledWorkoutId": 83,
+        "clientWorkoutId": "0ef8f37c-05da-3284-981d-6d078710ebe2"
       },
       {
         "id": 75,
@@ -9311,7 +9385,8 @@
         "updatedAt": 1760005080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 84
+        "scheduledWorkoutId": 84,
+        "clientWorkoutId": "d5254123-ed87-32d3-832f-dda732e8d6eb"
       },
       {
         "id": 76,
@@ -9330,7 +9405,8 @@
         "updatedAt": 1760177520000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 85
+        "scheduledWorkoutId": 85,
+        "clientWorkoutId": "ad0be1bd-53ac-3385-b60f-066fbb7f1027"
       },
       {
         "id": 77,
@@ -9349,7 +9425,8 @@
         "updatedAt": 1760350560000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 86
+        "scheduledWorkoutId": 86,
+        "clientWorkoutId": "2a356b3c-77d9-38a1-a3d6-107f6277a26d"
       },
       {
         "id": 78,
@@ -9368,7 +9445,8 @@
         "updatedAt": 1760437080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 87
+        "scheduledWorkoutId": 87,
+        "clientWorkoutId": "c969b613-55cd-3aeb-9ba1-9e89e4397f19"
       },
       {
         "id": 79,
@@ -9387,7 +9465,8 @@
         "updatedAt": 1760782560000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 89
+        "scheduledWorkoutId": 89,
+        "clientWorkoutId": "08a697b3-8541-3349-ab89-7849dfa5b2ea"
       },
       {
         "id": 80,
@@ -9406,7 +9485,8 @@
         "updatedAt": 1761041520000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 91
+        "scheduledWorkoutId": 91,
+        "clientWorkoutId": "680ac7d1-47f1-361d-8016-35b1f3e31d4f"
       },
       {
         "id": 81,
@@ -9425,7 +9505,8 @@
         "updatedAt": 1761214560000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 92
+        "scheduledWorkoutId": 92,
+        "clientWorkoutId": "a5203c1d-1a8c-37a3-821a-691dee7d97a4"
       },
       {
         "id": 82,
@@ -9444,7 +9525,8 @@
         "updatedAt": 1761560040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 93
+        "scheduledWorkoutId": 93,
+        "clientWorkoutId": "57cb6efe-542e-38b1-b1ad-ef3345808042"
       },
       {
         "id": 83,
@@ -9463,7 +9545,8 @@
         "updatedAt": 1761733080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 94
+        "scheduledWorkoutId": 94,
+        "clientWorkoutId": "3e2e6892-5a68-34cd-abdc-429701228f6a"
       },
       {
         "id": 84,
@@ -9482,7 +9565,8 @@
         "updatedAt": 1761991920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 95
+        "scheduledWorkoutId": 95,
+        "clientWorkoutId": "989227b5-d03f-3ad3-b4d0-04db0c0ad904"
       },
       {
         "id": 85,
@@ -9501,7 +9585,8 @@
         "updatedAt": 1761991920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 96
+        "scheduledWorkoutId": 96,
+        "clientWorkoutId": "9b4fe20f-69ce-3cd5-992d-6508fcca2e52"
       },
       {
         "id": 86,
@@ -9520,7 +9605,8 @@
         "updatedAt": 1762164960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 97
+        "scheduledWorkoutId": 97,
+        "clientWorkoutId": "9df7bc72-9af5-316f-aa9a-8674470011f7"
       },
       {
         "id": 87,
@@ -9539,7 +9625,8 @@
         "updatedAt": 1762423920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 99
+        "scheduledWorkoutId": 99,
+        "clientWorkoutId": "c2ff921a-7519-32f3-b7c7-f327f1b5069b"
       },
       {
         "id": 88,
@@ -9558,7 +9645,8 @@
         "updatedAt": 1762596960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 100
+        "scheduledWorkoutId": 100,
+        "clientWorkoutId": "aa241157-7126-37b4-a13f-016dd85ba124"
       },
       {
         "id": 89,
@@ -9577,7 +9665,8 @@
         "updatedAt": 1762769400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 101
+        "scheduledWorkoutId": 101,
+        "clientWorkoutId": "5cfaa446-a49d-3ee2-905b-c6c813b5b623"
       },
       {
         "id": 90,
@@ -9596,7 +9685,8 @@
         "updatedAt": 1763028960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 103
+        "scheduledWorkoutId": 103,
+        "clientWorkoutId": "c4c7f76e-fd8e-3479-a258-f3f8fc9e7d39"
       },
       {
         "id": 91,
@@ -9615,7 +9705,8 @@
         "updatedAt": 1763115480000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 102
+        "scheduledWorkoutId": 102,
+        "clientWorkoutId": "98c90598-e029-3ec6-a421-504291478256"
       },
       {
         "id": 92,
@@ -9634,7 +9725,8 @@
         "updatedAt": 1763201400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 104
+        "scheduledWorkoutId": 104,
+        "clientWorkoutId": "58c0346b-7e8e-3ccf-a8b3-543894f9c926"
       },
       {
         "id": 93,
@@ -9653,7 +9745,8 @@
         "updatedAt": 1763287920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "04f09c46-13e8-38ce-93db-e2786a986a52"
       },
       {
         "id": 94,
@@ -9672,7 +9765,8 @@
         "updatedAt": 1763460960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 105
+        "scheduledWorkoutId": 105,
+        "clientWorkoutId": "a90d593b-4717-39e0-a526-98b89050ad47"
       },
       {
         "id": 95,
@@ -9691,7 +9785,8 @@
         "updatedAt": 1763633400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 107
+        "scheduledWorkoutId": 107,
+        "clientWorkoutId": "e7f22e70-1682-3fac-a448-256c85d01505"
       },
       {
         "id": 96,
@@ -9710,7 +9805,8 @@
         "updatedAt": 1763806440000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 108
+        "scheduledWorkoutId": 108,
+        "clientWorkoutId": "357b5282-28f4-3b3b-b72d-c686c59f4821"
       },
       {
         "id": 97,
@@ -9729,7 +9825,8 @@
         "updatedAt": 1764065400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 109
+        "scheduledWorkoutId": 109,
+        "clientWorkoutId": "d4563b93-3dbd-3355-8919-5c64addfceda"
       },
       {
         "id": 98,
@@ -9748,7 +9845,8 @@
         "updatedAt": 1764065400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 110
+        "scheduledWorkoutId": 110,
+        "clientWorkoutId": "3612d7f5-c935-3930-a3c1-3cd5c25cfdb5"
       },
       {
         "id": 99,
@@ -9767,7 +9865,8 @@
         "updatedAt": 1764238440000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 111
+        "scheduledWorkoutId": 111,
+        "clientWorkoutId": "8cdff13e-44e8-3a91-80b3-ee70e95ad705"
       },
       {
         "id": 100,
@@ -9786,7 +9885,8 @@
         "updatedAt": 1764411480000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 112
+        "scheduledWorkoutId": 112,
+        "clientWorkoutId": "c6e71e9d-a203-3437-b07f-9e608a7e2da2"
       },
       {
         "id": 101,
@@ -9805,7 +9905,8 @@
         "updatedAt": 1764583920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 113
+        "scheduledWorkoutId": 113,
+        "clientWorkoutId": "a08e4897-e80b-3037-b47d-deb52ffe0925"
       },
       {
         "id": 102,
@@ -9824,7 +9925,8 @@
         "updatedAt": 1764843480000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 115
+        "scheduledWorkoutId": 115,
+        "clientWorkoutId": "8b91f67c-108d-3f7f-a0e6-4059d5c7ba89"
       },
       {
         "id": 103,
@@ -9843,7 +9945,8 @@
         "updatedAt": 1765188960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 116
+        "scheduledWorkoutId": 116,
+        "clientWorkoutId": "33c5e393-b8bb-336f-96c5-808d7cb20047"
       },
       {
         "id": 104,
@@ -9862,7 +9965,8 @@
         "updatedAt": 1765275480000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 118
+        "scheduledWorkoutId": 118,
+        "clientWorkoutId": "1c9ff02c-9cc4-3c86-99eb-9e41cac058a7"
       },
       {
         "id": 105,
@@ -9881,7 +9985,8 @@
         "updatedAt": 1765447920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 119
+        "scheduledWorkoutId": 119,
+        "clientWorkoutId": "e7a26c68-a064-36f3-885d-4ad16bc12e7c"
       },
       {
         "id": 106,
@@ -9900,7 +10005,8 @@
         "updatedAt": 1765620960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 120
+        "scheduledWorkoutId": 120,
+        "clientWorkoutId": "841e87ff-da5d-3743-a19c-917fa510cae3"
       },
       {
         "id": 107,
@@ -9919,7 +10025,8 @@
         "updatedAt": 1765793400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 121
+        "scheduledWorkoutId": 121,
+        "clientWorkoutId": "fccf547d-6b80-397c-ba33-b45c74d7f35b"
       },
       {
         "id": 108,
@@ -9938,7 +10045,8 @@
         "updatedAt": 1766311920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 123
+        "scheduledWorkoutId": 123,
+        "clientWorkoutId": "c3e0c85b-f5c3-3c23-bb87-3479e45090e0"
       },
       {
         "id": 109,
@@ -9957,7 +10065,8 @@
         "updatedAt": 1766398440000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 124
+        "scheduledWorkoutId": 124,
+        "clientWorkoutId": "fcc11dcd-e2a5-3354-92e2-ecb66fdd0997"
       },
       {
         "id": 110,
@@ -9976,7 +10085,8 @@
         "updatedAt": 1766484960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 125
+        "scheduledWorkoutId": 125,
+        "clientWorkoutId": "fb82b3cb-6d32-32fe-9190-7447e33eae50"
       },
       {
         "id": 111,
@@ -9995,7 +10105,8 @@
         "updatedAt": 1766657400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 126
+        "scheduledWorkoutId": 126,
+        "clientWorkoutId": "983b8886-6081-3788-aa71-64cc2ef86fc8"
       },
       {
         "id": 112,
@@ -10014,7 +10125,8 @@
         "updatedAt": 1766916960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 127
+        "scheduledWorkoutId": 127,
+        "clientWorkoutId": "db582118-b2bd-384b-8018-a8272d9a82f4"
       },
       {
         "id": 113,
@@ -10033,7 +10145,8 @@
         "updatedAt": 1767003480000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 128
+        "scheduledWorkoutId": 128,
+        "clientWorkoutId": "77866ea0-b672-31a3-87eb-3a0a3e8f4505"
       },
       {
         "id": 114,
@@ -10052,7 +10165,8 @@
         "updatedAt": 1767089400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 129
+        "scheduledWorkoutId": 129,
+        "clientWorkoutId": "ebb4239b-40fb-3919-898b-e9c9ba8351fb"
       },
       {
         "id": 115,
@@ -10071,7 +10185,8 @@
         "updatedAt": 1767435360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 131
+        "scheduledWorkoutId": 131,
+        "clientWorkoutId": "5fb4d7ad-6a18-344c-a44d-9a8625a8e448"
       },
       {
         "id": 116,
@@ -10090,7 +10205,8 @@
         "updatedAt": 1767607800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 132
+        "scheduledWorkoutId": 132,
+        "clientWorkoutId": "e7598f80-3128-38b6-b323-2d31588950c4"
       },
       {
         "id": 117,
@@ -10109,7 +10225,8 @@
         "updatedAt": 1767694320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 133
+        "scheduledWorkoutId": 133,
+        "clientWorkoutId": "0ae175c3-fe89-3521-8178-ece627d7c2f9"
       },
       {
         "id": 118,
@@ -10128,7 +10245,8 @@
         "updatedAt": 1767867360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 134
+        "scheduledWorkoutId": 134,
+        "clientWorkoutId": "4cfa3451-0d61-3fe2-8dac-0f3a2e7cbb3f"
       },
       {
         "id": 119,
@@ -10147,7 +10265,8 @@
         "updatedAt": 1768039800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 135
+        "scheduledWorkoutId": 135,
+        "clientWorkoutId": "84ef664a-ab9a-3282-bdc8-8009530ea5ba"
       },
       {
         "id": 120,
@@ -10166,7 +10285,8 @@
         "updatedAt": 1768212840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 136
+        "scheduledWorkoutId": 136,
+        "clientWorkoutId": "e16b455c-22e5-33cf-b096-e8d19a8a4902"
       },
       {
         "id": 121,
@@ -10185,7 +10305,8 @@
         "updatedAt": 1768471800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 137
+        "scheduledWorkoutId": 137,
+        "clientWorkoutId": "cbc40a28-0c42-392a-b137-05f81658727e"
       },
       {
         "id": 122,
@@ -10204,7 +10325,8 @@
         "updatedAt": 1768644840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 139
+        "scheduledWorkoutId": 139,
+        "clientWorkoutId": "2bc1dd68-b1ca-3871-896c-9f3bf349b4ee"
       },
       {
         "id": 123,
@@ -10223,7 +10345,8 @@
         "updatedAt": 1768817880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 140
+        "scheduledWorkoutId": 140,
+        "clientWorkoutId": "c4ed7092-e017-3315-90d6-a5b49ccefdf7"
       },
       {
         "id": 124,
@@ -10242,7 +10365,8 @@
         "updatedAt": 1768903800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 141
+        "scheduledWorkoutId": 141,
+        "clientWorkoutId": "4ad36e64-7ca2-3e12-b9df-74de4d63e122"
       },
       {
         "id": 125,
@@ -10261,7 +10385,8 @@
         "updatedAt": 1769076840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 142
+        "scheduledWorkoutId": 142,
+        "clientWorkoutId": "44f49b6c-a11f-39ed-867f-e471208d0a6e"
       },
       {
         "id": 126,
@@ -10280,7 +10405,8 @@
         "updatedAt": 1769249880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 143
+        "scheduledWorkoutId": 143,
+        "clientWorkoutId": "e23752d6-3705-3a05-9405-6a9fef42367c"
       },
       {
         "id": 127,
@@ -10299,7 +10425,8 @@
         "updatedAt": 1769508840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 145
+        "scheduledWorkoutId": 145,
+        "clientWorkoutId": "6106e970-bc0f-3ddd-ab8f-9491f40cbd79"
       },
       {
         "id": 128,
@@ -10318,7 +10445,8 @@
         "updatedAt": 1769681880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 144
+        "scheduledWorkoutId": 144,
+        "clientWorkoutId": "20598184-6f5d-39d0-82bd-bf65c5ece095"
       },
       {
         "id": 129,
@@ -10337,7 +10465,8 @@
         "updatedAt": 1769854320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 147
+        "scheduledWorkoutId": 147,
+        "clientWorkoutId": "69fe2c3a-8cde-3a25-9a08-371a839a3bb1"
       },
       {
         "id": 130,
@@ -10356,7 +10485,8 @@
         "updatedAt": 1770027240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 148
+        "scheduledWorkoutId": 148,
+        "clientWorkoutId": "aa8c7281-284d-3502-b096-970876bf4dfe"
       },
       {
         "id": 131,
@@ -10375,7 +10505,8 @@
         "updatedAt": 1770200280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 149
+        "scheduledWorkoutId": 149,
+        "clientWorkoutId": "2937af4d-3172-3425-b18e-da5bd896f89d"
       },
       {
         "id": 132,
@@ -10394,7 +10525,8 @@
         "updatedAt": 1770286200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 150
+        "scheduledWorkoutId": 150,
+        "clientWorkoutId": "741fa8fe-5a7f-3d2d-a071-6ec3008787f9"
       },
       {
         "id": 133,
@@ -10413,7 +10545,8 @@
         "updatedAt": 1770545760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 151
+        "scheduledWorkoutId": 151,
+        "clientWorkoutId": "33d1fb3b-9160-36f1-8729-2a37862f8a38"
       },
       {
         "id": 134,
@@ -10432,7 +10565,8 @@
         "updatedAt": 1770545760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "961271a5-c036-3d1e-8c43-b05f9b0c5fbc"
       },
       {
         "id": 135,
@@ -10451,7 +10585,8 @@
         "updatedAt": 1770632280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 152
+        "scheduledWorkoutId": 152,
+        "clientWorkoutId": "722fe553-a93d-37ea-be19-4a0a6f31da03"
       },
       {
         "id": 136,
@@ -10470,7 +10605,8 @@
         "updatedAt": 1770718200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 153
+        "scheduledWorkoutId": 153,
+        "clientWorkoutId": "1a395d5f-2a97-3cad-8235-3bf343bbf135"
       },
       {
         "id": 137,
@@ -10489,7 +10625,8 @@
         "updatedAt": 1771236720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 155
+        "scheduledWorkoutId": 155,
+        "clientWorkoutId": "b92ac914-bdac-3d27-b437-057fff469775"
       },
       {
         "id": 138,
@@ -10508,7 +10645,8 @@
         "updatedAt": 1771323240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 156
+        "scheduledWorkoutId": 156,
+        "clientWorkoutId": "4a239388-f1bf-3e33-b8af-d459247ac973"
       },
       {
         "id": 139,
@@ -10527,7 +10665,8 @@
         "updatedAt": 1771496280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 157
+        "scheduledWorkoutId": 157,
+        "clientWorkoutId": "a72e1e55-560a-3bb4-adb5-f62ad6c62472"
       },
       {
         "id": 140,
@@ -10546,7 +10685,8 @@
         "updatedAt": 1771841760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 158
+        "scheduledWorkoutId": 158,
+        "clientWorkoutId": "bd03f288-3e66-31f5-a018-356ce4d75254"
       },
       {
         "id": 141,
@@ -10565,7 +10705,8 @@
         "updatedAt": 1771841760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 159
+        "scheduledWorkoutId": 159,
+        "clientWorkoutId": "8cb5220e-1c62-3c4a-850f-985bcddd3f70"
       },
       {
         "id": 142,
@@ -10584,7 +10725,8 @@
         "updatedAt": 1772014200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 160
+        "scheduledWorkoutId": 160,
+        "clientWorkoutId": "f3f6a0c6-354a-3f0a-b259-926273c34e33"
       },
       {
         "id": 143,
@@ -10603,7 +10745,8 @@
         "updatedAt": 1772100720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 161
+        "scheduledWorkoutId": 161,
+        "clientWorkoutId": "c7433f53-8c31-3e08-9782-d3edf44a3ef8"
       },
       {
         "id": 144,
@@ -10622,7 +10765,8 @@
         "updatedAt": 1772446440000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 163
+        "scheduledWorkoutId": 163,
+        "clientWorkoutId": "2046551c-3eab-384b-aaf9-d1ae9213c235"
       },
       {
         "id": 145,
@@ -10641,7 +10785,8 @@
         "updatedAt": 1772532960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 164
+        "scheduledWorkoutId": 164,
+        "clientWorkoutId": "bd724c6b-1014-3acf-a195-68ec0a89347b"
       },
       {
         "id": 146,
@@ -10660,7 +10805,8 @@
         "updatedAt": 1772878440000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 166
+        "scheduledWorkoutId": 166,
+        "clientWorkoutId": "5c52974a-772e-33bb-bc11-8184a84d4ad8"
       },
       {
         "id": 147,
@@ -10679,7 +10825,8 @@
         "updatedAt": 1772964960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 165
+        "scheduledWorkoutId": 165,
+        "clientWorkoutId": "003d510a-d309-34ab-9c4f-638609d24fea"
       },
       {
         "id": 148,
@@ -10698,7 +10845,8 @@
         "updatedAt": 1773051480000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 167
+        "scheduledWorkoutId": 167,
+        "clientWorkoutId": "aad70d4b-9de3-36e0-b410-45d45dc26c26"
       },
       {
         "id": 149,
@@ -10717,7 +10865,8 @@
         "updatedAt": 1773137400000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 168
+        "scheduledWorkoutId": 168,
+        "clientWorkoutId": "bbddba70-2f3b-3b03-b911-82ad7d212507"
       },
       {
         "id": 150,
@@ -10736,7 +10885,8 @@
         "updatedAt": 1773310440000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 169
+        "scheduledWorkoutId": 169,
+        "clientWorkoutId": "4d502c51-8448-3002-bc72-35eda1dc367f"
       },
       {
         "id": 151,
@@ -10755,7 +10905,8 @@
         "updatedAt": 1773742440000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 171
+        "scheduledWorkoutId": 171,
+        "clientWorkoutId": "f6982bab-f852-3fb7-9a6e-14af17d218b0"
       },
       {
         "id": 152,
@@ -10774,7 +10925,8 @@
         "updatedAt": 1773828960000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 172
+        "scheduledWorkoutId": 172,
+        "clientWorkoutId": "c5fbbf8c-ce8c-31b6-a6dc-36720aff5633"
       },
       {
         "id": 153,
@@ -10793,7 +10945,8 @@
         "updatedAt": 1773915480000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 173
+        "scheduledWorkoutId": 173,
+        "clientWorkoutId": "35f49e83-9184-3070-89c8-33b8e606243e"
       },
       {
         "id": 154,
@@ -10812,7 +10965,8 @@
         "updatedAt": 1774087920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 174
+        "scheduledWorkoutId": 174,
+        "clientWorkoutId": "7ff7355a-c479-3cd9-ba24-398e5e6dd152"
       },
       {
         "id": 155,
@@ -10831,7 +10985,8 @@
         "updatedAt": 1774174440000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "93be1dde-c5f6-3b5e-8b05-1339e450df90"
       },
       {
         "id": 156,
@@ -10850,7 +11005,8 @@
         "updatedAt": 1774347480000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 176
+        "scheduledWorkoutId": 176,
+        "clientWorkoutId": "59ff1938-0c0b-3a68-bdbb-420eba916655"
       },
       {
         "id": 157,
@@ -10869,7 +11025,8 @@
         "updatedAt": 1774519920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 177
+        "scheduledWorkoutId": 177,
+        "clientWorkoutId": "b6d03906-f510-3a98-b377-3751e1054f76"
       },
       {
         "id": 158,
@@ -10888,7 +11045,8 @@
         "updatedAt": 1774951920000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 180
+        "scheduledWorkoutId": 180,
+        "clientWorkoutId": "153068ad-68c7-336c-8370-a2aa2bb3081c"
       },
       {
         "id": 159,
@@ -10907,7 +11065,8 @@
         "updatedAt": 1775038320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 179
+        "scheduledWorkoutId": 179,
+        "clientWorkoutId": "1b3c3044-6f03-3479-a0d8-6a097c2f1ecf"
       },
       {
         "id": 160,
@@ -10926,7 +11085,8 @@
         "updatedAt": 1775124840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 181
+        "scheduledWorkoutId": 181,
+        "clientWorkoutId": "900e69e9-f40a-3023-86ac-bd53e92a2594"
       },
       {
         "id": 161,
@@ -10945,7 +11105,8 @@
         "updatedAt": 1775297880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 182
+        "scheduledWorkoutId": 182,
+        "clientWorkoutId": "5ef9e79a-46c9-364a-bdd0-275c90c0f97b"
       },
       {
         "id": 162,
@@ -10964,7 +11125,8 @@
         "updatedAt": 1775297880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 183
+        "scheduledWorkoutId": 183,
+        "clientWorkoutId": "3d2658ab-4445-3314-82f3-ed3c79eaad9b"
       },
       {
         "id": 163,
@@ -10983,7 +11145,8 @@
         "updatedAt": 1775470320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 184
+        "scheduledWorkoutId": 184,
+        "clientWorkoutId": "5c9b68ef-b456-3f29-9b5a-e4cf805a0c6f"
       },
       {
         "id": 164,
@@ -11002,7 +11165,8 @@
         "updatedAt": 1775556840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 185
+        "scheduledWorkoutId": 185,
+        "clientWorkoutId": "d975996e-79b3-30ab-919c-81c528a30086"
       },
       {
         "id": 165,
@@ -11021,7 +11185,8 @@
         "updatedAt": 1776075360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 187
+        "scheduledWorkoutId": 187,
+        "clientWorkoutId": "883d8a2b-312f-33af-8d3e-1eff9891f5cd"
       },
       {
         "id": 166,
@@ -11040,7 +11205,8 @@
         "updatedAt": 1776161880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 188
+        "scheduledWorkoutId": 188,
+        "clientWorkoutId": "9d7b156e-f243-3b8e-bb95-59a7589ab32a"
       },
       {
         "id": 167,
@@ -11059,7 +11225,8 @@
         "updatedAt": 1776334320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 189
+        "scheduledWorkoutId": 189,
+        "clientWorkoutId": "ee69393c-7f76-3eb8-856e-f86e784d8e35"
       },
       {
         "id": 168,
@@ -11078,7 +11245,8 @@
         "updatedAt": 1776507360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 190
+        "scheduledWorkoutId": 190,
+        "clientWorkoutId": "98de53f3-d6de-3b04-9253-ffa301744737"
       },
       {
         "id": 169,
@@ -11097,7 +11265,8 @@
         "updatedAt": 1776679800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 191
+        "scheduledWorkoutId": 191,
+        "clientWorkoutId": "00b2189f-7d32-36d9-82bd-445132fccb17"
       },
       {
         "id": 170,
@@ -11116,7 +11285,8 @@
         "updatedAt": 1776766320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 192
+        "scheduledWorkoutId": 192,
+        "clientWorkoutId": "65d79a41-2aa1-3813-8180-68d1f5ed4d88"
       },
       {
         "id": 171,
@@ -11135,7 +11305,8 @@
         "updatedAt": 1777025880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 193
+        "scheduledWorkoutId": 193,
+        "clientWorkoutId": "93ee5a8f-1e70-3e5a-882c-3a1bfe32172d"
       },
       {
         "id": 172,
@@ -11154,7 +11325,8 @@
         "updatedAt": 1777284840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 195
+        "scheduledWorkoutId": 195,
+        "clientWorkoutId": "3db0f617-0686-39c7-b2d2-806c81666bea"
       },
       {
         "id": 173,
@@ -11173,7 +11345,8 @@
         "updatedAt": 1777371360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 196
+        "scheduledWorkoutId": 196,
+        "clientWorkoutId": "80361080-0bdb-37da-a8f0-a60b17483e71"
       },
       {
         "id": 174,
@@ -11192,7 +11365,8 @@
         "updatedAt": 1777543800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 197
+        "scheduledWorkoutId": 197,
+        "clientWorkoutId": "4d84f10b-e989-3a6f-939b-2e6b7222ae5c"
       },
       {
         "id": 175,
@@ -11211,7 +11385,8 @@
         "updatedAt": 1777630320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 198
+        "scheduledWorkoutId": 198,
+        "clientWorkoutId": "ed466efa-1db2-36a8-8db2-8d49f911637f"
       },
       {
         "id": 176,
@@ -11230,7 +11405,8 @@
         "updatedAt": 1777716840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 199
+        "scheduledWorkoutId": 199,
+        "clientWorkoutId": "19905b0b-c915-3201-9abb-3da7b58b6a41"
       },
       {
         "id": 177,
@@ -11249,7 +11425,8 @@
         "updatedAt": 1777803360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "77960f1f-e902-3069-8aa8-007b73f7bb24"
       },
       {
         "id": 178,
@@ -11268,7 +11445,8 @@
         "updatedAt": 1777975800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 201
+        "scheduledWorkoutId": 201,
+        "clientWorkoutId": "e5d92348-a9e3-31ba-b23c-b5867112eedb"
       },
       {
         "id": 179,
@@ -11287,7 +11465,8 @@
         "updatedAt": 1778062320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 200
+        "scheduledWorkoutId": 200,
+        "clientWorkoutId": "63cd88ef-136f-309a-9337-9eddbf04a23e"
       },
       {
         "id": 180,
@@ -11306,7 +11485,8 @@
         "updatedAt": 1778321880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 203
+        "scheduledWorkoutId": 203,
+        "clientWorkoutId": "8f305448-fbc6-34fb-8dcd-83c1c82b7758"
       },
       {
         "id": 181,
@@ -11325,7 +11505,8 @@
         "updatedAt": 1778580840000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 205
+        "scheduledWorkoutId": 205,
+        "clientWorkoutId": "d31a08fa-9bc8-30bb-9a30-7266f2827e30"
       },
       {
         "id": 182,
@@ -11344,7 +11525,8 @@
         "updatedAt": 1778753880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 206
+        "scheduledWorkoutId": 206,
+        "clientWorkoutId": "1d5cb84d-8be6-3a0e-9323-e6076c74ca89"
       },
       {
         "id": 183,
@@ -11363,7 +11545,8 @@
         "updatedAt": 1779099360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 208
+        "scheduledWorkoutId": 208,
+        "clientWorkoutId": "2e378270-ec2e-3a7f-8b1c-d03996890572"
       },
       {
         "id": 184,
@@ -11382,7 +11565,8 @@
         "updatedAt": 1779185880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 207
+        "scheduledWorkoutId": 207,
+        "clientWorkoutId": "8e79b99f-1564-3fa3-a11f-0d14528269ef"
       },
       {
         "id": 185,
@@ -11401,7 +11585,8 @@
         "updatedAt": 1779185880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 209
+        "scheduledWorkoutId": 209,
+        "clientWorkoutId": "d6b1d434-5774-34f4-8be7-3fa47fb3bafa"
       },
       {
         "id": 186,
@@ -11420,7 +11605,8 @@
         "updatedAt": 1779531360000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 211
+        "scheduledWorkoutId": 211,
+        "clientWorkoutId": "52101dff-d508-332d-a923-96a7a54f5c1d"
       },
       {
         "id": 187,
@@ -11439,7 +11625,8 @@
         "updatedAt": 1779703800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 212
+        "scheduledWorkoutId": 212,
+        "clientWorkoutId": "b09e270a-bae9-30d6-b1a7-5016b868c9c5"
       },
       {
         "id": 188,
@@ -11458,7 +11645,8 @@
         "updatedAt": 1779790320000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 213
+        "scheduledWorkoutId": 213,
+        "clientWorkoutId": "98671022-e973-3cf8-ba51-1cea553d91e6"
       },
       {
         "id": 189,
@@ -11477,7 +11665,8 @@
         "updatedAt": 1780049880000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 214
+        "scheduledWorkoutId": 214,
+        "clientWorkoutId": "fc68b17a-6e62-3d53-abeb-d64054f844d4"
       },
       {
         "id": 190,
@@ -11496,7 +11685,8 @@
         "updatedAt": 1780135800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 215
+        "scheduledWorkoutId": 215,
+        "clientWorkoutId": "7416d177-cb7d-38ab-9f16-4c95776fb470"
       },
       {
         "id": 191,
@@ -11515,7 +11705,8 @@
         "updatedAt": 1780135800000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 216
+        "scheduledWorkoutId": 216,
+        "clientWorkoutId": "db0ec551-046e-3289-b555-81cf2ba15fc1"
       },
       {
         "id": 192,
@@ -11534,7 +11725,8 @@
         "updatedAt": 1780308720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 217
+        "scheduledWorkoutId": 217,
+        "clientWorkoutId": "767267a8-aa67-345e-83db-aee9506bfd00"
       },
       {
         "id": 193,
@@ -11553,7 +11745,8 @@
         "updatedAt": 1780568280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 219
+        "scheduledWorkoutId": 219,
+        "clientWorkoutId": "676e4c2a-2009-3a35-9e9f-f3de82290779"
       },
       {
         "id": 194,
@@ -11572,7 +11765,8 @@
         "updatedAt": 1780913760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 220
+        "scheduledWorkoutId": 220,
+        "clientWorkoutId": "791d433c-4ce0-3fd5-aee6-95a623bb8158"
       },
       {
         "id": 195,
@@ -11591,7 +11785,8 @@
         "updatedAt": 1781172720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 221
+        "scheduledWorkoutId": 221,
+        "clientWorkoutId": "8ab6d653-f7b4-332d-bf92-77b3ab5e5906"
       },
       {
         "id": 196,
@@ -11610,7 +11805,8 @@
         "updatedAt": 1781172720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 222
+        "scheduledWorkoutId": 222,
+        "clientWorkoutId": "fca15112-4b4e-33a4-bf39-d8213a86499d"
       },
       {
         "id": 197,
@@ -11629,7 +11825,8 @@
         "updatedAt": 1781345760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 223
+        "scheduledWorkoutId": 223,
+        "clientWorkoutId": "813d342e-53fe-3bc5-87d3-d9b411f32a85"
       },
       {
         "id": 198,
@@ -11648,7 +11845,8 @@
         "updatedAt": 1781432280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "476b435e-6523-30d4-92a1-d0851d75c484"
       },
       {
         "id": 199,
@@ -11667,7 +11865,8 @@
         "updatedAt": 1781518200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 224
+        "scheduledWorkoutId": 224,
+        "clientWorkoutId": "ea4184f1-13ce-328f-a57c-11062a4f102b"
       },
       {
         "id": 200,
@@ -11686,7 +11885,8 @@
         "updatedAt": 1781604720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 225
+        "scheduledWorkoutId": 225,
+        "clientWorkoutId": "31bee4a5-daf4-3588-aecb-c82165694c67"
       },
       {
         "id": 201,
@@ -11705,7 +11905,8 @@
         "updatedAt": 1781950200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 227
+        "scheduledWorkoutId": 227,
+        "clientWorkoutId": "f12dfc4f-6836-33bd-bd1d-9bdead2d2adb"
       },
       {
         "id": 202,
@@ -11724,7 +11925,8 @@
         "updatedAt": 1782209760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 229
+        "scheduledWorkoutId": 229,
+        "clientWorkoutId": "34673fce-2b14-39c9-9b80-6bfaf9294559"
       },
       {
         "id": 203,
@@ -11743,7 +11945,8 @@
         "updatedAt": 1782382200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 228
+        "scheduledWorkoutId": 228,
+        "clientWorkoutId": "6c2ca777-f47e-3b29-ba2b-eedcd667bf52"
       },
       {
         "id": 204,
@@ -11762,7 +11965,8 @@
         "updatedAt": 1782382200000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 230
+        "scheduledWorkoutId": 230,
+        "clientWorkoutId": "8062f0d7-361d-3dd3-8174-ac81d8ca56f6"
       },
       {
         "id": 205,
@@ -11781,7 +11985,8 @@
         "updatedAt": 1782468720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 231
+        "scheduledWorkoutId": 231,
+        "clientWorkoutId": "dbf814d1-9d7f-376e-bb11-9b0a101de199"
       },
       {
         "id": 206,
@@ -11800,7 +12005,8 @@
         "updatedAt": 1782555240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 232
+        "scheduledWorkoutId": 232,
+        "clientWorkoutId": "8dd2f7c1-263e-3849-80ff-6e548dda3e2f"
       },
       {
         "id": 207,
@@ -11819,7 +12025,8 @@
         "updatedAt": 1783073760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 235
+        "scheduledWorkoutId": 235,
+        "clientWorkoutId": "07bd0546-fe2d-3059-87a8-539970d94161"
       },
       {
         "id": 208,
@@ -11838,7 +12045,8 @@
         "updatedAt": 1783160280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 236
+        "scheduledWorkoutId": 236,
+        "clientWorkoutId": "03d5ee59-604c-3ef5-98ef-d8a6673d6e1a"
       },
       {
         "id": 209,
@@ -11857,7 +12065,8 @@
         "updatedAt": 1783419240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 237
+        "scheduledWorkoutId": 237,
+        "clientWorkoutId": "a3fa0d87-3f72-3c95-954d-e0d4e851db07"
       },
       {
         "id": 210,
@@ -11876,7 +12085,8 @@
         "updatedAt": 1783419240000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 238
+        "scheduledWorkoutId": 238,
+        "clientWorkoutId": "4996fc18-fe70-32fc-9463-8cae747ba741"
       },
       {
         "id": 211,
@@ -11895,7 +12105,8 @@
         "updatedAt": 1783592280000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 239
+        "scheduledWorkoutId": 239,
+        "clientWorkoutId": "1e027c4c-feb4-3b37-9bea-f5be228a8ee9"
       },
       {
         "id": 212,
@@ -11914,7 +12125,8 @@
         "updatedAt": 1783764720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 240
+        "scheduledWorkoutId": 240,
+        "clientWorkoutId": "77a301f8-7c52-37ec-9c7a-b493baef6d9e"
       },
       {
         "id": 213,
@@ -11933,7 +12145,8 @@
         "updatedAt": 1783937760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 241
+        "scheduledWorkoutId": 241,
+        "clientWorkoutId": "38bceeaf-f4f5-334e-b29c-05dbb870ec16"
       },
       {
         "id": 214,
@@ -11952,7 +12165,8 @@
         "updatedAt": 1784196720000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 243
+        "scheduledWorkoutId": 243,
+        "clientWorkoutId": "42870e70-1381-38a6-9537-4c8cbd0fbdd8"
       },
       {
         "id": 215,
@@ -11971,7 +12185,8 @@
         "updatedAt": 1784369760000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 244
+        "scheduledWorkoutId": 244,
+        "clientWorkoutId": "0dbbc0f9-97d0-318f-9e9a-5a69339198dd"
       },
       {
         "id": 216,
@@ -11990,7 +12205,8 @@
         "updatedAt": 1785752160000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 254
+        "scheduledWorkoutId": 254,
+        "clientWorkoutId": "963279d1-e6ac-33e5-92e6-2d037292c7f8"
       },
       {
         "id": 217,
@@ -12009,7 +12225,8 @@
         "updatedAt": 1785838680000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 255
+        "scheduledWorkoutId": 255,
+        "clientWorkoutId": "d6eb1f22-6b10-360d-9132-0344b8b6bff8"
       },
       {
         "id": 218,
@@ -12028,7 +12245,8 @@
         "updatedAt": 1786097640000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 256
+        "scheduledWorkoutId": 256,
+        "clientWorkoutId": "ebb41112-a0c5-3edb-a965-11826a9a8c15"
       },
       {
         "id": 219,
@@ -12047,7 +12265,8 @@
         "updatedAt": 1786184160000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 257
+        "scheduledWorkoutId": 257,
+        "clientWorkoutId": "653ee1e8-730a-38a9-a450-bcc2799aafa3"
       },
       {
         "id": 220,
@@ -12066,7 +12285,8 @@
         "updatedAt": 1786356600000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 258
+        "scheduledWorkoutId": 258,
+        "clientWorkoutId": "ffe9454e-7780-3b68-8824-c31b135a3ae3"
       },
       {
         "id": 221,
@@ -12085,7 +12305,8 @@
         "updatedAt": 1786529640000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 259
+        "scheduledWorkoutId": 259,
+        "clientWorkoutId": "06db8fef-b840-3890-add9-ce22b7750f75"
       },
       {
         "id": 222,
@@ -12104,7 +12325,8 @@
         "updatedAt": 1786616160000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 260
+        "scheduledWorkoutId": 260,
+        "clientWorkoutId": "83fbcfc0-ac85-35b9-b8ac-d6c79a183dce"
       },
       {
         "id": 223,
@@ -12123,7 +12345,8 @@
         "updatedAt": 1786788600000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 261
+        "scheduledWorkoutId": 261,
+        "clientWorkoutId": "7faa4e1b-4e61-38e4-bd0e-e8862ed5158c"
       },
       {
         "id": 224,
@@ -12142,7 +12365,8 @@
         "updatedAt": 1787220600000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 263
+        "scheduledWorkoutId": 263,
+        "clientWorkoutId": "442e7906-7ae3-3c60-95ea-323e744f1ef1"
       },
       {
         "id": 225,
@@ -12161,7 +12385,8 @@
         "updatedAt": 1787220600000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 264
+        "scheduledWorkoutId": 264,
+        "clientWorkoutId": "4e18fd68-bcf4-33e1-8e51-ac4bef0fda53"
       },
       {
         "id": 226,
@@ -12180,7 +12405,8 @@
         "updatedAt": 1787307120000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 265
+        "scheduledWorkoutId": 265,
+        "clientWorkoutId": "8a837796-92a8-3069-8825-578f89eba12f"
       },
       {
         "id": 227,
@@ -12199,7 +12425,8 @@
         "updatedAt": 1787566680000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 267
+        "scheduledWorkoutId": 267,
+        "clientWorkoutId": "e8e1e430-c828-3967-8ac9-827af391e1d2"
       },
       {
         "id": 228,
@@ -12218,7 +12445,8 @@
         "updatedAt": 1787652600000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 268
+        "scheduledWorkoutId": 268,
+        "clientWorkoutId": "f4922d2e-0c67-3552-9f83-0cf1cbec3748"
       },
       {
         "id": 229,
@@ -12237,7 +12465,8 @@
         "updatedAt": 1787825640000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 269
+        "scheduledWorkoutId": 269,
+        "clientWorkoutId": "b213fc72-1dac-334b-a639-6aab160829d3"
       },
       {
         "id": 230,
@@ -12256,7 +12485,8 @@
         "updatedAt": 1788171120000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 271
+        "scheduledWorkoutId": 271,
+        "clientWorkoutId": "8dcfd7d3-79b7-3bcc-99ad-104a8b2d37e8"
       },
       {
         "id": 231,
@@ -12275,7 +12505,8 @@
         "updatedAt": 1788257520000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 270
+        "scheduledWorkoutId": 270,
+        "clientWorkoutId": "69d3b85e-8828-3a8d-9aca-2ca7441ca5fe"
       },
       {
         "id": 233,
@@ -12294,7 +12525,8 @@
         "updatedAt": 1788430560000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 273
+        "scheduledWorkoutId": 273,
+        "clientWorkoutId": "ad5fdcaf-93c8-3477-b9a4-ef4f0d508da3"
       },
       {
         "id": 234,
@@ -12313,7 +12545,8 @@
         "updatedAt": 1788689520000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "5aeac8cb-813f-3e6a-b3e4-dcce37999da9"
       },
       {
         "id": 235,
@@ -12332,7 +12565,8 @@
         "updatedAt": 1788776040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 275
+        "scheduledWorkoutId": 275,
+        "clientWorkoutId": "e777ea3f-67dd-34a5-bc68-20507078d0d4"
       },
       {
         "id": 236,
@@ -12351,7 +12585,8 @@
         "updatedAt": 1788862560000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 276
+        "scheduledWorkoutId": 276,
+        "clientWorkoutId": "b8841db0-27df-3736-bca8-91a04055207d"
       },
       {
         "id": 237,
@@ -12370,7 +12605,8 @@
         "updatedAt": 1789121520000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 277
+        "scheduledWorkoutId": 277,
+        "clientWorkoutId": "f710ebbd-f7f6-3da7-9add-694135e0e638"
       },
       {
         "id": 238,
@@ -12389,7 +12625,8 @@
         "updatedAt": 1789208040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 278
+        "scheduledWorkoutId": 278,
+        "clientWorkoutId": "e2c9c196-3c63-30c7-86bd-77ebad001b59"
       },
       {
         "id": 239,
@@ -12408,7 +12645,8 @@
         "updatedAt": 1789381080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 279
+        "scheduledWorkoutId": 279,
+        "clientWorkoutId": "33656b66-8d16-30af-b91c-90a36aedee59"
       },
       {
         "id": 240,
@@ -12427,7 +12665,8 @@
         "updatedAt": 1789467000000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 280
+        "scheduledWorkoutId": 280,
+        "clientWorkoutId": "580cce8d-14e4-3c40-b020-fc6d66e9494e"
       },
       {
         "id": 243,
@@ -12446,7 +12685,8 @@
         "updatedAt": 1790072040000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 285
+        "scheduledWorkoutId": 285,
+        "clientWorkoutId": "6dfee539-1e33-386e-abdc-192dd98ec1a2"
       },
       {
         "id": 244,
@@ -12465,7 +12705,8 @@
         "updatedAt": 1790158560000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 284
+        "scheduledWorkoutId": 284,
+        "clientWorkoutId": "05fec447-3e67-3912-a8e6-abcb90f5b537"
       },
       {
         "id": 245,
@@ -12484,7 +12725,8 @@
         "updatedAt": 1790245080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 286
+        "scheduledWorkoutId": 286,
+        "clientWorkoutId": "07cd2dfc-4a09-3863-9d0b-861c2e1bbfe2"
       },
       {
         "id": 247,
@@ -12503,7 +12745,8 @@
         "updatedAt": 1790677080000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": 288
+        "scheduledWorkoutId": 288,
+        "clientWorkoutId": "1b98da4c-ab85-3720-935a-7696489a407d"
       },
       {
         "id": 249,
@@ -12522,7 +12765,8 @@
         "updatedAt": 1786959900000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "55fd60bf-01e4-3cb7-9488-550542127f5a"
       },
       {
         "id": 250,
@@ -12541,7 +12785,8 @@
         "updatedAt": 1787737500000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "bf4d1d50-55ee-3d65-8a1c-5110d996bd7f"
       },
       {
         "id": 251,
@@ -12560,7 +12805,8 @@
         "updatedAt": 1787910300000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "6a6e648c-2521-325b-994b-5ae37a5ebbb4"
       },
       {
         "id": 252,
@@ -12579,7 +12825,8 @@
         "updatedAt": 1789983900000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "49e39db4-7435-3bc6-ac34-b70f7adac82b"
       },
       {
         "id": 253,
@@ -12598,7 +12845,8 @@
         "updatedAt": 1790934300000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "ce0164c5-c52c-32b4-aefe-0d66fc2ed0d5"
       },
       {
         "id": 254,
@@ -12617,7 +12865,8 @@
         "updatedAt": 1789897500000,
         "activeLock": null,
         "importFingerprint": null,
-        "scheduledWorkoutId": null
+        "scheduledWorkoutId": null,
+        "clientWorkoutId": "568608a3-7885-3011-97bb-a597c3d3aa3d"
       }
     ],
     "workout_session_exercises": [

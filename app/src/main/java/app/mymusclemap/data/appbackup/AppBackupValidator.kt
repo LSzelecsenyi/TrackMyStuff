@@ -83,6 +83,7 @@ object AppBackupValidator {
             errors
         )
         requireUnique(tables.workoutSessions.map { it.id }, "workout_sessions.id", errors)
+        requireUnique(tables.workoutSessions.map { it.clientWorkoutId }, "workout_sessions.clientWorkoutId", errors)
         requireUnique(
             tables.workoutSessions.mapNotNull { it.importFingerprint },
             "workout_sessions.importFingerprint",

@@ -230,6 +230,14 @@ public class FounderService {
                     "The Founder application is already awaiting review."
             );
         }
+        if (evaluation.status() == FounderStatus.APPROVED || evaluation.status() == FounderStatus.REJECTED) {
+            return FounderCommandResult.reject(
+                    view(evaluation, application),
+                    HttpStatus.CONFLICT,
+                    "APPLICATION_CLOSED",
+                    "The Founder application is no longer open."
+            );
+        }
         return null;
     }
 

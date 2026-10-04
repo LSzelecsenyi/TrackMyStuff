@@ -569,3 +569,160 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
     }
 }
 
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("PRAGMA foreign_keys=OFF")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `workout_sessions_new` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `templateId` INTEGER,
+                `templateName` TEXT NOT NULL,
+                `status` TEXT NOT NULL,
+                `workoutDate` TEXT NOT NULL,
+                `startedAt` INTEGER NOT NULL,
+                `finishedAt` INTEGER,
+                `abandonedAt` INTEGER,
+                `notes` TEXT,
+                `bodyWeightKg` REAL,
+                `bodyWeightSource` TEXT NOT NULL,
+                `bodyWeightSourceDate` TEXT,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                `activeLock` INTEGER,
+                `importFingerprint` TEXT,
+                `scheduledWorkoutId` INTEGER,
+                `clientWorkoutId` TEXT NOT NULL,
+                FOREIGN KEY(`templateId`) REFERENCES `workout_templates`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT,
+                FOREIGN KEY(`scheduledWorkoutId`) REFERENCES `scheduled_workouts`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT
+            )
+            """.trimIndent()
+        )
+        data class ExistingSession(
+            val id: Long,
+            val templateId: Long?,
+            val templateName: String,
+            val status: String,
+            val workoutDate: String,
+            val startedAt: Long,
+            val finishedAt: Long?,
+            val abandonedAt: Long?,
+            val notes: String?,
+            val bodyWeightKg: Double?,
+            val bodyWeightSource: String,
+            val bodyWeightSourceDate: String?,
+            val createdAt: Long,
+            val updatedAt: Long,
+            val activeLock: Long?,
+            val importFingerprint: String?,
+            val scheduledWorkoutId: Long?
+        )
+        val existing = mutableListOf<ExistingSession>()
+        val cursor = db.query(
+            """
+            SELECT `id`, `templateId`, `templateName`, `status`, `workoutDate`, `startedAt`, `finishedAt`,
+                `abandonedAt`, `notes`, `bodyWeightKg`, `bodyWeightSource`, `bodyWeightSourceDate`,
+                `createdAt`, `updatedAt`, `activeLock`, `importFingerprint`, `scheduledWorkoutId`
+            FROM `workout_sessions`
+            """.trimIndent()
+        )
+        while (cursor.moveToNext()) {
+            existing += ExistingSession(
+                id = cursor.getLong(0),
+                templateId = cursor.nullableLong(1),
+                templateName = cursor.getString(2),
+                status = cursor.getString(3),
+                workoutDate = cursor.getString(4),
+                startedAt = cursor.getLong(5),
+                finishedAt = cursor.nullableLong(6),
+                abandonedAt = cursor.nullableLong(7),
+                notes = cursor.nullableString(8),
+                bodyWeightKg = cursor.nullableDouble(9),
+                bodyWeightSource = cursor.getString(10),
+                bodyWeightSourceDate = cursor.nullableString(11),
+                createdAt = cursor.getLong(12),
+                updatedAt = cursor.getLong(13),
+                activeLock = cursor.nullableLong(14),
+                importFingerprint = cursor.nullableString(15),
+                scheduledWorkoutId = cursor.nullableLong(16)
+            )
+        }
+        cursor.close()
+        existing.forEach { row ->
+            db.execSQL(
+                """
+                INSERT INTO `workout_sessions_new` (
+                    `id`, `templateId`, `templateName`, `status`, `workoutDate`, `startedAt`, `finishedAt`,
+                    `abandonedAt`, `notes`, `bodyWeightKg`, `bodyWeightSource`, `bodyWeightSourceDate`,
+                    `createdAt`, `updatedAt`, `activeLock`, `importFingerprint`, `scheduledWorkoutId`,
+                    `clientWorkoutId`
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any?>(
+                    row.id,
+                    row.templateId,
+                    row.templateName,
+                    row.status,
+                    row.workoutDate,
+                    row.startedAt,
+                    row.finishedAt,
+                    row.abandonedAt,
+                    row.notes,
+                    row.bodyWeightKg,
+                    row.bodyWeightSource,
+                    row.bodyWeightSourceDate,
+                    row.createdAt,
+                    row.updatedAt,
+                    row.activeLock,
+                    row.importFingerprint,
+                    row.scheduledWorkoutId,
+                    java.util.UUID.randomUUID().toString()
+                )
+            )
+        }
+        db.execSQL("DROP TABLE `workout_sessions`")
+        db.execSQL("ALTER TABLE `workout_sessions_new` RENAME TO `workout_sessions`")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_workout_sessions_activeLock` ON `workout_sessions` (`activeLock`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_workout_sessions_status` ON `workout_sessions` (`status`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_workout_sessions_templateId` ON `workout_sessions` (`templateId`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_workout_sessions_workoutDate` ON `workout_sessions` (`workoutDate`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_workout_sessions_importFingerprint` ON `workout_sessions` (`importFingerprint`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_workout_sessions_scheduledWorkoutId` ON `workout_sessions` (`scheduledWorkoutId`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_workout_sessions_clientWorkoutId` ON `workout_sessions` (`clientWorkoutId`)"
+        )
+        db.execSQL(
+            """
+            UPDATE sqlite_sequence
+            SET seq = (SELECT IFNULL(MAX(id), 0) FROM `workout_sessions`)
+            WHERE name = 'workout_sessions'
+            """.trimIndent()
+        )
+        db.execSQL("PRAGMA foreign_keys=ON")
+    }
+
+    private fun android.database.Cursor.nullableLong(index: Int): Long? {
+        return if (isNull(index)) null else getLong(index)
+    }
+
+    private fun android.database.Cursor.nullableString(index: Int): String? {
+        return if (isNull(index)) null else getString(index)
+    }
+
+    private fun android.database.Cursor.nullableDouble(index: Int): Double? {
+        return if (isNull(index)) null else getDouble(index)
+    }
+}
+
