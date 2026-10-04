@@ -24,6 +24,7 @@ private val Context.founderMilestoneDataStore: DataStore<Preferences> by prefere
 
 data class FounderMilestoneAcknowledgements(
     val temporaryProUnlocked: Boolean = false,
+    val trainingComplete: Boolean = false,
     val qualificationComplete: Boolean = false,
     val founderApproved: Boolean = false,
     val invitationPending: Boolean = false,
@@ -37,6 +38,7 @@ class FounderMilestoneAcknowledgementStore(context: Context) {
         val prefs = dataStore.data.first()
         return FounderMilestoneAcknowledgements(
             temporaryProUnlocked = prefs[KEY_TEMPORARY_PRO] == true,
+            trainingComplete = prefs[KEY_TRAINING_COMPLETE] == true,
             qualificationComplete = prefs[KEY_QUALIFICATION] == true,
             founderApproved = prefs[KEY_APPROVED] == true,
             invitationPending = prefs[KEY_INVITATION_PENDING] == true,
@@ -47,6 +49,7 @@ class FounderMilestoneAcknowledgementStore(context: Context) {
     suspend fun save(acknowledgements: FounderMilestoneAcknowledgements) {
         dataStore.edit { prefs ->
             prefs[KEY_TEMPORARY_PRO] = acknowledgements.temporaryProUnlocked
+            prefs[KEY_TRAINING_COMPLETE] = acknowledgements.trainingComplete
             prefs[KEY_QUALIFICATION] = acknowledgements.qualificationComplete
             prefs[KEY_APPROVED] = acknowledgements.founderApproved
             prefs[KEY_INVITATION_PENDING] = acknowledgements.invitationPending
@@ -75,6 +78,7 @@ class FounderMilestoneAcknowledgementStore(context: Context) {
     companion object {
         const val PREFERENCES_NAME = "founder_milestone_acknowledgements"
         private val KEY_TEMPORARY_PRO = booleanPreferencesKey("temporary_pro_unlocked_seen")
+        private val KEY_TRAINING_COMPLETE = booleanPreferencesKey("training_complete_seen")
         private val KEY_QUALIFICATION = booleanPreferencesKey("qualification_complete_seen")
         private val KEY_APPROVED = booleanPreferencesKey("founder_approved_seen")
         private val KEY_INVITATION_PENDING = booleanPreferencesKey("founder_invitation_pending")

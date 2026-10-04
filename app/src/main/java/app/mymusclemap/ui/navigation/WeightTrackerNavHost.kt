@@ -57,6 +57,7 @@ import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.FounderProgramStatus
 import app.mymusclemap.ui.founder.FounderMilestone
+import app.mymusclemap.ui.founder.overviewFounderMilestone
 import app.mymusclemap.ui.founder.FounderProgramUiState
 import app.mymusclemap.ui.founder.FounderProgramViewModel
 import app.mymusclemap.ui.founder.founderJourney
@@ -291,7 +292,9 @@ fun WeightTrackerNavHost(
     val membership = remember(entitlementRevision, founder.status) {
         membershipPresentation(currentEntitlement(), founder.status)
     }
-    val deliverTemporaryPro = founder.journey.milestone == FounderMilestone.TemporaryProUnlocked
+    val overviewMilestone = overviewFounderMilestone(founder.journey.milestone)
+    val deliverTemporaryPro = overviewMilestone == FounderMilestone.TemporaryProUnlocked
+    val deliverTrainingComplete = overviewMilestone == FounderMilestone.TrainingComplete
     val onboardingGuideViewModel: OnboardingGuideViewModel = viewModel(factory = factory)
     val onboardingGuide by onboardingGuideViewModel.guide.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -505,7 +508,9 @@ fun WeightTrackerNavHost(
                     membership = membership,
                     showTemporaryProMilestone = deliverTemporaryPro,
                     temporaryProChecklist = founder.journey.presentedChecklist(),
-                    onAcknowledgeTemporaryPro = { founderViewModel?.acknowledgeMilestone() }
+                    onAcknowledgeTemporaryPro = { founderViewModel?.acknowledgeMilestone() },
+                    showTrainingCompleteMilestone = deliverTrainingComplete,
+                    onAcknowledgeTrainingComplete = { founderViewModel?.acknowledgeMilestone() }
                 )
                 LaunchedEffect(state.startedSessionId) {
                     val sessionId = state.startedSessionId ?: return@LaunchedEffect

@@ -93,7 +93,12 @@ class FounderProgramViewModel(
             status = state.status,
             qualification = qualification,
             acknowledgements = acks ?: FounderMilestoneAcknowledgements(),
-            authoritative = state.backendOwned
+            authoritative = state.backendOwned,
+            trainingCompleteOverride = if (state.backendOwned) {
+                state.serverTrainingRequirementsComplete
+            } else {
+                null
+            }
         ).let { presented ->
             if (acks == null) presented.copy(milestone = null) else presented
         }
@@ -234,6 +239,7 @@ class FounderProgramViewModel(
         viewModelScope.launch {
             val updated = when (milestone) {
                 FounderMilestone.TemporaryProUnlocked -> current.copy(temporaryProUnlocked = true)
+                FounderMilestone.TrainingComplete -> current.copy(trainingComplete = true)
                 FounderMilestone.QualificationComplete -> current.copy(qualificationComplete = true)
                 FounderMilestone.FounderApproved -> current.copy(founderApproved = true)
             }

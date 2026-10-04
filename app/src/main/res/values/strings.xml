@@ -1096,6 +1096,9 @@
     <string name="founder_report_needed">Tester Analytics Report still needed</string>
     <string name="founder_deadline">Your qualification window runs through %1$s.</string>
     <string name="founder_milestone_pro_title">Pro unlocked!</string>
+    <string name="founder_milestone_training_title">Training complete!</string>
+    <string name="founder_milestone_training_body">You\'ve completed the training requirement for the Founding Tester Program.</string>
+    <string name="founder_milestone_training_next">Next, share your feedback and Tester Report to complete your application.</string>
     <string name="founder_milestone_pro_body">Nice work — you\'ve reached your first Founding Tester milestone. Temporary Pro is now active while you continue toward Founding Member status.</string>
     <string name="founder_milestone_next">Next up</string>
     <string name="founder_milestone_qualified_title">You did it!</string>

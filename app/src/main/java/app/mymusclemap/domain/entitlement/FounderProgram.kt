@@ -40,7 +40,9 @@ data class FounderProgramState(
     val serverDistinctDays: Int = 0,
     val serverRequiredWorkouts: Int = 0,
     val serverRequiredDistinctDays: Int = 0,
-    val serverTemporaryProWorkouts: Int = 0
+    val serverTemporaryProWorkouts: Int = 0,
+    /** Backend `trainingRequirementsComplete`. Local workout counts do not set this. */
+    val serverTrainingRequirementsComplete: Boolean = false
 )
 
 data class FounderQualification(

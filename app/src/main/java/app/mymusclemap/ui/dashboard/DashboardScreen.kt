@@ -171,7 +171,9 @@ fun DashboardScreen(
     membership: MembershipPresentation = MembershipPresentation.None,
     showTemporaryProMilestone: Boolean = false,
     temporaryProChecklist: List<FounderChecklistRow> = emptyList(),
-    onAcknowledgeTemporaryPro: () -> Unit = {}
+    onAcknowledgeTemporaryPro: () -> Unit = {},
+    showTrainingCompleteMilestone: Boolean = false,
+    onAcknowledgeTrainingComplete: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
@@ -394,6 +396,10 @@ fun DashboardScreen(
         FounderProUnlockedDialog(
             checklist = temporaryProChecklist,
             onAcknowledge = onAcknowledgeTemporaryPro
+        )
+    } else if (showTrainingCompleteMilestone) {
+        app.mymusclemap.ui.founder.FounderTrainingCompleteDialog(
+            onAcknowledge = onAcknowledgeTrainingComplete
         )
     }
     val membershipDetail = membership.detail

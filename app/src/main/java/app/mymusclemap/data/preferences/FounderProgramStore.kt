@@ -48,7 +48,8 @@ class FounderProgramStore(context: Context) {
             serverDistinctDays = prefs[KEY_SERVER_DAYS] ?: 0,
             serverRequiredWorkouts = prefs[KEY_SERVER_REQUIRED_WORKOUTS] ?: 0,
             serverRequiredDistinctDays = prefs[KEY_SERVER_REQUIRED_DAYS] ?: 0,
-            serverTemporaryProWorkouts = prefs[KEY_SERVER_TEMPORARY_PRO] ?: 0
+            serverTemporaryProWorkouts = prefs[KEY_SERVER_TEMPORARY_PRO] ?: 0,
+            serverTrainingRequirementsComplete = prefs[KEY_SERVER_TRAINING_COMPLETE] == true
         )
     }
 
@@ -81,6 +82,7 @@ class FounderProgramStore(context: Context) {
             prefs[KEY_SERVER_REQUIRED_WORKOUTS] = state.serverRequiredWorkouts
             prefs[KEY_SERVER_REQUIRED_DAYS] = state.serverRequiredDistinctDays
             prefs[KEY_SERVER_TEMPORARY_PRO] = state.serverTemporaryProWorkouts
+            prefs[KEY_SERVER_TRAINING_COMPLETE] = state.serverTrainingRequirementsComplete
             state.rejectionReason?.let { prefs[KEY_REJECTION_REASON] = it }
                 ?: prefs.remove(KEY_REJECTION_REASON)
         }
@@ -101,5 +103,6 @@ class FounderProgramStore(context: Context) {
         private val KEY_SERVER_REQUIRED_WORKOUTS = intPreferencesKey("server_required_workouts")
         private val KEY_SERVER_REQUIRED_DAYS = intPreferencesKey("server_required_distinct_days")
         private val KEY_SERVER_TEMPORARY_PRO = intPreferencesKey("server_temporary_pro_workouts")
+        private val KEY_SERVER_TRAINING_COMPLETE = booleanPreferencesKey("server_training_requirements_complete")
     }
 }

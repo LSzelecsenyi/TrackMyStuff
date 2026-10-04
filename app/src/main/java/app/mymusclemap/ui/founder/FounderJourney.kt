@@ -24,6 +24,7 @@ enum class FounderJourneyPhase {
 
 enum class FounderMilestone {
     TemporaryProUnlocked,
+    TrainingComplete,
     QualificationComplete,
     FounderApproved
 }
@@ -72,11 +73,16 @@ fun founderJourney(
     status: FounderProgramStatus,
     qualification: FounderQualification,
     acknowledgements: FounderMilestoneAcknowledgements,
-    authoritative: Boolean = true
+    authoritative: Boolean = true,
+    /**
+     * Backend `trainingRequirementsComplete`. Null keeps the qualification value for
+     * presentation tests. Only an explicit true value can offer the Training Complete milestone.
+     */
+    trainingCompleteOverride: Boolean? = null
 ): FounderJourney {
     val next = nextAction(status, qualification)
     val acceptsContribution = status == FounderProgramStatus.ActiveFree || status == FounderProgramStatus.ActivePro
-    val trainingComplete = qualification.trainingRequirementsComplete
+    val trainingComplete = trainingCompleteOverride ?: qualification.trainingRequirementsComplete
     val showFeedback = acceptsContribution &&
         trainingComplete &&
         (qualification.rules.feedbackRequired || qualification.feedbackRecorded)
@@ -84,8 +90,16 @@ fun founderJourney(
         trainingComplete &&
         qualification.feedbackMet &&
         (qualification.rules.testerAnalyticsReportRequired || qualification.testerAnalyticsReportSubmitted)
-    val rawMilestone = milestone(status, acknowledgements)
-    val shownMilestone = if (!authoritative && rawMilestone == FounderMilestone.TemporaryProUnlocked) {
+    val rawMilestone = milestone(
+        status = status,
+        acknowledgements = acknowledgements,
+        authoritativeTrainingComplete = authoritative && trainingCompleteOverride == true
+    )
+    val shownMilestone = if (
+        !authoritative &&
+        (rawMilestone == FounderMilestone.TemporaryProUnlocked ||
+            rawMilestone == FounderMilestone.TrainingComplete)
+    ) {
         null
     } else {
         rawMilestone
@@ -132,11 +146,20 @@ private fun phase(status: FounderProgramStatus): FounderJourneyPhase {
 }
 
 /**
+ * The Overview dialog for the current Founder milestone.
+ * Qualification and approval milestones stay on the Founder screen.
+ */
+fun overviewFounderMilestone(milestone: FounderMilestone?): FounderMilestone? {
+    return when (milestone) {
+        FounderMilestone.TemporaryProUnlocked,
+        FounderMilestone.TrainingComplete -> milestone
+        else -> null
+    }
+}
+
+/**
  * Whether the existing Temporary Pro milestone is still unacknowledged.
- *
- * Overview and the Founder screen both use this. It is presentation metadata:
- * persisted program status plus the acknowledgement survive process death, and
- * neither flag grants or removes Pro.
+ * It is presentation metadata and does not grant or remove Pro.
  */
 fun temporaryProMilestonePending(
     status: FounderProgramStatus,
@@ -147,21 +170,37 @@ fun temporaryProMilestonePending(
 
 private fun milestone(
     status: FounderProgramStatus,
-    acknowledgements: FounderMilestoneAcknowledgements
+    acknowledgements: FounderMilestoneAcknowledgements,
+    authoritativeTrainingComplete: Boolean
 ): FounderMilestone? {
     return when (status) {
         FounderProgramStatus.Approved ->
             if (acknowledgements.founderApproved) null else FounderMilestone.FounderApproved
         FounderProgramStatus.PendingApproval ->
             if (acknowledgements.qualificationComplete) null else FounderMilestone.QualificationComplete
+        FounderProgramStatus.ActiveFree,
         FounderProgramStatus.ActivePro ->
-            if (temporaryProMilestonePending(status, acknowledgements)) {
-                FounderMilestone.TemporaryProUnlocked
-            } else {
-                null
-            }
+            activeMilestone(status, acknowledgements, authoritativeTrainingComplete)
         else -> null
     }
+}
+
+/**
+ * One milestone at a time. Temporary Pro is earlier than Training Complete.
+ * Pending Approval and Approved keep the existing later-status milestone.
+ */
+private fun activeMilestone(
+    status: FounderProgramStatus,
+    acknowledgements: FounderMilestoneAcknowledgements,
+    authoritativeTrainingComplete: Boolean
+): FounderMilestone? {
+    if (temporaryProMilestonePending(status, acknowledgements)) {
+        return FounderMilestone.TemporaryProUnlocked
+    }
+    if (authoritativeTrainingComplete && !acknowledgements.trainingComplete) {
+        return FounderMilestone.TrainingComplete
+    }
+    return null
 }
 
 private fun nextAction(

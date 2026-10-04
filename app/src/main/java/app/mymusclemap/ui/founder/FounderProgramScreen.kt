@@ -454,6 +454,10 @@ private fun FounderMilestoneDialog(
         )
         return
     }
+    if (milestone == FounderMilestone.TrainingComplete) {
+        FounderTrainingCompleteDialog(onAcknowledge = onAcknowledge)
+        return
+    }
     val prominent = milestone == FounderMilestone.FounderApproved
     AlertDialog(
         onDismissRequest = onAcknowledge,
@@ -481,7 +485,8 @@ private fun FounderMilestoneDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 when (milestone) {
-                    FounderMilestone.TemporaryProUnlocked -> Unit
+                    FounderMilestone.TemporaryProUnlocked,
+                    FounderMilestone.TrainingComplete -> Unit
                     FounderMilestone.QualificationComplete -> {
                         BodyText(stringResource(R.string.founder_milestone_qualified_body))
                         Spacer(Modifier.height(AppDimens.itemGap))
@@ -562,11 +567,56 @@ internal fun FounderProUnlockedDialog(
     )
 }
 
+/**
+ * Training requirement completed. This dialog does not submit feedback or a report.
+ */
+@Composable
+internal fun FounderTrainingCompleteDialog(
+    onAcknowledge: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onAcknowledge,
+        title = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                FounderProgramMark()
+                Spacer(Modifier.height(AppDimens.itemGap))
+                Text(
+                    text = stringResource(R.string.founder_milestone_training_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(FOUNDER_MILESTONE)
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                BodyText(stringResource(R.string.founder_milestone_training_body))
+                Spacer(Modifier.height(AppDimens.itemGap))
+                BodyText(stringResource(R.string.founder_milestone_training_next))
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onAcknowledge,
+                modifier = Modifier.testTag(FOUNDER_MILESTONE_CONTINUE)
+            ) {
+                Text(stringResource(R.string.founder_milestone_continue))
+            }
+        }
+    )
+}
+
 @Composable
 private fun milestoneTitle(milestone: FounderMilestone): String {
     return stringResource(
         when (milestone) {
             FounderMilestone.TemporaryProUnlocked -> R.string.founder_milestone_pro_title
+            FounderMilestone.TrainingComplete -> R.string.founder_milestone_training_title
             FounderMilestone.QualificationComplete -> R.string.founder_milestone_qualified_title
             FounderMilestone.FounderApproved -> R.string.founder_milestone_member_title
         }
