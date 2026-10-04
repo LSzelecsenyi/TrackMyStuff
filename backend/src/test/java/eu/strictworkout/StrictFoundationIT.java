@@ -1,5 +1,6 @@
 package eu.strictworkout;
 
+import eu.strictworkout.founder.FounderRules;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +59,9 @@ class StrictFoundationIT {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private FounderRules founderRules;
+
     @AfterAll
     static void restoreJvmZone() {
         TimeZone.setDefault(ORIGINAL_ZONE);
@@ -80,12 +84,30 @@ class StrictFoundationIT {
                 """,
                 String.class
         );
-        assertEquals(List.of("app_user", "auth_session", "external_identity", "flyway_schema_history"), tables);
+        assertEquals(List.of(
+                "app_user",
+                "auth_session",
+                "external_identity",
+                "flyway_schema_history",
+                "founder_application",
+                "founder_review_snapshot",
+                "founder_workout_event"
+        ), tables);
+        Integer founderMigration = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = true AND version = '3'",
+                Integer.class
+        );
+        assertEquals(1, founderMigration);
         Integer baseline = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success = true AND version = '2'",
                 Integer.class
         );
         assertEquals(1, baseline);
+    }
+
+    @Test
+    void productionFounderRulesStayAtThePublishedThresholds() {
+        assertEquals(FounderRules.PRODUCTION, founderRules);
     }
 
     @Test

@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -20,6 +21,16 @@ import app.mymusclemap.domain.workout.ActiveWorkoutNotificationModel
 import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.domain.workout.notificationLoadLabel
 import app.mymusclemap.domain.workout.notificationValueParts
+
+internal fun shouldRequestPromotedOngoing(
+    sdkInt: Int,
+    sdkIntFull: Int,
+    canPostPromoted: Boolean
+): Boolean {
+    if (sdkInt < Build.VERSION_CODES.BAKLAVA) return false
+    if (sdkIntFull < Build.VERSION_CODES_FULL.BAKLAVA_1) return false
+    return canPostPromoted
+}
 
 enum class LockScreenDeliveryBlock {
     None,
@@ -116,7 +127,11 @@ internal object ActiveWorkoutNotifications {
         NotificationManagerCompat.from(context).cancel(notificationId)
     }
 
-    fun build(context: Context, model: ActiveWorkoutNotificationModel): android.app.Notification {
+    fun build(
+        context: Context,
+        model: ActiveWorkoutNotificationModel,
+        requestPromotion: Boolean = promotionAvailable(context)
+    ): android.app.Notification {
         val current = model.body as? ActiveWorkoutNotificationBody.CurrentSet
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_workout)
@@ -173,7 +188,25 @@ internal object ActiveWorkoutNotifications {
         if (actionable != null) {
             builder.addAction(completeAction(context, model.sessionId, actionable.setId))
         }
+        if (requestPromotion) {
+            builder.setRequestPromotedOngoing(true)
+        }
         return builder.build()
+    }
+
+    fun promotionAvailable(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return false
+        return canRequestPromotedOngoing(context)
+    }
+
+    @RequiresApi(36)
+    private fun canRequestPromotedOngoing(context: Context): Boolean {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+        return shouldRequestPromotedOngoing(
+            sdkInt = Build.VERSION.SDK_INT,
+            sdkIntFull = Build.VERSION.SDK_INT_FULL,
+            canPostPromoted = manager.canPostPromotedNotifications()
+        )
     }
 
     fun completeIntent(context: Context, sessionId: Long, setId: Long): Intent {

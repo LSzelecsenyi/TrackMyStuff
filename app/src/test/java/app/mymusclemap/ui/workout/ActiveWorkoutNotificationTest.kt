@@ -150,6 +150,9 @@ class ActiveWorkoutNotificationTest {
         assertFalse(redacted.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("15"))
         assertEquals(context.getString(R.string.notification_workout_in_progress), redacted.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         assertEquals(1, redacted.actions.size)
+        assertFalse(NotificationCompat.isRequestPromotedOngoing(firstNotification))
+        assertFalse(NotificationCompat.isRequestPromotedOngoing(redacted))
+        assertFalse(ActiveWorkoutNotifications.promotionAvailable(context))
     }
 
     @Test
@@ -176,6 +179,65 @@ class ActiveWorkoutNotificationTest {
             context.getString(R.string.notification_finish_in_app),
             ready.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
         )
+        assertFalse(NotificationCompat.isRequestPromotedOngoing(needsInput))
+        assertFalse(NotificationCompat.isRequestPromotedOngoing(ready))
+    }
+
+    @Test
+    fun requestingPromotionKeepsTheWorkoutNotificationAndDoesNotLeakThePublicVersion() {
+        val detailed = ActiveWorkoutNotifications.build(
+            context,
+            model(current(setId = 3L, reps = 8, weightKg = 15.0)),
+            requestPromotion = true
+        )
+        assertTrue(NotificationCompat.isRequestPromotedOngoing(detailed))
+        assertEquals(NotificationCompat.CATEGORY_WORKOUT, detailed.category)
+        assertEquals(Notification.VISIBILITY_PRIVATE, detailed.visibility)
+        assertTrue(detailed.flags and Notification.FLAG_ONGOING_EVENT != 0)
+        assertEquals(1, detailed.actions.size)
+        assertEquals(context.getString(R.string.notification_complete_set), detailed.actions[0].title)
+        val redacted = detailed.publicVersion
+        assertFalse(NotificationCompat.isRequestPromotedOngoing(redacted))
+        assertFalse(redacted.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Dips"))
+        assertFalse(redacted.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("15"))
+        assertFalse(redacted.extras.getCharSequence(Notification.EXTRA_TITLE).toString().contains("Dips"))
+
+        val needsInput = ActiveWorkoutNotifications.build(
+            context,
+            model(current(setId = 3L, reps = null, weightKg = null, completable = false)),
+            requestPromotion = true
+        )
+        assertTrue(NotificationCompat.isRequestPromotedOngoing(needsInput))
+        assertNull(needsInput.actions)
+        assertTrue(
+            needsInput.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+                .contains(context.getString(R.string.notification_open_to_enter_set))
+        )
+
+        val ready = ActiveWorkoutNotifications.build(
+            context,
+            ActiveWorkoutNotificationModel(7L, "Push", ActiveWorkoutNotificationBody.ReadyToFinish),
+            requestPromotion = true
+        )
+        assertTrue(NotificationCompat.isRequestPromotedOngoing(ready))
+        assertNull(ready.actions)
+        assertEquals(
+            context.getString(R.string.notification_all_sets_logged),
+            ready.extras.getCharSequence(Notification.EXTRA_TITLE).toString()
+        )
+    }
+
+    @Test
+    fun unavailablePromotionStillPostsTheCompletableNotification() {
+        val notification = ActiveWorkoutNotifications.build(
+            context,
+            model(current(setId = 3L, reps = 8, weightKg = 15.0)),
+            requestPromotion = false
+        )
+        assertFalse(NotificationCompat.isRequestPromotedOngoing(notification))
+        assertEquals(1, notification.actions.size)
+        assertEquals(Notification.VISIBILITY_PRIVATE, notification.visibility)
+        assertTrue(notification.flags and Notification.FLAG_ONGOING_EVENT != 0)
     }
 
     @Test

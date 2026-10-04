@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import eu.strictworkout.founder.FounderCommandException;
 import eu.strictworkout.identity.UnverifiedIdentityException;
 
 @RestControllerAdvice
@@ -32,6 +33,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             log.info("Request rejected with {}", status);
         }
         return new ResponseEntity<>(apiError(status), headers, status);
+    }
+
+    @ExceptionHandler(FounderCommandException.class)
+    public ResponseEntity<ApiError> founderCommand(FounderCommandException exception) {
+        log.info("Founder command rejected: {}", exception.errorCode());
+        return ResponseEntity.status(exception.status())
+                .body(new ApiError(exception.errorCode(), exception.getMessage()));
     }
 
     @ExceptionHandler(UnverifiedIdentityException.class)

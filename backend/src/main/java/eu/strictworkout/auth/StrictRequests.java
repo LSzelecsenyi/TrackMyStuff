@@ -3,12 +3,12 @@ package eu.strictworkout.auth;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-final class StrictRequests {
+public final class StrictRequests {
 
     private StrictRequests() {
     }
 
-    static StrictPrincipal current() {
+    public static StrictPrincipal current() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication instanceof StrictUserAuthentication strict) {
             return strict.getStrictPrincipal();
