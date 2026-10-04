@@ -416,6 +416,71 @@ class FounderProgramRuntimeTest {
         assertTrue(composer.resolve().temporaryTesterPro)
     }
 
+    @Test
+    fun backendEnrollmentSurvivesLocalRefreshAndDebugApproval() = runTest {
+        insertWorkout(day = today, status = SessionStatus.COMPLETED)
+        coordinator.applyBackendEnrollment(
+            BackendFounderSnapshot(
+                status = FounderProgramStatus.ActiveFree,
+                enrolledOn = LocalDate.of(2026, 6, 1),
+                deadline = LocalDate.of(2026, 7, 16),
+                qualifyingWorkouts = 0,
+                distinctWorkoutDays = 0,
+                feedbackSubmitted = false,
+                reportSubmitted = false
+            )
+        )
+        coordinator.refresh()
+        val state = coordinator.currentState()
+        assertEquals(FounderProgramStatus.ActiveFree, state.status)
+        assertEquals(LocalDate.of(2026, 6, 1), state.enrolledOn)
+        assertEquals(LocalDate.of(2026, 7, 16), state.deadline)
+        assertTrue(state.backendOwned)
+        assertEquals(0, coordinator.view.value.qualification.nativeCompletedWorkouts)
+        assertFalse(coordinator.recordFeedback("This must stay on the server."))
+        coordinator.submitTesterAnalyticsReport()
+        coordinator.approve()
+        coordinator.reject("no")
+        assertEquals(FounderProgramStatus.ActiveFree, coordinator.currentState().status)
+        assertFalse(coordinator.currentState().feedbackRecorded)
+        var joins = 0
+        val viewModel = FounderProgramViewModel(
+            coordinator,
+            rules,
+            "0.1.0-debug",
+            acknowledgements,
+            joinFounder = {
+                joins += 1
+                FounderJoinResult.Rejected
+            }
+        )
+        viewModel.uiState.first { !it.loading }
+        assertEquals(0, joins)
+    }
+
+    @Test
+    fun repeatedEnrollDoesNotStartASecondJoin() = runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<FounderJoinResult>()
+        var calls = 0
+        val viewModel = FounderProgramViewModel(
+            coordinator,
+            rules,
+            "0.1.0-debug",
+            acknowledgements,
+            joinFounder = {
+                calls += 1
+                gate.await()
+            }
+        )
+        viewModel.enroll()
+        viewModel.enroll()
+        assertEquals(1, calls)
+        assertTrue(viewModel.uiState.value.joining)
+        gate.complete(FounderJoinResult.Cancelled)
+        assertFalse(viewModel.uiState.value.joining)
+        assertEquals(FounderProgramStatus.NotEnrolled, coordinator.currentState().status)
+    }
+
     private suspend fun completeQualification() {
         assertPending("workout", "workout", "feedback", "report")
     }

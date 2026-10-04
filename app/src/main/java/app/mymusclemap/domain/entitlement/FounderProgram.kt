@@ -33,7 +33,11 @@ data class FounderProgramState(
     val deadline: LocalDate? = null,
     val feedbackRecorded: Boolean = false,
     val testerAnalyticsReportSubmitted: Boolean = false,
-    val rejectionReason: String? = null
+    val rejectionReason: String? = null,
+    /** Set when this record was written from a backend enrollment response. */
+    val backendOwned: Boolean = false,
+    val serverQualifyingWorkouts: Int = 0,
+    val serverDistinctDays: Int = 0
 )
 
 data class FounderQualification(

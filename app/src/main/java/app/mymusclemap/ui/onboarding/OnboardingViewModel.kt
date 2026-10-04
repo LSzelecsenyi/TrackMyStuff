@@ -2,13 +2,16 @@ package app.mymusclemap.ui.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.mymusclemap.data.founder.FounderJoinResult
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.FounderProgramAvailability
+import app.mymusclemap.ui.founder.FounderJoinNotice
 import app.mymusclemap.ui.founder.shouldOfferFounderOnboardingInvitation
+import app.mymusclemap.ui.founder.toNotice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -31,14 +34,19 @@ class OnboardingViewModel(
     private val dateProvider: DateProvider? = null,
     private val founderInvitations: FounderMilestoneAcknowledgementStore? = null,
     private val founderProgram: FounderProgramCoordinator? = null,
-    private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open
+    private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open,
+    private val founderJoin: (suspend () -> FounderJoinResult)? = null
 ) : ViewModel() {
-    private var founderChoiceStarted = false
+    private var founderDeclined = false
     private val stepState = MutableStateFlow(OnboardingStep.Welcome)
     private val exitState = MutableStateFlow<OnboardingExit?>(null)
+    private val joiningState = MutableStateFlow(false)
+    private val joinNoticeState = MutableStateFlow(FounderJoinNotice.None)
 
     val step: StateFlow<OnboardingStep> = stepState
     val exit: StateFlow<OnboardingExit?> = exitState
+    val founderJoining: StateFlow<Boolean> = joiningState
+    val founderJoinNotice: StateFlow<FounderJoinNotice> = joinNoticeState
 
     fun onContinue() {
         val invitations = founderInvitations
@@ -67,21 +75,30 @@ class OnboardingViewModel(
     }
 
     fun onJoinFounder() {
-        if (founderChoiceStarted || stepState.value != OnboardingStep.FounderInvitation) return
-        founderChoiceStarted = true
+        if (founderDeclined || joiningState.value || stepState.value != OnboardingStep.FounderInvitation) {
+            return
+        }
+        val join = founderJoin ?: return
+        joiningState.value = true
+        joinNoticeState.value = FounderJoinNotice.None
         viewModelScope.launch {
-            val program = founderProgram
-            if (program != null && founderAvailability == FounderProgramAvailability.Open) {
-                program.enroll()
+            val result = join()
+            if (result == FounderJoinResult.InProgress) {
+                return@launch
             }
-            founderInvitations?.markInvitationHandled()
-            stepState.value = OnboardingStep.WeeklyGoal
+            joiningState.value = false
+            if (result == FounderJoinResult.Enrolled) {
+                founderInvitations?.markInvitationHandled()
+                stepState.value = OnboardingStep.WeeklyGoal
+                return@launch
+            }
+            joinNoticeState.value = result.toNotice()
         }
     }
 
     fun onDeclineFounder() {
-        if (founderChoiceStarted || stepState.value != OnboardingStep.FounderInvitation) return
-        founderChoiceStarted = true
+        if (founderDeclined || joiningState.value || stepState.value != OnboardingStep.FounderInvitation) return
+        founderDeclined = true
         viewModelScope.launch {
             founderInvitations?.markInvitationHandled()
             stepState.value = OnboardingStep.WeeklyGoal

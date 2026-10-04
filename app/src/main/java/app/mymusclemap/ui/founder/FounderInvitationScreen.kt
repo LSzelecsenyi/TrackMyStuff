@@ -22,18 +22,19 @@ import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.ui.theme.AppDimens
 
 /**
- * Onboarding step. The welcome copy and enrollment button are [FounderWelcomeContent].
- * Choosing either action is one-shot for this composition so a second tap cannot enroll twice.
+ * Onboarding step. Decline is one-shot. Join stays available after a cancelled or failed sign-in.
  */
 @Composable
 fun FounderInvitationScreen(
     rules: FounderProgramRules,
     onJoin: () -> Unit,
-    onNotNow: () -> Unit
+    onNotNow: () -> Unit,
+    joining: Boolean = false,
+    joinNotice: FounderJoinNotice = FounderJoinNotice.None
 ) {
-    var handled by remember { mutableStateOf(false) }
-    BackHandler(enabled = !handled) {
-        handled = true
+    var declined by remember { mutableStateOf(false) }
+    BackHandler(enabled = !declined && !joining) {
+        declined = true
         onNotNow()
     }
     Scaffold(
@@ -55,16 +56,17 @@ fun FounderInvitationScreen(
             FounderWelcomeContent(
                 rules = rules,
                 onEnroll = {
-                    if (handled) return@FounderWelcomeContent
-                    handled = true
+                    if (declined || joining) return@FounderWelcomeContent
                     onJoin()
                 },
                 onDecline = {
-                    if (handled) return@FounderWelcomeContent
-                    handled = true
+                    if (declined || joining) return@FounderWelcomeContent
+                    declined = true
                     onNotNow()
                 },
-                actionsEnabled = !handled
+                actionsEnabled = !declined && !joining,
+                joining = joining,
+                joinNotice = joinNotice
             )
         }
     }

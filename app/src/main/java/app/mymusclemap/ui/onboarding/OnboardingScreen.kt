@@ -40,6 +40,7 @@ import app.mymusclemap.R
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.ui.founder.FounderInvitationScreen
+import app.mymusclemap.ui.founder.FounderJoinNotice
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
@@ -62,13 +63,17 @@ fun OnboardingScreen(
     onSkipWeeklyGoal: () -> Unit = {},
     founderRules: FounderProgramRules = FounderProgramRules.Production,
     onJoinFounder: () -> Unit = {},
-    onDeclineFounder: () -> Unit = {}
+    onDeclineFounder: () -> Unit = {},
+    founderJoining: Boolean = false,
+    founderJoinNotice: FounderJoinNotice = FounderJoinNotice.None
 ) {
     if (step == OnboardingStep.FounderInvitation) {
         FounderInvitationScreen(
             rules = founderRules,
             onJoin = onJoinFounder,
-            onNotNow = onDeclineFounder
+            onNotNow = onDeclineFounder,
+            joining = founderJoining,
+            joinNotice = founderJoinNotice
         )
         return
     }

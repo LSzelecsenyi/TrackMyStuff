@@ -1,5 +1,6 @@
 package app.mymusclemap.data.auth
 
+import app.mymusclemap.data.founder.BackendFounderSnapshot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -8,6 +9,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
+import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -21,6 +23,7 @@ interface StrictBackendApi {
     suspend fun exchangeGoogleIdToken(idToken: GoogleIdTokenValue): GoogleExchangeResult
     suspend fun currentUser(): CurrentUserCall
     suspend fun revokeSession(): RevokeCall
+    suspend fun enrollFounder(zone: ZoneId): FounderEnrollmentCall
 }
 
 class OkHttpStrictBackendApi(
@@ -40,21 +43,17 @@ class OkHttpStrictBackendApi(
             .url("$root/api/v1/auth/google")
             .post(body.toRequestBody(json))
             .build()
-        val response = execute(request) ?: return GoogleExchangeResult.Unavailable
-        response.use {
-            if (it.code == 401) {
-                return if (errorCode(it) == "INVALID_GOOGLE_TOKEN") {
+        return call(request) { response ->
+            when {
+                response.code == 401 && errorCode(response) == "INVALID_GOOGLE_TOKEN" ->
                     GoogleExchangeResult.InvalidGoogleToken
-                } else {
+                response.code == 401 || !response.isSuccessful ->
                     GoogleExchangeResult.Rejected
-                }
+                else -> parseSession(response.body.string())
+                    ?.let { GoogleExchangeResult.Accepted(it) }
+                    ?: GoogleExchangeResult.Rejected
             }
-            if (!it.isSuccessful) {
-                return GoogleExchangeResult.Rejected
-            }
-            val session = parseSession(it.body.string()) ?: return GoogleExchangeResult.Rejected
-            return GoogleExchangeResult.Accepted(session)
-        }
+        } ?: GoogleExchangeResult.Unavailable
     }
 
     override suspend fun currentUser(): CurrentUserCall {
@@ -64,18 +63,39 @@ class OkHttpStrictBackendApi(
             .header("Authorization", "Bearer ${session.accessToken.value}")
             .get()
             .build()
-        val response = execute(request) ?: return CurrentUserCall.Unavailable
-        response.use {
-            if (it.code == 401) {
-                sessions.clear()
-                return CurrentUserCall.Rejected
+        return call(request) { response ->
+            when {
+                response.code == 401 -> {
+                    sessions.clear()
+                    CurrentUserCall.Rejected
+                }
+                !response.isSuccessful -> CurrentUserCall.Unavailable
+                else -> parseUserId(response.body.string())
+                    ?.let { CurrentUserCall.SignedIn(it) }
+                    ?: CurrentUserCall.Unavailable
             }
-            if (!it.isSuccessful) {
-                return CurrentUserCall.Unavailable
+        } ?: CurrentUserCall.Unavailable
+    }
+
+    override suspend fun enrollFounder(zone: ZoneId): FounderEnrollmentCall {
+        val session = sessions.read() ?: return FounderEnrollmentCall.NoSession
+        val request = Request.Builder()
+            .url("$root/api/v1/founder/enrollment")
+            .header("Authorization", "Bearer ${session.accessToken.value}")
+            .post(ByteArray(0).toRequestBody(null))
+            .build()
+        return call(request) { response ->
+            when {
+                response.code == 401 -> {
+                    sessions.clear()
+                    FounderEnrollmentCall.Unauthenticated
+                }
+                !response.isSuccessful -> FounderEnrollmentCall.Rejected
+                else -> BackendFounderSnapshot.parse(response.body.string(), zone)
+                    ?.let { FounderEnrollmentCall.Enrolled(it) }
+                    ?: FounderEnrollmentCall.Rejected
             }
-            val userId = parseUserId(it.body.string()) ?: return CurrentUserCall.Unavailable
-            return CurrentUserCall.SignedIn(userId)
-        }
+        } ?: FounderEnrollmentCall.Unavailable
     }
 
     override suspend fun revokeSession(): RevokeCall {
@@ -85,22 +105,32 @@ class OkHttpStrictBackendApi(
             .header("Authorization", "Bearer ${session.accessToken.value}")
             .delete()
             .build()
-        val response = execute(request) ?: return RevokeCall.Failed
-        response.use {
-            if (it.code == 401) {
-                sessions.clear()
-                return RevokeCall.Failed
+        return call(request) { response ->
+            when {
+                response.code == 401 -> {
+                    sessions.clear()
+                    RevokeCall.Failed
+                }
+                response.isSuccessful -> RevokeCall.Revoked
+                else -> RevokeCall.Failed
             }
-            return if (it.isSuccessful) RevokeCall.Revoked else RevokeCall.Failed
-        }
+        } ?: RevokeCall.Failed
     }
 
-    private suspend fun execute(request: Request) = try {
-        withContext(Dispatchers.IO) {
-            http.newCall(request).execute()
+    /**
+     * OkHttp's call and the response body both perform blocking network I/O.
+     * The body must be read and closed before this function resumes the caller.
+     */
+    private suspend fun <T> call(request: Request, consume: (okhttp3.Response) -> T): T? {
+        return try {
+            withContext(Dispatchers.IO) {
+                http.newCall(request).execute().use { response ->
+                    consume(response)
+                }
+            }
+        } catch (_: IOException) {
+            null
         }
-    } catch (_: IOException) {
-        null
     }
 
     private fun errorCode(response: okhttp3.Response): String? {

@@ -79,6 +79,8 @@ class MainActivity : ComponentActivity() {
                             val viewModel: OnboardingViewModel = viewModel(factory = container.viewModelFactory)
                             val step by viewModel.step.collectAsStateWithLifecycle()
                             val exit by viewModel.exit.collectAsStateWithLifecycle()
+                            val founderJoining by viewModel.founderJoining.collectAsStateWithLifecycle()
+                            val founderJoinNotice by viewModel.founderJoinNotice.collectAsStateWithLifecycle()
                             LaunchedEffect(exit) {
                                 val chosen = exit ?: return@LaunchedEffect
                                 openNewTemplate = chosen == OnboardingExit.OpenTemplateEditor
@@ -93,7 +95,9 @@ class MainActivity : ComponentActivity() {
                                 onSkipWeeklyGoal = viewModel::onWeeklyGoalSkipped,
                                 founderRules = container.founderProgramRules,
                                 onJoinFounder = viewModel::onJoinFounder,
-                                onDeclineFounder = viewModel::onDeclineFounder
+                                onDeclineFounder = viewModel::onDeclineFounder,
+                                founderJoining = founderJoining,
+                                founderJoinNotice = founderJoinNotice
                             )
                         }
                         AppLaunchStage.App -> {
@@ -124,10 +128,16 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         val container = (application as WeightTrackerApplication).container
+        container.bindStrictSignIn(this)
         container.activeWorkoutNotifications.refresh()
         lifecycleScope.launch {
             container.refreshFounderProgramFromStore()
         }
+    }
+
+    override fun onStop() {
+        (application as WeightTrackerApplication).container.unbindStrictSignIn(this)
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

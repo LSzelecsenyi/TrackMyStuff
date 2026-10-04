@@ -2,6 +2,7 @@ package app.mymusclemap.ui.founder
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.mymusclemap.data.founder.FounderJoinResult
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
@@ -34,22 +35,47 @@ data class FounderProgramUiState(
     val storedFeedback: String = "",
     val founderBadge: Boolean = false,
     val reportShareFailed: Boolean = false,
+    val joining: Boolean = false,
+    val joinNotice: FounderJoinNotice = FounderJoinNotice.None,
     val journey: FounderJourney
 )
+
+enum class FounderJoinNotice {
+    None,
+    GoogleFailed,
+    Unavailable,
+    Rejected,
+    NotConfigured
+}
+
+fun FounderJoinResult.toNotice(): FounderJoinNotice {
+    return when (this) {
+        FounderJoinResult.Enrolled,
+        FounderJoinResult.Cancelled,
+        FounderJoinResult.InProgress -> FounderJoinNotice.None
+        FounderJoinResult.GoogleFailed -> FounderJoinNotice.GoogleFailed
+        FounderJoinResult.Unavailable -> FounderJoinNotice.Unavailable
+        FounderJoinResult.Rejected -> FounderJoinNotice.Rejected
+        FounderJoinResult.NotConfigured -> FounderJoinNotice.NotConfigured
+    }
+}
 
 class FounderProgramViewModel(
     private val coordinator: FounderProgramCoordinator,
     private val rules: FounderProgramRules,
     private val versionName: String,
     private val milestoneAcknowledgements: FounderMilestoneAcknowledgementStore,
-    private val availability: FounderProgramAvailability = FounderProgramAvailability.Open
+    private val availability: FounderProgramAvailability = FounderProgramAvailability.Open,
+    private val joinFounder: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected }
 ) : ViewModel() {
     private val feedbackDraft = MutableStateFlow("")
     private val feedbackBlank = MutableStateFlow(false)
     private val reportShareFailed = MutableStateFlow(false)
     private val acknowledgements = MutableStateFlow<FounderMilestoneAcknowledgements?>(null)
+    private val joining = MutableStateFlow(false)
+    private val joinNotice = MutableStateFlow(FounderJoinNotice.None)
 
-    val uiState: StateFlow<FounderProgramUiState> = combine(
+    private val programUi: StateFlow<FounderProgramUiState> = combine(
         coordinator.view,
         feedbackDraft,
         feedbackBlank,
@@ -100,6 +126,18 @@ class FounderProgramViewModel(
         )
     )
 
+    val uiState: StateFlow<FounderProgramUiState> = combine(
+        programUi,
+        joining,
+        joinNotice
+    ) { program, active, notice ->
+        program.copy(joining = active, joinNotice = notice)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = programUi.value
+    )
+
     init {
         viewModelScope.launch {
             acknowledgements.value = milestoneAcknowledgements.load()
@@ -115,11 +153,21 @@ class FounderProgramViewModel(
     }
 
     fun enroll() {
+        if (joining.value) {
+            return
+        }
+        if (!founderEnrollmentAllowed(availability, coordinator.currentState().status)) {
+            return
+        }
+        joining.value = true
+        joinNotice.value = FounderJoinNotice.None
         viewModelScope.launch {
-            if (!founderEnrollmentAllowed(availability, coordinator.currentState().status)) {
+            val result = joinFounder()
+            if (result == FounderJoinResult.InProgress) {
                 return@launch
             }
-            coordinator.enroll()
+            joining.value = false
+            joinNotice.value = result.toNotice()
         }
     }
 

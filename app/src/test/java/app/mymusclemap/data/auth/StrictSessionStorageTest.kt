@@ -71,7 +71,15 @@ class StrictSessionStorageTest {
         assertFalse(startup.contains("signIn("))
         assertFalse(startup.contains("bindStrictSignIn"))
         assertFalse(main.contains("signIn("))
-        assertFalse(main.contains("bindStrictSignIn"))
+        val onCreate = main.substringAfter("override fun onCreate").substringBefore("override fun onStart")
+        assertFalse(onCreate.contains("bindStrictSignIn"))
+        assertTrue(main.contains("override fun onStart()"))
+        assertTrue(main.contains("bindStrictSignIn(this)"))
+        assertTrue(main.contains("unbindStrictSignIn(this)"))
+        val founderScreen = File("src/main/java/app/mymusclemap/ui/founder/FounderProgramViewModel.kt").readText()
+        val founderInit = founderScreen.substringAfter("init {").substringBefore("fun onFeedbackChange")
+        assertFalse(founderInit.contains("joinFounder"))
+        assertFalse(founderInit.contains("signIn("))
     }
 
     @Test

@@ -61,6 +61,7 @@ internal const val FOUNDER_REPORT = "founder-report"
 internal const val FOUNDER_STATUS = "founder-status"
 internal const val FOUNDER_INVITATION = "founder-invitation"
 internal const val FOUNDER_INVITATION_NOT_NOW = "founder-invitation-not-now"
+internal const val FOUNDER_JOIN_NOTICE = "founder-join-notice"
 
 @Composable
 fun FounderProgramScreen(
@@ -125,7 +126,13 @@ fun FounderProgramScreen(
                     .padding(horizontal = AppDimens.screenPadding)
             ) {
                 if (state.journey.phase == FounderJourneyPhase.Welcome) {
-                    FounderWelcomeContent(rules = state.journey.rules, onEnroll = onEnroll)
+                    FounderWelcomeContent(
+                        rules = state.journey.rules,
+                        onEnroll = onEnroll,
+                        actionsEnabled = !state.joining,
+                        joining = state.joining,
+                        joinNotice = state.joinNotice
+                    )
                 } else {
                     EnrolledSection(state = state)
                     if (state.journey.showFeedback) {
@@ -168,7 +175,9 @@ internal fun FounderWelcomeContent(
     rules: FounderProgramRules,
     onEnroll: () -> Unit,
     onDecline: (() -> Unit)? = null,
-    actionsEnabled: Boolean = true
+    actionsEnabled: Boolean = true,
+    joining: Boolean = false,
+    joinNotice: FounderJoinNotice = FounderJoinNotice.None
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -213,15 +222,41 @@ internal fun FounderWelcomeContent(
         SecondaryText(stringResource(R.string.founder_welcome_review))
         Spacer(Modifier.height(AppDimens.itemGap))
         SecondaryText(stringResource(R.string.founder_welcome_native))
+        Spacer(Modifier.height(AppDimens.itemGap))
+        SecondaryText(stringResource(R.string.founder_welcome_account))
         Spacer(Modifier.height(AppDimens.sectionGap))
         Button(
             onClick = onEnroll,
-            enabled = actionsEnabled,
+            enabled = actionsEnabled && !joining,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(FOUNDER_ENROLL)
         ) {
-            Text(stringResource(R.string.founder_enroll))
+            if (joining) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(Modifier.size(8.dp))
+            }
+            Text(
+                stringResource(
+                    if (joining) R.string.founder_enroll_working else R.string.founder_enroll
+                )
+            )
+        }
+        val notice = joinNoticeText(joinNotice)
+        if (notice != null) {
+            Spacer(Modifier.height(AppDimens.itemGap))
+            Text(
+                text = notice,
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(FOUNDER_JOIN_NOTICE)
+            )
         }
         if (onDecline != null) {
             Spacer(Modifier.height(AppDimens.itemGap))
@@ -237,6 +272,18 @@ internal fun FounderWelcomeContent(
         }
         Spacer(Modifier.height(AppDimens.sectionGap))
     }
+}
+
+@Composable
+private fun joinNoticeText(notice: FounderJoinNotice): String? {
+    val res = when (notice) {
+        FounderJoinNotice.None -> return null
+        FounderJoinNotice.GoogleFailed -> R.string.founder_join_google_failed
+        FounderJoinNotice.Unavailable -> R.string.founder_join_unavailable
+        FounderJoinNotice.Rejected -> R.string.founder_join_rejected
+        FounderJoinNotice.NotConfigured -> R.string.founder_join_not_configured
+    }
+    return stringResource(res)
 }
 
 @Composable

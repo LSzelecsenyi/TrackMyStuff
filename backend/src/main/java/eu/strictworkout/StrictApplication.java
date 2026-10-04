@@ -9,6 +9,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 
+import eu.strictworkout.identity.GoogleProperties;
+
 @SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 public class StrictApplication {
 
@@ -25,6 +27,18 @@ public class StrictApplication {
                     ? "(default)"
                     : String.join(",", environment.getActiveProfiles());
             log.info("Strict backend is up. Health endpoint: /api/v1/health. Active profiles: {}", profiles);
+        };
+    }
+
+    @Bean
+    ApplicationRunner googleAudience(GoogleProperties google) {
+        return args -> {
+            String clientId = google.clientId() == null ? "" : google.clientId().trim();
+            if (clientId.isEmpty()) {
+                log.warn("Google ID token audience is not configured. STRICT_GOOGLE_CLIENT_ID is blank.");
+            } else {
+                log.info("Google ID token audience configured: {}", clientId);
+            }
         };
     }
 }

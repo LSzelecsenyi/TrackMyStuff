@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -41,7 +42,10 @@ class FounderProgramStore(context: Context) {
             deadline = prefs[KEY_DEADLINE_EPOCH_DAY]?.let(LocalDate::ofEpochDay),
             feedbackRecorded = prefs[KEY_FEEDBACK] == true,
             testerAnalyticsReportSubmitted = prefs[KEY_ANALYTICS_REPORT] == true,
-            rejectionReason = prefs[KEY_REJECTION_REASON]
+            rejectionReason = prefs[KEY_REJECTION_REASON],
+            backendOwned = prefs[KEY_BACKEND_OWNED] == true,
+            serverQualifyingWorkouts = prefs[KEY_SERVER_WORKOUTS] ?: 0,
+            serverDistinctDays = prefs[KEY_SERVER_DAYS] ?: 0
         )
     }
 
@@ -68,6 +72,9 @@ class FounderProgramStore(context: Context) {
                 ?: prefs.remove(KEY_DEADLINE_EPOCH_DAY)
             prefs[KEY_FEEDBACK] = state.feedbackRecorded
             prefs[KEY_ANALYTICS_REPORT] = state.testerAnalyticsReportSubmitted
+            prefs[KEY_BACKEND_OWNED] = state.backendOwned
+            prefs[KEY_SERVER_WORKOUTS] = state.serverQualifyingWorkouts
+            prefs[KEY_SERVER_DAYS] = state.serverDistinctDays
             state.rejectionReason?.let { prefs[KEY_REJECTION_REASON] = it }
                 ?: prefs.remove(KEY_REJECTION_REASON)
         }
@@ -82,5 +89,8 @@ class FounderProgramStore(context: Context) {
         private val KEY_ANALYTICS_REPORT = booleanPreferencesKey("tester_analytics_report_submitted")
         private val KEY_REJECTION_REASON = stringPreferencesKey("rejection_reason")
         private val KEY_FEEDBACK_TEXT = stringPreferencesKey("feedback_text")
+        private val KEY_BACKEND_OWNED = booleanPreferencesKey("backend_owned")
+        private val KEY_SERVER_WORKOUTS = intPreferencesKey("server_qualifying_workouts")
+        private val KEY_SERVER_DAYS = intPreferencesKey("server_distinct_days")
     }
 }

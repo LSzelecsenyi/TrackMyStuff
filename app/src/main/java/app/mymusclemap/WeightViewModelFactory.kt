@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import app.mymusclemap.data.founder.FounderJoinResult
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
@@ -70,7 +71,8 @@ class WeightViewModelFactory(
     private val founderRules: FounderProgramRules? = null,
     private val founderMilestoneAcknowledgements: FounderMilestoneAcknowledgementStore? = null,
     private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open,
-    private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off
+    private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off,
+    private val founderJoin: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected }
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -131,7 +133,8 @@ class WeightViewModelFactory(
                     dateProvider,
                     founderMilestoneAcknowledgements,
                     founderProgram,
-                    founderAvailability
+                    founderAvailability,
+                    founderJoin
                 )
             }
             modelClass.isAssignableFrom(OnboardingGuideViewModel::class.java) -> {
@@ -202,7 +205,8 @@ class WeightViewModelFactory(
                     rules = checkNotNull(founderRules),
                     versionName = BuildConfig.VERSION_NAME,
                     milestoneAcknowledgements = checkNotNull(founderMilestoneAcknowledgements),
-                    availability = founderAvailability
+                    availability = founderAvailability,
+                    joinFounder = founderJoin
                 )
             }
             modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {

@@ -11,6 +11,7 @@ import app.mymusclemap.data.auth.strictOkHttpClient
 import app.mymusclemap.data.health.HealthConnectGateway
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.founder.FounderJoinCoordinator
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderProgramStore
@@ -46,6 +47,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.Clock
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicReference
 
 class AppContainer(context: Context) {
@@ -171,16 +173,18 @@ class AppContainer(context: Context) {
         val google = ActivityBoundGoogleIdentityProvider(
             serverClientId = BuildConfig.STRICT_GOOGLE_SERVER_CLIENT_ID
         )
+        val api = OkHttpStrictBackendApi(
+            baseUrl = BuildConfig.STRICT_API_BASE_URL,
+            http = strictOkHttpClient(),
+            sessions = sessions
+        )
         StrictAccount(
             sessions = sessions,
             google = google,
+            api = api,
             repository = StrictAuthRepository(
                 google = google,
-                api = OkHttpStrictBackendApi(
-                    baseUrl = BuildConfig.STRICT_API_BASE_URL,
-                    http = strictOkHttpClient(),
-                    sessions = sessions
-                ),
+                api = api,
                 sessions = sessions
             )
         )
@@ -196,6 +200,15 @@ class AppContainer(context: Context) {
 
     fun unbindStrictSignIn(uiContext: Context) {
         strictAccount.google.unbind(uiContext)
+    }
+
+    private val founderJoin by lazy {
+        FounderJoinCoordinator(
+            auth = strictAuthRepository,
+            api = strictAccount.api,
+            applyEnrollment = { snapshot -> founderProgram.applyBackendEnrollment(snapshot) },
+            zone = ZoneId.systemDefault()
+        )
     }
 
     val onboardingRepository = OnboardingRepository(
@@ -225,12 +238,14 @@ class AppContainer(context: Context) {
         founderRules = founderProgramRules,
         founderMilestoneAcknowledgements = founderMilestoneAcknowledgements,
         founderAvailability = founderProgramAvailability,
-        lockScreenSetCompletion = lockScreenSetCompletion
+        lockScreenSetCompletion = lockScreenSetCompletion,
+        founderJoin = { founderJoin.join() }
     )
 }
 
 private class StrictAccount(
     val sessions: StrictSessionStore,
     val google: ActivityBoundGoogleIdentityProvider,
+    val api: OkHttpStrictBackendApi,
     val repository: StrictAuthRepository
 )

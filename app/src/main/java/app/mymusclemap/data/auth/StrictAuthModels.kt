@@ -1,5 +1,7 @@
 package app.mymusclemap.data.auth
 
+import app.mymusclemap.data.founder.BackendFounderSnapshot
+
 /**
  * Raw bearer and Google ID token values are redacted from [toString] so a log of the model
  * cannot print the secret. Callers that need the wire value use [value] and must not log it.
@@ -73,4 +75,13 @@ sealed interface RevokeCall {
     data object Revoked : RevokeCall
     data object NoSession : RevokeCall
     data object Failed : RevokeCall
+}
+
+sealed interface FounderEnrollmentCall {
+    data class Enrolled(val snapshot: BackendFounderSnapshot) : FounderEnrollmentCall
+    data object NoSession : FounderEnrollmentCall
+    /** Bearer was rejected. The stored session has been cleared. */
+    data object Unauthenticated : FounderEnrollmentCall
+    data object Rejected : FounderEnrollmentCall
+    data object Unavailable : FounderEnrollmentCall
 }

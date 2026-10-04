@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.MainDispatcherRule
+import app.mymusclemap.data.founder.BackendFounderSnapshot
+import app.mymusclemap.data.founder.FounderJoinResult
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
@@ -148,6 +150,7 @@ class FounderInvitationHandoffTest {
         assertEquals(FounderProgramStatus.ActiveFree, enrolled.status)
         assertEquals(today, enrolled.enrolledOn)
         assertEquals(today.plusDays(45), enrolled.deadline)
+        assertTrue(enrolled.backendOwned)
         founder.enroll()
         assertEquals(enrolled, founder.currentState())
         assertTrue(acknowledgements.load().invitationHandled)
@@ -172,7 +175,8 @@ class FounderInvitationHandoffTest {
             rules,
             "0.1.0-debug",
             acknowledgements,
-            FounderProgramAvailability.Open
+            FounderProgramAvailability.Open,
+            joinFounder = { applyServerEnrollment() }
         )
         settings.enroll()
         assertEquals(
@@ -183,14 +187,20 @@ class FounderInvitationHandoffTest {
 
     @Test
     fun closedSettingsCannotEnrollAndExistingParticipantsKeepTheirStatus() = runTest {
+        var joinCalls = 0
         val blocked = FounderProgramViewModel(
             founder,
             rules,
             "0.1.0-debug",
             acknowledgements,
-            FounderProgramAvailability.Closed
+            FounderProgramAvailability.Closed,
+            joinFounder = {
+                joinCalls += 1
+                FounderJoinResult.Enrolled
+            }
         )
         blocked.enroll()
+        assertEquals(0, joinCalls)
         assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
         programStore.save(
             FounderProgramState(
@@ -201,6 +211,7 @@ class FounderInvitationHandoffTest {
         )
         founder.refresh()
         blocked.enroll()
+        assertEquals(0, joinCalls)
         assertEquals(FounderProgramStatus.ActivePro, founder.currentState().status)
         val resolved = EntitlementResolver.resolve(
             EntitlementSources.of(program = founder.currentState()),
@@ -236,7 +247,23 @@ class FounderInvitationHandoffTest {
             firstRunCoordinator = firstRun,
             founderInvitations = acknowledgements,
             founderProgram = founder,
-            founderAvailability = availability
+            founderAvailability = availability,
+            founderJoin = { applyServerEnrollment() }
         )
+    }
+
+    private suspend fun applyServerEnrollment(): FounderJoinResult {
+        founder.applyBackendEnrollment(
+            BackendFounderSnapshot(
+                status = FounderProgramStatus.ActiveFree,
+                enrolledOn = today,
+                deadline = today.plusDays(45),
+                qualifyingWorkouts = 0,
+                distinctWorkoutDays = 0,
+                feedbackSubmitted = false,
+                reportSubmitted = false
+            )
+        )
+        return FounderJoinResult.Enrolled
     }
 }

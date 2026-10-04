@@ -62,11 +62,26 @@ class FounderProgramCoordinator(
 
     suspend fun enroll() {
         mutex.withLock {
+            if (viewState.value.state.backendOwned) {
+                return@withLock
+            }
             val result = logic.enroll(viewState.value.state, dateProvider.today())
             if (result is FounderProgramResult.Changed) {
                 store.save(result.state)
             }
             reevaluate()
+        }
+    }
+
+    /**
+     * Writes the backend enrollment response as the Founder record.
+     * Later local refresh does not replace this status, these dates, or these counts.
+     */
+    suspend fun applyBackendEnrollment(snapshot: BackendFounderSnapshot) {
+        mutex.withLock {
+            val state = snapshot.toProgramState()
+            store.save(state)
+            publish(state, qualifyingWorkouts(state), store.loadFeedbackText())
         }
     }
 
@@ -81,6 +96,9 @@ class FounderProgramCoordinator(
             return false
         }
         return mutex.withLock {
+            if (viewState.value.state.backendOwned) {
+                return@withLock false
+            }
             val workouts = qualifyingWorkouts(viewState.value.state)
             val result = logic.recordFeedback(
                 state = viewState.value.state,
@@ -99,6 +117,9 @@ class FounderProgramCoordinator(
 
     suspend fun submitTesterAnalyticsReport() {
         mutex.withLock {
+            if (viewState.value.state.backendOwned) {
+                return@withLock
+            }
             val workouts = qualifyingWorkouts(viewState.value.state)
             val result = logic.submitTesterAnalyticsReport(
                 state = viewState.value.state,
@@ -114,6 +135,9 @@ class FounderProgramCoordinator(
 
     suspend fun approve() {
         mutex.withLock {
+            if (viewState.value.state.backendOwned) {
+                return@withLock
+            }
             val result = logic.approve(viewState.value.state)
             if (result is FounderProgramResult.Changed) {
                 store.save(result.state)
@@ -124,6 +148,9 @@ class FounderProgramCoordinator(
 
     suspend fun reject(reason: String) {
         mutex.withLock {
+            if (viewState.value.state.backendOwned) {
+                return@withLock
+            }
             val result = logic.reject(viewState.value.state, reason)
             if (result is FounderProgramResult.Changed) {
                 store.save(result.state)
@@ -147,6 +174,10 @@ class FounderProgramCoordinator(
     private suspend fun reevaluate() {
         val loaded = store.load()
         val workouts = qualifyingWorkouts(loaded)
+        if (loaded.backendOwned) {
+            publish(loaded, workouts, store.loadFeedbackText())
+            return
+        }
         val result = logic.refresh(
             state = loaded,
             workouts = workouts.map { it.asCompletedWorkout() },
@@ -180,11 +211,21 @@ class FounderProgramCoordinator(
         viewState.value = FounderProgramView(
             ready = true,
             state = state,
-            qualification = rules.qualify(
-                workouts = workouts.map { it.asCompletedWorkout() },
-                feedbackRecorded = state.feedbackRecorded,
-                testerAnalyticsReportSubmitted = state.testerAnalyticsReportSubmitted
-            ),
+            qualification = if (state.backendOwned) {
+                FounderQualification(
+                    nativeCompletedWorkouts = state.serverQualifyingWorkouts,
+                    distinctNativeWorkoutDays = state.serverDistinctDays,
+                    feedbackRecorded = state.feedbackRecorded,
+                    testerAnalyticsReportSubmitted = state.testerAnalyticsReportSubmitted,
+                    rules = rules
+                )
+            } else {
+                rules.qualify(
+                    workouts = workouts.map { it.asCompletedWorkout() },
+                    feedbackRecorded = state.feedbackRecorded,
+                    testerAnalyticsReportSubmitted = state.testerAnalyticsReportSubmitted
+                )
+            },
             workouts = workouts,
             feedbackText = feedbackText
         )

@@ -85,15 +85,40 @@ class FounderInvitationScreenTest {
     }
 
     @Test
-    fun joinFiresOnceAndNotNowIsASeparateAction() {
+    fun joinStaysDisabledWhileItIsRunningAndCanBeRetriedAfterItStops() {
         var joins = 0
         var declines = 0
-        render(fastRules, onJoin = { joins += 1 }, onNotNow = { declines += 1 })
+        var joining by mutableStateOf(false)
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density = density.density, fontScale = 1f)) {
+                WeightTrackerThemeForPreview {
+                    Box(Modifier.width(360.dp).height(2000.dp).fillMaxSize()) {
+                        FounderInvitationScreen(
+                            rules = fastRules,
+                            onJoin = {
+                                joins += 1
+                                joining = true
+                            },
+                            onNotNow = { declines += 1 },
+                            joining = joining
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag(FOUNDER_ENROLL).performScrollTo().performClick()
         assertEquals(1, joins)
         assertEquals(0, declines)
         composeRule.onNodeWithTag(FOUNDER_ENROLL).assertIsNotEnabled()
         composeRule.onNodeWithTag(FOUNDER_INVITATION_NOT_NOW).assertIsNotEnabled()
+        composeRule.onNodeWithTag(FOUNDER_ENROLL).performClick()
+        assertEquals(1, joins)
+        joining = false
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(FOUNDER_ENROLL).performScrollTo().performClick()
+        assertEquals(2, joins)
     }
 
     @Test
