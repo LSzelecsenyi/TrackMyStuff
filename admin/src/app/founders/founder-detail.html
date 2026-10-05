@@ -1,0 +1,28 @@
+@if (valid()) {
+  <strict-state kind="content">
+    <p class="kicker">Founder application</p>
+    <h1>Review</h1>
+    <p class="lede">
+      This layout is ready for one application. The review record is not loaded.
+    </p>
+    <p class="id">Application <span class="tabular">{{ applicationId() }}</span></p>
+    <div class="review-grid">
+      @for (section of sections; track section.id) {
+        <section class="surface" [attr.aria-labelledby]="section.id">
+          <h2 [id]="section.id">{{ section.title }}</h2>
+          <p>{{ section.text }}</p>
+        </section>
+      }
+      <section class="surface decision" aria-labelledby="decision">
+        <h2 id="decision">Decision</h2>
+        <p>Approval and rejection are not available in this version.</p>
+      </section>
+    </div>
+  </strict-state>
+} @else {
+  <strict-state kind="error">
+    <h1>This address is not a Founder application id</h1>
+    <p>Open an application from the list once review data is connected.</p>
+    <a class="button" routerLink="/founders">Founder applications</a>
+  </strict-state>
+}

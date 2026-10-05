@@ -23,4 +23,14 @@ public final class FounderRulesSelection {
         }
         return FounderRules.PRODUCTION;
     }
+
+    public static String profile(String requested, boolean productionProfile) {
+        select(requested, productionProfile);
+        String mode = requested == null || requested.isBlank() ? "production" : requested.trim();
+        return "fast".equalsIgnoreCase(mode) ? "fast" : "production";
+    }
+
+    public static FounderRulesBinding binding(String requested, boolean productionProfile) {
+        return new FounderRulesBinding(profile(requested, productionProfile), select(requested, productionProfile));
+    }
 }

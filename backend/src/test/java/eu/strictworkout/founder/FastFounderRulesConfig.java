@@ -13,8 +13,14 @@ public class FastFounderRulesConfig {
 
     @Bean
     @Primary
-    FounderRules fastFounderRules() {
-        return new FounderRules(1, 2, 1, 45, true, true);
+    FounderRulesBinding fastFounderRulesBinding() {
+        return new FounderRulesBinding("fast", new FounderRules(1, 2, 1, 45, true, true));
+    }
+
+    @Bean
+    @Primary
+    FounderRules fastFounderRules(FounderRulesBinding binding) {
+        return binding.rules();
     }
 
     @Bean

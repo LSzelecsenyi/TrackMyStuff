@@ -60,6 +60,7 @@ class FounderInvitationScreenTest {
         composeRule.onNodeWithText(testString(R.string.founder_welcome_lead)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_unlock_early_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_welcome_native)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_welcome_upload)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_welcome_review)).assertIsDisplayed()
         show(bullet(R.plurals.founder_challenge_workouts, fastRules.founderWorkoutCount))
         show(bullet(R.plurals.founder_challenge_days, fastRules.requiredDistinctWorkoutDays))

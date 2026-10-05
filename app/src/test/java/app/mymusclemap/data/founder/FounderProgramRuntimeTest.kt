@@ -7,6 +7,7 @@ import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.appbackup.AppBackupFormat
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.local.WorkoutSessionEntity
+import app.mymusclemap.data.auth.FounderReportSubmission
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
 import app.mymusclemap.data.preferences.FounderProgramStore
@@ -187,15 +188,15 @@ class FounderProgramRuntimeTest {
         assertTrue(coordinator.recordFeedback("The rest timer should stay visible."))
         assertTrue(coordinator.currentState().feedbackRecorded)
         assertEquals("The rest timer should stay visible.", store.loadFeedbackText())
-        val viewModel = FounderProgramViewModel(coordinator, rules, "0.1.0-debug", acknowledgements)
-        viewModel.uiState.value
-        val report = viewModel.reportText()
-        assertTrue(report.contains("Qualifying native workouts"))
+        val viewModel = founderViewModel()
+        val ready = ready(viewModel)
+        viewModel.onFeedbackChange("   ")
+        viewModel.submitTesterReport()
+        val blank = viewModel.uiState.first { it.feedbackBlank }
+        assertEquals("   ", blank.feedbackDraft)
+        assertFalse(blank.reportSubmitFailed)
         assertFalse(coordinator.currentState().testerAnalyticsReportSubmitted)
-        viewModel.onReportShareResult(false)
-        assertFalse(coordinator.currentState().testerAnalyticsReportSubmitted)
-        viewModel.onReportShareResult(true)
-        assertTrue(coordinator.currentState().testerAnalyticsReportSubmitted)
+        assertEquals(ready.status, coordinator.currentState().status)
     }
 
     @Test
@@ -346,7 +347,30 @@ class FounderProgramRuntimeTest {
     @Test
     fun qualificationMilestoneShowsOnceWhileTemporaryProStaysActive() = runTest {
         completeQualification()
+        assertNull(ready(founderViewModel()).journey.milestone)
+        coordinator.applyBackendEnrollment(
+            BackendFounderSnapshot(
+                status = FounderProgramStatus.PendingApproval,
+                enrolledOn = today,
+                deadline = today.plusDays(45),
+                qualifyingWorkouts = 2,
+                distinctWorkoutDays = 1,
+                feedbackSubmitted = true,
+                reportSubmitted = true,
+                requiredWorkouts = 2,
+                requiredDistinctDays = 1,
+                temporaryProRequiredWorkouts = 1,
+                temporaryProActive = true,
+                trainingRequirementsComplete = true
+            )
+        )
+        backendEntitlement = BackendFounderEntitlement(
+            temporaryFounderPro = true,
+            validUntil = Instant.parse("2026-10-04T12:00:00Z")
+        )
         val before = composer.resolve()
+        assertTrue(before.temporaryTesterPro)
+        assertFalse(before.founderLifetime)
         val viewModel = founderViewModel()
         val shown = ready(viewModel)
         assertEquals(FounderJourneyPhase.PendingReview, shown.journey.phase)
@@ -401,30 +425,165 @@ class FounderProgramRuntimeTest {
         assertFalse(open.journey.feedbackSaved)
         assertFalse(open.journey.reportShared)
         assertEquals(FounderNextAction.Feedback, open.journey.nextAction)
-        val built = viewModel.reportText()
-        assertTrue(built.contains("Qualifying native workouts"))
-        assertFalse(ready(viewModel).journey.reportShared)
+        assertTrue(open.journey.showFeedback)
         viewModel.onFeedbackChange("   ")
-        viewModel.saveFeedback()
+        viewModel.submitTesterReport()
         val blank = viewModel.uiState.first { it.feedbackBlank }
-        assertFalse(blank.feedbackRecorded)
-        assertFalse(blank.journey.feedbackSaved)
+        assertFalse(blank.reportSubmitted)
+        assertEquals(FounderProgramStatus.ActivePro, coordinator.currentState().status)
         viewModel.onFeedbackChange("Keep the rest timer visible.")
-        viewModel.saveFeedback()
-        val saved = viewModel.uiState.first { it.feedbackRecorded }
-        assertTrue(saved.journey.feedbackSaved)
-        assertEquals(FounderNextAction.TesterReport, saved.journey.nextAction)
-        viewModel.onReportShareResult(false)
-        val failed = viewModel.uiState.first { it.reportShareFailed }
+        viewModel.submitTesterReport()
+        val failed = viewModel.uiState.first { it.reportSubmitFailed }
         assertFalse(failed.journey.reportShared)
-        viewModel.onReportShareResult(true)
-        val shared = viewModel.uiState.first { it.reportSubmitted }
-        assertTrue(shared.journey.reportShared)
-        assertEquals(FounderJourneyPhase.PendingReview, shared.journey.phase)
+        assertEquals(FounderJourneyPhase.ActivePro, failed.journey.phase)
     }
 
-    private fun founderViewModel(): FounderProgramViewModel {
-        return FounderProgramViewModel(coordinator, rules, "0.1.0-debug", acknowledgements)
+    @Test
+    fun testerReportSubmissionUsesTheBackendSnapshotAndKeepsTheDraftUntilThen() = runTest {
+        acknowledgements.save(
+            FounderMilestoneAcknowledgements(
+                temporaryProUnlocked = true,
+                trainingComplete = true
+            )
+        )
+        store.saveFeedbackText("Keep the rest timer visible.")
+        coordinator.applyBackendEnrollment(trainingSnapshot())
+        assertFalse(coordinator.recordFeedback("Local note"))
+        coordinator.submitTesterAnalyticsReport()
+        assertEquals(FounderProgramStatus.ActivePro, coordinator.currentState().status)
+        val ids = mutableListOf<String>()
+        val bodies = mutableListOf<String>()
+        var attempts = 0
+        val viewModel = founderViewModel { id, feedback, version ->
+            attempts += 1
+            ids += id
+            bodies += feedback
+            assertEquals("0.1.0-debug", version)
+            assertFalse(feedback.contains("status"))
+            if (attempts == 1) {
+                FounderReportSubmission.Unavailable
+            } else {
+                coordinator.applyBackendEnrollment(pendingSnapshot())
+                backendEntitlement = BackendFounderEntitlement(
+                    temporaryFounderPro = true,
+                    validUntil = Instant.parse("2026-10-04T12:00:00Z")
+                )
+                FounderReportSubmission.Accepted(pendingSnapshot())
+            }
+        }
+        val open = viewModel.uiState.first { !it.loading && it.feedbackDraft == "Keep the rest timer visible." }
+        assertTrue(open.journey.showFeedback)
+        assertNull(open.journey.milestone)
+        viewModel.submitTesterReport()
+        val failed = viewModel.uiState.first { it.reportSubmitFailed && !it.submittingReport }
+        assertEquals("Keep the rest timer visible.", failed.feedbackDraft)
+        assertEquals(FounderProgramStatus.ActivePro, coordinator.currentState().status)
+        assertNull(failed.journey.milestone)
+        viewModel.submitTesterReport()
+        val submitted = viewModel.uiState.first {
+            it.status == FounderProgramStatus.PendingApproval &&
+                !it.submittingReport &&
+                it.feedbackDraft.isEmpty() &&
+                it.journey.milestone == FounderMilestone.QualificationComplete
+        }
+        assertEquals("", store.loadFeedbackText())
+        assertEquals(1, ids.distinct().size)
+        assertEquals(listOf("Keep the rest timer visible.", "Keep the rest timer visible."), bodies)
+        assertTrue(composer.resolve().temporaryTesterPro)
+        assertFalse(composer.resolve().founderLifetime)
+        assertEquals(FounderJourneyPhase.PendingReview, submitted.journey.phase)
+        val restarted = founderViewModel()
+        val again = ready(restarted)
+        assertEquals(FounderProgramStatus.PendingApproval, again.status)
+        assertEquals(FounderMilestone.QualificationComplete, again.journey.milestone)
+    }
+
+    @Test
+    fun testerReportDoubleTapAndAuthenticationFailureDoNotInventPendingApproval() = runTest {
+        acknowledgements.save(FounderMilestoneAcknowledgements(temporaryProUnlocked = true, trainingComplete = true))
+        coordinator.applyBackendEnrollment(trainingSnapshot())
+        store.saveFeedbackText("Still here")
+        val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val gate = kotlinx.coroutines.CompletableDeferred<FounderReportSubmission>()
+        var calls = 0
+        val viewModel = founderViewModel { _, _, _ ->
+            calls += 1
+            started.complete(Unit)
+            gate.await()
+        }
+        viewModel.uiState.first { !it.loading && it.feedbackDraft == "Still here" }
+        viewModel.submitTesterReport()
+        viewModel.submitTesterReport()
+        started.await()
+        assertEquals(1, calls)
+        assertTrue(viewModel.uiState.value.submittingReport)
+        gate.complete(FounderReportSubmission.Unavailable)
+        val failed = viewModel.uiState.first { it.reportSubmitFailed && !it.submittingReport }
+        assertEquals("Still here", failed.feedbackDraft)
+        assertEquals(FounderProgramStatus.ActivePro, failed.status)
+
+        var signedIn = true
+        val revisions = MutableStateFlow(0)
+        val signedOut = FounderProgramViewModel(
+            coordinator = coordinator,
+            rules = rules,
+            versionName = "0.1.0-debug",
+            milestoneAcknowledgements = acknowledgements,
+            sessionRevision = revisions,
+            sessionPresent = { signedIn },
+            submitReport = { _, feedback, _ ->
+                assertEquals("Still here", feedback)
+                signedIn = false
+                revisions.value = revisions.value + 1
+                FounderReportSubmission.Unauthenticated
+            }
+        )
+        signedOut.uiState.first { !it.loading && it.feedbackDraft == "Still here" }
+        signedOut.submitTesterReport()
+        val rejected = signedOut.uiState.first { it.reportSubmitFailed && it.sessionRequired }
+        assertEquals("Still here", rejected.feedbackDraft)
+        assertEquals("Still here", store.loadFeedbackText())
+        assertEquals(FounderProgramStatus.ActivePro, coordinator.currentState().status)
+        assertNull(rejected.journey.milestone)
+    }
+
+    private fun trainingSnapshot(): BackendFounderSnapshot {
+        return BackendFounderSnapshot(
+            status = FounderProgramStatus.ActivePro,
+            enrolledOn = today,
+            deadline = today.plusDays(45),
+            qualifyingWorkouts = 2,
+            distinctWorkoutDays = 1,
+            feedbackSubmitted = false,
+            reportSubmitted = false,
+            requiredWorkouts = 2,
+            requiredDistinctDays = 1,
+            temporaryProRequiredWorkouts = 1,
+            temporaryProActive = true,
+            trainingRequirementsComplete = true
+        )
+    }
+
+    private fun pendingSnapshot(): BackendFounderSnapshot {
+        return trainingSnapshot().copy(
+            status = FounderProgramStatus.PendingApproval,
+            feedbackSubmitted = true,
+            reportSubmitted = true
+        )
+    }
+
+    private fun founderViewModel(
+        submit: suspend (String, String, String) -> FounderReportSubmission = { _, _, _ ->
+            FounderReportSubmission.Unavailable
+        }
+    ): FounderProgramViewModel {
+        return FounderProgramViewModel(
+            coordinator = coordinator,
+            rules = rules,
+            versionName = "0.1.0-debug",
+            milestoneAcknowledgements = acknowledgements,
+            submitReport = submit
+        )
     }
 
     private suspend fun ready(viewModel: FounderProgramViewModel): FounderProgramUiState {

@@ -184,7 +184,8 @@ class FounderWorkoutSyncTest {
                 clientWorkoutId = workoutId.toString(),
                 completedAt = Instant.ofEpochMilli(1_700_000_000_000L),
                 localDate = java.time.LocalDate.parse("2026-10-04"),
-                zone = ZoneOffset.UTC
+                zone = ZoneOffset.UTC,
+                observation = null
             )
             val recorded = server.takeRequest()
             val body = JSONObject(recorded.body.readUtf8())
@@ -197,6 +198,93 @@ class FounderWorkoutSyncTest {
             assertFalse(body.has("founderLifetime"))
             assertEquals(FounderWorkoutSubmission.Unauthenticated, result)
             assertNull(sessions.read())
+        } finally {
+            server.shutdown()
+            http.dispatcher.executorService.shutdown()
+            http.connectionPool.evictAll()
+        }
+    }
+
+    @Test
+    fun outboxKeepsTheFirstObservationAndReadsOlderRecords() = runBlocking {
+        val first = FounderWorkoutObservation("Legs", 100, 3, 9, true, true)
+        val replacement = FounderWorkoutObservation("Changed", 1, 1, 1, false, false)
+        outbox.enqueue(PendingFounderWorkout(workoutId.toString(), 1_700_000_000_000L, "2026-10-04", first))
+        outbox.enqueue(PendingFounderWorkout(workoutId.toString(), 1_700_000_000_000L, "2026-10-04", replacement))
+        val stored = FounderWorkoutOutbox(context).pending().single()
+        assertEquals(first, stored.observation)
+
+        clearOutbox()
+        outbox.enqueue(PendingFounderWorkout(workoutId.toString(), 1_700_000_000_000L, "2026-10-04"))
+        assertNull(FounderWorkoutOutbox(context).pending().single().observation)
+    }
+
+    @Test
+    fun retrySubmitsTheObservationFrozenAtEnqueue() = runBlocking {
+        val frozen = FounderWorkoutObservation("Push", 90, 2, 4, true, false)
+        val later = FounderWorkoutObservation("Changed", 1, 9, 9, false, true)
+        var lookups = 0
+        val seen = mutableListOf<FounderWorkoutObservation?>()
+        val sync = FounderWorkoutSync(
+            outbox = outbox,
+            accepting = { true },
+            lookup = {
+                lookups += 1
+                NativeFounderWorkout(
+                    clientWorkoutId = workoutId.toString(),
+                    completedAtEpochMilli = 1_700_000_000_000L,
+                    localDate = "2026-10-04",
+                    imported = false,
+                    observation = if (lookups == 1) frozen else later
+                )
+            },
+            submit = {
+                seen += it.observation
+                FounderWorkoutSubmission.Unavailable
+            },
+            onAccepted = {},
+            onUnauthenticated = {}
+        )
+        sync.onNativeWorkoutCompleted(workoutId.toString())
+        sync.onNativeWorkoutCompleted(workoutId.toString())
+        assertEquals(FounderWorkoutFlush.Retry, sync.flush())
+        assertEquals(listOf(frozen), seen)
+        assertEquals(frozen, outbox.pending().single().observation)
+    }
+
+    @Test
+    fun httpWorkoutPayloadCarriesObservationsWithoutSetDetails() = runBlocking {
+        val server = MockWebServer()
+        val sessions = MemorySession()
+        sessions.write(StoredStrictSession(StrictBearerToken("bearer-token"), "2026-11-01T00:00:00Z", UUID.randomUUID().toString()))
+        val http = OkHttpClient.Builder().callTimeout(2, TimeUnit.SECONDS).build()
+        val api = OkHttpStrictBackendApi(server.url("/").toString(), http, sessions)
+        server.enqueue(MockResponse().setResponseCode(401).setBody("""{"errorCode":"UNAUTHENTICATED"}"""))
+        val observation = FounderWorkoutObservation("Push day", 1800, 4, 12, true, false)
+        try {
+            api.submitFounderWorkout(
+                clientWorkoutId = workoutId.toString(),
+                completedAt = Instant.ofEpochMilli(1_700_000_000_000L),
+                localDate = java.time.LocalDate.parse("2026-10-04"),
+                zone = ZoneOffset.UTC,
+                observation = observation
+            )
+            val body = JSONObject(server.takeRequest().body.readUtf8())
+            assertEquals("Push day", body.getString("displayName"))
+            assertEquals(1800, body.getInt("durationSeconds"))
+            assertEquals(4, body.getInt("exerciseCount"))
+            assertEquals(12, body.getInt("completedSetCount"))
+            assertTrue(body.getBoolean("fromTemplate"))
+            assertFalse(body.getBoolean("usedExternalLoad"))
+            assertFalse(body.has("reps"))
+            assertFalse(body.has("weightKg"))
+            assertFalse(body.has("exerciseName"))
+            assertFalse(body.has("templateId"))
+            assertFalse(body.has("notes"))
+            assertFalse(body.has("status"))
+            assertFalse(body.has("requiredWorkoutCount"))
+            assertFalse(body.has("trainingComplete"))
+            assertFalse(body.toString().contains(roomSessionId.toString()))
         } finally {
             server.shutdown()
             http.dispatcher.executorService.shutdown()

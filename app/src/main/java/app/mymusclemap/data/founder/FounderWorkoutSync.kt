@@ -8,7 +8,8 @@ data class NativeFounderWorkout(
     val clientWorkoutId: String,
     val completedAtEpochMilli: Long,
     val localDate: String,
-    val imported: Boolean
+    val imported: Boolean,
+    val observation: FounderWorkoutObservation? = null
 )
 
 enum class FounderWorkoutFlush {
@@ -53,7 +54,8 @@ class FounderWorkoutSync(
             PendingFounderWorkout(
                 clientWorkoutId = workout.clientWorkoutId,
                 completedAtEpochMilli = workout.completedAtEpochMilli,
-                localDate = workout.localDate
+                localDate = workout.localDate,
+                observation = workout.observation
             )
         )
         schedule()

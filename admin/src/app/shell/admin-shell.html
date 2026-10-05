@@ -1,0 +1,41 @@
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" routerLink="/founders">
+      <strict-mark />
+      <span class="brand-text">
+        <span class="wordmark">Strict</span>
+        <span class="admin-label">Admin</span>
+      </span>
+    </a>
+    <nav aria-label="Admin">
+      <a routerLink="/founders" routerLinkActive="active">Founder applications</a>
+    </nav>
+    <div class="topbar-actions">
+      <button type="button" class="button" (click)="theme.cycle()" [attr.aria-label]="theme.cycleLabel()">
+        {{ theme.label() }}
+      </button>
+      <button
+        type="button"
+        class="button"
+        (click)="toggleAccount()"
+        [attr.aria-expanded]="accountOpen()"
+        aria-controls="admin-account"
+      >
+        Account
+      </button>
+    </div>
+  </header>
+  @if (accountOpen()) {
+    <section id="admin-account" class="account" aria-label="Account">
+      <p class="account-status">Not signed in</p>
+      <p>
+        Admin access uses its own Google sign-in and admin session. A Strict member token is not an admin token.
+        Sign-in is not connected on this screen.
+      </p>
+    </section>
+  }
+  <main id="main">
+    <router-outlet />
+  </main>
+</div>

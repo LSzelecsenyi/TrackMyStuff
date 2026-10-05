@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import app.mymusclemap.data.auth.FounderReportSubmission
 import app.mymusclemap.data.founder.FounderJoinResult
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.health.HealthRepository
@@ -76,7 +77,9 @@ class WeightViewModelFactory(
     private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off,
     private val founderJoin: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected },
     private val founderSessionRevision: Flow<Int> = flowOf(0),
-    private val founderSessionPresent: () -> Boolean = { true }
+    private val founderSessionPresent: () -> Boolean = { true },
+    private val founderSubmitReport: suspend (submissionId: String, feedback: String, appVersion: String) -> FounderReportSubmission =
+        { _, _, _ -> FounderReportSubmission.Unavailable }
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -212,7 +215,8 @@ class WeightViewModelFactory(
                     availability = founderAvailability,
                     joinFounder = founderJoin,
                     sessionRevision = founderSessionRevision,
-                    sessionPresent = founderSessionPresent
+                    sessionPresent = founderSessionPresent,
+                    submitReport = founderSubmitReport
                 )
             }
             modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {

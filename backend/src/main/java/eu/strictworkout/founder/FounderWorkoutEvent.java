@@ -39,6 +39,24 @@ public class FounderWorkoutEvent {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "display_name", length = 80)
+    private String displayName;
+
+    @Column(name = "duration_seconds")
+    private Integer durationSeconds;
+
+    @Column(name = "exercise_count")
+    private Integer exerciseCount;
+
+    @Column(name = "completed_set_count")
+    private Integer completedSetCount;
+
+    @Column(name = "from_template")
+    private Boolean fromTemplate;
+
+    @Column(name = "used_external_load")
+    private Boolean usedExternalLoad;
+
     protected FounderWorkoutEvent() {
     }
 
@@ -48,7 +66,8 @@ public class FounderWorkoutEvent {
             UUID clientWorkoutId,
             Instant completedAt,
             LocalDate workoutLocalDate,
-            Instant createdAt
+            Instant createdAt,
+            WorkoutObservation observation
     ) {
         this.id = id;
         this.application = application;
@@ -56,6 +75,15 @@ public class FounderWorkoutEvent {
         this.completedAt = completedAt;
         this.workoutLocalDate = workoutLocalDate;
         this.createdAt = createdAt;
+        WorkoutObservation stored = observation == null ? null : observation.normalized();
+        if (stored != null) {
+            this.displayName = stored.displayName();
+            this.durationSeconds = stored.durationSeconds();
+            this.exerciseCount = stored.exerciseCount();
+            this.completedSetCount = stored.completedSetCount();
+            this.fromTemplate = stored.fromTemplate();
+            this.usedExternalLoad = stored.usedExternalLoad();
+        }
     }
 
     public UUID getClientWorkoutId() {
@@ -68,6 +96,30 @@ public class FounderWorkoutEvent {
 
     public LocalDate getWorkoutLocalDate() {
         return workoutLocalDate;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public Integer getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    public Integer getExerciseCount() {
+        return exerciseCount;
+    }
+
+    public Integer getCompletedSetCount() {
+        return completedSetCount;
+    }
+
+    public Boolean getFromTemplate() {
+        return fromTemplate;
+    }
+
+    public Boolean getUsedExternalLoad() {
+        return usedExternalLoad;
     }
 
     public boolean samePayload(Instant completedAt, LocalDate localDate) {

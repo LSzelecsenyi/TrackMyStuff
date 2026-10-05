@@ -51,6 +51,24 @@ public class FounderReviewSnapshot {
     @Column(name = "feedback_text", nullable = false, length = 8000)
     private String feedbackText;
 
+    @Column(name = "client_submission_id", nullable = false)
+    private UUID clientSubmissionId;
+
+    @Column(name = "rules_profile", length = 32)
+    private String rulesProfile;
+
+    @Column(name = "temporary_pro_workout_count")
+    private Integer temporaryProWorkoutCount;
+
+    @Column(name = "required_workout_count")
+    private Integer requiredWorkoutCount;
+
+    @Column(name = "required_distinct_day_count")
+    private Integer requiredDistinctDayCount;
+
+    @Column(name = "qualification_window_days")
+    private Integer qualificationWindowDays;
+
     @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -66,7 +84,13 @@ public class FounderReviewSnapshot {
             String platform,
             int qualifyingWorkoutCount,
             int distinctWorkoutDayCount,
-            String feedbackText
+            String feedbackText,
+            UUID clientSubmissionId,
+            String rulesProfile,
+            int temporaryProWorkoutCount,
+            int requiredWorkoutCount,
+            int requiredDistinctDayCount,
+            int qualificationWindowDays
     ) {
         this.id = id;
         this.application = application;
@@ -78,6 +102,12 @@ public class FounderReviewSnapshot {
         this.enrolledAt = application.getEnrolledAt();
         this.deadlineAt = application.getDeadlineAt();
         this.feedbackText = feedbackText;
+        this.clientSubmissionId = clientSubmissionId;
+        this.rulesProfile = rulesProfile;
+        this.temporaryProWorkoutCount = temporaryProWorkoutCount;
+        this.requiredWorkoutCount = requiredWorkoutCount;
+        this.requiredDistinctDayCount = requiredDistinctDayCount;
+        this.qualificationWindowDays = qualificationWindowDays;
         this.createdAt = submittedAt;
     }
 
@@ -113,7 +143,11 @@ public class FounderReviewSnapshot {
         return feedbackText;
     }
 
-    public boolean sameDiagnostics(String appVersion, String platform) {
-        return this.appVersion.equals(appVersion) && this.platform.equals(platform);
+    public UUID getClientSubmissionId() {
+        return clientSubmissionId;
+    }
+
+    public boolean sameSubmission(UUID submissionId) {
+        return clientSubmissionId.equals(submissionId);
     }
 }

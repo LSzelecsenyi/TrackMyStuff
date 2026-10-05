@@ -25,7 +25,7 @@ public class FounderService {
     private final FounderReviewSnapshotRepository snapshots;
     private final FounderEnrollment enrollment;
     private final FounderStateMachine machine;
-    private final FounderRules rules;
+    private final FounderRulesBinding rulesBinding;
     private final Clock clock;
 
     public FounderService(
@@ -34,7 +34,7 @@ public class FounderService {
             FounderReviewSnapshotRepository snapshots,
             FounderEnrollment enrollment,
             FounderStateMachine machine,
-            FounderRules rules,
+            FounderRulesBinding rulesBinding,
             Clock clock
     ) {
         this.applications = applications;
@@ -42,8 +42,12 @@ public class FounderService {
         this.snapshots = snapshots;
         this.enrollment = enrollment;
         this.machine = machine;
-        this.rules = rules;
+        this.rulesBinding = rulesBinding;
         this.clock = clock;
+    }
+
+    private FounderRules rules() {
+        return rulesBinding.rules();
     }
 
     @Transactional
@@ -66,7 +70,13 @@ public class FounderService {
     }
 
     @Transactional
-    public FounderCommandResult recordWorkout(UUID userId, UUID workoutId, Instant completedAt, LocalDate localDate) {
+    public FounderCommandResult recordWorkout(
+            UUID userId,
+            UUID workoutId,
+            Instant completedAt,
+            LocalDate localDate,
+            WorkoutObservation observation
+    ) {
         FounderApplication application = lock(userId);
         List<FounderWorkoutEvent> stored = events.findByApplicationIdOrderByCreatedAtAsc(application.getId());
         FounderEvaluation evaluation = sync(application, stored);
@@ -104,13 +114,25 @@ public class FounderService {
                     "This workout was already recorded with different details."
             );
         }
+        WorkoutObservation accepted = observation == null
+                ? new WorkoutObservation(null, null, null, null, null, null)
+                : observation;
+        if (accepted.invalid()) {
+            return FounderCommandResult.reject(
+                    view(evaluation, application),
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_WORKOUT",
+                    "The workout observation is not valid."
+            );
+        }
         events.saveAndFlush(new FounderWorkoutEvent(
                 UUID.randomUUID(),
                 application,
                 workoutId,
                 completedAt,
                 localDate,
-                now
+                now,
+                accepted.normalized()
         ));
         stored = events.findByApplicationIdOrderByCreatedAtAsc(application.getId());
         return FounderCommandResult.ok(view(sync(application, stored), application));
@@ -154,36 +176,53 @@ public class FounderService {
         return FounderCommandResult.ok(view(sync(application, stored), application));
     }
 
+    /**
+     * One submission stores the user's feedback, records the review package, and moves the
+     * application to pending approval. A repeated {@code submissionId} returns the existing
+     * result and does not change {@code pending_at} or create another snapshot.
+     * Qualification counts, status, and entitlement are taken from the server, not the body.
+     * The platform stored for review is always {@code android}.
+     */
     @Transactional
-    public FounderCommandResult submitReport(UUID userId, String appVersion, String platform) {
+    public FounderCommandResult submitReport(UUID userId, UUID submissionId, String feedback, String appVersion) {
         FounderApplication application = lock(userId);
         List<FounderWorkoutEvent> stored = events.findByApplicationIdOrderByCreatedAtAsc(application.getId());
         FounderEvaluation evaluation = sync(application, stored);
-        if (application.reportSubmitted() || evaluation.status() == FounderStatus.PENDING_APPROVAL) {
-            FounderReviewSnapshot snapshot = snapshots.findByApplicationId(application.getId()).orElseThrow();
-            if (snapshot.sameDiagnostics(appVersion, platform)) {
+        FounderReviewSnapshot existing = snapshots.findByApplicationId(application.getId()).orElse(null);
+        if (existing != null || application.reportSubmitted() || evaluation.status() == FounderStatus.PENDING_APPROVAL) {
+            if (existing != null && existing.sameSubmission(submissionId)) {
                 return FounderCommandResult.ok(view(evaluation, application));
             }
             return FounderCommandResult.reject(
                     view(evaluation, application),
                     HttpStatus.CONFLICT,
                     "REPORT_CONFLICT",
-                    "The Tester Report was already submitted with different details."
+                    "The Tester Report was already submitted."
             );
         }
         FounderCommandResult closed = closed(application, evaluation);
         if (closed != null) {
             return closed;
         }
-        if (!evaluation.trainingRequirementsComplete() || !evaluation.feedbackRequirementMet()) {
+        if (!evaluation.trainingRequirementsComplete()) {
             return FounderCommandResult.reject(
                     view(evaluation, application),
                     HttpStatus.CONFLICT,
                     "REPORT_NOT_AVAILABLE",
-                    "The Tester Report is not available yet."
+                    "The Tester Report is not available until training requirements are complete."
+            );
+        }
+        String trimmed = feedback == null ? "" : feedback.trim();
+        if (trimmed.isEmpty() || trimmed.length() > FEEDBACK_MAX_LENGTH) {
+            return FounderCommandResult.reject(
+                    view(evaluation, application),
+                    HttpStatus.BAD_REQUEST,
+                    "FEEDBACK_INVALID",
+                    "Feedback must be between 1 and 8000 characters."
             );
         }
         Instant now = clock.instant();
+        application.replaceFeedback(trimmed, now);
         application.markReportSubmitted(now);
         FounderEvaluation submitted = sync(application, stored);
         snapshots.saveAndFlush(new FounderReviewSnapshot(
@@ -191,10 +230,16 @@ public class FounderService {
                 application,
                 now,
                 appVersion,
-                platform,
+                "android",
                 submitted.qualifyingWorkouts(),
                 submitted.distinctWorkoutDays(),
-                application.getFeedbackText()
+                trimmed,
+                submissionId,
+                rulesBinding.profile(),
+                rules().temporaryProWorkoutCount(),
+                rules().founderWorkoutCount(),
+                rules().requiredDistinctWorkoutDays(),
+                rules().qualificationWindowDays()
         ));
         return FounderCommandResult.ok(view(submitted, application));
     }
@@ -208,7 +253,7 @@ public class FounderService {
     }
 
     private FounderEvaluation sync(FounderApplication application, List<FounderWorkoutEvent> stored) {
-        FounderEvaluation evaluation = machine.evaluate(facts(application, stored), rules, clock.instant());
+        FounderEvaluation evaluation = machine.evaluate(facts(application, stored), rules(), clock.instant());
         application.applyStatus(evaluation.status(), clock.instant());
         return evaluation;
     }
@@ -259,15 +304,15 @@ public class FounderService {
                 application.getDeadlineAt(),
                 new FounderView.Progress(
                         evaluation.qualifyingWorkouts(),
-                        rules.founderWorkoutCount(),
+                        rules().founderWorkoutCount(),
                         evaluation.distinctWorkoutDays(),
-                        rules.requiredDistinctWorkoutDays(),
-                        rules.temporaryProWorkoutCount()
+                        rules().requiredDistinctWorkoutDays(),
+                        rules().temporaryProWorkoutCount()
                 ),
                 evaluation.temporaryProActive(),
                 evaluation.trainingRequirementsComplete(),
-                new FounderView.Requirement(rules.feedbackRequired(), application.feedbackSubmitted()),
-                new FounderView.Requirement(rules.testerAnalyticsReportRequired(), application.reportSubmitted()),
+                new FounderView.Requirement(rules().feedbackRequired(), application.feedbackSubmitted()),
+                new FounderView.Requirement(rules().testerAnalyticsReportRequired(), application.reportSubmitted()),
                 evaluation.nextAction()
         );
     }

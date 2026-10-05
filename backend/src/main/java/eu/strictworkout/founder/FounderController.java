@@ -1,6 +1,7 @@
 package eu.strictworkout.founder;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -44,7 +45,8 @@ public class FounderController {
                 StrictRequests.current().userId(),
                 request.workoutId(),
                 request.completedAt(),
-                request.localDate()
+                request.localDate(),
+                request.observation()
         ));
     }
 
@@ -57,8 +59,9 @@ public class FounderController {
     public FounderView submitReport(@Valid @RequestBody TesterReportRequest request) {
         return respond(founder.submitReport(
                 StrictRequests.current().userId(),
-                request.appVersion(),
-                request.platform()
+                request.submissionId(),
+                request.feedback(),
+                request.appVersion()
         ));
     }
 
@@ -72,8 +75,24 @@ public class FounderController {
     public record WorkoutEventRequest(
             @NotNull UUID workoutId,
             @NotNull Instant completedAt,
-            @NotNull LocalDate localDate
+            @NotNull LocalDate localDate,
+            @Size(max = WorkoutObservation.DISPLAY_NAME_MAX) String displayName,
+            @Min(0) Integer durationSeconds,
+            @Min(0) Integer exerciseCount,
+            @Min(0) Integer completedSetCount,
+            Boolean fromTemplate,
+            Boolean usedExternalLoad
     ) {
+        private WorkoutObservation observation() {
+            return new WorkoutObservation(
+                    displayName,
+                    durationSeconds,
+                    exerciseCount,
+                    completedSetCount,
+                    fromTemplate,
+                    usedExternalLoad
+            );
+        }
     }
 
     public record FeedbackRequest(
@@ -82,8 +101,9 @@ public class FounderController {
     }
 
     public record TesterReportRequest(
-            @NotBlank @Size(max = 32) @Pattern(regexp = "[0-9A-Za-z._+-]{1,32}") String appVersion,
-            @NotBlank @Pattern(regexp = "android") String platform
+            @NotNull UUID submissionId,
+            @NotBlank @Size(max = FounderService.FEEDBACK_MAX_LENGTH) String feedback,
+            @NotBlank @Size(max = 32) @Pattern(regexp = "[0-9A-Za-z._+-]{1,32}") String appVersion
     ) {
     }
 }

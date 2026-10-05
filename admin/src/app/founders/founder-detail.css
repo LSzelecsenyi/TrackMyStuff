@@ -1,0 +1,40 @@
+.id {
+  margin: var(--strict-space-item) 0 var(--strict-space-section);
+  color: var(--strict-text-secondary);
+  font-size: 14px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  color: var(--strict-text);
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--strict-space-item);
+}
+
+h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+section p {
+  margin: var(--strict-space-stack) 0 0;
+  color: var(--strict-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.decision {
+  grid-column: 1 / -1;
+}
+
+.state-error .button {
+  margin-top: var(--strict-space-item);
+  background: var(--strict-surface);
+  color: var(--strict-text);
+}

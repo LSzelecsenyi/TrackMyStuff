@@ -146,6 +146,16 @@ abstract class WorkoutSessionDao {
     @Query("SELECT * FROM workout_session_sets WHERE sessionExerciseId = :sessionExerciseId ORDER BY position ASC, id ASC")
     abstract suspend fun getSets(sessionExerciseId: Long): List<WorkoutSessionSetEntity>
 
+    @Query(
+        """
+        SELECT workout_session_sets.* FROM workout_session_sets
+        INNER JOIN workout_session_exercises
+            ON workout_session_exercises.id = workout_session_sets.sessionExerciseId
+        WHERE workout_session_exercises.sessionId = :sessionId
+        """
+    )
+    abstract suspend fun getSetsForSession(sessionId: Long): List<WorkoutSessionSetEntity>
+
     @Query("SELECT * FROM workout_session_sets WHERE id = :id LIMIT 1")
     abstract suspend fun getSet(id: Long): WorkoutSessionSetEntity?
 

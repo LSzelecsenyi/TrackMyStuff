@@ -93,6 +93,15 @@ sealed interface FounderSnapshotCall {
     data object Unavailable : FounderSnapshotCall
 }
 
+sealed interface FounderReportSubmission {
+    data class Accepted(val snapshot: BackendFounderSnapshot) : FounderReportSubmission
+    data object NoSession : FounderReportSubmission
+    /** Bearer was rejected. The stored session has been cleared. */
+    data object Unauthenticated : FounderReportSubmission
+    data object Rejected : FounderReportSubmission
+    data object Unavailable : FounderReportSubmission
+}
+
 sealed interface FounderEntitlementCall {
     data class Loaded(
         val temporaryFounderPro: Boolean,

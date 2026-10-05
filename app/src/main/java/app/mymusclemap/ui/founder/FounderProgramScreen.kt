@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -30,10 +33,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -57,7 +61,8 @@ internal const val FOUNDER_MILESTONE = "founder-milestone"
 internal const val FOUNDER_MILESTONE_CONTINUE = "founder-milestone-continue"
 internal const val FOUNDER_NEXT = "founder-next"
 internal const val FOUNDER_FEEDBACK = "founder-feedback"
-internal const val FOUNDER_REPORT = "founder-report"
+internal const val FOUNDER_FEEDBACK_FIELD = "founder-feedback-field"
+internal const val FOUNDER_SUBMIT_REPORT = "founder-submit-report"
 internal const val FOUNDER_STATUS = "founder-status"
 internal const val FOUNDER_INVITATION = "founder-invitation"
 internal const val FOUNDER_INVITATION_NOT_NOW = "founder-invitation-not-now"
@@ -70,8 +75,6 @@ fun FounderProgramScreen(
     onEnroll: () -> Unit,
     onResumeSession: () -> Unit = {},
     onFeedbackChange: (String) -> Unit,
-    onSaveFeedback: () -> Unit,
-    onShareFeedback: () -> Unit,
     onSubmitReport: () -> Unit,
     onAcknowledgeMilestone: () -> Unit,
     onApprove: () -> Unit,
@@ -124,6 +127,7 @@ fun FounderProgramScreen(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
+                    .imePadding()
                     .padding(horizontal = AppDimens.screenPadding)
             ) {
                 if (state.journey.phase == FounderJourneyPhase.Welcome) {
@@ -156,16 +160,12 @@ fun FounderProgramScreen(
                         }
                     }
                     EnrolledSection(state = state)
-                    if (state.journey.showFeedback) {
-                        FeedbackSection(
+                    if (state.journey.showFeedback && !state.journey.reportShared) {
+                        TesterReportSection(
                             state = state,
                             onFeedbackChange = onFeedbackChange,
-                            onSaveFeedback = onSaveFeedback,
-                            onShareFeedback = onShareFeedback
+                            onSubmitReport = onSubmitReport
                         )
-                    }
-                    if (state.journey.showReport) {
-                        ReportSection(state = state, onSubmitReport = onSubmitReport)
                     }
                     FounderDebugReview(
                         status = state.status,
@@ -243,6 +243,8 @@ internal fun FounderWelcomeContent(
         SecondaryText(stringResource(R.string.founder_welcome_review))
         Spacer(Modifier.height(AppDimens.itemGap))
         SecondaryText(stringResource(R.string.founder_welcome_native))
+        Spacer(Modifier.height(AppDimens.itemGap))
+        SecondaryText(stringResource(R.string.founder_welcome_upload))
         Spacer(Modifier.height(AppDimens.itemGap))
         SecondaryText(stringResource(R.string.founder_welcome_account))
         Spacer(Modifier.height(AppDimens.sectionGap))
@@ -722,96 +724,73 @@ private fun checklistLabel(row: FounderChecklistRow): String {
 }
 
 @Composable
-private fun FeedbackSection(
+private fun TesterReportSection(
     state: FounderProgramUiState,
     onFeedbackChange: (String) -> Unit,
-    onSaveFeedback: () -> Unit,
-    onShareFeedback: () -> Unit
-) {
-    val journey = state.journey
-    if (!journey.acceptsContribution && !journey.feedbackSaved) {
-        return
-    }
-    Spacer(Modifier.height(AppDimens.sectionGap))
-    CompactEditorSection(
-        title = stringResource(R.string.founder_feedback_title),
-        modifier = Modifier.testTag(FOUNDER_FEEDBACK)
-    ) {
-        if (journey.acceptsContribution && !journey.feedbackSaved) {
-            BodyText(stringResource(R.string.founder_feedback_why))
-            Spacer(Modifier.height(AppDimens.itemGap))
-            OutlinedTextField(
-                value = state.feedbackDraft,
-                onValueChange = onFeedbackChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.founder_feedback_hint)) },
-                isError = state.feedbackBlank,
-                supportingText = if (state.feedbackBlank) {
-                    { Text(stringResource(R.string.founder_feedback_blank)) }
-                } else {
-                    null
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                minLines = 3
-            )
-            Spacer(Modifier.height(AppDimens.itemGap))
-            Button(onClick = onSaveFeedback, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.founder_feedback_save))
-            }
-        } else {
-            Text(
-                text = stringResource(R.string.founder_feedback_saved),
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(AppDimens.itemGap))
-            BodyText(stringResource(R.string.founder_feedback_share_optional))
-            TextButton(onClick = onShareFeedback) {
-                Text(stringResource(R.string.founder_feedback_share))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReportSection(
-    state: FounderProgramUiState,
     onSubmitReport: () -> Unit
 ) {
-    val journey = state.journey
-    if (!journey.acceptsContribution && !journey.reportShared) {
-        return
-    }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
     Spacer(Modifier.height(AppDimens.sectionGap))
     CompactEditorSection(
         title = stringResource(R.string.founder_report_title),
-        modifier = Modifier.testTag(FOUNDER_REPORT)
+        modifier = Modifier.testTag(FOUNDER_FEEDBACK)
     ) {
-        BodyText(stringResource(R.string.founder_report_body))
-        if (state.reportShareFailed) {
+        BodyText(stringResource(R.string.founder_feedback_why))
+        Spacer(Modifier.height(AppDimens.itemGap))
+        OutlinedTextField(
+            value = state.feedbackDraft,
+            onValueChange = onFeedbackChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(FOUNDER_FEEDBACK_FIELD)
+                .bringIntoViewRequester(bringIntoViewRequester)
+                .onFocusChanged { focus ->
+                    if (focus.isFocused) {
+                        scope.launch { bringIntoViewRequester.bringIntoView() }
+                    }
+                },
+            label = { Text(stringResource(R.string.founder_feedback_hint)) },
+            isError = state.feedbackBlank || state.feedbackTooLong,
+            supportingText = when {
+                state.feedbackBlank -> {
+                    { Text(stringResource(R.string.founder_feedback_blank)) }
+                }
+                state.feedbackTooLong -> {
+                    { Text(stringResource(R.string.founder_feedback_too_long)) }
+                }
+                else -> null
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            minLines = 3
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        BodyText(stringResource(R.string.founder_report_submit_hint))
+        if (state.reportSubmitFailed) {
             Spacer(Modifier.height(AppDimens.itemGap))
             Text(
-                text = stringResource(R.string.founder_report_share_failed),
+                text = stringResource(R.string.founder_report_failed),
                 style = AppTypeTokens.statSecondary,
                 color = MaterialTheme.colorScheme.error
             )
         }
         Spacer(Modifier.height(AppDimens.itemGap))
-        if (journey.acceptsContribution && !journey.reportShared) {
-            BodyText(stringResource(R.string.founder_report_submit_hint))
-            Spacer(Modifier.height(AppDimens.itemGap))
-            Button(onClick = onSubmitReport, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.founder_report_submit))
-            }
-        } else {
+        Button(
+            onClick = onSubmitReport,
+            enabled = !state.submittingReport,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(FOUNDER_SUBMIT_REPORT)
+        ) {
             Text(
-                text = stringResource(R.string.founder_report_submitted),
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurface
+                stringResource(
+                    if (state.submittingReport) {
+                        R.string.founder_report_submitting
+                    } else {
+                        R.string.founder_report_submit
+                    }
+                )
             )
-            TextButton(onClick = onSubmitReport) {
-                Text(stringResource(R.string.founder_report_share_again))
-            }
         }
     }
 }
@@ -861,37 +840,22 @@ private fun Bullet(text: String) {
 @Composable
 fun FounderProgramRoute(
     state: FounderProgramUiState,
-    reportText: () -> String,
     onBack: () -> Unit,
     onEnroll: () -> Unit,
     onResumeSession: () -> Unit = {},
     onFeedbackChange: (String) -> Unit,
-    onSaveFeedback: () -> Unit,
-    onReportShareResult: suspend (Boolean) -> Unit,
+    onSubmitReport: () -> Unit,
     onAcknowledgeMilestone: () -> Unit,
     onApprove: () -> Unit,
     onReject: (String) -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val feedbackSubject = stringResource(R.string.founder_feedback_share_subject)
-    val reportSubject = stringResource(R.string.founder_report_share_subject)
     FounderProgramScreen(
         state = state,
         onBack = onBack,
         onEnroll = onEnroll,
         onResumeSession = onResumeSession,
         onFeedbackChange = onFeedbackChange,
-        onSaveFeedback = onSaveFeedback,
-        onShareFeedback = {
-            FounderShare.text(context, feedbackSubject, state.storedFeedback)
-        },
-        onSubmitReport = {
-            val shared = FounderShare.text(context, reportSubject, reportText())
-            if (!state.reportSubmitted) {
-                scope.launch { onReportShareResult(shared) }
-            }
-        },
+        onSubmitReport = onSubmitReport,
         onAcknowledgeMilestone = onAcknowledgeMilestone,
         onApprove = onApprove,
         onReject = onReject

@@ -63,6 +63,20 @@ class FounderProgramStore(context: Context) {
         }
     }
 
+    /**
+     * Stable id for one Tester Report submission. It is created before the request is sent
+     * so a lost response can be retried without a second report. It is not a backend status.
+     */
+    suspend fun loadSubmissionId(): String? {
+        return dataStore.data.first()[KEY_SUBMISSION_ID]?.takeIf { it.isNotBlank() }
+    }
+
+    suspend fun saveSubmissionId(id: String) {
+        dataStore.edit { prefs ->
+            prefs[KEY_SUBMISSION_ID] = id
+        }
+    }
+
     suspend fun save(state: FounderProgramState) {
         dataStore.edit { prefs ->
             if (state.status == FounderProgramStatus.NotEnrolled) {
@@ -97,6 +111,7 @@ class FounderProgramStore(context: Context) {
         private val KEY_ANALYTICS_REPORT = booleanPreferencesKey("tester_analytics_report_submitted")
         private val KEY_REJECTION_REASON = stringPreferencesKey("rejection_reason")
         private val KEY_FEEDBACK_TEXT = stringPreferencesKey("feedback_text")
+        private val KEY_SUBMISSION_ID = stringPreferencesKey("tester_report_submission_id")
         private val KEY_BACKEND_OWNED = booleanPreferencesKey("backend_owned")
         private val KEY_SERVER_WORKOUTS = intPreferencesKey("server_qualifying_workouts")
         private val KEY_SERVER_DAYS = intPreferencesKey("server_distinct_days")

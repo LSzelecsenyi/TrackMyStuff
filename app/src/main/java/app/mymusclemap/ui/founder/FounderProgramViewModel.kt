@@ -2,6 +2,7 @@ package app.mymusclemap.ui.founder
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.mymusclemap.data.auth.FounderReportSubmission
 import app.mymusclemap.data.founder.FounderJoinResult
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
@@ -18,6 +19,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.util.concurrent.atomic.AtomicBoolean
+
+const val FOUNDER_FEEDBACK_MAX_LENGTH = 8000
 
 data class FounderProgramUiState(
     val loading: Boolean = true,
@@ -34,9 +38,11 @@ data class FounderProgramUiState(
     val rejectionReason: String? = null,
     val feedbackDraft: String = "",
     val feedbackBlank: Boolean = false,
+    val feedbackTooLong: Boolean = false,
+    val submittingReport: Boolean = false,
+    val reportSubmitFailed: Boolean = false,
     val storedFeedback: String = "",
     val founderBadge: Boolean = false,
-    val reportShareFailed: Boolean = false,
     val joining: Boolean = false,
     val joinNotice: FounderJoinNotice = FounderJoinNotice.None,
     val sessionRequired: Boolean = false,
@@ -71,11 +77,16 @@ class FounderProgramViewModel(
     private val availability: FounderProgramAvailability = FounderProgramAvailability.Open,
     private val joinFounder: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected },
     private val sessionRevision: Flow<Int> = flowOf(0),
-    private val sessionPresent: () -> Boolean = { true }
+    private val sessionPresent: () -> Boolean = { true },
+    private val submitReport: suspend (submissionId: String, feedback: String, appVersion: String) -> FounderReportSubmission =
+        { _, _, _ -> FounderReportSubmission.Unavailable }
 ) : ViewModel() {
     private val feedbackDraft = MutableStateFlow("")
     private val feedbackBlank = MutableStateFlow(false)
-    private val reportShareFailed = MutableStateFlow(false)
+    private val feedbackTooLong = MutableStateFlow(false)
+    private val submittingReport = MutableStateFlow(false)
+    private val reportSubmitFailed = MutableStateFlow(false)
+    private val submissionInFlight = AtomicBoolean(false)
     private val acknowledgements = MutableStateFlow<FounderMilestoneAcknowledgements?>(null)
     private val joining = MutableStateFlow(false)
     private val joinNotice = MutableStateFlow(FounderJoinNotice.None)
@@ -84,9 +95,12 @@ class FounderProgramViewModel(
         coordinator.view,
         feedbackDraft,
         feedbackBlank,
-        reportShareFailed,
+        combine(feedbackTooLong, submittingReport, reportSubmitFailed) { tooLong, submitting, failed ->
+            Triple(tooLong, submitting, failed)
+        },
         acknowledgements
-    ) { program, draft, blank, shareFailed, acks ->
+    ) { program, draft, blank, submit, acks ->
+        val (tooLong, submitting, failed) = submit
         val state = program.state
         val qualification = program.qualification
         val journey = founderJourney(
@@ -119,9 +133,11 @@ class FounderProgramViewModel(
             rejectionReason = state.rejectionReason,
             feedbackDraft = draft,
             feedbackBlank = blank,
+            feedbackTooLong = tooLong,
+            submittingReport = submitting,
+            reportSubmitFailed = failed,
             storedFeedback = program.feedbackText,
             founderBadge = state.status == FounderProgramStatus.Approved,
-            reportShareFailed = shareFailed,
             journey = journey
         )
     }.stateIn(
@@ -162,12 +178,20 @@ class FounderProgramViewModel(
         }
         viewModelScope.launch {
             coordinator.refresh()
+            if (feedbackDraft.value.isEmpty()) {
+                feedbackDraft.value = coordinator.loadFeedbackDraft()
+            }
         }
     }
 
     fun onFeedbackChange(value: String) {
         feedbackDraft.value = value
         feedbackBlank.value = false
+        feedbackTooLong.value = false
+        reportSubmitFailed.value = false
+        viewModelScope.launch {
+            coordinator.saveFeedbackDraft(value)
+        }
     }
 
     fun enroll() {
@@ -212,25 +236,45 @@ class FounderProgramViewModel(
         }
     }
 
-    fun saveFeedback() {
-        viewModelScope.launch {
-            val saved = coordinator.recordFeedback(feedbackDraft.value)
-            feedbackBlank.value = !saved && feedbackDraft.value.isBlank()
-            if (saved) {
-                feedbackDraft.value = ""
-            }
-        }
-    }
-
-    fun reportText(): String = coordinator.reportText(versionName)
-
-    suspend fun onReportShareResult(shared: Boolean) {
-        if (!shared) {
-            reportShareFailed.value = true
+    fun submitTesterReport() {
+        val trimmed = feedbackDraft.value.trim()
+        if (trimmed.isEmpty()) {
+            feedbackBlank.value = true
+            feedbackTooLong.value = false
             return
         }
-        reportShareFailed.value = false
-        coordinator.submitTesterAnalyticsReport()
+        if (trimmed.length > FOUNDER_FEEDBACK_MAX_LENGTH) {
+            feedbackBlank.value = false
+            feedbackTooLong.value = true
+            return
+        }
+        if (!submissionInFlight.compareAndSet(false, true)) {
+            return
+        }
+        submittingReport.value = true
+        reportSubmitFailed.value = false
+        feedbackBlank.value = false
+        feedbackTooLong.value = false
+        viewModelScope.launch {
+            try {
+                coordinator.saveFeedbackDraft(trimmed)
+                val submissionId = coordinator.loadOrCreateSubmissionId()
+                when (submitReport(submissionId, trimmed, versionName)) {
+                    is FounderReportSubmission.Accepted -> {
+                        coordinator.clearFeedbackDraft()
+                        feedbackDraft.value = ""
+                        reportSubmitFailed.value = false
+                    }
+                    FounderReportSubmission.Unauthenticated,
+                    FounderReportSubmission.NoSession,
+                    FounderReportSubmission.Rejected,
+                    FounderReportSubmission.Unavailable -> reportSubmitFailed.value = true
+                }
+            } finally {
+                submittingReport.value = false
+                submissionInFlight.set(false)
+            }
+        }
     }
 
     fun acknowledgeMilestone() {

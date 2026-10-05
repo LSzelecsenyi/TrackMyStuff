@@ -12,6 +12,7 @@ import app.mymusclemap.data.health.HealthConnectGateway
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.auth.FounderEntitlementCall
+import app.mymusclemap.data.auth.FounderReportSubmission
 import app.mymusclemap.data.auth.FounderSnapshotCall
 import app.mymusclemap.data.founder.BackendFounderSnapshot
 import app.mymusclemap.data.founder.FounderJoinCoordinator
@@ -20,6 +21,8 @@ import app.mymusclemap.data.founder.FounderWorkoutFlush
 import app.mymusclemap.data.founder.FounderWorkoutOutbox
 import app.mymusclemap.data.founder.FounderWorkoutSync
 import app.mymusclemap.data.founder.FounderWorkoutSyncScheduler
+import app.mymusclemap.data.founder.FounderSetObservation
+import app.mymusclemap.data.founder.FounderWorkoutObservations
 import app.mymusclemap.data.founder.NativeFounderWorkout
 import app.mymusclemap.data.preferences.FounderEntitlementCache
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
@@ -268,11 +271,22 @@ class AppContainer(context: Context) {
                 if (session == null || finishedAt == null) {
                     null
                 } else {
+                    val exercises = database.workoutSessionDao().getExercises(session.id)
+                    val sets = database.workoutSessionDao().getSetsForSession(session.id)
+                        .map { set -> FounderSetObservation(set.status, set.actualLoadKind) }
                     NativeFounderWorkout(
                         clientWorkoutId = session.clientWorkoutId,
                         completedAtEpochMilli = finishedAt,
                         localDate = session.workoutDate,
-                        imported = !session.importFingerprint.isNullOrBlank()
+                        imported = !session.importFingerprint.isNullOrBlank(),
+                        observation = FounderWorkoutObservations.derive(
+                            templateName = session.templateName,
+                            templateId = session.templateId,
+                            startedAt = session.startedAt,
+                            finishedAt = finishedAt,
+                            exerciseCount = exercises.size,
+                            sets = sets
+                        )
                     )
                 }
             },
@@ -281,13 +295,31 @@ class AppContainer(context: Context) {
                     clientWorkoutId = event.clientWorkoutId,
                     completedAt = Instant.ofEpochMilli(event.completedAtEpochMilli),
                     localDate = LocalDate.parse(event.localDate),
-                    zone = founderZone
+                    zone = founderZone,
+                    observation = event.observation
                 )
             },
             onAccepted = { snapshot -> publishFounderSnapshot(snapshot) },
             onUnauthenticated = { founderEntitlementCache.drop() },
             schedule = { FounderWorkoutSyncScheduler.enqueue(appContext) }
         )
+    }
+
+    private suspend fun submitFounderTesterReport(
+        submissionId: String,
+        feedback: String,
+        appVersion: String
+    ): FounderReportSubmission {
+        val result = strictAccount.api.submitFounderReport(
+            submissionId = submissionId,
+            feedback = feedback,
+            appVersion = appVersion,
+            zone = founderZone
+        )
+        if (result is FounderReportSubmission.Accepted) {
+            publishFounderSnapshot(result.snapshot)
+        }
+        return result
     }
 
     private suspend fun publishFounderSnapshot(snapshot: BackendFounderSnapshot) {
@@ -369,7 +401,10 @@ class AppContainer(context: Context) {
         lockScreenSetCompletion = lockScreenSetCompletion,
         founderJoin = { founderJoin.join() },
         founderSessionRevision = strictSessionRevision,
-        founderSessionPresent = { strictSessionStore.read() != null }
+        founderSessionPresent = { strictSessionStore.read() != null },
+        founderSubmitReport = { submissionId, feedback, appVersion ->
+            submitFounderTesterReport(submissionId, feedback, appVersion)
+        }
     )
 }
 

@@ -1,6 +1,7 @@
 package app.mymusclemap.data.auth
 
 import app.mymusclemap.data.founder.BackendFounderSnapshot
+import app.mymusclemap.data.founder.FounderWorkoutObservation
 import app.mymusclemap.data.founder.FounderWorkoutSubmission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,9 +33,16 @@ interface StrictBackendApi {
         clientWorkoutId: String,
         completedAt: Instant,
         localDate: LocalDate,
-        zone: ZoneId
+        zone: ZoneId,
+        observation: FounderWorkoutObservation? = null
     ): FounderWorkoutSubmission
     suspend fun currentEntitlements(): FounderEntitlementCall
+    suspend fun submitFounderReport(
+        submissionId: String,
+        feedback: String,
+        appVersion: String,
+        zone: ZoneId
+    ): FounderReportSubmission
 }
 
 class OkHttpStrictBackendApi(
@@ -134,16 +142,25 @@ class OkHttpStrictBackendApi(
         clientWorkoutId: String,
         completedAt: Instant,
         localDate: LocalDate,
-        zone: ZoneId
+        zone: ZoneId,
+        observation: FounderWorkoutObservation?
     ): FounderWorkoutSubmission {
         val parsed = runCatching { UUID.fromString(clientWorkoutId) }.getOrNull()
             ?: return FounderWorkoutSubmission.Rejected
         val session = sessions.read() ?: return FounderWorkoutSubmission.NoSession
-        val body = JSONObject()
+        val payload = JSONObject()
             .put("workoutId", parsed.toString())
             .put("completedAt", completedAt.toString())
             .put("localDate", localDate.toString())
-            .toString()
+        observation?.let { observed ->
+            observed.displayName?.let { payload.put("displayName", it) }
+            observed.durationSeconds?.let { payload.put("durationSeconds", it) }
+            observed.exerciseCount?.let { payload.put("exerciseCount", it) }
+            observed.completedSetCount?.let { payload.put("completedSetCount", it) }
+            observed.fromTemplate?.let { payload.put("fromTemplate", it) }
+            observed.usedExternalLoad?.let { payload.put("usedExternalLoad", it) }
+        }
+        val body = payload.toString()
         val request = Request.Builder()
             .url("$root/api/v1/founder/workouts")
             .header("Authorization", "Bearer ${session.accessToken.value}")
@@ -162,6 +179,37 @@ class OkHttpStrictBackendApi(
                     ?: FounderWorkoutSubmission.Rejected
             }
         } ?: FounderWorkoutSubmission.Unavailable
+    }
+
+    override suspend fun submitFounderReport(
+        submissionId: String,
+        feedback: String,
+        appVersion: String,
+        zone: ZoneId
+    ): FounderReportSubmission {
+        val session = sessions.read() ?: return FounderReportSubmission.NoSession
+        val body = JSONObject()
+            .put("submissionId", submissionId)
+            .put("feedback", feedback)
+            .put("appVersion", appVersion)
+        val request = Request.Builder()
+            .url("$root/api/v1/founder/tester-report")
+            .header("Authorization", "Bearer ${session.accessToken.value}")
+            .post(body.toString().toRequestBody(json))
+            .build()
+        return call(request) { response ->
+            when {
+                response.code == 401 -> {
+                    sessions.clear()
+                    FounderReportSubmission.Unauthenticated
+                }
+                response.code in 400..499 -> FounderReportSubmission.Rejected
+                !response.isSuccessful -> FounderReportSubmission.Unavailable
+                else -> BackendFounderSnapshot.parse(response.body.string(), zone)
+                    ?.let { FounderReportSubmission.Accepted(it) }
+                    ?: FounderReportSubmission.Rejected
+            }
+        } ?: FounderReportSubmission.Unavailable
     }
 
     override suspend fun currentEntitlements(): FounderEntitlementCall {

@@ -635,16 +635,11 @@ fun WeightTrackerNavHost(
             composable(AppRoutes.FOUNDER_PROGRAM) {
                 app.mymusclemap.ui.founder.FounderProgramRoute(
                     state = founder,
-                    reportText = { founderViewModel?.reportText().orEmpty() },
                     onBack = { navController.popBackStack() },
                     onEnroll = { founderViewModel?.enroll() },
                     onResumeSession = { founderViewModel?.resumeSession() },
                     onFeedbackChange = { founderViewModel?.onFeedbackChange(it) },
-                    onSaveFeedback = { founderViewModel?.saveFeedback() },
-                    onReportShareResult = { shared ->
-                        founderViewModel?.onReportShareResult(shared)
-                        Unit
-                    },
+                    onSubmitReport = { founderViewModel?.submitTesterReport() },
                     onAcknowledgeMilestone = { founderViewModel?.acknowledgeMilestone() },
                     onApprove = { founderViewModel?.approve() },
                     onReject = { founderViewModel?.reject(it) }

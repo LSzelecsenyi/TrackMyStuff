@@ -66,6 +66,7 @@ class FounderProgramScreenTest {
         composeRule.onNodeWithText(testString(R.string.founder_welcome_lead)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_unlock_early_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_welcome_native)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_welcome_upload)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_welcome_review)).assertIsDisplayed()
         show(bullet(R.plurals.founder_challenge_workouts, FounderProgramRules.Production.founderWorkoutCount))
         show(bullet(R.plurals.founder_challenge_days, FounderProgramRules.Production.requiredDistinctWorkoutDays))
@@ -117,8 +118,11 @@ class FounderProgramScreenTest {
         )
         composeRule.onNodeWithText(testString(R.string.founder_training_complete_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_feedback_why)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.founder_feedback_save)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.founder_report_submit)).assertDoesNotExist()
+        composeRule.onNodeWithTag(FOUNDER_FEEDBACK_FIELD).assertIsDisplayed()
+        composeRule.onNodeWithTag(FOUNDER_SUBMIT_REPORT).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_report_submit)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_feedback_save)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_feedback_share)).assertDoesNotExist()
     }
 
     @Test
@@ -194,10 +198,10 @@ class FounderProgramScreenTest {
         )
         composeRule.onNodeWithText(testString(R.string.founder_feedback_complete_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_next_report)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.founder_feedback_saved)).performScrollTo().assertIsDisplayed()
-        show(testString(R.string.founder_feedback_share_optional))
-        composeRule.onNodeWithText(testString(R.string.founder_feedback_why)).assertDoesNotExist()
-        composeRule.onNodeWithText(testString(R.string.founder_report_submitted)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_report_submit)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_feedback_share)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_feedback_share_optional)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_report_share_again)).assertDoesNotExist()
     }
 
     @Test
@@ -342,8 +346,6 @@ class FounderProgramScreenTest {
                             onBack = {},
                             onEnroll = onEnroll,
                             onFeedbackChange = {},
-                            onSaveFeedback = {},
-                            onShareFeedback = {},
                             onSubmitReport = {},
                             onAcknowledgeMilestone = onAcknowledge,
                             onApprove = {},

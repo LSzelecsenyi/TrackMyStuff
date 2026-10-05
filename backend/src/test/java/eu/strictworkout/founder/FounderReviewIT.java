@@ -311,13 +311,67 @@ class FounderReviewIT {
         assertFlag(false, parse(ok(get("/api/v1/entitlements", second))).get("founderLifetime"));
     }
 
+    @Test
+    void approvedAndRejectedApplicationsCannotResubmitTheTesterReport() {
+        String admin = adminLogin();
+        String approved = pendingUser("closed-approved");
+        String approvedId = applicationId(userId(approved));
+        Object approvedPendingAt = jdbc.queryForObject(
+                "select pending_at from founder_application where id = ?::uuid",
+                Object.class,
+                approvedId
+        );
+        ok(post("/api/v1/admin/founder/applications/" + approvedId + "/approval", "{}", admin));
+        ResponseEntity<String> approvedAgain = post(
+                "/api/v1/founder/tester-report",
+                "{\"submissionId\":\"" + UUID.randomUUID() + "\",\"appVersion\":\"9.9.9\",\"feedback\":\"Changed\",\"status\":\"APPROVED\",\"founderLifetime\":true}",
+                approved
+        );
+        assertEquals(HttpStatus.CONFLICT, approvedAgain.getStatusCode());
+        assertEquals("APPROVED", parse(ok(get("/api/v1/founder", approved))).get("status"));
+        assertEquals(approvedPendingAt, jdbc.queryForObject(
+                "select pending_at from founder_application where id = ?::uuid",
+                Object.class,
+                approvedId
+        ));
+        assertEquals(1, snapshotCount(approvedId));
+
+        String rejected = pendingUser("closed-rejected");
+        String rejectedId = applicationId(userId(rejected));
+        ok(post(
+                "/api/v1/admin/founder/applications/" + rejectedId + "/rejection",
+                "{\"reason\":\"Not this time\"}",
+                admin
+        ));
+        ResponseEntity<String> rejectedAgain = post(
+                "/api/v1/founder/tester-report",
+                "{\"submissionId\":\"" + UUID.randomUUID() + "\",\"appVersion\":\"9.9.9\",\"feedback\":\"Changed\"}",
+                rejected
+        );
+        assertEquals(HttpStatus.CONFLICT, rejectedAgain.getStatusCode());
+        assertEquals("REJECTED", parse(ok(get("/api/v1/founder", rejected))).get("status"));
+        assertEquals(1, snapshotCount(rejectedId));
+        assertEquals(0, grantCount(userId(rejected)));
+    }
+
+    private int snapshotCount(String applicationId) {
+        return jdbc.queryForObject(
+                "select count(*) from founder_review_snapshot where founder_application_id = ?::uuid",
+                Integer.class,
+                applicationId
+        );
+    }
+
     private String pendingUser(String subject) {
         String token = login(subject, subject);
         ok(post("/api/v1/founder/enrollment", "{}", token));
         ok(post("/api/v1/founder/workouts", workout(UUID.randomUUID(), FastFounderRulesConfig.START, "2026-06-01"), token));
         ok(post("/api/v1/founder/workouts", workout(UUID.randomUUID(), FastFounderRulesConfig.START.plusSeconds(5), "2026-06-01"), token));
-        ok(put("/api/v1/founder/feedback", "{\"text\":\"Ready for review\"}", token));
-        ok(post("/api/v1/founder/tester-report", "{\"appVersion\":\"1.0.0\",\"platform\":\"android\"}", token));
+        ok(post(
+                "/api/v1/founder/tester-report",
+                "{\"submissionId\":\"" + UUID.randomUUID() + "\",\"appVersion\":\"1.0.0\",\"feedback\":\"Ready for review\"}",
+                token
+        ));
         return token;
     }
 

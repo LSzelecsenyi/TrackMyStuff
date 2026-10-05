@@ -1,0 +1,122 @@
+.skip {
+  position: absolute;
+  left: var(--strict-space-screen);
+  top: 0;
+  transform: translateY(-120%);
+  background: var(--strict-primary);
+  color: var(--strict-on-primary);
+  padding: 8px 12px;
+  border-radius: var(--strict-radius-compact);
+  z-index: 2;
+}
+
+.skip:focus {
+  transform: none;
+  top: 8px;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--strict-space-item) var(--strict-space-section);
+  min-height: var(--strict-nav);
+  padding: var(--strict-space-item) var(--strict-space-screen);
+  background: var(--strict-surface);
+  border-bottom: 1px solid var(--strict-divider);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--strict-space-item);
+  min-height: var(--strict-control);
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.wordmark {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 26px;
+}
+
+.admin-label {
+  color: var(--strict-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.4px;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--strict-control);
+  padding: 0 12px;
+  border-radius: var(--strict-radius-compact);
+  color: var(--strict-text-secondary);
+  text-decoration: none;
+}
+
+nav a.active {
+  color: var(--strict-primary);
+  box-shadow: inset 0 -2px 0 var(--strict-primary);
+}
+
+.topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.account {
+  margin: var(--strict-space-item) auto 0;
+  width: min(var(--strict-content), calc(100% - 40px));
+  padding: var(--strict-space-screen);
+  background: var(--strict-surface);
+  border: 1px solid var(--strict-divider);
+  border-radius: var(--strict-radius-large);
+}
+
+.account-status {
+  margin: 0;
+  font-weight: 600;
+}
+
+.account p:last-child {
+  margin: var(--strict-space-stack) 0 0;
+  color: var(--strict-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+main {
+  width: min(var(--strict-content), calc(100% - 40px));
+  margin: var(--strict-space-section) auto 48px;
+}
+
+@media (max-width: 720px) {
+  .topbar-actions {
+    margin-left: 0;
+  }
+
+  main,
+  .account {
+    width: min(var(--strict-content), calc(100% - 32px));
+  }
+}

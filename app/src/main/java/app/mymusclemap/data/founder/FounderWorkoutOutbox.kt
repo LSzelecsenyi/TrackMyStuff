@@ -15,7 +15,8 @@ private val Context.founderWorkoutOutboxDataStore by preferencesDataStore(
 data class PendingFounderWorkout(
     val clientWorkoutId: String,
     val completedAtEpochMilli: Long,
-    val localDate: String
+    val localDate: String,
+    val observation: FounderWorkoutObservation? = null
 )
 
 /**
@@ -44,7 +45,8 @@ class FounderWorkoutOutbox(context: Context) {
                     PendingFounderWorkout(
                         clientWorkoutId = id,
                         completedAtEpochMilli = completedAt,
-                        localDate = localDate
+                        localDate = localDate,
+                        observation = item.toObservation()
                     )
                 )
             }
@@ -90,20 +92,73 @@ class FounderWorkoutOutbox(context: Context) {
                     if (id.isBlank() || completedAt == Long.MIN_VALUE || localDate.isBlank()) {
                         continue
                     }
-                    add(PendingFounderWorkout(id, completedAt, localDate))
+                    add(
+                        PendingFounderWorkout(
+                            clientWorkoutId = id,
+                            completedAtEpochMilli = completedAt,
+                            localDate = localDate,
+                            observation = item.toObservation()
+                        )
+                    )
                 }
             }
+        }
+
+        private fun JSONObject.toObservation(): FounderWorkoutObservation? {
+            if (!has("displayName") && !has("durationSeconds") && !has("exerciseCount") &&
+                !has("completedSetCount") && !has("fromTemplate") && !has("usedExternalLoad")
+            ) {
+                return null
+            }
+            return FounderWorkoutObservation(
+                displayName = optionalString("displayName"),
+                durationSeconds = optionalInt("durationSeconds"),
+                exerciseCount = optionalInt("exerciseCount"),
+                completedSetCount = optionalInt("completedSetCount"),
+                fromTemplate = optionalBoolean("fromTemplate"),
+                usedExternalLoad = optionalBoolean("usedExternalLoad")
+            )
+        }
+
+        private fun JSONObject.putObservation(observation: FounderWorkoutObservation) {
+            observation.displayName?.let { put("displayName", it) }
+            observation.durationSeconds?.let { put("durationSeconds", it) }
+            observation.exerciseCount?.let { put("exerciseCount", it) }
+            observation.completedSetCount?.let { put("completedSetCount", it) }
+            observation.fromTemplate?.let { put("fromTemplate", it) }
+            observation.usedExternalLoad?.let { put("usedExternalLoad", it) }
+        }
+
+        private fun JSONObject.optionalString(key: String): String? {
+            if (!has(key) || isNull(key)) {
+                return null
+            }
+            return getString(key).ifBlank { null }
+        }
+
+        private fun JSONObject.optionalInt(key: String): Int? {
+            if (!has(key) || isNull(key)) {
+                return null
+            }
+            return getInt(key)
+        }
+
+        private fun JSONObject.optionalBoolean(key: String): Boolean? {
+            if (!has(key) || isNull(key)) {
+                return null
+            }
+            return getBoolean(key)
         }
 
         private fun encode(events: List<PendingFounderWorkout>): String {
             val array = JSONArray()
             events.forEach { event ->
-                array.put(
-                    JSONObject()
-                        .put("clientWorkoutId", event.clientWorkoutId)
-                        .put("completedAtEpochMilli", event.completedAtEpochMilli)
-                        .put("localDate", event.localDate)
-                )
+                val item = JSONObject()
+                    .put("clientWorkoutId", event.clientWorkoutId)
+                    .put("completedAtEpochMilli", event.completedAtEpochMilli)
+                    .put("localDate", event.localDate)
+                event.observation?.let { observation -> item.putObservation(observation) }
+                array.put(item)
             }
             return array.toString()
         }

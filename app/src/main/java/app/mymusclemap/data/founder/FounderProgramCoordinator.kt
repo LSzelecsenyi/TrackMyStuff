@@ -159,16 +159,21 @@ class FounderProgramCoordinator(
         }
     }
 
-    fun reportText(versionName: String): String {
-        val current = viewState.value
-        return app.mymusclemap.domain.entitlement.FounderTesterReport.render(
-            versionName = versionName,
-            rules = rules,
-            state = current.state,
-            qualification = current.qualification,
-            workouts = current.workouts,
-            feedbackText = current.feedbackText
-        )
+    suspend fun loadFeedbackDraft(): String = store.loadFeedbackText()
+
+    suspend fun saveFeedbackDraft(text: String) {
+        store.saveFeedbackText(text)
+    }
+
+    suspend fun clearFeedbackDraft() {
+        store.saveFeedbackText("")
+    }
+
+    suspend fun loadOrCreateSubmissionId(): String {
+        store.loadSubmissionId()?.let { return it }
+        val created = java.util.UUID.randomUUID().toString()
+        store.saveSubmissionId(created)
+        return created
     }
 
     private suspend fun reevaluate() {

@@ -98,7 +98,8 @@ fun founderJourney(
     val shownMilestone = if (
         !authoritative &&
         (rawMilestone == FounderMilestone.TemporaryProUnlocked ||
-            rawMilestone == FounderMilestone.TrainingComplete)
+            rawMilestone == FounderMilestone.TrainingComplete ||
+            rawMilestone == FounderMilestone.QualificationComplete)
     ) {
         null
     } else {

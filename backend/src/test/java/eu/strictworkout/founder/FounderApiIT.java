@@ -40,6 +40,8 @@ import java.util.concurrent.Future;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(
@@ -73,6 +75,9 @@ class FounderApiIT {
     private FounderRules rules;
 
     @Autowired
+    private FounderRulesBinding rulesBinding;
+
+    @Autowired
     private JdbcTemplate jdbc;
 
     @Autowired
@@ -84,6 +89,7 @@ class FounderApiIT {
     @BeforeEach
     void resetClock() {
         clock.set(FastFounderRulesConfig.START);
+        rulesBinding.replace("fast", new FounderRules(1, 2, 1, 45, true, true));
     }
 
     @AfterAll
@@ -215,34 +221,47 @@ class FounderApiIT {
         assertEquals(HttpStatus.CONFLICT, early.getStatusCode());
         assertEquals("FEEDBACK_NOT_AVAILABLE", parse(early).get("errorCode"));
 
-        completeTraining(token);
         ResponseEntity<String> earlyReport = post("/api/v1/founder/tester-report", report("1.0.0"), token);
         assertEquals(HttpStatus.CONFLICT, earlyReport.getStatusCode());
         assertEquals("REPORT_NOT_AVAILABLE", parse(earlyReport).get("errorCode"));
 
-        Map<String, Object> saved = parse(ok(put("/api/v1/founder/feedback", "{\"text\":\"First note\"}", token)));
-        assertFlag(true, requirement(saved, "feedback").get("submitted"));
-        assertEquals("SUBMIT_TESTER_REPORT", saved.get("nextAction"));
-        ok(put("/api/v1/founder/feedback", "{\"text\":\"Revised note\"}", token));
-
-        Map<String, Object> pending = parse(ok(post(
-                "/api/v1/founder/tester-report",
-                "{\"appVersion\":\"1.2.3\",\"platform\":\"android\",\"qualifyingWorkouts\":99}",
-                token
-        )));
+        completeTraining(token);
+        UUID submissionId = UUID.randomUUID();
+        String body = report(submissionId, "1.2.3", "Revised note", ",\"qualifyingWorkouts\":99,\"status\":\"APPROVED\",\"founderLifetime\":true,\"userId\":\"" + userId(token) + "\",\"pendingAt\":\"2000-01-01T00:00:00Z\"");
+        Map<String, Object> pending = parse(ok(post("/api/v1/founder/tester-report", body, token)));
         assertEquals("PENDING_APPROVAL", pending.get("status"));
         assertEquals("WAIT_FOR_REVIEW", pending.get("nextAction"));
         assertFlag(true, pending.get("temporaryProActive"));
+        assertFlag(true, requirement(pending, "feedback").get("submitted"));
+        assertFlag(true, requirement(pending, "testerReport").get("submitted"));
+        assertFalse(pending.toString().contains("Revised note"));
+        assertFalse(pending.toString().contains("@"));
 
         ResponseEntity<String> frozen = put("/api/v1/founder/feedback", "{\"text\":\"Changed after review\"}", token);
         assertEquals(HttpStatus.CONFLICT, frozen.getStatusCode());
         assertEquals("FEEDBACK_FROZEN", parse(frozen).get("errorCode"));
 
-        ResponseEntity<String> retry = post("/api/v1/founder/tester-report", report("1.2.3"), token);
+        Object pendingAt = jdbc.queryForObject(
+                "select pending_at from founder_application where user_id = ?::uuid",
+                Object.class,
+                userId(token)
+        );
+        ResponseEntity<String> retry = post("/api/v1/founder/tester-report", body, token);
         assertEquals(HttpStatus.OK, retry.getStatusCode());
+        assertEquals("PENDING_APPROVAL", parse(retry).get("status"));
+        assertEquals(pendingAt, jdbc.queryForObject(
+                "select pending_at from founder_application where user_id = ?::uuid",
+                Object.class,
+                userId(token)
+        ));
         ResponseEntity<String> conflict = post("/api/v1/founder/tester-report", report("9.9.9"), token);
         assertEquals(HttpStatus.CONFLICT, conflict.getStatusCode());
         assertEquals("REPORT_CONFLICT", parse(conflict).get("errorCode"));
+        assertEquals(pendingAt, jdbc.queryForObject(
+                "select pending_at from founder_application where user_id = ?::uuid",
+                Object.class,
+                userId(token)
+        ));
 
         Map<String, Object> snapshot = snapshot(userId(token));
         assertEquals("1.2.3", snapshot.get("app_version"));
@@ -250,8 +269,17 @@ class FounderApiIT {
         assertCount(2, snapshot.get("qualifying_workout_count"));
         assertCount(1, snapshot.get("distinct_workout_day_count"));
         assertEquals("Revised note", snapshot.get("feedback_text"));
+        assertEquals(submissionId.toString(), snapshot.get("client_submission_id").toString());
         assertEquals(1, countSnapshots(userId(token)));
         assertFalse(conflict.getBody().contains("Revised note"));
+        Map<String, Object> entitlements = parse(ok(get("/api/v1/entitlements", token)));
+        assertFlag(true, entitlements.get("temporaryFounderPro"));
+        assertFlag(false, entitlements.get("founderLifetime"));
+        assertEquals(0, jdbc.queryForObject(
+                "select count(*) from entitlement_grant where user_id = ?::uuid",
+                Integer.class,
+                userId(token)
+        ));
     }
 
     @Test
@@ -265,16 +293,17 @@ class FounderApiIT {
                 insert into founder_review_snapshot (
                     id, founder_application_id, submitted_at, app_version, platform,
                     qualifying_workout_count, distinct_workout_day_count, enrolled_at, deadline_at,
-                    feedback_text, created_at
-                ) values (?::uuid, ?::uuid, now(), '0.0.1', 'android', 2, 1, now(), now(), 'seed', now())
+                    feedback_text, created_at, client_submission_id
+                ) values (?::uuid, ?::uuid, now(), '0.0.1', 'android', 2, 1, now(), now(), 'seed', now(), ?::uuid)
                 """,
                 UUID.randomUUID().toString(),
-                applicationId.toString()
+                applicationId.toString(),
+                UUID.randomUUID().toString()
         );
 
         ResponseEntity<String> failed = post("/api/v1/founder/tester-report", report("1.0.0"), token);
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, failed.getStatusCode());
-        assertEquals("INTERNAL_ERROR", parse(failed).get("errorCode"));
+        assertEquals(HttpStatus.CONFLICT, failed.getStatusCode());
+        assertEquals("REPORT_CONFLICT", parse(failed).get("errorCode"));
         assertFalse(failed.getBody().contains("Keep this private"));
         assertEquals("ACTIVE_PRO", jdbc.queryForObject(
                 "select status from founder_application where id = ?::uuid",
@@ -331,6 +360,40 @@ class FounderApiIT {
     }
 
     @Test
+    void testerReportRejectsBlankFeedbackAndALateDeadline() {
+        assertEquals(HttpStatus.UNAUTHORIZED, post("/api/v1/founder/tester-report", report("1.0.0"), null).getStatusCode());
+
+        String token = enrolled("report-validation");
+        completeTraining(token);
+        assertEquals(HttpStatus.BAD_REQUEST, post("/api/v1/founder/tester-report", report(UUID.randomUUID(), "1.0.0", ""), token).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, post("/api/v1/founder/tester-report", report(UUID.randomUUID(), "1.0.0", "   "), token).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, post(
+                "/api/v1/founder/tester-report",
+                report(UUID.randomUUID(), "1.0.0", "x".repeat(8001)),
+                token
+        ).getStatusCode());
+        assertEquals("ACTIVE_PRO", parse(ok(get("/api/v1/founder", token))).get("status"));
+        assertEquals(0, countSnapshots(userId(token)));
+
+        String other = enrolled("report-other");
+        ResponseEntity<String> foreign = post(
+                "/api/v1/founder/tester-report",
+                report(UUID.randomUUID(), "1.0.0", "For someone else", ",\"applicationId\":\"" + applicationId(userId(token)) + "\""),
+                other
+        );
+        assertEquals(HttpStatus.CONFLICT, foreign.getStatusCode());
+        assertEquals("ACTIVE_PRO", parse(ok(get("/api/v1/founder", token))).get("status"));
+        assertEquals(0, countSnapshots(userId(token)));
+
+        clock.set(FastFounderRulesConfig.START.plus(Duration.ofHours(45 * 24)).plusNanos(1));
+        ResponseEntity<String> late = post("/api/v1/founder/tester-report", report("1.0.0"), token);
+        assertEquals(HttpStatus.CONFLICT, late.getStatusCode());
+        assertEquals("APPLICATION_EXPIRED", parse(late).get("errorCode"));
+        assertEquals("EXPIRED", parse(ok(get("/api/v1/founder", token))).get("status"));
+        assertEquals(0, countSnapshots(userId(token)));
+    }
+
+    @Test
     void founderEndpointsRequireTheStrictSessionAndIgnoreABodyUserId() {
         assertEquals(HttpStatus.UNAUTHORIZED, get("/api/v1/founder", null).getStatusCode());
         assertEquals(HttpStatus.UNAUTHORIZED, post("/api/v1/founder/workouts", workout(UUID.randomUUID(), FastFounderRulesConfig.START, "2026-06-01"), null).getStatusCode());
@@ -367,10 +430,10 @@ class FounderApiIT {
     void concurrentReportSubmissionCreatesOneSnapshot() throws Exception {
         String token = enrolled("concurrent-report");
         completeTraining(token);
-        ok(put("/api/v1/founder/feedback", "{\"text\":\"Race\"}", token));
+        String body = report(UUID.randomUUID(), "1.0.0", "Race");
         List<Integer> statuses = race(
-                () -> post("/api/v1/founder/tester-report", report("1.0.0"), token),
-                () -> post("/api/v1/founder/tester-report", report("1.0.0"), token)
+                () -> post("/api/v1/founder/tester-report", body, token),
+                () -> post("/api/v1/founder/tester-report", body, token)
         );
         assertEquals(List.of(200, 200), statuses.stream().sorted().toList());
         assertEquals(1, countSnapshots(userId(token)));
@@ -419,6 +482,172 @@ class FounderApiIT {
         assertFlag(false, restoredEntitlements.get("founderLifetime"));
     }
 
+    @Test
+    void workoutObservationsStayOptionalAndCannotChangeQualification() {
+        assertEquals(6, columnCount("founder_workout_event",
+                "display_name", "duration_seconds", "exercise_count", "completed_set_count", "from_template", "used_external_load"));
+        assertEquals(5, columnCount("founder_review_snapshot",
+                "rules_profile", "temporary_pro_workout_count", "required_workout_count",
+                "required_distinct_day_count", "qualification_window_days"));
+
+        String token = enrolled("workout-observations");
+        String userId = userId(token);
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        Map<String, Object> sparse = parse(ok(post(
+                "/api/v1/founder/workouts",
+                workout(first, FastFounderRulesConfig.START, "2026-06-01", ",\"displayName\":\"   \""),
+                token
+        )));
+        assertEquals("ACTIVE_PRO", sparse.get("status"));
+        assertCount(1, progress(sparse).get("qualifyingWorkouts"));
+        Map<String, Object> sparseRow = eventRow(userId, first);
+        assertNull(sparseRow.get("display_name"));
+        assertNull(sparseRow.get("duration_seconds"));
+        assertNull(sparseRow.get("exercise_count"));
+        assertNull(sparseRow.get("completed_set_count"));
+        assertNull(sparseRow.get("from_template"));
+        assertNull(sparseRow.get("used_external_load"));
+
+        String observed = workout(second, FastFounderRulesConfig.START.plusSeconds(10), "2026-06-01",
+                ",\"displayName\":\"Push\",\"durationSeconds\":1800,\"exerciseCount\":500,\"completedSetCount\":12,"
+                        + "\"fromTemplate\":true,\"usedExternalLoad\":false,\"requiredWorkoutCount\":99,"
+                        + "\"rulesProfile\":\"production\",\"temporaryProUnlocked\":true,\"trainingComplete\":true,"
+                        + "\"status\":\"APPROVED\",\"pendingApproval\":true");
+        Map<String, Object> recorded = parse(ok(post("/api/v1/founder/workouts", observed, token)));
+        assertEquals("ACTIVE_PRO", recorded.get("status"));
+        assertCount(2, progress(recorded).get("qualifyingWorkouts"));
+        assertCount(2, progress(recorded).get("requiredWorkouts"));
+        assertCount(1, progress(recorded).get("distinctWorkoutDays"));
+        Map<String, Object> observedRow = eventRow(userId, second);
+        assertEquals("Push", observedRow.get("display_name"));
+        assertCount(1800, observedRow.get("duration_seconds"));
+        assertCount(500, observedRow.get("exercise_count"));
+        assertCount(12, observedRow.get("completed_set_count"));
+        assertEquals(Boolean.TRUE, observedRow.get("from_template"));
+        assertEquals(Boolean.FALSE, observedRow.get("used_external_load"));
+        assertEquals(2, countEvents(userId));
+
+        Map<String, Object> retried = parse(ok(post(
+                "/api/v1/founder/workouts",
+                workout(second, FastFounderRulesConfig.START.plusSeconds(10), "2026-06-01",
+                        ",\"displayName\":\"Changed\",\"durationSeconds\":1,\"fromTemplate\":false,\"usedExternalLoad\":true"),
+                token
+        )));
+        assertCount(2, progress(retried).get("qualifyingWorkouts"));
+        Map<String, Object> unchanged = eventRow(userId, second);
+        assertEquals("Push", unchanged.get("display_name"));
+        assertCount(1800, unchanged.get("duration_seconds"));
+        assertEquals(Boolean.TRUE, unchanged.get("from_template"));
+        assertEquals(Boolean.FALSE, unchanged.get("used_external_load"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, post(
+                "/api/v1/founder/workouts",
+                workout(second, FastFounderRulesConfig.START.plusSeconds(10), "2026-06-01", ",\"durationSeconds\":-1"),
+                token
+        ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, post(
+                "/api/v1/founder/workouts",
+                workout(UUID.randomUUID(), FastFounderRulesConfig.START.plusSeconds(20), "2026-06-01",
+                        ",\"durationSeconds\":-1,\"exerciseCount\":-1,\"completedSetCount\":-5"),
+                token
+        ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, post(
+                "/api/v1/founder/workouts",
+                workout(UUID.randomUUID(), FastFounderRulesConfig.START.plusSeconds(30), "2026-06-01",
+                        ",\"displayName\":\"" + "x".repeat(81) + "\""),
+                token
+        ).getStatusCode());
+        assertEquals(HttpStatus.CONFLICT, post(
+                "/api/v1/founder/workouts",
+                workout(second, FastFounderRulesConfig.START.plusSeconds(40), "2026-06-01", ",\"displayName\":\"Other\""),
+                token
+        ).getStatusCode());
+        assertEquals(2, countEvents(userId));
+        assertEquals("Push", eventRow(userId, second).get("display_name"));
+
+        UUID application = applicationId(userId);
+        UUID rejected = UUID.randomUUID();
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
+                """
+                insert into founder_workout_event (
+                    id, founder_application_id, client_workout_id, completed_at, workout_local_date, created_at, duration_seconds
+                ) values (?::uuid, ?::uuid, ?::uuid, ?::timestamptz, ?::date, ?::timestamptz, -1)
+                """,
+                rejected.toString(),
+                application.toString(),
+                rejected.toString(),
+                FastFounderRulesConfig.START.plusSeconds(50).toString(),
+                "2026-06-01",
+                FastFounderRulesConfig.START.plusSeconds(50).toString()
+        ));
+        assertEquals(2, countEvents(userId));
+    }
+
+    @Test
+    void reviewSnapshotFreezesRulesAndReportSubmissionDoesNotGrantLifetime() {
+        String token = enrolled("frozen-rules");
+        String userId = userId(token);
+        completeTraining(token);
+        UUID submissionId = UUID.randomUUID();
+        String body = report(submissionId, "1.4.0", "The timer is easy to miss.",
+                ",\"requiredWorkoutCount\":99,\"rulesProfile\":\"production\",\"temporaryProWorkoutCount\":7,"
+                        + "\"qualificationWindowDays\":1,\"status\":\"APPROVED\",\"founderLifetime\":true");
+        Map<String, Object> pending = parse(ok(post("/api/v1/founder/tester-report", body, token)));
+        assertEquals("PENDING_APPROVAL", pending.get("status"));
+        assertCount(2, progress(pending).get("requiredWorkouts"));
+        Map<String, Object> frozen = jdbc.queryForMap(
+                """
+                select snapshot.rules_profile, snapshot.temporary_pro_workout_count, snapshot.required_workout_count,
+                       snapshot.required_distinct_day_count, snapshot.qualification_window_days,
+                       snapshot.client_submission_id, snapshot.feedback_text
+                from founder_review_snapshot snapshot
+                join founder_application application on application.id = snapshot.founder_application_id
+                where application.user_id = ?::uuid
+                """,
+                userId
+        );
+        assertEquals("fast", frozen.get("rules_profile"));
+        assertCount(1, frozen.get("temporary_pro_workout_count"));
+        assertCount(2, frozen.get("required_workout_count"));
+        assertCount(1, frozen.get("required_distinct_day_count"));
+        assertCount(45, frozen.get("qualification_window_days"));
+        assertEquals(submissionId.toString(), frozen.get("client_submission_id").toString());
+        assertEquals("The timer is easy to miss.", frozen.get("feedback_text"));
+
+        ResponseEntity<String> retry = post("/api/v1/founder/tester-report", body, token);
+        assertEquals(HttpStatus.OK, retry.getStatusCode());
+        assertEquals(1, countSnapshots(userId));
+        Map<String, Object> entitlements = parse(ok(get("/api/v1/entitlements", token)));
+        assertFlag(true, entitlements.get("temporaryFounderPro"));
+        assertFlag(false, entitlements.get("founderLifetime"));
+        assertEquals(0, jdbc.queryForObject(
+                "select count(*) from entitlement_grant where user_id = ?::uuid and source = 'FOUNDER_LIFETIME'",
+                Integer.class,
+                userId
+        ));
+
+        rulesBinding.replace("production", FounderRules.PRODUCTION);
+        Map<String, Object> after = parse(ok(get("/api/v1/founder", token)));
+        assertEquals("PENDING_APPROVAL", after.get("status"));
+        assertCount(10, progress(after).get("requiredWorkouts"));
+        Map<String, Object> stillFrozen = jdbc.queryForMap(
+                """
+                select snapshot.rules_profile, snapshot.temporary_pro_workout_count, snapshot.required_workout_count,
+                       snapshot.required_distinct_day_count, snapshot.qualification_window_days
+                from founder_review_snapshot snapshot
+                join founder_application application on application.id = snapshot.founder_application_id
+                where application.user_id = ?::uuid
+                """,
+                userId
+        );
+        assertEquals("fast", stillFrozen.get("rules_profile"));
+        assertCount(1, stillFrozen.get("temporary_pro_workout_count"));
+        assertCount(2, stillFrozen.get("required_workout_count"));
+        assertCount(1, stillFrozen.get("required_distinct_day_count"));
+        assertCount(45, stillFrozen.get("qualification_window_days"));
+    }
+
     private void qualify(String token) {
         completeTraining(token);
         ok(put("/api/v1/founder/feedback", "{\"text\":\"Ready\"}", token));
@@ -448,11 +677,24 @@ class FounderApiIT {
     }
 
     private static String workout(UUID id, Instant completedAt, String localDate) {
-        return "{\"workoutId\":\"" + id + "\",\"completedAt\":\"" + completedAt + "\",\"localDate\":\"" + localDate + "\"}";
+        return workout(id, completedAt, localDate, "");
+    }
+
+    private static String workout(UUID id, Instant completedAt, String localDate, String extra) {
+        return "{\"workoutId\":\"" + id + "\",\"completedAt\":\"" + completedAt + "\",\"localDate\":\"" + localDate + "\"" + extra + "}";
     }
 
     private static String report(String version) {
-        return "{\"appVersion\":\"" + version + "\",\"platform\":\"android\"}";
+        return report(UUID.randomUUID(), version, "Ready");
+    }
+
+    private static String report(UUID submissionId, String version, String feedback) {
+        return report(submissionId, version, feedback, "");
+    }
+
+    private static String report(UUID submissionId, String version, String feedback, String extra) {
+        return "{\"submissionId\":\"" + submissionId + "\",\"appVersion\":\"" + version
+                + "\",\"feedback\":\"" + feedback + "\"" + extra + "}";
     }
 
     @SuppressWarnings("unchecked")
@@ -470,6 +712,32 @@ class FounderApiIT {
                 "select count(*) from founder_application where user_id = ?::uuid",
                 Integer.class,
                 userId
+        );
+    }
+
+    private int columnCount(String table, String... columns) {
+        String placeholders = String.join(",", java.util.Collections.nCopies(columns.length, "?"));
+        Object[] args = new Object[columns.length + 1];
+        args[0] = table;
+        System.arraycopy(columns, 0, args, 1, columns.length);
+        return jdbc.queryForObject(
+                "select count(*) from information_schema.columns where table_name = ? and column_name in (" + placeholders + ")",
+                Integer.class,
+                args
+        );
+    }
+
+    private Map<String, Object> eventRow(String userId, UUID clientWorkoutId) {
+        return jdbc.queryForMap(
+                """
+                select event.display_name, event.duration_seconds, event.exercise_count,
+                       event.completed_set_count, event.from_template, event.used_external_load
+                from founder_workout_event event
+                join founder_application application on application.id = event.founder_application_id
+                where application.user_id = ?::uuid and event.client_workout_id = ?::uuid
+                """,
+                userId,
+                clientWorkoutId.toString()
         );
     }
 
@@ -521,7 +789,8 @@ class FounderApiIT {
         return jdbc.queryForMap(
                 """
                 select snapshot.app_version, snapshot.platform, snapshot.qualifying_workout_count,
-                       snapshot.distinct_workout_day_count, snapshot.feedback_text
+                       snapshot.distinct_workout_day_count, snapshot.feedback_text,
+                       snapshot.client_submission_id
                 from founder_review_snapshot snapshot
                 join founder_application application on application.id = snapshot.founder_application_id
                 where application.user_id = ?::uuid

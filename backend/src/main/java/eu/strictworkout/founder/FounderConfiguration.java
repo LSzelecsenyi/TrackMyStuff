@@ -14,11 +14,16 @@ class FounderConfiguration {
     private static final Logger log = LoggerFactory.getLogger(FounderConfiguration.class);
 
     @Bean
-    FounderRules founderRules(Environment environment) {
-        return FounderRulesSelection.select(
+    FounderRulesBinding founderRulesBinding(Environment environment) {
+        return FounderRulesSelection.binding(
                 environment.getProperty("strict.founder.rules", "production"),
                 environment.acceptsProfiles(Profiles.of("prod"))
         );
+    }
+
+    @Bean
+    FounderRules founderRules(FounderRulesBinding binding) {
+        return binding.rules();
     }
 
     @Bean
