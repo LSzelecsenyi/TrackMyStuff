@@ -14,6 +14,12 @@ final class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     static final String BODY = "{\"errorCode\":\"UNAUTHENTICATED\",\"message\":\"Authentication is required.\"}";
 
+    private final boolean advertiseBearer;
+
+    ApiAuthenticationEntryPoint(boolean advertiseBearer) {
+        this.advertiseBearer = advertiseBearer;
+    }
+
     @Override
     public void commence(
             HttpServletRequest request,
@@ -23,7 +29,9 @@ final class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        if (advertiseBearer) {
+            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        }
         response.getWriter().write(BODY);
     }
 }

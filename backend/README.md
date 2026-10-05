@@ -128,23 +128,37 @@ Stored Founder data is the Strict user (already linked to a Google subject and o
 
 Approval, rejection, and Lifetime Pro are separate from the mobile Founder routes. A normal bearer token cannot approve an application or create a grant.
 
-Admin sign-in is `POST /api/v1/admin/session` with a Google ID token. The Google subject must be listed in `STRICT_ADMIN_GOOGLE_SUBJECTS` (comma-separated). An empty list allows nobody. There is no password and no default admin. The response is a separate opaque bearer session stored only as a SHA-256 hash in `admin_session`. It is not a cookie, so the admin API does not use CSRF. The mobile session filter ignores `/api/v1/admin/**`, and the admin filter ignores every other route. Logout is `DELETE /api/v1/admin/session`.
+Admin sign-in is `POST /api/v1/admin/session` with a Google ID token. The Google subject must be listed in `STRICT_ADMIN_GOOGLE_SUBJECTS` (comma-separated). An empty list allows nobody. There is no password and no default admin. The server stores only the SHA-256 hash of a new opaque session in `admin_session`. The raw token is returned only as an HttpOnly `STRICT_ADMIN_SESSION` cookie (`Path=/api/v1/admin`, `SameSite=Strict`, no `Domain`). The response body is empty. The `prod` profile always marks that cookie `Secure`. Local HTTP development sets `strict.admin.cookie-secure=false`.
+
+Browser admin requests are same-origin and use CSRF. `GET /api/v1/admin/csrf` sets a readable `XSRF-TOKEN` cookie. State-changing admin requests send that value in `X-XSRF-TOKEN` and send the cookie back. Android bearer routes do not use this cookie and do not require CSRF.
+
+Logout is `DELETE /api/v1/admin/session` with the admin cookie and CSRF header. It revokes that server session and clears the cookie. A later login replaces any admin cookie presented with the request by revoking that session and setting a new one.
 
 ```shell
-curl -s -X POST http://localhost:8082/api/v1/admin/session \
+curl -si http://localhost:8082/api/v1/admin/csrf
+
+curl -si -X POST http://localhost:8082/api/v1/admin/session \
   -H "Content-Type: application/json" \
+  -H "X-XSRF-TOKEN: <csrf-token>" \
+  -H "Cookie: XSRF-TOKEN=<csrf-token>" \
   -d "{\"idToken\":\"<google-id-token>\"}"
 
 curl -s http://localhost:8082/api/v1/admin/founder/applications \
-  -H "Authorization: Bearer <admin-token>"
+  -H "Cookie: STRICT_ADMIN_SESSION=<admin-session>; XSRF-TOKEN=<csrf-token>"
 
 curl -s -X POST http://localhost:8082/api/v1/admin/founder/applications/<application-id>/approval \
-  -H "Authorization: Bearer <admin-token>"
+  -H "X-XSRF-TOKEN: <csrf-token>" \
+  -H "Cookie: STRICT_ADMIN_SESSION=<admin-session>; XSRF-TOKEN=<csrf-token>"
 
 curl -s -X POST http://localhost:8082/api/v1/admin/founder/applications/<application-id>/rejection \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <admin-token>" \
+  -H "X-XSRF-TOKEN: <csrf-token>" \
+  -H "Cookie: STRICT_ADMIN_SESSION=<admin-session>; XSRF-TOKEN=<csrf-token>" \
   -d "{\"reason\":\"The report did not describe the training.\"}"
+
+curl -si -X DELETE http://localhost:8082/api/v1/admin/session \
+  -H "X-XSRF-TOKEN: <csrf-token>" \
+  -H "Cookie: STRICT_ADMIN_SESSION=<admin-session>; XSRF-TOKEN=<csrf-token>"
 ```
 
 Repeating the same decision is a success and does not create a second grant or audit row. The opposite decision is 409 `REVIEW_CONFLICT`. Only `PENDING_APPROVAL` can be decided. Approval writes `APPROVED` and one `entitlement_grant` row with source `FOUNDER_LIFETIME` in the same transaction. Rejection stores a mandatory reason and does not create a grant. The reviewer is the `admin_user` id on `founder_review_decision`.
@@ -163,7 +177,7 @@ Integration tests start PostgreSQL 16 with Testcontainers. Docker must be runnin
 
 ## CORS
 
-No CORS policy is configured. The Android app does not need browser CORS. The future admin UI at `https://admin.strictworkout.eu` will need an explicit allowed origin. Do not allow `*`.
+No CORS policy is configured. The Android app does not need browser CORS. The admin UI is served from the same origin that proxies `/api`, so the browser does not call `api.strictworkout.eu`. Do not add credentialed CORS for the admin cookie.
 
 ## Time
 

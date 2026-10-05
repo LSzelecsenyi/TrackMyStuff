@@ -75,6 +75,11 @@ public class AdminSessionService {
         });
     }
 
+    @Transactional
+    public void revokePresented(String rawToken) {
+        authenticate(rawToken).ifPresent(this::revoke);
+    }
+
     private AdminUser insert(VerifiedExternalIdentity identity) {
         try {
             return creation.insert(identity);

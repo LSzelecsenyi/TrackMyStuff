@@ -43,6 +43,7 @@ strict:
   admin:
     session-lifetime: ${STRICT_ADMIN_SESSION_LIFETIME:12h}
     google-subjects: ${STRICT_ADMIN_GOOGLE_SUBJECTS:}
+    cookie-secure: false
 
 logging:
   pattern:

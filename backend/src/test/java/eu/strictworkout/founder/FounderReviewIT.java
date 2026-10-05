@@ -27,7 +27,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,6 +38,7 @@ import java.util.concurrent.Future;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(
@@ -71,6 +74,10 @@ class FounderReviewIT {
 
     @Autowired
     private FounderReviewDecisionRepository decisions;
+
+    private volatile String csrfToken;
+
+    private final Set<String> adminSessions = ConcurrentHashMap.newKeySet();
 
     @BeforeEach
     void resetClock() {
@@ -378,8 +385,12 @@ class FounderReviewIT {
     private String adminLogin() {
         identities.accept("admin-token", "admin-subject", "admin@example.com", true);
         ResponseEntity<String> response = post("/api/v1/admin/session", "{\"idToken\":\"admin-token\"}", null);
-        assertEquals(HttpStatus.OK, response.getStatusCode(), response.getBody());
-        return String.valueOf(parse(response).get("accessToken"));
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode(), response.getBody());
+        String token = setCookie(response, "STRICT_ADMIN_SESSION");
+        assertNotNull(token, response.getHeaders().toString());
+        assertTrue(response.getBody() == null || !response.getBody().contains(token));
+        adminSessions.add(token);
+        return token;
     }
 
     private String login(String tokenName, String subject) {
@@ -453,31 +464,84 @@ class FounderReviewIT {
 
     private ResponseEntity<String> get(String path, String accessToken) {
         RestClient.RequestHeadersSpec<?> request = client().get().uri(path);
-        if (accessToken != null) {
-            request = request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
-        }
+        applyCredential(request, path, accessToken, false);
         return exchange(request);
     }
 
     private ResponseEntity<String> post(String path, String json, String accessToken) {
         RestClient.RequestBodySpec request = client().post().uri(path).contentType(MediaType.APPLICATION_JSON);
-        if (accessToken != null) {
-            request = request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
-        }
+        applyCredential(request, path, accessToken, true);
         return exchange(request.body(json));
     }
 
     private ResponseEntity<String> put(String path, String json, String accessToken) {
         RestClient.RequestBodySpec request = client().put().uri(path).contentType(MediaType.APPLICATION_JSON);
-        if (accessToken != null) {
-            request = request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
-        }
+        applyCredential(request, path, accessToken, true);
         return exchange(request.body(json));
     }
 
+    private void applyCredential(
+            RestClient.RequestHeadersSpec<?> request,
+            String path,
+            String accessToken,
+            boolean mutating
+    ) {
+        if (path.startsWith("/api/v1/admin")) {
+            String csrf = ensureCsrf();
+            StringBuilder cookie = new StringBuilder("XSRF-TOKEN=").append(csrf);
+            if (accessToken != null && adminSessions.contains(accessToken)) {
+                cookie.append("; STRICT_ADMIN_SESSION=").append(accessToken);
+            } else if (accessToken != null) {
+                request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
+            }
+            request.header(HttpHeaders.COOKIE, cookie.toString());
+            if (mutating) {
+                request.header("X-XSRF-TOKEN", csrf);
+            }
+            return;
+        }
+        if (accessToken != null) {
+            request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
+        }
+    }
+
+    private String ensureCsrf() {
+        if (csrfToken != null) {
+            return csrfToken;
+        }
+        ResponseEntity<String> response = exchange(client().get().uri("/api/v1/admin/csrf"));
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode(), response.getBody());
+        String token = setCookie(response, "XSRF-TOKEN");
+        assertNotNull(token, response.getHeaders().toString());
+        csrfToken = token;
+        return token;
+    }
+
+    private static String setCookie(ResponseEntity<?> response, String name) {
+        List<String> headers = response.getHeaders().get(HttpHeaders.SET_COOKIE);
+        if (headers == null) {
+            return null;
+        }
+        String prefix = name + "=";
+        for (String header : headers) {
+            if (header.startsWith(prefix)) {
+                String value = header.substring(prefix.length());
+                int end = value.indexOf(';');
+                return end < 0 ? value : value.substring(0, end);
+            }
+        }
+        return null;
+    }
+
     private ResponseEntity<String> exchange(RestClient.RequestHeadersSpec<?> request) {
-        return request.exchange((httpRequest, response) -> ResponseEntity.status(response.getStatusCode())
-                .body(new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8)));
+        return request.exchange((httpRequest, response) -> {
+            HttpHeaders headers = new HttpHeaders();
+            response.getHeaders().forEach(headers::addAll);
+            byte[] body = response.getBody().readAllBytes();
+            return ResponseEntity.status(response.getStatusCode())
+                    .headers(headers)
+                    .body(new String(body, StandardCharsets.UTF_8));
+        });
     }
 
     private RestClient client() {
