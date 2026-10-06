@@ -92,4 +92,8 @@
         <item quantity="one">%1$d of %2$d workout toward Temporary Pro</item>
         <item quantity="other">%1$d of %2$d workouts toward Temporary Pro</item>
     </plurals>
+    <plurals name="celebration_history_body">
+        <item quantity="one">Your training history earned you %d badge.</item>
+        <item quantity="other">Your training history earned you %d badges.</item>
+    </plurals>
 </resources>

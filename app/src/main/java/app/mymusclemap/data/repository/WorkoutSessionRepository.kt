@@ -65,7 +65,8 @@ class WorkoutSessionRepository(
     private val clock: Clock,
     private val dateProvider: DateProvider,
     private val onHeatmapDataChanged: () -> Unit = {},
-    private val onNativeWorkoutCompleted: suspend (String) -> Unit = { _ -> }
+    private val onNativeWorkoutCompleted: suspend (String) -> Unit = { _ -> },
+    private val onTrainingHistoryChanged: suspend (String?) -> Unit = { _ -> }
 ) {
     private val mutex = Mutex()
 
@@ -297,6 +298,7 @@ class WorkoutSessionRepository(
         return try {
             val ids = sessionDao.insertImportedAggregates(aggregates)
             onHeatmapDataChanged()
+            notifyTrainingHistoryChanged(null)
             WorkoutImportPersistenceResult.Imported(
                 sessionIds = ids,
                 workoutCount = ids.size,
@@ -664,6 +666,7 @@ class WorkoutSessionRepository(
                 } else {
                     if (affectsHeatmap) {
                         onHeatmapDataChanged()
+                        notifyTrainingHistoryChanged(null)
                     }
                     DeleteWorkoutResult.Deleted
                 }
@@ -681,14 +684,21 @@ class WorkoutSessionRepository(
             when (outcome) {
                 1 -> {
                     onHeatmapDataChanged()
-                    try {
-                        val completed = sessionDao.getById(sessionId)
-                        if (completed != null) {
-                            onNativeWorkoutCompleted(completed.clientWorkoutId)
-                        }
+                    val completed = try {
+                        sessionDao.getById(sessionId)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
+                        null
+                    }
+                    if (completed != null) {
+                        try {
+                            onNativeWorkoutCompleted(completed.clientWorkoutId)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                        }
+                        notifyTrainingHistoryChanged(completed.clientWorkoutId)
                     }
                     FinishWorkoutResult.Finished
                 }
@@ -748,6 +758,15 @@ class WorkoutSessionRepository(
     suspend fun completedWorkoutNames(): List<Pair<LocalDate, String>> {
         return sessionDao.getCompletedDateNames().map { row ->
             LocalDate.parse(row.date) to row.name
+        }
+    }
+
+    private suspend fun notifyTrainingHistoryChanged(clientWorkoutId: String?) {
+        try {
+            onTrainingHistoryChanged(clientWorkoutId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
         }
     }
 

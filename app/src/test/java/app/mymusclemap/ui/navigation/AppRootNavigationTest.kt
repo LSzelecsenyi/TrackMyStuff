@@ -400,6 +400,10 @@ class AppRootNavigationTest {
                             navArgument("durationMillis") {
                                 type = NavType.LongType
                                 defaultValue = 0L
+                            },
+                            navArgument("clientWorkoutId") {
+                                type = NavType.StringType
+                                defaultValue = ""
                             }
                         )
                     ) { Text("complete") }

@@ -26,7 +26,10 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import app.mymusclemap.R
+import app.mymusclemap.domain.achievements.PendingCelebration
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
+import app.mymusclemap.ui.achievements.celebrationBody
+import app.mymusclemap.ui.achievements.celebrationTitle
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
@@ -37,15 +40,27 @@ internal const val WORKOUT_COMPLETE_SUMMARY = "workout-complete-summary"
 internal const val WORKOUT_COMPLETE_BACK = "workout-complete-back"
 internal const val WORKOUT_COMPLETE_HEATMAP = "workout-complete-heatmap"
 
+internal const val WORKOUT_COMPLETE_CELEBRATIONS = "workout-complete-celebrations"
+
 @Composable
 fun WorkoutCompletionScreen(
     summary: WorkoutCompletionSummary,
     onBackToOverview: () -> Unit,
     playAnimation: Boolean = true,
     showHeatmapCta: Boolean = false,
-    onSeeWhatYouTrained: () -> Unit = onBackToOverview
+    onSeeWhatYouTrained: () -> Unit = onBackToOverview,
+    celebrations: List<PendingCelebration> = emptyList(),
+    onAcknowledgeCelebrations: () -> Unit = {}
 ) {
-    BackHandler(onBack = onBackToOverview)
+    val leaveOverview = {
+        onAcknowledgeCelebrations()
+        onBackToOverview()
+    }
+    val seeTrained = {
+        onAcknowledgeCelebrations()
+        onSeeWhatYouTrained()
+    }
+    BackHandler(onBack = leaveOverview)
     val stats = stringResource(
         R.string.workout_complete_summary,
         summary.exerciseCount,
@@ -97,10 +112,36 @@ fun WorkoutCompletionScreen(
                         .fillMaxWidth()
                         .testTag(WORKOUT_COMPLETE_SUMMARY)
                 )
+                if (celebrations.isNotEmpty()) {
+                    Spacer(Modifier.height(AppDimens.sectionGap))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(WORKOUT_COMPLETE_CELEBRATIONS),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        celebrations.forEach { celebration ->
+                            Text(
+                                text = celebrationTitle(celebration),
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                text = celebrationBody(celebration),
+                                style = AppTypeTokens.statSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(AppDimens.itemGap))
+                        }
+                    }
+                }
             }
             if (showHeatmapCta) {
                 Button(
-                    onClick = onSeeWhatYouTrained,
+                    onClick = seeTrained,
                     shape = AppShapeTokens.button,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -110,7 +151,7 @@ fun WorkoutCompletionScreen(
                     Text(stringResource(R.string.workout_complete_see_trained))
                 }
                 TextButton(
-                    onClick = onBackToOverview,
+                    onClick = leaveOverview,
                     modifier = Modifier
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = AppDimens.minTouch)
@@ -120,7 +161,7 @@ fun WorkoutCompletionScreen(
                 }
             } else {
                 Button(
-                    onClick = onBackToOverview,
+                    onClick = leaveOverview,
                     shape = AppShapeTokens.button,
                     modifier = Modifier
                         .fillMaxWidth()

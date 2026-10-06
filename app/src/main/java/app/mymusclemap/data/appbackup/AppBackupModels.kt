@@ -1,10 +1,14 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.data.local.AchievementStateEntity
 import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
+import app.mymusclemap.data.local.ProgressEventEntity
 import app.mymusclemap.data.local.ProgressPhotoEntity
 import app.mymusclemap.data.local.ScheduledWorkoutEntity
+import app.mymusclemap.data.local.TargetWeightGoalEntity
+import app.mymusclemap.data.local.UnlockedAchievementEntity
 import app.mymusclemap.data.local.WeightMeasurementEntity
 import app.mymusclemap.data.local.WorkoutSessionEntity
 import app.mymusclemap.data.local.WorkoutSessionExerciseEntity
@@ -21,8 +25,12 @@ object AppBackupFormat {
     const val FORMAT_VERSION = 1
     /** Structured JSON still written by the legacy exporter and accepted from old files. */
     const val SCHEMA_VERSION = 8
+    /** First archive schema that replaces the progress-photo library. */
+    const val ARCHIVE_PHOTO_SCHEMA_VERSION = 9
+    /** Archive schema that first replaces achievement rows. */
+    const val ARCHIVE_ACHIEVEMENT_SCHEMA_VERSION = 10
     /** Structured JSON stored inside a photo archive. Not accepted as a loose JSON file. */
-    const val ARCHIVE_DATA_SCHEMA_VERSION = 9
+    const val ARCHIVE_DATA_SCHEMA_VERSION = 11
     const val CONTAINER_VERSION = 1
     const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024
@@ -50,6 +58,10 @@ object AppBackupFormat {
     const val TABLE_WORKOUT_SESSION_SETS = "workout_session_sets"
     const val TABLE_WEEKLY_WORKOUT_GOALS = "weekly_workout_goals"
     const val TABLE_PROGRESS_PHOTOS = "progress_photos"
+    const val TABLE_UNLOCKED_ACHIEVEMENTS = "unlocked_achievements"
+    const val TABLE_PROGRESS_EVENTS = "progress_events"
+    const val TABLE_ACHIEVEMENT_STATE = "achievement_state"
+    const val TABLE_TARGET_WEIGHT_GOALS = "target_weight_goals"
 
     val TABLE_NAMES: List<String> = listOf(
         TABLE_WEIGHT_MEASUREMENTS,
@@ -86,7 +98,13 @@ data class AppBackupTables(
     val bodyMeasurements: List<BodyMeasurementEntity> = emptyList(),
     val weeklyWorkoutGoals: List<WeeklyWorkoutGoalEntity> = emptyList(),
     val progressPhotos: List<ProgressPhotoEntity> = emptyList(),
-    val replacesProgressPhotos: Boolean = false
+    val replacesProgressPhotos: Boolean = false,
+    val unlockedAchievements: List<UnlockedAchievementEntity> = emptyList(),
+    val progressEvents: List<ProgressEventEntity> = emptyList(),
+    val achievementState: List<AchievementStateEntity> = emptyList(),
+    val replacesAchievements: Boolean = false,
+    val targetWeightGoals: List<TargetWeightGoalEntity> = emptyList(),
+    val replacesTargetWeightGoals: Boolean = false
 )
 
 data class AppBackupSnapshot(

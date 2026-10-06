@@ -45,6 +45,22 @@ abstract class WorkoutSessionDao {
     )
     abstract fun observeAllCompletedCounts(): Flow<List<WorkoutDateCount>>
 
+    @Query(
+        """
+        SELECT workoutDate AS date, COUNT(*) AS completedCount
+        FROM workout_sessions
+        WHERE status = 'COMPLETED'
+        GROUP BY workoutDate
+        """
+    )
+    abstract suspend fun allCompletedCounts(): List<WorkoutDateCount>
+
+    @Query("SELECT COUNT(*) FROM workout_sessions WHERE status = 'COMPLETED'")
+    abstract fun observeCompletedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM workout_sessions WHERE status = 'COMPLETED'")
+    abstract suspend fun countCompleted(): Int
+
     @Query("SELECT MIN(workoutDate) FROM workout_sessions WHERE status = 'COMPLETED'")
     abstract suspend fun earliestCompletedWorkoutDate(): String?
 

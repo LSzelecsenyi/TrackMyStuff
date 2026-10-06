@@ -20,9 +20,13 @@ import androidx.room.RoomDatabase
         WorkoutSessionExerciseMuscleEntity::class,
         WorkoutSessionSetEntity::class,
         ProgressPhotoEntity::class,
-        WeeklyWorkoutGoalEntity::class
+        WeeklyWorkoutGoalEntity::class,
+        UnlockedAchievementEntity::class,
+        ProgressEventEntity::class,
+        AchievementStateEntity::class,
+        TargetWeightGoalEntity::class
     ],
-    version = 13,
+    version = 15,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
@@ -35,6 +39,8 @@ abstract class WeightDatabase : RoomDatabase() {
     abstract fun appBackupDao(): AppBackupDao
     abstract fun progressPhotoDao(): ProgressPhotoDao
     abstract fun weeklyWorkoutGoalDao(): WeeklyWorkoutGoalDao
+    abstract fun achievementDao(): AchievementDao
+    abstract fun targetWeightGoalDao(): TargetWeightGoalDao
 
     companion object {
         fun create(context: Context): WeightDatabase {
@@ -55,7 +61,9 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
-                    MIGRATION_12_13
+                    MIGRATION_12_13,
+                    MIGRATION_13_14,
+                    MIGRATION_14_15
                 )
                 .build()
         }

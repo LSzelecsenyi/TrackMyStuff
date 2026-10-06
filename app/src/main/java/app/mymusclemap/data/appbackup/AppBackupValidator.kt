@@ -1,7 +1,14 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.data.local.ProgressEventEntity
 import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.progress.ProgressPhotoStore
+import app.mymusclemap.domain.achievements.AchievementId
+import app.mymusclemap.domain.achievements.ProgressEventKind
+import app.mymusclemap.domain.achievements.TargetWeightDirection
+import app.mymusclemap.domain.achievements.TargetWeightProgressEvaluator
+import app.mymusclemap.domain.achievements.WeeklyGoalCompletionEvaluator
+import app.mymusclemap.domain.achievements.WeightMilestone
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MovementPattern
@@ -310,7 +317,112 @@ object AppBackupValidator {
                 }
             }
         }
+        if (tables.replacesAchievements) {
+            requireUnique(
+                tables.unlockedAchievements.map { it.achievementId },
+                "unlocked_achievements.achievementId",
+                errors
+            )
+            requireUnique(tables.progressEvents.map { it.id }, "progress_events.id", errors)
+            requireUnique(tables.progressEvents.map { it.dedupeKey }, "progress_events.dedupeKey", errors)
+            requireUnique(tables.achievementState.map { it.id }, "achievement_state.id", errors)
+            if (tables.achievementState.size > 1) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "achievement_state")
+            }
+            tables.unlockedAchievements.forEach { row ->
+                if (AchievementId.fromStorage(row.achievementId) == null) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "unlocked_achievements.achievementId")
+                }
+                if (row.unlockedAt < 0L) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "unlocked_achievements.unlockedAt")
+                }
+                if (row.celebratedAt != null && row.celebratedAt < 0L) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "unlocked_achievements.celebratedAt")
+                }
+                if (row.triggerClientWorkoutId != null && row.triggerClientWorkoutId.isBlank()) {
+                    errors += AppBackupError(
+                        AppBackupErrorCode.InvalidValue,
+                        "unlocked_achievements.triggerClientWorkoutId"
+                    )
+                }
+            }
+            tables.progressEvents.forEach { row ->
+                validateProgressEvent(row, errors)
+            }
+            tables.achievementState.forEach { row ->
+                if (row.id != app.mymusclemap.data.local.AchievementStateEntity.SINGLETON_ID) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "achievement_state.id")
+                }
+                if (row.updatedAt < 0L) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "achievement_state.updatedAt")
+                }
+            }
+        }
+        if (tables.replacesTargetWeightGoals) {
+            requireUnique(tables.targetWeightGoals.map { it.id }, "target_weight_goals.id", errors)
+            val active = tables.targetWeightGoals.count { it.retiredAt == null }
+            if (active > 1) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "target_weight_goals.active")
+            }
+            tables.targetWeightGoals.forEach { row ->
+                if (!row.targetKg.isFinite() || row.createdAt < 0L || row.updatedAt < 0L) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "target_weight_goals")
+                }
+                if (row.baselineKg != null && !row.baselineKg.isFinite()) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "target_weight_goals.baselineKg")
+                }
+                if (row.direction != null && TargetWeightDirection.fromStorage(row.direction) == null) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "target_weight_goals.direction")
+                }
+                if (row.retiredAt != null && row.retiredAt < 0L) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "target_weight_goals.retiredAt")
+                }
+            }
+        }
         return errors.distinct()
+    }
+
+    private fun validateProgressEvent(row: ProgressEventEntity, errors: MutableList<AppBackupError>) {
+        val kind = ProgressEventKind.fromStorage(row.kind)
+        if (kind == null) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.kind")
+            return
+        }
+        if (row.dedupeKey.isBlank() || row.payload.isBlank() || row.occurredAt < 0L) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events")
+        }
+        if (row.celebratedAt != null && row.celebratedAt < 0L) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.celebratedAt")
+        }
+        if (row.triggerClientWorkoutId != null && row.triggerClientWorkoutId.isBlank()) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.triggerClientWorkoutId")
+        }
+        when (kind) {
+            ProgressEventKind.HISTORY_RECOGNIZED -> {
+                if (row.dedupeKey != WeeklyGoalCompletionEvaluator.HISTORY_RECOGNIZED_KEY) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.dedupeKey")
+                }
+                val count = row.payload.toIntOrNull()
+                if (count == null || count <= 0) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.payload")
+                }
+            }
+            ProgressEventKind.WEEKLY_GOAL_COMPLETED -> {
+                if (WeeklyGoalCompletionEvaluator.weekStartFromKey(row.dedupeKey) == null ||
+                    WeeklyGoalCompletionEvaluator.parsePayload(row.payload) == null
+                ) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.dedupeKey")
+                }
+            }
+            ProgressEventKind.WEIGHT_GOAL_MILESTONE -> {
+                val milestone = WeightMilestone.fromPayload(row.payload)
+                val goalId = TargetWeightProgressEvaluator.goalIdFromKey(row.dedupeKey)
+                val suffix = row.dedupeKey.substringAfterLast(':')
+                if (milestone == null || goalId == null || milestone.keySuffix != suffix) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.dedupeKey")
+                }
+            }
+        }
     }
 
     private fun validateWeeklyGoal(row: WeeklyWorkoutGoalEntity, errors: MutableList<AppBackupError>) {

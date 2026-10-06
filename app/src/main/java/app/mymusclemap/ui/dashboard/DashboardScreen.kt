@@ -75,6 +75,7 @@ import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.DashboardSnapshot
 import app.mymusclemap.domain.WeeklyOverview
 import app.mymusclemap.domain.WeeklyOverviewLogic
+import app.mymusclemap.domain.achievements.NextWorkoutMilestone
 import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.WeightMeasurement
@@ -111,6 +112,8 @@ internal const val OVERVIEW_OVERFLOW_MENU = "overview-overflow-menu"
 internal const val OVERVIEW_OVERFLOW_TEMPLATES = "overview-overflow-templates"
 internal const val OVERVIEW_OVERFLOW_EXERCISES = "overview-overflow-exercises"
 internal const val OVERVIEW_OVERFLOW_SETTINGS = "overview-overflow-settings"
+internal const val OVERVIEW_OVERFLOW_ACHIEVEMENTS = "overview-overflow-achievements"
+internal const val OVERVIEW_NEXT_ACHIEVEMENT = "overview-next-achievement"
 internal const val OVERVIEW_MEMBERSHIP_BADGE = "overview-membership-badge"
 internal const val OVERVIEW_MEMBERSHIP_INFO = "overview-membership-info"
 private val HeatmapCoachCalloutSpace = 176.dp
@@ -174,7 +177,9 @@ fun DashboardScreen(
     temporaryProChecklist: List<FounderChecklistRow> = emptyList(),
     onAcknowledgeTemporaryPro: () -> Unit = {},
     showTrainingCompleteMilestone: Boolean = false,
-    onAcknowledgeTrainingComplete: () -> Unit = {}
+    onAcknowledgeTrainingComplete: () -> Unit = {},
+    nextAchievement: NextWorkoutMilestone? = null,
+    onOpenAchievements: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
@@ -252,7 +257,8 @@ fun DashboardScreen(
                 onMembershipClick = { membershipInfoOpen = true },
                 onOpenSettings = onOpenSettings,
                 onOpenTemplates = onOpenTemplates,
-                onOpenCatalog = onOpenCatalog
+                onOpenCatalog = onOpenCatalog,
+                onOpenAchievements = onOpenAchievements
             )
             if (state.onboarding.reminderVisible) {
                 OverviewSectionDivider()
@@ -292,6 +298,12 @@ fun DashboardScreen(
                     reportCalendarBounds(coordinates.boundsInRoot())
                 }
             )
+            if (nextAchievement != null) {
+                NextAchievementLine(
+                    milestone = nextAchievement,
+                    onClick = onOpenAchievements
+                )
+            }
             OverviewSectionDivider()
             HealthConnectOverviewCard(
                 state = health,
@@ -409,6 +421,52 @@ fun DashboardScreen(
             detail = membershipDetail,
             onDismiss = { membershipInfoOpen = false }
         )
+    }
+}
+
+@Composable
+internal fun NextAchievementLine(
+    milestone: NextWorkoutMilestone,
+    onClick: () -> Unit
+) {
+    val detail = if (milestone.next == null) {
+        stringResource(R.string.achievements_all_workout_milestones)
+    } else {
+        stringResource(R.string.achievements_workouts_name, milestone.next.workoutThreshold!!)
+    }
+    val progress = milestone.next?.let { next ->
+        val threshold = next.workoutThreshold ?: return@let null
+        stringResource(
+            R.string.achievements_progress_count,
+            milestone.completed.coerceAtMost(threshold),
+            threshold
+        )
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp)
+            .testTag(OVERVIEW_NEXT_ACHIEVEMENT)
+    ) {
+        Text(
+            text = stringResource(R.string.achievements_next),
+            style = AppTypeTokens.columnHeader,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = detail,
+            style = MaterialTheme.typography.bodyLarge
+        )
+        if (progress != null) {
+            Text(
+                text = progress,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("overview-next-achievement-progress")
+            )
+        }
     }
 }
 
@@ -538,7 +596,8 @@ private fun OverviewHeader(
     onMembershipClick: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTemplates: () -> Unit,
-    onOpenCatalog: () -> Unit
+    onOpenCatalog: () -> Unit,
+    onOpenAchievements: () -> Unit
 ) {
     val dateRange = UiFormatters.inclusiveDateRange(
         WeeklyOverviewLogic.windowStart(today),
@@ -599,7 +658,8 @@ private fun OverviewHeader(
                 OverviewOverflowMenu(
                     onOpenTemplates = onOpenTemplates,
                     onOpenCatalog = onOpenCatalog,
-                    onOpenSettings = onOpenSettings
+                    onOpenSettings = onOpenSettings,
+                    onOpenAchievements = onOpenAchievements
                 )
             }
         }
@@ -710,7 +770,8 @@ private fun MembershipInfoDialog(
 private fun OverviewOverflowMenu(
     onOpenTemplates: () -> Unit,
     onOpenCatalog: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenAchievements: () -> Unit
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box(
@@ -753,6 +814,14 @@ private fun OverviewOverflowMenu(
                     onOpenCatalog()
                 },
                 modifier = Modifier.testTag(OVERVIEW_OVERFLOW_EXERCISES)
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.achievements_title)) },
+                onClick = {
+                    menuOpen = false
+                    onOpenAchievements()
+                },
+                modifier = Modifier.testTag(OVERVIEW_OVERFLOW_ACHIEVEMENTS)
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.settings_title)) },

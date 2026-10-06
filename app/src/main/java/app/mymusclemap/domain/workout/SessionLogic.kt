@@ -169,7 +169,8 @@ object WorkoutCompletionLogic {
         return WorkoutCompletionSummary(
             exerciseCount = aggregate.exercises.size,
             completedSetCount = progress.completed,
-            durationMillis = ElapsedTime.forSession(aggregate.session)
+            durationMillis = ElapsedTime.forSession(aggregate.session),
+            clientWorkoutId = aggregate.session.clientWorkoutId.takeIf { it.isNotBlank() }
         )
     }
 }

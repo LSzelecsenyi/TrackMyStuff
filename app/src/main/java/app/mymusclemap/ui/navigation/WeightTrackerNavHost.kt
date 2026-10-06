@@ -70,6 +70,9 @@ import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
 import app.mymusclemap.domain.workout.LockScreenEnableDecision
 import app.mymusclemap.domain.workout.LockScreenEnablePolicy
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
+import app.mymusclemap.ui.achievements.AchievementsScreen
+import app.mymusclemap.ui.achievements.AchievementsViewModel
+import app.mymusclemap.ui.achievements.CelebrationDialog
 import app.mymusclemap.ui.dashboard.DashboardScreen
 import app.mymusclemap.ui.dashboard.DashboardViewModel
 import app.mymusclemap.ui.dashboard.BodyMeasurementDetailScreen
@@ -144,6 +147,7 @@ private const val ARG_SESSION_ID = "sessionId"
 private const val ARG_EXERCISES = "exercises"
 private const val ARG_COMPLETED_SETS = "completedSets"
 private const val ARG_DURATION_MILLIS = "durationMillis"
+private const val ARG_CLIENT_WORKOUT_ID = "clientWorkoutId"
 private const val ARG_STATISTICS_EXERCISE_ID = "exerciseId"
 private const val ARG_REPORT_KIND = "kind"
 private const val ARG_REPORT_START = "start"
@@ -224,10 +228,12 @@ internal fun activeWorkoutRoute(sessionId: Long): String {
 }
 
 internal fun workoutCompleteRoute(summary: WorkoutCompletionSummary): String {
+    val clientWorkoutId = android.net.Uri.encode(summary.clientWorkoutId.orEmpty())
     return "${AppRoutes.WORKOUT_COMPLETE}?" +
         "$ARG_EXERCISES=${summary.exerciseCount}&" +
         "$ARG_COMPLETED_SETS=${summary.completedSetCount}&" +
-        "$ARG_DURATION_MILLIS=${summary.durationMillis}"
+        "$ARG_DURATION_MILLIS=${summary.durationMillis}&" +
+        "$ARG_CLIENT_WORKOUT_ID=$clientWorkoutId"
 }
 
 private fun workoutDetailRoute(sessionId: Long): String {
@@ -282,6 +288,8 @@ fun WeightTrackerNavHost(
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+    val achievementsViewModel: AchievementsViewModel = viewModel(factory = factory)
+    val achievementBoard by achievementsViewModel.board.collectAsStateWithLifecycle()
     val showBottomBar = AppNavigation.showsBottomBar(currentRoute)
     val workoutHubViewModel: WorkoutHubViewModel = viewModel(factory = factory)
     val hubState by workoutHubViewModel.uiState.collectAsStateWithLifecycle()
@@ -422,6 +430,8 @@ fun WeightTrackerNavHost(
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
                     onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
                     onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
+                    onOpenAchievements = { navController.navigateInternal(AppRoutes.ACHIEVEMENTS) },
+                    nextAchievement = achievementBoard.next,
                     onDisplayedMonthChange = viewModel::showMonth,
                     onSetWeeklyGoal = viewModel::setWeeklyGoal,
                     onDisableWeeklyGoal = viewModel::disableWeeklyGoal,
@@ -813,6 +823,11 @@ fun WeightTrackerNavHost(
                         },
                         onLockedMeasurement = viewModel::showBodyMeasurementLocked,
                         onDismissLocked = viewModel::dismissLockedFeature,
+                        onOpenTarget = viewModel::openTargetEditor,
+                        onTargetInput = viewModel::onTargetInput,
+                        onSaveTarget = viewModel::saveTarget,
+                        onDismissTarget = viewModel::dismissTargetEditor,
+                        onClearTarget = viewModel::clearTarget,
                         progressPhotoCount = photos.photos.size,
                         progressPhotoLatestDate = photos.latest?.date,
                         progressPhotoProBadge = photos.showProBadge,
@@ -1190,6 +1205,12 @@ fun WeightTrackerNavHost(
                     onMessageConsumed = viewModel::consumeMessage
                 )
             }
+            composable(AppRoutes.ACHIEVEMENTS) {
+                AchievementsScreen(
+                    items = achievementBoard.items,
+                    onBack = { navController.popBackStack() }
+                )
+            }
             composable(
                 route = AppRoutes.WORKOUT_COMPLETE_PATTERN,
                 arguments = listOf(
@@ -1204,21 +1225,36 @@ fun WeightTrackerNavHost(
                     navArgument(ARG_DURATION_MILLIS) {
                         type = NavType.LongType
                         defaultValue = 0L
+                    },
+                    navArgument(ARG_CLIENT_WORKOUT_ID) {
+                        type = NavType.StringType
+                        defaultValue = ""
                     }
                 )
             ) { entry ->
+                val clientWorkoutId = entry.arguments?.getString(ARG_CLIENT_WORKOUT_ID).orEmpty()
                 val summary = WorkoutCompletionSummary(
                     exerciseCount = entry.arguments?.getInt(ARG_EXERCISES) ?: 0,
                     completedSetCount = entry.arguments?.getInt(ARG_COMPLETED_SETS) ?: 0,
-                    durationMillis = entry.arguments?.getLong(ARG_DURATION_MILLIS) ?: 0L
+                    durationMillis = entry.arguments?.getLong(ARG_DURATION_MILLIS) ?: 0L,
+                    clientWorkoutId = clientWorkoutId.ifBlank { null }
                 )
+                val workoutCelebrations = if (clientWorkoutId.isBlank()) {
+                    emptyList()
+                } else {
+                    achievementBoard.pending.filter { it.triggerClientWorkoutId == clientWorkoutId }
+                }
                 val onboardingViewModel: OnboardingGuideViewModel = viewModel(factory = factory)
                 val onboarding by onboardingViewModel.guide.collectAsStateWithLifecycle()
                 WorkoutCompletionScreen(
                     summary = summary,
                     onBackToOverview = { navController.leaveWorkoutComplete() },
                     showHeatmapCta = onboarding.showHeatmapCompletionCta,
-                    onSeeWhatYouTrained = { navController.leaveWorkoutComplete() }
+                    onSeeWhatYouTrained = { navController.leaveWorkoutComplete() },
+                    celebrations = workoutCelebrations,
+                    onAcknowledgeCelebrations = {
+                        achievementsViewModel.acknowledgeCelebrations(workoutCelebrations)
+                    }
                 )
             }
             composable(
@@ -1329,6 +1365,13 @@ fun WeightTrackerNavHost(
         ProInfoSheet(
             feature = feature,
             onDismiss = workoutHubViewModel::consumeLockedFeature
+        )
+    }
+    val completionVisible = AppNavigation.canonicalRoute(currentRoute) == AppRoutes.WORKOUT_COMPLETE
+    if (!completionVisible && achievementBoard.pending.isNotEmpty()) {
+        CelebrationDialog(
+            celebrations = achievementBoard.pending,
+            onDismiss = { achievementsViewModel.acknowledgeCelebrations(achievementBoard.pending) }
         )
     }
 }

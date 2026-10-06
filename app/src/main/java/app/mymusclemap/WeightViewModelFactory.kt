@@ -12,6 +12,7 @@ import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
 import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.data.repository.AchievementRepository
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
 import app.mymusclemap.data.repository.ExerciseRepository
@@ -19,6 +20,7 @@ import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.OnboardingRepository
 import app.mymusclemap.data.repository.ProgressPhotoRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
+import app.mymusclemap.data.repository.TargetWeightGoalRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
@@ -30,6 +32,7 @@ import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.exercise.MuscleGroup
+import app.mymusclemap.ui.achievements.AchievementsViewModel
 import app.mymusclemap.ui.dashboard.DashboardViewModel
 import app.mymusclemap.ui.dashboard.WeightDetailsViewModel
 import app.mymusclemap.ui.founder.FounderProgramViewModel
@@ -80,7 +83,9 @@ class WeightViewModelFactory(
     private val founderSessionPresent: () -> Boolean = { true },
     private val founderSubmitReport: suspend (submissionId: String, feedback: String, appVersion: String) -> FounderReportSubmission =
         { _, _, _ -> FounderReportSubmission.Unavailable },
-    private val founderRefreshAuthority: suspend () -> Unit = {}
+    private val founderRefreshAuthority: suspend () -> Unit = {},
+    private val achievementRepository: AchievementRepository? = null,
+    private val targetWeightGoalRepository: TargetWeightGoalRepository? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -103,7 +108,8 @@ class WeightViewModelFactory(
                     dateProvider,
                     onboardingRepository,
                     bodyMeasurementRepository,
-                    featureEntitlements
+                    featureEntitlements,
+                    targetWeightGoalRepository
                 )
             }
             modelClass.isAssignableFrom(HistoryViewModel::class.java) -> {
@@ -222,6 +228,9 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {
                 HealthConnectViewModel(healthRepository, dateProvider)
+            }
+            modelClass.isAssignableFrom(AchievementsViewModel::class.java) -> {
+                AchievementsViewModel(checkNotNull(achievementRepository))
             }
             modelClass.isAssignableFrom(ReportsViewModel::class.java) -> {
                 ReportsViewModel(

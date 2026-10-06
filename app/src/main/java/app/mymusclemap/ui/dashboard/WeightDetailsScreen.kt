@@ -18,8 +18,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +55,7 @@ import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.ChartRange
 import app.mymusclemap.ui.components.HeroSurface
+import app.mymusclemap.ui.components.weightErrorMessage
 import app.mymusclemap.ui.components.MeasurementEditorSheet
 import app.mymusclemap.ui.components.SectionHeader
 import app.mymusclemap.ui.components.SegmentedControl
@@ -88,7 +93,12 @@ fun WeightDetailsScreen(
     progressPhotoProBadge: Boolean = false,
     progressPhotoThumbnails: List<android.graphics.Bitmap> = emptyList(),
     progressPhotoMissing: Boolean = false,
-    onOpenProgressPhotos: () -> Unit = {}
+    onOpenProgressPhotos: () -> Unit = {},
+    onOpenTarget: () -> Unit = {},
+    onTargetInput: (String) -> Unit = {},
+    onSaveTarget: () -> Unit = {},
+    onDismissTarget: () -> Unit = {},
+    onClearTarget: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedPoint by remember { mutableStateOf<ChartPoint?>(null) }
@@ -126,6 +136,14 @@ fun WeightDetailsScreen(
                 snapshot = state.snapshot,
                 onAddToday = onAddToday
             )
+            if (state.showTarget) {
+                Spacer(Modifier.height(AppDimens.sectionGap))
+                TargetWeightSection(
+                    card = state.target,
+                    onOpen = onOpenTarget,
+                    onClear = onClearTarget
+                )
+            }
             Spacer(Modifier.height(AppDimens.sectionGap))
             SectionHeader(title = stringResource(R.string.chart_title))
             val ranges = ChartRange.entries
@@ -182,6 +200,141 @@ fun WeightDetailsScreen(
             ProInfoSheet(feature = feature, onDismiss = onDismissLocked)
         }
     }
+    state.targetEditor?.let { editor ->
+        TargetWeightDialog(
+            editor = editor,
+            onInput = onTargetInput,
+            onSave = onSaveTarget,
+            onDismiss = onDismissTarget
+        )
+    }
+}
+
+@Composable
+private fun TargetWeightSection(
+    card: TargetWeightCard?,
+    onOpen: () -> Unit,
+    onClear: () -> Unit
+) {
+    HeroSurface(modifier = Modifier.testTag("target-weight-section")) {
+        Text(
+            text = stringResource(R.string.target_weight_label),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (card == null) {
+            Spacer(Modifier.height(12.dp))
+            TextButton(onClick = onOpen, modifier = Modifier.testTag("target-weight-set")) {
+                Text(stringResource(R.string.target_weight_set))
+            }
+            return@HeroSurface
+        }
+        Text(
+            text = UiFormatters.weightKg(card.targetKg),
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .testTag("target-weight-value")
+        )
+        val progress = card.progress
+        if (card.waitingForBaseline || progress == null) {
+            Text(
+                text = stringResource(R.string.target_weight_waiting),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        } else {
+            Text(
+                text = stringResource(
+                    R.string.target_weight_current,
+                    UiFormatters.weightKg(progress.currentKg)
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            LinearProgressIndicator(
+                progress = { progress.progressFraction.toFloat() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+                    .testTag("target-weight-progress"),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            Text(
+                text = stringResource(
+                    R.string.target_weight_progress_count,
+                    UiFormatters.weightValue(progress.progressedKg.coerceAtLeast(0.0)),
+                    UiFormatters.weightValue(progress.totalDistanceKg)
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                text = if (progress.reached) {
+                    stringResource(R.string.target_weight_reached_status)
+                } else {
+                    stringResource(
+                        R.string.target_weight_to_go,
+                        UiFormatters.weightKg(progress.remainingTowardTargetKg)
+                    )
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .testTag("target-weight-remaining")
+            )
+        }
+        Row(modifier = Modifier.padding(top = 8.dp)) {
+            TextButton(onClick = onOpen, modifier = Modifier.testTag("target-weight-change")) {
+                Text(stringResource(R.string.target_weight_change))
+            }
+            TextButton(onClick = onClear, modifier = Modifier.testTag("target-weight-remove")) {
+                Text(stringResource(R.string.target_weight_remove))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TargetWeightDialog(
+    editor: TargetWeightEditor,
+    onInput: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.target_weight_label)) },
+        text = {
+            OutlinedTextField(
+                value = editor.input,
+                onValueChange = onInput,
+                label = { Text(stringResource(R.string.target_weight_label)) },
+                supportingText = editor.error?.let { error ->
+                    { Text(stringResource(weightErrorMessage(error))) }
+                },
+                isError = editor.error != null,
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("target-weight-input")
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onSave, modifier = Modifier.testTag("target-weight-save")) {
+                Text(stringResource(R.string.target_weight_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
 }
 
 @Composable

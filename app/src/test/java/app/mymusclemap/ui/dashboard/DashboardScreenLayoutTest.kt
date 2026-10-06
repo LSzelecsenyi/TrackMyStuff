@@ -229,10 +229,12 @@ class DashboardScreenLayoutTest {
         var templates = 0
         var catalog = 0
         var settings = 0
+        var achievements = 0
         render(
             onOpenTemplates = { templates += 1 },
             onOpenCatalog = { catalog += 1 },
-            onOpenSettings = { settings += 1 }
+            onOpenSettings = { settings += 1 },
+            onOpenAchievements = { achievements += 1 }
         )
         val header = composeRule.onNodeWithTag("dashboard_weekly_header").getBoundsInRoot()
         val anchor = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_ANCHOR, useUnmergedTree = true).getBoundsInRoot()
@@ -250,6 +252,7 @@ class DashboardScreenLayoutTest {
         composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_MENU).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.templates_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.exercises_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.achievements_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.settings_title)).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.nav_journal)).assertCountEquals(0)
         val menu = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_MENU).getBoundsInRoot()
@@ -270,9 +273,12 @@ class DashboardScreenLayoutTest {
         composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
         composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_EXERCISES).performClick()
         composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
+        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_ACHIEVEMENTS).performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
         composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_SETTINGS).performClick()
         assertEquals(1, templates)
         assertEquals(1, catalog)
+        assertEquals(1, achievements)
         assertEquals(1, settings)
     }
 
@@ -838,6 +844,7 @@ class DashboardScreenLayoutTest {
         onOpenTemplates: () -> Unit = {},
         onOpenCatalog: () -> Unit = {},
         onOpenSettings: () -> Unit = {},
+        onOpenAchievements: () -> Unit = {},
         entitlements: FeatureEntitlements = OpenFeatureEntitlements,
         onboarding: OnboardingGuide = OnboardingGuide.Inactive,
         onContinueOnboarding: () -> Unit = {},
@@ -918,6 +925,7 @@ class DashboardScreenLayoutTest {
                             onDeleteConfirm = {},
                             onMessageConsumed = {},
                             onOpenSettings = onOpenSettings,
+                            onOpenAchievements = onOpenAchievements,
                             onOpenTemplates = onOpenTemplates,
                             onOpenCatalog = onOpenCatalog,
                             onOpenWorkout = {},

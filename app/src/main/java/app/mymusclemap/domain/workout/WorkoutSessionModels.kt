@@ -99,7 +99,8 @@ data class WorkoutSessionSummary(
 data class WorkoutCompletionSummary(
     val exerciseCount: Int,
     val completedSetCount: Int,
-    val durationMillis: Long
+    val durationMillis: Long,
+    val clientWorkoutId: String? = null
 ) {
     val durationLabel: String get() = ElapsedTime.formatMillis(durationMillis)
 }

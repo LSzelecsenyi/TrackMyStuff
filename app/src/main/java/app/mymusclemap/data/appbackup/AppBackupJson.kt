@@ -1,10 +1,14 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.data.local.AchievementStateEntity
 import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
+import app.mymusclemap.data.local.ProgressEventEntity
 import app.mymusclemap.data.local.ProgressPhotoEntity
 import app.mymusclemap.data.local.ScheduledWorkoutEntity
+import app.mymusclemap.data.local.TargetWeightGoalEntity
+import app.mymusclemap.data.local.UnlockedAchievementEntity
 import app.mymusclemap.data.local.WeightMeasurementEntity
 import app.mymusclemap.data.local.WorkoutSessionEntity
 import app.mymusclemap.data.local.WorkoutSessionExerciseEntity
@@ -290,7 +294,7 @@ object AppBackupJson {
                 }
             }
         )
-        if (snapshot.schemaVersion >= AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION) {
+        if (snapshot.schemaVersion >= AppBackupFormat.ARCHIVE_PHOTO_SCHEMA_VERSION) {
             tables.put(
                 AppBackupFormat.TABLE_PROGRESS_PHOTOS,
                 JSONArray().also { array ->
@@ -302,6 +306,71 @@ object AppBackupJson {
                                 .put("fileName", row.fileName)
                                 .put("createdAt", row.createdAt)
                                 .put("updatedAt", row.updatedAt)
+                        )
+                    }
+                }
+            )
+        }
+        if (snapshot.schemaVersion >= AppBackupFormat.ARCHIVE_ACHIEVEMENT_SCHEMA_VERSION) {
+            tables.put(
+                AppBackupFormat.TABLE_UNLOCKED_ACHIEVEMENTS,
+                JSONArray().also { array ->
+                    snapshot.tables.unlockedAchievements.sortedBy { it.achievementId }.forEach { row ->
+                        array.put(
+                            JSONObject()
+                                .put("achievementId", row.achievementId)
+                                .put("unlockedAt", row.unlockedAt)
+                                .put("celebratedAt", nullable(row.celebratedAt))
+                                .put("triggerClientWorkoutId", nullable(row.triggerClientWorkoutId))
+                        )
+                    }
+                }
+            )
+            tables.put(
+                AppBackupFormat.TABLE_PROGRESS_EVENTS,
+                JSONArray().also { array ->
+                    snapshot.tables.progressEvents.sortedBy { it.id }.forEach { row ->
+                        array.put(
+                            JSONObject()
+                                .put("id", row.id)
+                                .put("dedupeKey", row.dedupeKey)
+                                .put("kind", row.kind)
+                                .put("payload", row.payload)
+                                .put("occurredAt", row.occurredAt)
+                                .put("celebratedAt", nullable(row.celebratedAt))
+                                .put("triggerClientWorkoutId", nullable(row.triggerClientWorkoutId))
+                        )
+                    }
+                }
+            )
+            tables.put(
+                AppBackupFormat.TABLE_ACHIEVEMENT_STATE,
+                JSONArray().also { array ->
+                    snapshot.tables.achievementState.sortedBy { it.id }.forEach { row ->
+                        array.put(
+                            JSONObject()
+                                .put("id", row.id)
+                                .put("initialized", row.initialized)
+                                .put("updatedAt", row.updatedAt)
+                        )
+                    }
+                }
+            )
+        }
+        if (snapshot.schemaVersion >= AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION) {
+            tables.put(
+                AppBackupFormat.TABLE_TARGET_WEIGHT_GOALS,
+                JSONArray().also { array ->
+                    snapshot.tables.targetWeightGoals.sortedBy { it.id }.forEach { row ->
+                        array.put(
+                            JSONObject()
+                                .put("id", row.id)
+                                .put("targetKg", row.targetKg)
+                                .put("baselineKg", nullable(row.baselineKg))
+                                .put("direction", nullable(row.direction))
+                                .put("createdAt", row.createdAt)
+                                .put("updatedAt", row.updatedAt)
+                                .put("retiredAt", nullable(row.retiredAt))
                         )
                     }
                 }
@@ -406,21 +475,20 @@ object AppBackupJson {
                 errors += AppBackupError(AppBackupErrorCode.InvalidType, "tables.$name")
             }
         }
-        val replacesProgressPhotos = schemaVersion == AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION
+        val version = schemaVersion!!
+        val replacesProgressPhotos = version >= AppBackupFormat.ARCHIVE_PHOTO_SCHEMA_VERSION
+        val replacesAchievements = version >= AppBackupFormat.ARCHIVE_ACHIEVEMENT_SCHEMA_VERSION
+        val replacesTargetWeightGoals = version >= AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION
         if (replacesProgressPhotos) {
-            if (!tablesObject.has(AppBackupFormat.TABLE_PROGRESS_PHOTOS) ||
-                tablesObject.isNull(AppBackupFormat.TABLE_PROGRESS_PHOTOS)
-            ) {
-                errors += AppBackupError(
-                    AppBackupErrorCode.MissingField,
-                    "tables.${AppBackupFormat.TABLE_PROGRESS_PHOTOS}"
-                )
-            } else if (tablesObject.opt(AppBackupFormat.TABLE_PROGRESS_PHOTOS) !is JSONArray) {
-                errors += AppBackupError(
-                    AppBackupErrorCode.InvalidType,
-                    "tables.${AppBackupFormat.TABLE_PROGRESS_PHOTOS}"
-                )
-            }
+            requireJsonArray(tablesObject, AppBackupFormat.TABLE_PROGRESS_PHOTOS, errors)
+        }
+        if (replacesAchievements) {
+            requireJsonArray(tablesObject, AppBackupFormat.TABLE_UNLOCKED_ACHIEVEMENTS, errors)
+            requireJsonArray(tablesObject, AppBackupFormat.TABLE_PROGRESS_EVENTS, errors)
+            requireJsonArray(tablesObject, AppBackupFormat.TABLE_ACHIEVEMENT_STATE, errors)
+        }
+        if (replacesTargetWeightGoals) {
+            requireJsonArray(tablesObject, AppBackupFormat.TABLE_TARGET_WEIGHT_GOALS, errors)
         }
         if (errors.isNotEmpty()) {
             return AppBackupParseResult.Failure(errors)
@@ -480,7 +548,37 @@ object AppBackupJson {
             } else {
                 emptyList()
             },
-            replacesProgressPhotos = replacesProgressPhotos
+            replacesProgressPhotos = replacesProgressPhotos,
+            unlockedAchievements = if (replacesAchievements) {
+                parseArray(tablesObject, AppBackupFormat.TABLE_UNLOCKED_ACHIEVEMENTS, errors) {
+                    parseUnlockedAchievement(it, errors)
+                }
+            } else {
+                emptyList()
+            },
+            progressEvents = if (replacesAchievements) {
+                parseArray(tablesObject, AppBackupFormat.TABLE_PROGRESS_EVENTS, errors) {
+                    parseProgressEvent(it, errors)
+                }
+            } else {
+                emptyList()
+            },
+            achievementState = if (replacesAchievements) {
+                parseArray(tablesObject, AppBackupFormat.TABLE_ACHIEVEMENT_STATE, errors) {
+                    parseAchievementState(it, errors)
+                }
+            } else {
+                emptyList()
+            },
+            replacesAchievements = replacesAchievements,
+            targetWeightGoals = if (replacesTargetWeightGoals) {
+                parseArray(tablesObject, AppBackupFormat.TABLE_TARGET_WEIGHT_GOALS, errors) {
+                    parseTargetWeightGoal(it, errors)
+                }
+            } else {
+                emptyList()
+            },
+            replacesTargetWeightGoals = replacesTargetWeightGoals
         )
         val tables = parsedTables.copy(
             scheduledWorkouts = hydrateScheduledTemplateNames(
@@ -596,6 +694,92 @@ object AppBackupJson {
         return parseArray(tables, AppBackupFormat.TABLE_WEEKLY_WORKOUT_GOALS, errors) {
             parseWeeklyGoal(it, errors)
         }
+    }
+
+    private fun requireJsonArray(
+        tables: JSONObject,
+        name: String,
+        errors: MutableList<AppBackupError>
+    ) {
+        if (!tables.has(name) || tables.isNull(name)) {
+            errors += AppBackupError(AppBackupErrorCode.MissingField, "tables.$name")
+        } else if (tables.opt(name) !is JSONArray) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidType, "tables.$name")
+        }
+    }
+
+    private fun parseUnlockedAchievement(
+        obj: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): UnlockedAchievementEntity? {
+        val achievementId = obj.requiredString("achievementId", errors) ?: return null
+        val unlockedAt = obj.requiredLong("unlockedAt", errors) ?: return null
+        val celebratedAt = obj.optionalNullableLong("celebratedAt", errors)
+        val triggerClientWorkoutId = obj.optionalNullableString("triggerClientWorkoutId", errors)
+        return UnlockedAchievementEntity(
+            achievementId = achievementId,
+            unlockedAt = unlockedAt,
+            celebratedAt = celebratedAt,
+            triggerClientWorkoutId = triggerClientWorkoutId
+        )
+    }
+
+    private fun parseProgressEvent(
+        obj: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): ProgressEventEntity? {
+        val id = obj.requiredId("id", errors) ?: return null
+        val dedupeKey = obj.requiredString("dedupeKey", errors) ?: return null
+        val kind = obj.requiredString("kind", errors) ?: return null
+        val payload = obj.requiredString("payload", errors) ?: return null
+        val occurredAt = obj.requiredLong("occurredAt", errors) ?: return null
+        val celebratedAt = obj.optionalNullableLong("celebratedAt", errors)
+        val triggerClientWorkoutId = obj.optionalNullableString("triggerClientWorkoutId", errors)
+        return ProgressEventEntity(
+            id = id,
+            dedupeKey = dedupeKey,
+            kind = kind,
+            payload = payload,
+            occurredAt = occurredAt,
+            celebratedAt = celebratedAt,
+            triggerClientWorkoutId = triggerClientWorkoutId
+        )
+    }
+
+    private fun parseAchievementState(
+        obj: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): AchievementStateEntity? {
+        val id = obj.requiredInt("id", errors) ?: return null
+        val initialized = obj.requiredBoolean("initialized", errors) ?: return null
+        val updatedAt = obj.requiredLong("updatedAt", errors) ?: return null
+        return AchievementStateEntity(
+            id = id,
+            initialized = initialized,
+            updatedAt = updatedAt
+        )
+    }
+
+    private fun parseTargetWeightGoal(
+        obj: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): TargetWeightGoalEntity? {
+        val id = obj.requiredId("id", errors) ?: return null
+        val targetKg = obj.requiredDouble("targetKg", errors) ?: return null
+        val baselineKg = obj.optionalNullableDouble("baselineKg", errors)
+        val direction = obj.optionalNullableString("direction", errors)
+        val createdAt = obj.requiredLong("createdAt", errors) ?: return null
+        val updatedAt = obj.requiredLong("updatedAt", errors) ?: return null
+        val retiredAt = obj.optionalNullableLong("retiredAt", errors)
+        return TargetWeightGoalEntity(
+            id = id,
+            targetKg = targetKg,
+            baselineKg = baselineKg,
+            direction = direction,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            retiredAt = retiredAt
+        )
     }
 
     private fun parseWeeklyGoal(

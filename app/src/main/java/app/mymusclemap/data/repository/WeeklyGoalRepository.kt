@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 class WeeklyGoalRepository(
     private val dao: WeeklyWorkoutGoalDao,
     private val clock: Clock,
+    private val onGoalChanged: suspend () -> Unit = {},
     private val earliestCompletedDate: suspend () -> LocalDate? = { null }
 ) {
     fun observe(): Flow<List<WeeklyGoalRevision>> {
@@ -53,6 +54,12 @@ class WeeklyGoalRepository(
                 )
             }
         )
+        try {
+            onGoalChanged()
+        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+        }
     }
 }
 

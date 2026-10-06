@@ -28,6 +28,7 @@ class AppBackupRepository(
     private val progressPhotoStore: ProgressPhotoStore? = null,
     private val onHeatmapDataChanged: () -> Unit = {},
     private val beforeDestructiveRestore: suspend () -> Unit = {},
+    private val onAfterRestore: suspend () -> Unit = {},
     private val instantSource: () -> Instant = { Instant.now() }
 ) {
     suspend fun exportJson(source: AppBackupSource): String {
@@ -64,7 +65,12 @@ class AppBackupRepository(
             schemaVersion = AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION,
             exportedAt = instantSource(),
             source = source,
-            tables = loaded.copy(progressPhotos = kept, replacesProgressPhotos = true),
+            tables = loaded.copy(
+                progressPhotos = kept,
+                replacesProgressPhotos = true,
+                replacesAchievements = true,
+                replacesTargetWeightGoals = true
+            ),
             settings = AppearanceCodec.encode(themePreferences.current())
         )
         return try {
@@ -180,6 +186,7 @@ class AppBackupRepository(
         }
         themePreferences.replaceAppearance(AppearanceCodec.decodeFrom(snapshot.settings))
         onHeatmapDataChanged()
+        notifyRestored()
         return AppBackupRestoreResult.Success
     }
 
@@ -223,6 +230,16 @@ class AppBackupRepository(
         }
         themePreferences.replaceAppearance(AppearanceCodec.decodeFrom(snapshot.settings))
         onHeatmapDataChanged()
+        notifyRestored()
         return AppBackupRestoreResult.Success
+    }
+
+    private suspend fun notifyRestored() {
+        try {
+            onAfterRestore()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+        }
     }
 }

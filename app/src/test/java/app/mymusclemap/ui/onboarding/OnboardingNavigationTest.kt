@@ -160,6 +160,11 @@ class OnboardingNavigationTest {
                 sessionRepository = workoutSessionRepository,
                 weightRepository = weightRepository,
                 templateRepository = workoutTemplateRepository
+            ),
+            achievementRepository = app.mymusclemap.data.repository.AchievementRepository(
+                database = database,
+                clock = clock,
+                dateProvider = dateProvider
             )
         )
     }

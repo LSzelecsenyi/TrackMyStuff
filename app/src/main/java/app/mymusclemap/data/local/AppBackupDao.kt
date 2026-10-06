@@ -135,6 +135,42 @@ abstract class AppBackupDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertProgressPhotos(rows: List<ProgressPhotoEntity>)
 
+    @Query("SELECT * FROM unlocked_achievements ORDER BY achievementId ASC")
+    abstract suspend fun getUnlockedAchievements(): List<UnlockedAchievementEntity>
+
+    @Query("DELETE FROM unlocked_achievements")
+    abstract suspend fun deleteUnlockedAchievements()
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertUnlockedAchievements(rows: List<UnlockedAchievementEntity>)
+
+    @Query("SELECT * FROM progress_events ORDER BY id ASC")
+    abstract suspend fun getProgressEvents(): List<ProgressEventEntity>
+
+    @Query("DELETE FROM progress_events")
+    abstract suspend fun deleteProgressEvents()
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertProgressEvents(rows: List<ProgressEventEntity>)
+
+    @Query("SELECT * FROM achievement_state ORDER BY id ASC")
+    abstract suspend fun getAchievementState(): List<AchievementStateEntity>
+
+    @Query("DELETE FROM achievement_state")
+    abstract suspend fun deleteAchievementState()
+
+    @Query("SELECT * FROM target_weight_goals ORDER BY id ASC")
+    abstract suspend fun getTargetWeightGoals(): List<TargetWeightGoalEntity>
+
+    @Query("DELETE FROM target_weight_goals")
+    abstract suspend fun deleteTargetWeightGoals()
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertTargetWeightGoals(rows: List<TargetWeightGoalEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertAchievementState(rows: List<AchievementStateEntity>)
+
     @Transaction
     open suspend fun loadTables(): AppBackupTables {
         return AppBackupTables(
@@ -151,12 +187,20 @@ abstract class AppBackupDao {
             workoutSessionSets = getWorkoutSessionSets(),
             bodyMeasurements = getBodyMeasurements(),
             weeklyWorkoutGoals = getWeeklyWorkoutGoals(),
-            progressPhotos = getProgressPhotos()
+            progressPhotos = getProgressPhotos(),
+            unlockedAchievements = getUnlockedAchievements(),
+            progressEvents = getProgressEvents(),
+            achievementState = getAchievementState(),
+            targetWeightGoals = getTargetWeightGoals()
         )
     }
 
     @Transaction
     open suspend fun replaceAll(tables: AppBackupTables) {
+        deleteUnlockedAchievements()
+        deleteProgressEvents()
+        deleteAchievementState()
+        deleteTargetWeightGoals()
         deleteWorkoutSessionSets()
         deleteWorkoutSessionExerciseMuscles()
         deleteWorkoutSessionExercises()
@@ -214,6 +258,20 @@ abstract class AppBackupDao {
             if (tables.progressPhotos.isNotEmpty()) {
                 insertProgressPhotos(tables.progressPhotos)
             }
+        }
+        if (tables.replacesAchievements) {
+            if (tables.unlockedAchievements.isNotEmpty()) {
+                insertUnlockedAchievements(tables.unlockedAchievements)
+            }
+            if (tables.progressEvents.isNotEmpty()) {
+                insertProgressEvents(tables.progressEvents)
+            }
+            if (tables.achievementState.isNotEmpty()) {
+                insertAchievementState(tables.achievementState)
+            }
+        }
+        if (tables.replacesTargetWeightGoals && tables.targetWeightGoals.isNotEmpty()) {
+            insertTargetWeightGoals(tables.targetWeightGoals)
         }
     }
 }

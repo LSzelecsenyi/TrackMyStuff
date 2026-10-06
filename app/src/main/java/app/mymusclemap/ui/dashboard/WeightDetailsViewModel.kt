@@ -4,7 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.BodyMeasurementRepository
 import app.mymusclemap.data.repository.OnboardingRepository
+import app.mymusclemap.data.repository.TargetWeightGoalRepository
 import app.mymusclemap.data.repository.WeightRepository
+import app.mymusclemap.domain.WeightParseError
+import app.mymusclemap.domain.WeightParser
+import app.mymusclemap.domain.achievements.TargetWeightGoalFacts
+import app.mymusclemap.domain.achievements.TargetWeightProgress
+import app.mymusclemap.domain.achievements.TargetWeightProgressEvaluator
 import app.mymusclemap.domain.DashboardAssembler
 import app.mymusclemap.domain.DashboardSnapshot
 import app.mymusclemap.domain.DateProvider
@@ -91,7 +97,21 @@ data class WeightDetailsUiState(
     val details: Map<String, BodyMeasurementDetail> = emptyMap(),
     val measurementDetailVisible: Boolean = false,
     val bodyEditor: BodyEditorUiState? = null,
-    val lockedFeature: AppFeature? = null
+    val lockedFeature: AppFeature? = null,
+    val showTarget: Boolean = false,
+    val target: TargetWeightCard? = null,
+    val targetEditor: TargetWeightEditor? = null
+)
+
+data class TargetWeightCard(
+    val targetKg: Double,
+    val progress: TargetWeightProgress?,
+    val waitingForBaseline: Boolean
+)
+
+data class TargetWeightEditor(
+    val input: String,
+    val error: WeightParseError?
 )
 
 class WeightDetailsViewModel(
@@ -99,7 +119,8 @@ class WeightDetailsViewModel(
     private val dateProvider: DateProvider,
     private val onboardingRepository: OnboardingRepository? = null,
     private val bodyRepository: BodyMeasurementRepository? = null,
-    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
+    private val targetWeightGoalRepository: TargetWeightGoalRepository? = null
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
     private val bodyChartRange = MutableStateFlow(ChartRange.Days30)
@@ -110,6 +131,8 @@ class WeightDetailsViewModel(
     private val measurements = MutableStateFlow<List<WeightMeasurement>>(emptyList())
     private val bodyMeasurements = MutableStateFlow<List<BodyMeasurement>>(emptyList())
     private val lockedFeature = MutableStateFlow<AppFeature?>(null)
+    private val targetGoal = MutableStateFlow<TargetWeightGoalFacts?>(null)
+    private val targetEditor = MutableStateFlow<TargetWeightEditor?>(null)
 
     val uiState: StateFlow<WeightDetailsUiState> = combine(
         combine(measurements, bodyMeasurements, chartRange, bodyChartRange) { weights, body, range, bodyRange ->
@@ -123,10 +146,12 @@ class WeightDetailsViewModel(
             onboardingRepository?.observe() ?: flowOf(OnboardingGuide.Inactive)
         ) { message, guide ->
             message to guide
-        }
-    ) { series, chrome, messageGuide ->
+        },
+        combine(targetGoal, targetEditor) { goal, editorState -> goal to editorState }
+    ) { series, chrome, messageGuide, targetState ->
         val today = dateProvider.today()
         val (message, guide) = messageGuide
+        val (goal, editorState) = targetState
         WeightDetailsUiState(
             snapshot = DashboardAssembler.assemble(series.weights, today, series.range),
             chartRange = series.range,
@@ -139,7 +164,10 @@ class WeightDetailsViewModel(
             details = details(series.body, today, series.bodyRange),
             bodyEditor = chrome.measurementEditor,
             lockedFeature = chrome.locked,
-            measurementDetailVisible = chrome.detailVisible
+            measurementDetailVisible = chrome.detailVisible,
+            showTarget = targetWeightGoalRepository != null,
+            target = goal?.toCard(series.weights),
+            targetEditor = editorState
         )
     }.stateIn(
         scope = viewModelScope,
@@ -157,6 +185,51 @@ class WeightDetailsViewModel(
                 body.observeAll().collect { bodyMeasurements.value = it }
             }
         }
+        val goals = targetWeightGoalRepository
+        if (goals != null) {
+            viewModelScope.launch {
+                goals.observeActive().collect { targetGoal.value = it }
+            }
+        }
+    }
+
+    fun openTargetEditor() {
+        val current = targetGoal.value
+        targetEditor.value = TargetWeightEditor(
+            input = current?.let { formatWeightInput(it.targetKg) }.orEmpty(),
+            error = null
+        )
+    }
+
+    fun onTargetInput(value: String) {
+        val editorState = targetEditor.value ?: return
+        targetEditor.value = editorState.copy(input = WeightParser.filterUserInput(value), error = null)
+    }
+
+    fun dismissTargetEditor() {
+        targetEditor.value = null
+    }
+
+    fun saveTarget() {
+        val editorState = targetEditor.value ?: return
+        val goals = targetWeightGoalRepository ?: return
+        when (val parsed = WeightParser.parseUserInput(editorState.input)) {
+            is app.mymusclemap.domain.WeightParseResult.Invalid -> {
+                targetEditor.value = editorState.copy(error = parsed.error)
+            }
+            is app.mymusclemap.domain.WeightParseResult.Valid -> {
+                val latest = measurements.value.maxByOrNull { it.date }?.weightKg
+                viewModelScope.launch {
+                    goals.setTarget(parsed.kilograms, latest)
+                    targetEditor.value = null
+                }
+            }
+        }
+    }
+
+    fun clearTarget() {
+        val goals = targetWeightGoalRepository ?: return
+        viewModelScope.launch { goals.clear() }
     }
 
     fun onChartRangeSelected(range: ChartRange) {
@@ -427,6 +500,16 @@ class WeightDetailsViewModel(
                 Triple(null, code, measurements.filter { it.typeCode == code })
             }
         return known + unknown
+    }
+
+    private fun TargetWeightGoalFacts.toCard(weights: List<WeightMeasurement>): TargetWeightCard {
+        val inJourney = weights.filter { it.createdAt >= createdAt }
+        val current = inJourney.maxByOrNull { it.date }?.weightKg ?: baselineKg
+        return TargetWeightCard(
+            targetKg = targetKg,
+            progress = TargetWeightProgressEvaluator.progress(this, current),
+            waitingForBaseline = baselineKg == null
+        )
     }
 
     private data class BodySeriesInputs(

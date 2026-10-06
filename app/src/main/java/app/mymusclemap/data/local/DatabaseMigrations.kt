@@ -726,3 +726,63 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `target_weight_goals` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `targetKg` REAL NOT NULL,
+                `baselineKg` REAL,
+                `direction` TEXT,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                `retiredAt` INTEGER
+            )
+            """.trimIndent()
+        )
+    }
+}
+
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `unlocked_achievements` (
+                `achievementId` TEXT NOT NULL,
+                `unlockedAt` INTEGER NOT NULL,
+                `celebratedAt` INTEGER,
+                `triggerClientWorkoutId` TEXT,
+                PRIMARY KEY(`achievementId`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `progress_events` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `dedupeKey` TEXT NOT NULL,
+                `kind` TEXT NOT NULL,
+                `payload` TEXT NOT NULL,
+                `occurredAt` INTEGER NOT NULL,
+                `celebratedAt` INTEGER,
+                `triggerClientWorkoutId` TEXT
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_progress_events_dedupeKey` ON `progress_events` (`dedupeKey`)"
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `achievement_state` (
+                `id` INTEGER NOT NULL,
+                `initialized` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent()
+        )
+    }
+}
+

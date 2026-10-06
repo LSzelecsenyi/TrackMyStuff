@@ -12,7 +12,8 @@ import java.time.LocalDate
 
 class WeightRepository(
     private val dao: WeightMeasurementDao,
-    private val clock: Clock
+    private val clock: Clock,
+    private val onWeightChanged: suspend () -> Unit = {}
 ) {
     fun observeAll(): Flow<List<WeightMeasurement>> {
         return dao.observeAllAscending().map { entities ->
@@ -53,10 +54,22 @@ class WeightRepository(
                 )
             )
             SaveOutcome.Updated
+        }.also {
+            notifyChanged()
         }
     }
 
     suspend fun delete(id: Long) {
         dao.deleteById(id)
+        notifyChanged()
+    }
+
+    private suspend fun notifyChanged() {
+        try {
+            onWeightChanged()
+        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+        }
     }
 }

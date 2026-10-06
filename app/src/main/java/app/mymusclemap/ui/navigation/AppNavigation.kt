@@ -43,9 +43,10 @@ object AppRoutes {
     const val PROGRESS_PHOTO_COMPARE = "progress_photo_compare"
     const val PROGRESS_PHOTO_COMPARE_PATTERN = "progress_photo_compare?first={first}&second={second}"
     const val WORKOUT_IMPORT = "workout_import"
+    const val ACHIEVEMENTS = "achievements"
     const val WORKOUT_COMPLETE = "workout_complete"
     const val WORKOUT_COMPLETE_PATTERN =
-        "workout_complete?exercises={exercises}&completedSets={completedSets}&durationMillis={durationMillis}"
+        "workout_complete?exercises={exercises}&completedSets={completedSets}&durationMillis={durationMillis}&clientWorkoutId={clientWorkoutId}"
 }
 
 data class RootTab(

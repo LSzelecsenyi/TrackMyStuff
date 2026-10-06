@@ -116,7 +116,9 @@ internal object AppBackupArchive {
                 declared.containerVersion.toString()
             )
         }
-        if (declared.dataSchemaVersion != AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION) {
+        if (declared.dataSchemaVersion !in
+            AppBackupFormat.ARCHIVE_PHOTO_SCHEMA_VERSION..AppBackupFormat.ARCHIVE_DATA_SCHEMA_VERSION
+        ) {
             return reject(
                 staging,
                 AppBackupErrorCode.UnsupportedSchemaVersion,

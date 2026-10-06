@@ -21,6 +21,7 @@ class WeightTrackerApplication : Application() {
             container.restoreFounderEntitlementCache()
             container.refreshFounderAuthority()
             container.appBackupRepository.recoverInterruptedPhotoRestore()
+            container.achievementRepository.reconcile()
         }
     }
 }
