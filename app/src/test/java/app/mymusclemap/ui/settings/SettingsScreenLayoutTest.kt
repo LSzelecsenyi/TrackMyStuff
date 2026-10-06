@@ -42,6 +42,7 @@ import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -329,8 +330,6 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.theme_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.palette_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.theme_preview_title).uppercase()).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.privacy_title).uppercase()).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.privacy_body)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PREVIEW).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_EDITOR_MODE).assertIsDisplayed()
         composeRule.onAllNodesWithText("Export body-weight data").assertCountEquals(0)
@@ -340,6 +339,10 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.action_export_app_backup_subtitle)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.action_restore_app_backup)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.action_restore_app_backup_subtitle)).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Export full backup").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Restore full backup").assertCountEquals(0)
+        composeRule.onAllNodesWithText("My Muscle Map").assertCountEquals(0)
+        composeRule.onAllNodesWithText("ABOUT MY MUSCLE MAP").assertCountEquals(0)
         composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_EXPORT).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_RESTORE).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
@@ -383,8 +386,38 @@ class SettingsScreenLayoutTest {
         render(onOpenFounderProgram = { opens[0] += 1 })
         composeRule.onNodeWithTag("settings-founder-program").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_open)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_open_subtitle)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.founder_open)).assertCountEquals(1)
+        val founder = composeRule.onNodeWithTag("settings-founder-program").getBoundsInRoot()
+        val about = composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).getBoundsInRoot()
+        val palette = composeRule.onNodeWithText(testString(R.string.palette_title).uppercase()).getBoundsInRoot()
+        assertTrue(palette.bottom < founder.top)
+        assertTrue(founder.bottom < about.top)
         composeRule.onNodeWithTag("settings-founder-program").performClick()
         assertEquals(1, opens[0])
+    }
+
+    @Test
+    fun givenFoundingMemberThenSettingsShowsMemberStatusOnce() {
+        render(state = SettingsUiState(appVersionName = "0.1.0-debug"), showFounderBadge = true)
+        composeRule.onNodeWithText(testString(R.string.founder_badge)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_member_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_open)).assertDoesNotExist()
+        composeRule.onNodeWithText(
+            testString(R.string.about_version_status, "0.1.0-debug", testString(R.string.founder_badge))
+        ).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.founder_member_subtitle)).assertCountEquals(1)
+    }
+
+    @Test
+    fun lockScreenRowKeepsItsCopyClearOfTheSwitch() {
+        render(width = 320.dp, fontScale = 1.3f)
+        val title = composeRule.onNodeWithText(testString(R.string.settings_lock_screen_sets_title)).getBoundsInRoot()
+        val body = composeRule.onNodeWithText(testString(R.string.settings_lock_screen_sets_body)).getBoundsInRoot()
+        val toggle = composeRule.onNodeWithTag(SETTINGS_LOCK_SCREEN_SETS).getBoundsInRoot()
+        assertTrue(title.right <= toggle.left)
+        assertTrue(body.right <= toggle.left)
+        assertTrue(toggle.left - maxOf(title.right, body.right) >= AppDimens.itemGap - 1.dp)
     }
 
     @Test
@@ -566,6 +599,7 @@ class SettingsScreenLayoutTest {
         onOpenHelp: () -> Unit = {},
         onOpenFounderProgram: () -> Unit = {},
         showFounderProgram: Boolean = true,
+        showFounderBadge: Boolean = false,
         onBack: () -> Unit = {},
         onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
         lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
@@ -606,6 +640,7 @@ class SettingsScreenLayoutTest {
                             onOpenHelp = onOpenHelp,
                             onOpenFounderProgram = onOpenFounderProgram,
                             showFounderProgram = showFounderProgram,
+                            showFounderBadge = showFounderBadge,
                             onMessageConsumed = {},
                             onBack = onBack,
                             onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,

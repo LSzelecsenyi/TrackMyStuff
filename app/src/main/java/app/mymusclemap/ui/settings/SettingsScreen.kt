@@ -261,6 +261,13 @@ fun SettingsScreen(
                     onGenerateDark = onGenerateDark,
                     onResetCustomDraft = onResetCustomDraft
                 )
+                if (showFounderProgram) {
+                    CompactEditorDivider()
+                    FounderSection(
+                        foundingMember = showFounderBadge,
+                        onOpenFounderProgram = onOpenFounderProgram
+                    )
+                }
                 CompactEditorDivider()
                 TrainingSection(
                     state = state,
@@ -271,34 +278,24 @@ fun SettingsScreen(
                     onOpenLockScreenAccessSettings = onOpenLockScreenAccessSettings
                 )
                 CompactEditorDivider()
-                AppBackupSection(
-                    onExportClick = onAppBackupExportClick,
-                    onRestoreClick = onRestoreClick
-                )
-                CompactEditorDivider()
                 HealthConnectSettingsSection(
                     state = health,
                     onAction = onHealthAction,
                     onOpenDetails = onOpenHealthDetails
                 )
                 CompactEditorDivider()
-                CompactEditorSection(title = settingsKicker(stringResource(R.string.privacy_title))) {
-                    Text(
-                        text = stringResource(R.string.privacy_body),
-                        style = AppTypeTokens.statSecondary,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                AppBackupSection(
+                    onExportClick = onAppBackupExportClick,
+                    onRestoreClick = onRestoreClick
+                )
                 CompactEditorDivider()
                 AboutSection(
                     state = state,
-                    showFounderProgram = showFounderProgram,
                     showFounderBadge = showFounderBadge,
                     onSendFeedback = onSendFeedback,
                     onOpenPrivacyPolicy = onOpenPrivacyPolicy,
                     onOpenHelp = onOpenHelp,
-                    onOpenOpenSourceLicenses = onOpenOpenSourceLicenses,
-                    onOpenFounderProgram = onOpenFounderProgram
+                    onOpenOpenSourceLicenses = onOpenOpenSourceLicenses
                 )
             }
         }
@@ -922,7 +919,11 @@ private fun LockScreenSetCompletionRow(
             .defaultMinSize(minHeight = AppDimens.minTouch),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = AppDimens.itemGap)
+        ) {
             Text(
                 text = stringResource(R.string.settings_lock_screen_sets_title),
                 style = AppTypeTokens.sectionTitle,
@@ -989,39 +990,57 @@ private fun AppBackupSection(
 }
 
 @Composable
+private fun FounderSection(
+    foundingMember: Boolean,
+    onOpenFounderProgram: () -> Unit
+) {
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.founder_settings_title))) {
+        DataActionRow(
+            icon = Icons.Filled.EmojiEvents,
+            title = stringResource(
+                if (foundingMember) R.string.founder_badge else R.string.founder_open
+            ),
+            subtitle = stringResource(
+                if (foundingMember) R.string.founder_member_subtitle else R.string.founder_open_subtitle
+            ),
+            testTag = "settings-founder-program",
+            onClick = onOpenFounderProgram
+        )
+    }
+}
+
+@Composable
 private fun AboutSection(
     state: SettingsUiState,
-    showFounderProgram: Boolean,
     showFounderBadge: Boolean,
     onSendFeedback: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
     onOpenHelp: () -> Unit,
-    onOpenOpenSourceLicenses: () -> Unit,
-    onOpenFounderProgram: () -> Unit
+    onOpenOpenSourceLicenses: () -> Unit
 ) {
     val usesExternalPrivacyPolicy = !state.privacyPolicyUrl.isNullOrBlank()
+    val version = if (showFounderBadge) {
+        stringResource(
+            R.string.about_version_status,
+            state.appVersionName,
+            stringResource(R.string.founder_badge)
+        )
+    } else {
+        stringResource(R.string.about_version, state.appVersionName)
+    }
     CompactEditorSection(title = settingsKicker(stringResource(R.string.about_title))) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(R.string.about_version, state.appVersionName),
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag(SETTINGS_APP_VERSION)
-            )
-            if (showFounderBadge) {
-                app.mymusclemap.ui.founder.FounderBadge()
-            }
-        }
+        Text(
+            text = stringResource(R.string.about_product),
+            style = AppTypeTokens.sectionTitle,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = version,
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag(SETTINGS_APP_VERSION)
+        )
         Spacer(Modifier.height(AppDimens.itemGap))
-        if (showFounderProgram) {
-            DataActionRow(
-                icon = Icons.Filled.EmojiEvents,
-                title = stringResource(R.string.founder_open),
-                subtitle = stringResource(R.string.founder_open_subtitle),
-                testTag = "settings-founder-program",
-                onClick = onOpenFounderProgram
-            )
-        }
         DataActionRow(
             icon = Icons.AutoMirrored.Outlined.HelpOutline,
             title = stringResource(R.string.action_help_tips),

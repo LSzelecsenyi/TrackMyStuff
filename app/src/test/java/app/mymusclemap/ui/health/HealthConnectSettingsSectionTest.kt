@@ -28,7 +28,6 @@ class HealthConnectSettingsSectionTest {
     fun unavailableHasNoAction() {
         render(status(HealthSettingsStatus.Unavailable, HealthSettingsAction.None))
         composeRule.onNodeWithText(testString(R.string.health_connect_status_unavailable)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.health_connect_summary)).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_HEALTH_ACTION).assertDoesNotExist()
     }
 
@@ -112,7 +111,7 @@ class HealthConnectSettingsSectionTest {
             ),
             onOpenDetails = { opens[0] += 1 }
         )
-        composeRule.onNodeWithText("Steps, Exercise sessions, Sleep").assertIsDisplayed()
+        composeRule.onNodeWithText("Steps, Workouts, Sleep").assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.health_connect_partial_steps)).assertDoesNotExist()
         composeRule.onNodeWithTag(SETTINGS_HEALTH_DETAILS).performClick()
         assertEquals(1, opens[0])

@@ -80,7 +80,7 @@ class FeedbackComposerTest {
             "14",
             "Google/Pixel 8"
         )
-        assertEquals("My Muscle Map feedback – 9.9.9-debug", subject)
+        assertEquals("Strict feedback – 9.9.9-debug", subject)
         assertEquals(
             "App version: 9.9.9-debug\nAndroid: 14\nDevice: Google/Pixel 8\n\nFeedback:\n",
             body

@@ -1,0 +1,37 @@
+# Repository template. Install later as /etc/systemd/system/strict-backend.service.
+# Installing this unit does not start or reload a web server.
+
+[Unit]
+Description=Strict backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=strict
+Group=strict
+WorkingDirectory=/opt/strict/prod
+EnvironmentFile=/etc/strict/strict-backend.env
+ExecStart=/usr/bin/java -Xmx512m -XX:+ExitOnOutOfMemoryError -jar /opt/strict/prod/strict-backend.jar --spring.profiles.active=prod --server.address=127.0.0.1 --server.port=8082
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=180
+TimeoutStopSec=30
+StartLimitIntervalSec=300
+StartLimitBurst=5
+SuccessExitStatus=143
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strict-backend
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+UMask=0077
+MemoryMax=1G
+MemorySwapMax=0
+
+[Install]
+WantedBy=multi-user.target

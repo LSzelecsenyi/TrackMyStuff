@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,21 +61,17 @@ fun HealthConnectSettingsSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(Modifier.height(AppDimens.statSecondaryGap))
         }
-        Text(
-            text = stringResource(R.string.health_connect_summary),
-            style = AppTypeTokens.statSecondary,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         if (state.ready && state.action != HealthSettingsAction.None) {
             Spacer(Modifier.height(AppDimens.itemGap))
             HealthActionRow(
+                icon = Icons.Outlined.MonitorHeart,
                 title = actionTitle(state),
                 onClick = onAction
             )
             if (state.status == HealthSettingsStatus.Connected) {
                 HealthActionRow(
+                    icon = Icons.Outlined.BarChart,
                     title = stringResource(R.string.health_connect_view_data),
                     onClick = onOpenDetails,
                     tag = SETTINGS_HEALTH_DETAILS
@@ -108,8 +107,8 @@ private fun connectedDetail(state: HealthSettingsState): String {
     }
     val names = buildList {
         if (state.stepsGranted) add(stringResource(R.string.health_connect_steps))
-        if (state.exerciseGranted) add(stringResource(R.string.health_connect_exercise_sessions))
-        if (state.restingHeartRateGranted) add(stringResource(R.string.health_connect_resting_heart_rate))
+        if (state.exerciseGranted) add(stringResource(R.string.health_connect_settings_workouts))
+        if (state.restingHeartRateGranted) add(stringResource(R.string.health_connect_settings_heart))
         if (state.hrvGranted) add(stringResource(R.string.health_connect_hrv))
         if (state.sleepGranted) add(stringResource(R.string.health_connect_sleep))
     }
@@ -130,6 +129,7 @@ private fun actionTitle(state: HealthSettingsState): String {
 
 @Composable
 private fun HealthActionRow(
+    icon: ImageVector,
     title: String,
     onClick: () -> Unit,
     tag: String = SETTINGS_HEALTH_ACTION
@@ -143,7 +143,7 @@ private fun HealthActionRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Outlined.MonitorHeart,
+            imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
@@ -158,5 +158,11 @@ private fun HealthActionRow(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }

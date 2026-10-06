@@ -1,0 +1,16 @@
+# Repository template. Install later as /etc/sudoers.d/strict-deploy
+# with mode 0440, then check it with visudo before relying on it.
+# The installed name must not contain a dot or a tilde.
+#
+# strict-deploy can restart and inspect only strict-backend.
+# sudo matches these argument lists exactly. A future workflow has to
+# call one of these commands and no others.
+# Health checks against http://127.0.0.1:8082/api/v1/health do not need sudo.
+# Publishing a jar or an admin release does not need sudo.
+
+Cmnd_Alias STRICT_DEPLOY_CMDS = \
+    /usr/bin/systemctl restart strict-backend.service, \
+    /usr/bin/systemctl status strict-backend.service --no-pager -l, \
+    /usr/bin/systemctl is-active strict-backend.service
+
+strict-deploy ALL=(root) NOPASSWD: STRICT_DEPLOY_CMDS
