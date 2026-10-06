@@ -3,9 +3,7 @@ package app.mymusclemap.data.repository
 import app.mymusclemap.data.local.WeightMeasurementDao
 import app.mymusclemap.data.local.WeightMeasurementEntity
 import app.mymusclemap.data.local.toModel
-import app.mymusclemap.domain.csv.WeightCsv
 import app.mymusclemap.domain.model.SaveOutcome
-import app.mymusclemap.domain.model.UpsertSummary
 import app.mymusclemap.domain.model.WeightMeasurement
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -60,17 +58,5 @@ class WeightRepository(
 
     suspend fun delete(id: Long) {
         dao.deleteById(id)
-    }
-
-    suspend fun importRows(rows: List<WeightCsv.ParsedRow>): UpsertSummary {
-        var created = 0
-        var updated = 0
-        rows.forEach { row ->
-            when (save(row.date, row.weightKg)) {
-                SaveOutcome.Created -> created++
-                SaveOutcome.Updated -> updated++
-            }
-        }
-        return UpsertSummary(createdCount = created, updatedCount = updated)
     }
 }

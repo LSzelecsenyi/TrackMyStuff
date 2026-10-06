@@ -436,7 +436,7 @@ private fun TemplateRow(
                 Text(
                     text = stringResource(R.string.template_archived_badge),
                     style = AppTypeTokens.statCaption,
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

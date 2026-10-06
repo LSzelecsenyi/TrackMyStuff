@@ -139,7 +139,11 @@ enum class SeedField {
     Background,
     Primary,
     Secondary,
-    Tertiary
+    Tertiary;
+
+    companion object {
+        val editorFields: List<SeedField> = listOf(Background, Primary, Secondary)
+    }
 }
 
 enum class ColorFieldError {

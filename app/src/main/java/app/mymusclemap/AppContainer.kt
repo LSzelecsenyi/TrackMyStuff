@@ -57,6 +57,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -138,6 +140,7 @@ class AppContainer(context: Context) {
     val founderProgramStore = FounderProgramStore(appContext)
     val founderMilestoneAcknowledgements = FounderMilestoneAcknowledgementStore(appContext)
     private val entitlementRevision = MutableStateFlow(0)
+    private val founderAuthorityRefresh = Mutex()
     private val founderCacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val strictSessionRevision = MutableStateFlow(0)
     val founderEntitlementCache = FounderEntitlementCache(
@@ -192,6 +195,12 @@ class AppContainer(context: Context) {
         if (!founderProgram.currentState().backendOwned) {
             return
         }
+        founderAuthorityRefresh.withLock {
+            reloadFounderAuthority()
+        }
+    }
+
+    private suspend fun reloadFounderAuthority() {
         when (val current = strictAccount.api.currentFounder(founderZone)) {
             is FounderSnapshotCall.Loaded -> founderProgram.applyBackendEnrollment(current.snapshot)
             FounderSnapshotCall.Unauthenticated -> founderEntitlementCache.drop()
@@ -404,7 +413,8 @@ class AppContainer(context: Context) {
         founderSessionPresent = { strictSessionStore.read() != null },
         founderSubmitReport = { submissionId, feedback, appVersion ->
             submitFounderTesterReport(submissionId, feedback, appVersion)
-        }
+        },
+        founderRefreshAuthority = { refreshFounderAuthority() }
     )
 }
 

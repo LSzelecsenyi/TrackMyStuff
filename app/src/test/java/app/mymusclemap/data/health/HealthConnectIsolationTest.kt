@@ -13,7 +13,6 @@ import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.domain.body.BodyMeasurementType
 import app.mymusclemap.domain.FixedDateProvider
-import app.mymusclemap.domain.csv.WeightCsv
 import app.mymusclemap.domain.health.HealthAvailability
 import app.mymusclemap.domain.health.HealthExerciseKind
 import app.mymusclemap.domain.health.HealthExerciseSession
@@ -152,11 +151,10 @@ class HealthConnectIsolationTest {
         assertEquals(80.0, bodyWeight?.firstKg ?: Double.NaN, 0.0)
         assertTrue(bodyWeight?.firstKg != 424_242.0)
 
-        val csv = WeightCsv.export(weights)
-        assertFalse(csv.contains("424242"))
-        assertTrue(csv.startsWith(WeightCsv.HEADER))
-
         val json = backup.exportJson(AppBackupSource("app.mymusclemap", "test"))
+        assertTrue(json.contains("\"weight_measurements\""))
+        assertTrue(json.contains("2024-08-15"))
+        assertTrue(json.contains("81.5"))
         assertFalse(json.contains("424242"))
         assertFalse(json.contains("restingHeartRate"))
         assertFalse(json.contains("health_connect"))

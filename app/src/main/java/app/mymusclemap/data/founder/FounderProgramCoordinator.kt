@@ -133,32 +133,6 @@ class FounderProgramCoordinator(
         }
     }
 
-    suspend fun approve() {
-        mutex.withLock {
-            if (viewState.value.state.backendOwned) {
-                return@withLock
-            }
-            val result = logic.approve(viewState.value.state)
-            if (result is FounderProgramResult.Changed) {
-                store.save(result.state)
-                reevaluate()
-            }
-        }
-    }
-
-    suspend fun reject(reason: String) {
-        mutex.withLock {
-            if (viewState.value.state.backendOwned) {
-                return@withLock
-            }
-            val result = logic.reject(viewState.value.state, reason)
-            if (result is FounderProgramResult.Changed) {
-                store.save(result.state)
-                reevaluate()
-            }
-        }
-    }
-
     suspend fun loadFeedbackDraft(): String = store.loadFeedbackText()
 
     suspend fun saveFeedbackDraft(text: String) {

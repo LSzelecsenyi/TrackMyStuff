@@ -1,28 +1,292 @@
-@if (valid()) {
-  <strict-state kind="content">
-    <p class="kicker">Founder application</p>
-    <h1>Review</h1>
-    <p class="lede">
-      This layout is ready for one application. The review record is not loaded.
-    </p>
-    <p class="id">Application <span class="tabular">{{ applicationId() }}</span></p>
-    <div class="review-grid">
-      @for (section of sections; track section.id) {
-        <section class="surface" [attr.aria-labelledby]="section.id">
-          <h2 [id]="section.id">{{ section.title }}</h2>
-          <p>{{ section.text }}</p>
+@switch (phase()) {
+  @case ('loading') {
+    <strict-state kind="loading" />
+  }
+  @case ('invalid') {
+    <strict-state kind="error">
+      <h1>This address is not a Founder application id</h1>
+      <p>Open an application from the review queue.</p>
+      <a class="button" routerLink="/founders">Founder applications</a>
+    </strict-state>
+  }
+  @case ('missing') {
+    <strict-state kind="error">
+      <h1>This Founder application was not found</h1>
+      <p>It may have been removed, or the address is no longer valid.</p>
+      <a class="button" routerLink="/founders">Founder applications</a>
+    </strict-state>
+  }
+  @case ('error') {
+    <strict-state kind="error">
+      <h1>This Founder application could not be loaded</h1>
+      <p>The review record did not respond. Try again.</p>
+      <button type="button" class="button" (click)="load()">Try again</button>
+      <a class="button quiet" routerLink="/founders">Founder applications</a>
+    </strict-state>
+  }
+  @case ('ready') {
+    @if (detail(); as review) {
+      <strict-state kind="content">
+        <p class="kicker">Founder application</p>
+        <header class="surface header">
+          <p class="badge">Status: {{ statusLabel(review.application.status) }}</p>
+          <h1>{{ emailLabel(review.tester.email) }}</h1>
+          <dl class="facts">
+            <div>
+              <dt>Waiting since</dt>
+              <dd class="tabular">{{ formatInstant(review.application.pendingAt) }}</dd>
+            </div>
+            <div>
+              <dt>Enrolled</dt>
+              <dd class="tabular">{{ formatInstant(review.application.enrolledAt) }}</dd>
+            </div>
+            <div>
+              <dt>Qualification deadline</dt>
+              <dd class="tabular">{{ formatInstant(review.application.deadlineAt) }}</dd>
+            </div>
+            @if (review.application.expiredAt) {
+              <div>
+                <dt>Expired</dt>
+                <dd class="tabular">{{ formatInstant(review.application.expiredAt) }}</dd>
+              </div>
+            }
+          </dl>
+          <p class="id">Application <span class="tabular">{{ review.application.id }}</span></p>
+        </header>
+
+        <section class="surface" aria-labelledby="qualification">
+          <h2 id="qualification">Qualification</h2>
+          <p class="note">Counts and completion come from the stored submission. This page does not recalculate them.</p>
+          @if (review.qualification; as qualification) {
+            <dl class="facts">
+              <div>
+                <dt>Qualifying workouts</dt>
+                <dd class="tabular">{{ countPair(qualification.qualifyingWorkoutCount, qualification.rules.requiredWorkoutCount) }}</dd>
+              </div>
+              <div>
+                <dt>Distinct workout days</dt>
+                <dd class="tabular">{{ countPair(qualification.distinctWorkoutDayCount, qualification.rules.requiredDistinctDayCount) }}</dd>
+              </div>
+              <div>
+                <dt>Training requirement</dt>
+                <dd>{{ requirementLabel(qualification.trainingRequirementsComplete) }}</dd>
+              </div>
+              <div>
+                <dt>Temporary Pro</dt>
+                <dd>{{ temporaryProLabel(qualification.temporaryProReached) }}</dd>
+              </div>
+            </dl>
+            <h3 id="rules">Rules recorded with this submission</h3>
+            <p class="note">These are the thresholds stored for this application, not Strict’s current settings.</p>
+            <dl class="facts">
+              <div>
+                <dt>Rules profile</dt>
+                <dd>{{ recordedValue(qualification.rules.profile) }}</dd>
+              </div>
+              <div>
+                <dt>Required qualifying workouts</dt>
+                <dd>{{ recordedValue(qualification.rules.requiredWorkoutCount) }}</dd>
+              </div>
+              <div>
+                <dt>Required distinct days</dt>
+                <dd>{{ recordedValue(qualification.rules.requiredDistinctDayCount) }}</dd>
+              </div>
+              <div>
+                <dt>Temporary Pro threshold</dt>
+                <dd>{{ recordedValue(qualification.rules.temporaryProWorkoutCount) }}</dd>
+              </div>
+              <div>
+                <dt>Qualification window</dt>
+                <dd>{{ windowLabel(qualification.rules.qualificationWindowDays) }}</dd>
+              </div>
+            </dl>
+            @if (recordedWindowDiffers(review)) {
+              <dl class="facts">
+                <div>
+                  <dt>Enrollment recorded with this submission</dt>
+                  <dd class="tabular">{{ formatInstant(qualification.rules.enrolledAt) }}</dd>
+                </div>
+                <div>
+                  <dt>Deadline recorded with this submission</dt>
+                  <dd class="tabular">{{ formatInstant(qualification.rules.deadlineAt) }}</dd>
+                </div>
+              </dl>
+            } @else {
+              <p class="note">The enrollment and deadline above are the window stored with this submission.</p>
+            }
+          } @else {
+            <p>No qualification snapshot was stored for this application.</p>
+          }
         </section>
-      }
-      <section class="surface decision" aria-labelledby="decision">
-        <h2 id="decision">Decision</h2>
-        <p>Approval and rejection are not available in this version.</p>
-      </section>
-    </div>
-  </strict-state>
-} @else {
-  <strict-state kind="error">
-    <h1>This address is not a Founder application id</h1>
-    <p>Open an application from the list once review data is connected.</p>
-    <a class="button" routerLink="/founders">Founder applications</a>
-  </strict-state>
+
+        <section class="surface" aria-labelledby="report">
+          <h2 id="report">Tester Report</h2>
+          @if (review.report; as report) {
+            <dl class="facts">
+              <div>
+                <dt>Submitted</dt>
+                <dd class="tabular">{{ formatInstant(report.submittedAt) }}</dd>
+              </div>
+              <div>
+                <dt>App version</dt>
+                <dd>{{ report.appVersion }}</dd>
+              </div>
+              <div>
+                <dt>Platform</dt>
+                <dd>{{ report.platform }}</dd>
+              </div>
+            </dl>
+            <h3 id="feedback">Written feedback</h3>
+            <p class="feedback">{{ report.feedback }}</p>
+          } @else {
+            <p>No Tester Report was submitted.</p>
+          }
+        </section>
+
+        <section class="surface" aria-labelledby="workouts">
+          <h2 id="workouts">Qualifying workouts</h2>
+          @if (review.workouts.length === 0) {
+            <p>No qualifying workouts were recorded.</p>
+          } @else {
+            <ol class="workouts">
+              @for (workout of review.workouts; track workout.clientWorkoutId) {
+                <li class="workout">
+                  <h3>{{ workout.displayName || 'Untitled workout' }}</h3>
+                  <dl class="facts">
+                    <div>
+                      <dt>Local date</dt>
+                      <dd class="tabular">{{ formatLocalDate(workout.localDate) }}</dd>
+                    </div>
+                    <div>
+                      <dt>Completed</dt>
+                      <dd class="tabular">{{ formatInstant(workout.completedAt) }}</dd>
+                    </div>
+                    <div>
+                      <dt>Duration</dt>
+                      <dd>{{ formatDuration(workout.durationSeconds) || unavailable }}</dd>
+                    </div>
+                    <div>
+                      <dt>Exercises</dt>
+                      <dd>{{ workout.exerciseCount == null ? unavailable : workout.exerciseCount }}</dd>
+                    </div>
+                    <div>
+                      <dt>Completed sets</dt>
+                      <dd>{{ workout.completedSetCount == null ? unavailable : workout.completedSetCount }}</dd>
+                    </div>
+                    <div>
+                      <dt>Template</dt>
+                      <dd>{{ yesNo(workout.fromTemplate, 'From a template', 'Not from a template') }}</dd>
+                    </div>
+                    <div>
+                      <dt>External load</dt>
+                      <dd>{{ yesNo(workout.usedExternalLoad, 'External load used', 'No external load') }}</dd>
+                    </div>
+                  </dl>
+                  <p class="reference">Reference <span class="tabular">{{ workout.clientWorkoutId }}</span></p>
+                </li>
+              }
+            </ol>
+          }
+        </section>
+
+        <section class="surface decision" aria-labelledby="decision">
+          <h2 id="decision">Decision</h2>
+          @if (review.decision; as decision) {
+            <p class="badge">Decision: {{ decisionLabel(decision.decision) }}</p>
+            <dl class="facts">
+              <div>
+                <dt>Decided</dt>
+                <dd class="tabular">{{ formatInstant(decision.decidedAt) }}</dd>
+              </div>
+              @if (decision.reason) {
+                <div>
+                  <dt>Reason</dt>
+                  <dd class="feedback">{{ decision.reason }}</dd>
+                </div>
+              }
+            </dl>
+          } @else if (review.application.status === 'PENDING_APPROVAL') {
+            <p>Awaiting review.</p>
+          } @else {
+            <p>No review decision was recorded.</p>
+          }
+
+          @if (actionError() && editor() === null) {
+            <p class="action-error" role="alert">{{ actionError() }}</p>
+          }
+
+          @if (review.application.status === 'PENDING_APPROVAL' && editor() === null && !deciding()) {
+            <div class="actions">
+              <button type="button" class="button primary" (click)="openApprove()">Approve</button>
+              <button type="button" class="button caution" (click)="openReject()">Reject</button>
+            </div>
+          }
+
+          @if (editor() === 'approve') {
+            <div
+              #approveDialog
+              class="dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="approve-title"
+              tabindex="-1"
+              [attr.aria-busy]="deciding()"
+              (keydown.escape)="cancelEditor($event)"
+            >
+              <h3 id="approve-title">Approve this Founding Tester?</h3>
+              <p>Approval grants this tester permanent Founder Lifetime access.</p>
+              @if (actionError(); as message) {
+                <p class="action-error" role="alert">{{ message }}</p>
+              }
+              <div class="actions">
+                <button type="button" class="button" (click)="cancelEditor()" [disabled]="deciding()">Cancel</button>
+                <button type="button" class="button primary" (click)="confirmApprove()" [disabled]="deciding()">
+                  {{ deciding() ? 'Approving…' : 'Approve' }}
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (editor() === 'reject') {
+            <div
+              #rejectDialog
+              class="dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reject-title"
+              tabindex="-1"
+              [attr.aria-busy]="deciding()"
+              (keydown.escape)="cancelEditor($event)"
+            >
+              <h3 id="reject-title">Reject this Founding Tester?</h3>
+              <p>Rejection keeps this application closed and does not grant Founder Lifetime.</p>
+              <label for="rejection-reason">Rejection reason</label>
+              <textarea
+                id="rejection-reason"
+                [value]="reason()"
+                (input)="onReasonInput($any($event.target).value)"
+                [attr.aria-invalid]="reasonError() ? 'true' : null"
+                [attr.aria-describedby]="reasonError() ? 'rejection-reason-error' : null"
+                [disabled]="deciding()"
+              ></textarea>
+              @if (reasonError(); as validation) {
+                <p id="rejection-reason-error" class="action-error" role="alert">{{ validation }}</p>
+              }
+              @if (actionError(); as message) {
+                <p class="action-error" role="alert">{{ message }}</p>
+              }
+              <div class="actions">
+                <button type="button" class="button" (click)="cancelEditor()" [disabled]="deciding()">Cancel</button>
+                <button type="button" class="button caution" (click)="confirmReject()" [disabled]="deciding()">
+                  {{ deciding() ? 'Rejecting…' : 'Reject application' }}
+                </button>
+              </div>
+            </div>
+          }
+        </section>
+
+        <a class="button" routerLink="/founders">Founder applications</a>
+      </strict-state>
+    }
+  }
 }

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +23,11 @@ public class AdminSessionController {
     public AdminSessionController(AdminSessionService sessions, AdminSessionCookies cookies) {
         this.sessions = sessions;
         this.cookies = cookies;
+    }
+
+    @GetMapping
+    public AdminSessionView current() {
+        return sessions.current(AdminRequests.current());
     }
 
     @PostMapping

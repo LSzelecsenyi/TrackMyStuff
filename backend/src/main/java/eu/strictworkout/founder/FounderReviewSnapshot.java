@@ -143,6 +143,26 @@ public class FounderReviewSnapshot {
         return feedbackText;
     }
 
+    public String getRulesProfile() {
+        return rulesProfile;
+    }
+
+    public Integer getTemporaryProWorkoutCount() {
+        return temporaryProWorkoutCount;
+    }
+
+    public Integer getRequiredWorkoutCount() {
+        return requiredWorkoutCount;
+    }
+
+    public Integer getRequiredDistinctDayCount() {
+        return requiredDistinctDayCount;
+    }
+
+    public Integer getQualificationWindowDays() {
+        return qualificationWindowDays;
+    }
+
     public UUID getClientSubmissionId() {
         return clientSubmissionId;
     }

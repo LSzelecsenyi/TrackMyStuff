@@ -78,7 +78,7 @@ fun SeriesChart(
     val markerInner = MaterialTheme.colorScheme.background
     val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (subdued) 0.55f else 1f)
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val selectedColor = MaterialTheme.colorScheme.tertiary
+    val selectedHalo = MaterialTheme.colorScheme.surface
     val textMeasurer = rememberTextMeasurer()
     var selectedDate by rememberSaveable { mutableStateOf<String?>(null) }
     val lineWidth = if (subdued) 2.dp else 3.dp
@@ -188,9 +188,16 @@ fun SeriesChart(
             }
             layout.mapped.forEach { point ->
                 val selected = point.point.date.toString() == selectedDate
+                if (selected) {
+                    drawCircle(
+                        color = selectedHalo,
+                        radius = 11.dp.toPx(),
+                        center = point.offset
+                    )
+                }
                 drawCircle(
-                    color = if (selected) selectedColor else markerColor,
-                    radius = if (selected) 7.dp.toPx() else 5.dp.toPx(),
+                    color = if (selected) lineColor else markerColor,
+                    radius = if (selected) 7.5.dp.toPx() else 5.dp.toPx(),
                     center = point.offset
                 )
                 drawCircle(

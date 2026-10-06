@@ -1,0 +1,24 @@
+<main class="login">
+  <section class="login-card" aria-labelledby="admin-login-title">
+    <strict-mark [decorative]="false" />
+    <p class="kicker">Strict Admin</p>
+    <h1 id="admin-login-title">Restricted access</h1>
+    <p>
+      Strict Admin is only for approved operators. Sign in with Google. A Strict member account is not admin access.
+    </p>
+    @if (auth.phase() === 'signingIn') {
+      <p role="status">Signing in…</p>
+    }
+    @if (auth.errorMessage(); as message) {
+      <p class="login-error" role="alert">{{ message }}</p>
+    }
+    <button
+      type="button"
+      class="button button-primary"
+      (click)="signIn()"
+      [disabled]="auth.phase() === 'signingIn'"
+    >
+      Sign in with Google
+    </button>
+  </section>
+</main>

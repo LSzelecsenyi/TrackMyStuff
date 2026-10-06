@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -76,6 +77,7 @@ import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.exercises.labelRes
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.StrictStatus
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.Instant
@@ -661,7 +663,7 @@ private fun WorkoutJournalRow(
                 ),
                 style = AppTypeTokens.statCaption,
                 color = if (entry.abandoned) {
-                    MaterialTheme.colorScheme.tertiary
+                    StrictStatus.abandoned(MaterialTheme.colorScheme.background.luminance() < 0.5f)
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 }

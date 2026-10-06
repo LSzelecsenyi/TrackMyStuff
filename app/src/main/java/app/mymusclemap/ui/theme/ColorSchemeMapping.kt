@@ -40,7 +40,7 @@ fun DerivedColorScheme.toComposeColorScheme(isDark: Boolean): ColorScheme {
             inverseOnSurface = color(surface),
             inversePrimary = color(primaryContainer),
             scrim = Color.Black,
-            surfaceTint = color(primary)
+            surfaceTint = color(surfaceTint)
         )
     } else {
         lightColorScheme(
@@ -62,6 +62,8 @@ fun DerivedColorScheme.toComposeColorScheme(isDark: Boolean): ColorScheme {
             onSurface = color(onSurface),
             surfaceVariant = color(surfaceVariant),
             onSurfaceVariant = color(onSurfaceVariant),
+            surfaceContainerLowest = color(background),
+            surfaceContainerLow = color(surface),
             surfaceContainer = color(surfaceContainer),
             surfaceContainerHigh = color(surfaceContainerHigh),
             outline = color(outline),
@@ -74,7 +76,7 @@ fun DerivedColorScheme.toComposeColorScheme(isDark: Boolean): ColorScheme {
             inverseOnSurface = color(surface),
             inversePrimary = color(primaryContainer),
             scrim = Color.Black,
-            surfaceTint = color(primary)
+            surfaceTint = color(surfaceTint)
         )
     }
 }

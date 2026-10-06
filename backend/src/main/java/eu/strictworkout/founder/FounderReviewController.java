@@ -25,22 +25,22 @@ public class FounderReviewController {
     }
 
     @GetMapping
-    public List<FounderReviewView> pending() {
+    public List<FounderReviewSummary> pending() {
         return reviews.pending();
     }
 
     @GetMapping("/{id}")
-    public FounderReviewView get(@PathVariable UUID id) {
+    public FounderReviewDetail get(@PathVariable UUID id) {
         return reviews.get(id);
     }
 
     @PostMapping("/{id}/approval")
-    public FounderReviewView approve(@PathVariable UUID id) {
+    public FounderReviewDetail approve(@PathVariable UUID id) {
         return reviews.approve(AdminRequests.current().adminId(), id);
     }
 
     @PostMapping("/{id}/rejection")
-    public FounderReviewView reject(@PathVariable UUID id, @Valid @RequestBody RejectionRequest request) {
+    public FounderReviewDetail reject(@PathVariable UUID id, @Valid @RequestBody RejectionRequest request) {
         return reviews.reject(AdminRequests.current().adminId(), id, request.reason());
     }
 

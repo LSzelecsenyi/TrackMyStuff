@@ -136,7 +136,6 @@ import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.nio.charset.StandardCharsets
 import java.time.LocalDate
 
 private const val ARG_EXERCISE_ID = "exerciseId"
@@ -633,6 +632,10 @@ fun WeightTrackerNavHost(
                 )
             }
             composable(AppRoutes.FOUNDER_PROGRAM) {
+                val program = founderViewModel
+                LaunchedEffect(program) {
+                    program?.refreshFromBackend()
+                }
                 app.mymusclemap.ui.founder.FounderProgramRoute(
                     state = founder,
                     onBack = { navController.popBackStack() },
@@ -640,9 +643,7 @@ fun WeightTrackerNavHost(
                     onResumeSession = { founderViewModel?.resumeSession() },
                     onFeedbackChange = { founderViewModel?.onFeedbackChange(it) },
                     onSubmitReport = { founderViewModel?.submitTesterReport() },
-                    onAcknowledgeMilestone = { founderViewModel?.acknowledgeMilestone() },
-                    onApprove = { founderViewModel?.approve() },
-                    onReject = { founderViewModel?.reject(it) }
+                    onAcknowledgeMilestone = { founderViewModel?.acknowledgeMilestone() }
                 )
             }
             composable(AppRoutes.HEALTH_CONNECT) {
@@ -1353,41 +1354,6 @@ private fun SettingsRoute(
     val context = LocalContext.current
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
-    val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val csv = viewModel.buildExportCsv()
-            val success = withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        stream.write(csv.toByteArray(StandardCharsets.UTF_8))
-                    } ?: error("missing stream")
-                }.isSuccess
-            }
-            viewModel.onExportFinished(success)
-        }
-    }
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val content = withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        stream.readBytes().toString(StandardCharsets.UTF_8)
-                    }
-                }.getOrNull()
-            }
-            if (content == null) {
-                viewModel.onImportReadFailed()
-            } else {
-                viewModel.importCsv(content)
-            }
-        }
-    }
     val appBackupExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri: Uri? ->
@@ -1470,20 +1436,10 @@ private fun SettingsRoute(
         onSaveDraft = viewModel::saveDraft,
         onCancelDraft = viewModel::cancelDraft,
         onResetCustomDraft = viewModel::resetCustomDraft,
-        onExportClick = {
-            exportLauncher.launch("my_muscle_map_weight_${today}.csv")
-        },
-        onImportClick = viewModel::onImportClicked,
         onAppBackupExportClick = {
             appBackupExportLauncher.launch("strict-backup-$today.zip")
         },
         onRestoreClick = viewModel::onRestoreClicked,
-        onConfirmImportExplanation = {
-            viewModel.confirmImportExplanation()
-            importLauncher.launch(arrayOf("text/*", "text/csv", "text/comma-separated-values"))
-        },
-        onDismissImportExplanation = viewModel::dismissImportExplanation,
-        onDismissImportErrors = viewModel::dismissImportErrors,
         onConfirmRestoreExplanation = {
             viewModel.confirmRestoreExplanation()
             appBackupImportLauncher.launch(

@@ -1,0 +1,4 @@
+.boot {
+  width: min(var(--strict-content), calc(100% - 40px));
+  margin: var(--strict-space-section) auto;
+}

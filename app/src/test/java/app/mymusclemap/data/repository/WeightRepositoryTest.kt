@@ -1,7 +1,6 @@
 package app.mymusclemap.data.repository
 
 import app.mymusclemap.FakeWeightMeasurementDao
-import app.mymusclemap.domain.csv.WeightCsv
 import app.mymusclemap.domain.model.SaveOutcome
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -33,24 +32,5 @@ class WeightRepositoryTest {
         assertEquals(original.createdAt, updated.createdAt)
         assertEquals(81.5, updated.weightKg, 0.0)
         assertEquals(clock.millis(), updated.updatedAt)
-    }
-
-    @Test
-    fun csvImportUpdatesExistingDatesAfterSuccessfulValidation() = runTest {
-        val dao = FakeWeightMeasurementDao()
-        val repository = WeightRepository(dao, clock)
-        val date = LocalDate.of(2026, 3, 1)
-        repository.save(date, 80.0)
-        val summary = repository.importRows(
-            listOf(
-                WeightCsv.ParsedRow(date, 82.0, 2),
-                WeightCsv.ParsedRow(LocalDate.of(2026, 3, 2), 83.0, 3)
-            )
-        )
-        val stored = repository.observeAll().first()
-        assertEquals(1, summary.createdCount)
-        assertEquals(1, summary.updatedCount)
-        assertEquals(2, stored.size)
-        assertEquals(82.0, stored.first { it.date == date }.weightKg, 0.0)
     }
 }

@@ -28,6 +28,7 @@ import app.mymusclemap.ui.founder.FounderMilestone
 import app.mymusclemap.ui.founder.FounderNextAction
 import app.mymusclemap.ui.founder.FounderProgramUiState
 import app.mymusclemap.ui.founder.FounderProgramViewModel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -227,10 +228,17 @@ class FounderProgramRuntimeTest {
         assertEquals(FounderProgramStatus.Expired, coordinator.currentState().status)
 
         resetProgram()
-        completeQualification()
-        coordinator.reject("   ")
-        assertEquals(FounderProgramStatus.PendingApproval, coordinator.currentState().status)
-        coordinator.reject("Spam feedback")
+        coordinator.applyBackendEnrollment(
+            BackendFounderSnapshot(
+                status = FounderProgramStatus.Rejected,
+                enrolledOn = today,
+                deadline = today.plusDays(45),
+                qualifyingWorkouts = 2,
+                distinctWorkoutDays = 1,
+                feedbackSubmitted = true,
+                reportSubmitted = true
+            )
+        )
         assertEquals(FounderProgramStatus.Rejected, coordinator.currentState().status)
         assertFalse(composer.resolve().temporaryTesterPro)
         assertEquals(EntitlementTier.Free, composer.resolve().tier)
@@ -242,8 +250,8 @@ class FounderProgramRuntimeTest {
 
     @Test
     fun approvedStateReloadsAndBackupTablesDoNotCarryIt() = runTest {
-        completeQualification()
-        coordinator.approve()
+        coordinator.applyBackendEnrollment(approvedSnapshot())
+        store.saveFeedbackText("The rest timer should stay visible.")
         assertEquals(FounderProgramStatus.Approved, coordinator.currentState().status)
         assertFalse(composer.resolve().founderLifetime)
         assertEquals(EntitlementTier.Free, composer.resolve().tier)
@@ -392,9 +400,14 @@ class FounderProgramRuntimeTest {
 
     @Test
     fun approvedMilestoneShowsOnceAndLosingItCannotRemoveLifetimePro() = runTest {
-        completeQualification()
-        coordinator.approve()
+        coordinator.applyBackendEnrollment(approvedSnapshot())
+        backendEntitlement = BackendFounderEntitlement(
+            founderLifetime = true,
+            validUntil = Instant.parse("2026-10-04T12:00:00Z")
+        )
         val before = composer.resolve()
+        assertTrue(before.founderLifetime)
+        assertFalse(before.temporaryTesterPro)
         val viewModel = founderViewModel()
         val shown = ready(viewModel)
         assertEquals(FounderJourneyPhase.FoundingMember, shown.journey.phase)
@@ -410,7 +423,7 @@ class FounderProgramRuntimeTest {
         acknowledgements.save(FounderMilestoneAcknowledgements())
         assertEquals(FounderMilestone.FounderApproved, ready(founderViewModel()).journey.milestone)
         assertEquals(before, composer.resolve())
-        assertFalse(before.founderLifetime)
+        assertTrue(before.founderLifetime)
         assertEquals(FounderProgramStatus.Approved, store.load().status)
     }
 
@@ -547,6 +560,106 @@ class FounderProgramRuntimeTest {
         assertNull(rejected.journey.milestone)
     }
 
+    @Test
+    fun openingTheFounderScreenRefreshesAPendingApplicationFromTheBackend() = runTest {
+        coordinator.applyBackendEnrollment(pendingSnapshot())
+        var refreshes = 0
+        val viewModel = founderViewModel(
+            refresh = {
+                refreshes += 1
+                coordinator.applyBackendEnrollment(pendingSnapshot())
+            }
+        )
+        ready(viewModel)
+        assertEquals(FounderJourneyPhase.PendingReview, viewModel.uiState.value.journey.phase)
+        viewModel.refreshFromBackend()
+        viewModel.uiState.first { refreshes == 1 && it.status == FounderProgramStatus.PendingApproval }
+        assertEquals(FounderJourneyPhase.PendingReview, viewModel.uiState.value.journey.phase)
+        assertFalse(viewModel.uiState.value.journey.milestone == FounderMilestone.FounderApproved)
+        assertFalse(composer.resolve().founderLifetime)
+    }
+
+    @Test
+    fun aBackendApprovalUpdatesTheRunningAppAndShowsTheFounderMilestoneOnce() = runTest {
+        coordinator.applyBackendEnrollment(pendingSnapshot())
+        val viewModel = founderViewModel(
+            refresh = {
+                coordinator.applyBackendEnrollment(approvedSnapshot())
+                backendEntitlement = BackendFounderEntitlement(
+                    founderLifetime = true,
+                    temporaryFounderPro = false,
+                    validUntil = Instant.parse("2026-10-04T12:00:00Z")
+                )
+            }
+        )
+        val pending = ready(viewModel)
+        assertEquals(FounderProgramStatus.PendingApproval, pending.status)
+        viewModel.refreshFromBackend()
+        val approved = viewModel.uiState.first { it.status == FounderProgramStatus.Approved }
+        assertEquals(FounderJourneyPhase.FoundingMember, approved.journey.phase)
+        assertEquals(FounderMilestone.FounderApproved, approved.journey.milestone)
+        val entitlement = composer.resolve()
+        assertTrue(entitlement.founderLifetime)
+        assertFalse(entitlement.temporaryTesterPro)
+        assertEquals(EntitlementTier.Pro, entitlement.tier)
+        viewModel.acknowledgeMilestone()
+        val steady = viewModel.uiState.first { it.journey.milestone == null }
+        assertEquals(FounderJourneyPhase.FoundingMember, steady.journey.phase)
+        assertEquals(composer.resolve(), entitlement)
+        assertNull(ready(founderViewModel()).journey.milestone)
+    }
+
+    @Test
+    fun aFailedAuthorityRefreshKeepsThePendingApplication() = runTest {
+        coordinator.applyBackendEnrollment(pendingSnapshot())
+        val finished = CompletableDeferred<Unit>()
+        val viewModel = founderViewModel(
+            refresh = {
+                try {
+                    error("offline")
+                } finally {
+                    finished.complete(Unit)
+                }
+            }
+        )
+        val before = ready(viewModel)
+        viewModel.refreshFromBackend()
+        finished.await()
+        assertEquals(before.status, coordinator.currentState().status)
+        assertEquals(FounderJourneyPhase.PendingReview, viewModel.uiState.value.journey.phase)
+        assertFalse(composer.resolve().founderLifetime)
+    }
+
+    @Test
+    fun anInFlightAuthorityRefreshIgnoresASecondCall() = runTest {
+        coordinator.applyBackendEnrollment(pendingSnapshot())
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        var calls = 0
+        val viewModel = founderViewModel(
+            refresh = {
+                calls += 1
+                if (calls == 1) {
+                    entered.complete(Unit)
+                    release.await()
+                } else {
+                    second.complete(Unit)
+                }
+            }
+        )
+        ready(viewModel)
+        viewModel.refreshFromBackend()
+        entered.await()
+        viewModel.refreshFromBackend()
+        assertEquals(1, calls)
+        release.complete(Unit)
+        assertEquals(1, calls)
+        viewModel.refreshFromBackend()
+        second.await()
+        assertEquals(2, calls)
+    }
+
     private fun trainingSnapshot(): BackendFounderSnapshot {
         return BackendFounderSnapshot(
             status = FounderProgramStatus.ActivePro,
@@ -572,7 +685,15 @@ class FounderProgramRuntimeTest {
         )
     }
 
+    private fun approvedSnapshot(): BackendFounderSnapshot {
+        return pendingSnapshot().copy(
+            status = FounderProgramStatus.Approved,
+            temporaryProActive = false
+        )
+    }
+
     private fun founderViewModel(
+        refresh: suspend () -> Unit = {},
         submit: suspend (String, String, String) -> FounderReportSubmission = { _, _, _ ->
             FounderReportSubmission.Unavailable
         }
@@ -582,7 +703,8 @@ class FounderProgramRuntimeTest {
             rules = rules,
             versionName = "0.1.0-debug",
             milestoneAcknowledgements = acknowledgements,
-            submitReport = submit
+            submitReport = submit,
+            refreshAuthority = refresh
         )
     }
 
@@ -615,7 +737,7 @@ class FounderProgramRuntimeTest {
     }
 
     @Test
-    fun backendEnrollmentSurvivesLocalRefreshAndDebugApproval() = runTest {
+    fun backendEnrollmentSurvivesLocalRefresh() = runTest {
         insertWorkout(day = today, status = SessionStatus.COMPLETED)
         coordinator.applyBackendEnrollment(
             BackendFounderSnapshot(
@@ -637,8 +759,7 @@ class FounderProgramRuntimeTest {
         assertEquals(0, coordinator.view.value.qualification.nativeCompletedWorkouts)
         assertFalse(coordinator.recordFeedback("This must stay on the server."))
         coordinator.submitTesterAnalyticsReport()
-        coordinator.approve()
-        coordinator.reject("no")
+        coordinator.refresh()
         assertEquals(FounderProgramStatus.ActiveFree, coordinator.currentState().status)
         assertFalse(coordinator.currentState().feedbackRecorded)
         var joins = 0

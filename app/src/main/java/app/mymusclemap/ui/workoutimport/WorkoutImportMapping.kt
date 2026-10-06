@@ -255,7 +255,7 @@ private fun MappingExerciseRow(exercise: Exercise, onClick: () -> Unit) {
             Text(
                 text = stringResource(R.string.exercise_archived_badge),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.tertiary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

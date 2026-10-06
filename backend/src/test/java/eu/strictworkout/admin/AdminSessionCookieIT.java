@@ -233,6 +233,69 @@ class AdminSessionCookieIT {
     }
 
     @Test
+    void currentSessionRequiresTheAdminCookieAndReturnsOnlyVerifiedEmail() {
+        clock.set(START);
+        ResponseEntity<String> missing = get("/api/v1/admin/session", null, null);
+        assertEquals(HttpStatus.UNAUTHORIZED, missing.getStatusCode());
+
+        String session = sessionOf(login("admin-token", "admin-subject", null));
+        jdbc.update("update admin_user set email = 'ada@example.com', email_verified = true where google_subject = 'admin-subject'");
+        ResponseEntity<String> current = client().get()
+                .uri("/api/v1/admin/session")
+                .header(HttpHeaders.COOKIE, AdminSessionCookies.NAME + "=" + session)
+                .exchange(this::capture);
+        assertEquals(HttpStatus.OK, current.getStatusCode(), current.getBody());
+        assertEquals("ada@example.com", parse(current).get("email"));
+        assertFalse(current.getBody().contains(session));
+        assertFalse(current.getBody().contains("google-sub-123"));
+        assertFalse(current.getBody().contains("accessToken"));
+        assertFalse(current.getBody().contains("tokenHash"));
+        assertNull(parse(current).get("subject"));
+        assertNull(parse(current).get("sessionId"));
+
+        String member = memberToken("member-subject");
+        ResponseEntity<String> bearer = client().get()
+                .uri("/api/v1/admin/session")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + member)
+                .exchange(this::capture);
+        assertEquals(HttpStatus.UNAUTHORIZED, bearer.getStatusCode());
+        assertFalse(bearer.getBody().contains(session));
+
+        jdbc.update("update admin_session set revoked_at = created_at");
+        assertEquals(HttpStatus.UNAUTHORIZED, client().get()
+                .uri("/api/v1/admin/session")
+                .header(HttpHeaders.COOKIE, AdminSessionCookies.NAME + "=" + session)
+                .exchange(this::capture)
+                .getStatusCode());
+
+        jdbc.update("update admin_session set revoked_at = null");
+        clock.set(START.plusSeconds(7201));
+        assertEquals(HttpStatus.UNAUTHORIZED, client().get()
+                .uri("/api/v1/admin/session")
+                .header(HttpHeaders.COOKIE, AdminSessionCookies.NAME + "=" + session)
+                .exchange(this::capture)
+                .getStatusCode());
+    }
+
+    @Test
+    void currentSessionOmitsAnUnverifiedEmail() {
+        clock.set(START);
+        String session = sessionOf(login("hidden-token", "admin-subject", null));
+        jdbc.update("update admin_user set email = 'hidden@example.com', email_verified = false where google_subject = 'admin-subject'");
+        ResponseEntity<String> current = client().get()
+                .uri("/api/v1/admin/session")
+                .header(HttpHeaders.COOKIE, AdminSessionCookies.NAME + "=" + session)
+                .exchange(this::capture);
+        assertEquals(HttpStatus.OK, current.getStatusCode(), current.getBody());
+        // BasicJsonParser turns a JSON null into the string "null".
+        Object email = parse(current).get("email");
+        assertTrue(email == null || "null".equals(email));
+        assertFalse(current.getBody().contains("hidden@example.com"));
+        assertFalse(current.getBody().contains("hidden-subject"));
+        assertFalse(current.getBody().contains(session));
+    }
+
+    @Test
     void logoutRevokesTheServerSessionAndClearsTheCookie() {
         clock.set(START);
         String csrf = csrfValue();
@@ -297,7 +360,17 @@ class AdminSessionCookieIT {
     }
 
     private ResponseEntity<String> login(String idToken, String subject, String presentedSession) {
-        identities.accept(idToken, subject, subject + "@example.com", true);
+        return login(idToken, subject, subject + "@example.com", true, presentedSession);
+    }
+
+    private ResponseEntity<String> login(
+            String idToken,
+            String subject,
+            String email,
+            boolean emailVerified,
+            String presentedSession
+    ) {
+        identities.accept(idToken, subject, email, emailVerified);
         String csrf = csrfValue();
         return post(
                 "/api/v1/admin/session",

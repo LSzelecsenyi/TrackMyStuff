@@ -1,0 +1,60 @@
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--strict-space-item);
+  margin: var(--strict-space-section) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--strict-space-stack);
+  color: inherit;
+  text-decoration: none;
+}
+
+.queue-card:hover {
+  border-color: var(--strict-primary);
+}
+
+.who {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--strict-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--strict-divider);
+  border-radius: 999px;
+  background: var(--strict-surface-secondary);
+  color: var(--strict-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  color: var(--strict-text);
+}
+
+.state-error .button,
+.button {
+  margin-top: var(--strict-space-item);
+}

@@ -150,14 +150,11 @@ class FounderReviewIT {
                 "{\"status\":\"IGNORED\"}",
                 admin
         )));
-        assertEquals("APPROVED", approved.get("status"));
-        assertEquals("lifetime-user@example.com", approved.get("testerEmail"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> snapshot = (Map<String, Object>) approved.get("snapshot");
-        assertCount(2, snapshot.get("qualifyingWorkoutCount"));
-        assertEquals("Ready for review", snapshot.get("feedbackText"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> decision = (Map<String, Object>) approved.get("decision");
+        assertEquals("APPROVED", map(approved, "application").get("status"));
+        assertEquals("lifetime-user@example.com", map(approved, "tester").get("email"));
+        assertCount(2, map(approved, "qualification").get("qualifyingWorkoutCount"));
+        assertEquals("Ready for review", map(approved, "report").get("feedback"));
+        Map<String, Object> decision = map(approved, "decision");
         assertEquals("APPROVED", decision.get("decision"));
         assertEquals("null", String.valueOf(decision.get("reason")));
 
@@ -166,7 +163,7 @@ class FounderReviewIT {
                 "{}",
                 admin
         )));
-        assertEquals("APPROVED", again.get("status"));
+        assertEquals("APPROVED", map(again, "application").get("status"));
         assertEquals(1, grantCount(userId));
         assertEquals(1, decisionCount(applicationId));
 
@@ -202,7 +199,7 @@ class FounderReviewIT {
                 "{\"reason\":\"Not enough detail\"}",
                 admin
         )));
-        assertEquals("REJECTED", rejected.get("status"));
+        assertEquals("REJECTED", map(rejected, "application").get("status"));
         parse(ok(post(
                 "/api/v1/admin/founder/applications/" + applicationId + "/rejection",
                 "{\"reason\":\"Not enough detail\"}",
@@ -554,6 +551,11 @@ class FounderReviewIT {
 
     private static Map<String, Object> parse(ResponseEntity<String> response) {
         return new BasicJsonParser().parseMap(response.getBody());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> map(Map<String, Object> parent, String key) {
+        return (Map<String, Object>) parent.get(key);
     }
 
     @SuppressWarnings("unchecked")

@@ -166799,13 +166799,13 @@
   },
   "settings": {
     "dark_background": "#0C121C",
-    "dark_primary": "#7FA6FF",
+    "dark_primary": "#E2FD6D",
     "dark_secondary": "#1C2D4A",
-    "dark_tertiary": "#FF9A78",
+    "dark_tertiary": "#C5CED6",
     "light_background": "#F4F7FB",
-    "light_primary": "#2457C5",
+    "light_primary": "#1548C6",
     "light_secondary": "#DCE7FA",
-    "light_tertiary": "#E8754F",
+    "light_tertiary": "#5C6770",
     "palette_type": "DEFAULT",
     "theme_preference": "System"
   }

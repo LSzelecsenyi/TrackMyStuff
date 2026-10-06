@@ -6,13 +6,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import app.mymusclemap.FakeWeightMeasurementDao
 import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
-import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.domain.FixedDateProvider
 import app.mymusclemap.domain.workout.PendingWeeklyGoal
 import java.time.Clock
@@ -54,7 +52,6 @@ class WeeklyGoalSettingsViewModelTest {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 return SettingsViewModel(
-                    repository = WeightRepository(FakeWeightMeasurementDao(), clock),
                     themePreferences = themePreferences,
                     dateProvider = FixedDateProvider(today, LocalTime.of(8, 0)),
                     appBackupRepository = AppBackupRepository(database, themePreferences),

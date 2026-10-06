@@ -133,18 +133,17 @@ class FounderProgramTest {
     @Test
     fun approvalCorrespondsToFounderLifetime() {
         val pending = recordTesterInput(enroll(), qualifyingWorkouts(), enrolledOn.plusDays(12))
-        val approved = logic.approve(pending)
-        assertEquals(FounderProgramStatus.Approved, approved.state.status)
+        val approved = pending.copy(status = FounderProgramStatus.Approved)
         val now = Instant.parse("2026-06-01T00:00:00Z")
         val local = EntitlementResolver.resolve(
-            EntitlementSources.of(program = approved.state),
+            EntitlementSources.of(program = approved),
             now
         )
         assertFalse(local.founderLifetime)
         assertEquals(EntitlementTier.Free, local.tier)
         val cached = EntitlementResolver.resolve(
             EntitlementSources.of(
-                program = approved.state,
+                program = approved,
                 backendFounder = BackendFounderEntitlement(
                     founderLifetime = true,
                     validUntil = now.plusSeconds(60)
@@ -154,29 +153,31 @@ class FounderProgramTest {
         )
         assertTrue(cached.founderLifetime)
         assertEquals(EntitlementTier.Pro, cached.tier)
-        assertTrue(logic.approve(enroll()) is FounderProgramResult.Unchanged)
+        assertTrue(logic.refresh(approved, qualifyingWorkouts(), deadline.plusDays(1)) is FounderProgramResult.Unchanged)
     }
 
     @Test
     fun rejectionRemovesTemporaryProUnlessAnotherSourceRemains() {
         val pending = recordTesterInput(enroll(), qualifyingWorkouts(), enrolledOn.plusDays(12))
-        val rejected = logic.reject(pending, "invalid report")
-        assertEquals(FounderProgramStatus.Rejected, rejected.state.status)
-        assertEquals("invalid report", rejected.state.rejectionReason)
+        val rejected = pending.copy(
+            status = FounderProgramStatus.Rejected,
+            rejectionReason = "invalid report"
+        )
         val now = Instant.parse("2026-03-01T00:00:00Z")
         assertEquals(
             EntitlementTier.Free,
-            EntitlementResolver.resolve(EntitlementSources.of(program = rejected.state), now).tier
+            EntitlementResolver.resolve(EntitlementSources.of(program = rejected), now).tier
         )
         val subscribed = EntitlementResolver.resolve(
             EntitlementSources.of(
                 subscription = SubscriptionEntitlement(paidUntilInclusive = now.plusSeconds(3600)),
-                program = rejected.state
+                program = rejected
             ),
             now
         )
         assertEquals(EntitlementTier.Pro, subscribed.tier)
-        assertTrue(logic.reject(pending, "  ") is FounderProgramResult.Unchanged)
+        assertFalse(subscribed.founderLifetime)
+        assertTrue(logic.refresh(rejected, qualifyingWorkouts(), deadline.plusDays(1)) is FounderProgramResult.Unchanged)
     }
 
     @Test

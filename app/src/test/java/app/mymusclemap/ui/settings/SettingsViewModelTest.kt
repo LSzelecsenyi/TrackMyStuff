@@ -7,13 +7,11 @@ import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.BuildConfig
-import app.mymusclemap.FakeWeightMeasurementDao
 import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
-import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.domain.FixedDateProvider
 import app.mymusclemap.domain.theme.HexColor
 import app.mymusclemap.domain.theme.PaletteSaveResult
@@ -70,7 +68,6 @@ class SettingsViewModelTest {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 return SettingsViewModel(
-                    repository = WeightRepository(FakeWeightMeasurementDao(), clock),
                     themePreferences = themePreferences,
                     dateProvider = dateProvider,
                     appBackupRepository = AppBackupRepository(database, themePreferences)
@@ -102,8 +99,8 @@ class SettingsViewModelTest {
         assertEquals("#8A2BE2", HexColor.format(state.draft.lightPreview.primary))
         val persisted = themePreferences.appearance.first { it.paletteType == PaletteType.Custom }
         assertEquals(PaletteType.Custom, persisted.paletteType)
-        assertEquals("#2457C5", persisted.customLight.canonical().primary)
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#1548C6", persisted.customLight.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
     }
 
     @Test
@@ -111,9 +108,9 @@ class SettingsViewModelTest {
         selectCustomAndAwaitDraft()
         viewModel.onDraftFieldChange(SeedField.Primary, "#8A2BE2")
         viewModel.cancelDraft()
-        assertEquals("#2457C5", viewModel.uiState.value.draft!!.lightPrimary)
+        assertEquals("#1548C6", viewModel.uiState.value.draft!!.lightPrimary)
         val persisted = themePreferences.appearance.first { it.paletteType == PaletteType.Custom }
-        assertEquals("#2457C5", persisted.customLight.canonical().primary)
+        assertEquals("#1548C6", persisted.customLight.canonical().primary)
     }
 
     @Test
@@ -138,7 +135,7 @@ class SettingsViewModelTest {
         viewModel.saveDraft()
         assertEquals(PaletteSaveResult.InvalidHex, viewModel.uiState.value.saveError)
         val persisted = themePreferences.appearance.first { it.paletteType == PaletteType.Custom }
-        assertEquals("#2457C5", persisted.customLight.canonical().primary)
+        assertEquals("#1548C6", persisted.customLight.canonical().primary)
     }
 
     @Test
@@ -172,7 +169,6 @@ class SettingsViewModelTest {
     @Test
     fun injectedAboutFieldsAppearInState() = runTest {
         val injected = SettingsViewModel(
-            repository = WeightRepository(FakeWeightMeasurementDao(), clock),
             themePreferences = themePreferences,
             dateProvider = dateProvider,
             appBackupRepository = AppBackupRepository(database, themePreferences),
@@ -185,12 +181,39 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun strictDefaultKeepsStoredCustomColorsAndCustomBringsThemBack() = runTest {
+        selectCustomAndAwaitDraft()
+        viewModel.onDraftFieldChange(SeedField.Primary, "#8A2BE2")
+        viewModel.setEditingDark(true)
+        viewModel.onDraftFieldChange(SeedField.Primary, "#8FB2FF")
+        viewModel.saveDraft()
+        assertNull(viewModel.uiState.value.saveError)
+        themePreferences.appearance.first { it.customLight.canonical().primary == "#8A2BE2" }
+
+        viewModel.setThemeMode(ThemeMode.Dark)
+        themePreferences.appearance.first { it.mode == ThemeMode.Dark }
+        viewModel.selectDefaultPalette()
+        val onDefault = themePreferences.appearance.first { it.paletteType == PaletteType.Default }
+        viewModel.uiState.first { it.appearance.paletteType == PaletteType.Default && it.draft == null }
+        assertEquals(ThemeMode.Dark, onDefault.mode)
+        assertEquals(ThemeSeeds.DefaultDark.canonical(), onDefault.activeSeeds(true).canonical())
+        assertEquals("#8A2BE2", onDefault.customLight.canonical().primary)
+        assertEquals("#8FB2FF", onDefault.customDark.canonical().primary)
+
+        viewModel.selectCustomPalette()
+        val onCustom = themePreferences.appearance.first { it.paletteType == PaletteType.Custom }
+        viewModel.uiState.first { it.appearance.paletteType == PaletteType.Custom && it.draft != null }
+        assertEquals("#8A2BE2", onCustom.activeSeeds(false).canonical().primary)
+        assertEquals("#8FB2FF", onCustom.activeSeeds(true).canonical().primary)
+        assertEquals(ThemeMode.Dark, onCustom.mode)
+    }
+
+    @Test
     fun lockScreenCompletionDefaultsOffAndSurvivesANewStore() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val first = LockScreenSetCompletionPreferences(context)
         first.setEnabled(false)
         val settings = SettingsViewModel(
-            repository = WeightRepository(FakeWeightMeasurementDao(), clock),
             themePreferences = themePreferences,
             dateProvider = dateProvider,
             appBackupRepository = AppBackupRepository(database, themePreferences),

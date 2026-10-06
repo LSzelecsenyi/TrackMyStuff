@@ -10,6 +10,7 @@ import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
 import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.FounderProgramStatus
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -79,7 +80,8 @@ class FounderProgramViewModel(
     private val sessionRevision: Flow<Int> = flowOf(0),
     private val sessionPresent: () -> Boolean = { true },
     private val submitReport: suspend (submissionId: String, feedback: String, appVersion: String) -> FounderReportSubmission =
-        { _, _, _ -> FounderReportSubmission.Unavailable }
+        { _, _, _ -> FounderReportSubmission.Unavailable },
+    private val refreshAuthority: suspend () -> Unit = {}
 ) : ViewModel() {
     private val feedbackDraft = MutableStateFlow("")
     private val feedbackBlank = MutableStateFlow(false)
@@ -87,6 +89,7 @@ class FounderProgramViewModel(
     private val submittingReport = MutableStateFlow(false)
     private val reportSubmitFailed = MutableStateFlow(false)
     private val submissionInFlight = AtomicBoolean(false)
+    private val authorityRefreshInFlight = AtomicBoolean(false)
     private val acknowledgements = MutableStateFlow<FounderMilestoneAcknowledgements?>(null)
     private val joining = MutableStateFlow(false)
     private val joinNotice = MutableStateFlow(FounderJoinNotice.None)
@@ -277,6 +280,27 @@ class FounderProgramViewModel(
         }
     }
 
+    /**
+     * Reloads the backend Founder snapshot and entitlement.
+     * One call runs at a time. A failure leaves the last stored state in place.
+     */
+    fun refreshFromBackend() {
+        if (!authorityRefreshInFlight.compareAndSet(false, true)) {
+            return
+        }
+        viewModelScope.launch {
+            try {
+                refreshAuthority()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Unit
+            } finally {
+                authorityRefreshInFlight.set(false)
+            }
+        }
+    }
+
     fun acknowledgeMilestone() {
         val milestone = uiState.value.journey.milestone ?: return
         val current = acknowledgements.value ?: return
@@ -289,18 +313,6 @@ class FounderProgramViewModel(
             }
             milestoneAcknowledgements.save(updated)
             acknowledgements.value = updated
-        }
-    }
-
-    fun approve() {
-        viewModelScope.launch {
-            coordinator.approve()
-        }
-    }
-
-    fun reject(reason: String) {
-        viewModelScope.launch {
-            coordinator.reject(reason)
         }
     }
 }

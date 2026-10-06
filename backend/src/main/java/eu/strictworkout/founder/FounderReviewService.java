@@ -22,6 +22,7 @@ public class FounderReviewService {
 
     private final FounderApplicationRepository applications;
     private final FounderReviewSnapshotRepository snapshots;
+    private final FounderWorkoutEventRepository events;
     private final FounderReviewDecisionRepository decisions;
     private final EntitlementGrantRepository grants;
     private final AdminUserRepository admins;
@@ -32,6 +33,7 @@ public class FounderReviewService {
     public FounderReviewService(
             FounderApplicationRepository applications,
             FounderReviewSnapshotRepository snapshots,
+            FounderWorkoutEventRepository events,
             FounderReviewDecisionRepository decisions,
             EntitlementGrantRepository grants,
             AdminUserRepository admins,
@@ -41,6 +43,7 @@ public class FounderReviewService {
     ) {
         this.applications = applications;
         this.snapshots = snapshots;
+        this.events = events;
         this.decisions = decisions;
         this.grants = grants;
         this.admins = admins;
@@ -50,22 +53,22 @@ public class FounderReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<FounderReviewView> pending() {
+    public List<FounderReviewSummary> pending() {
         return applications.findByStatusOrderByPendingAtAsc(FounderStatus.PENDING_APPROVAL).stream()
-                .map(this::view)
+                .map(this::summary)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public FounderReviewView get(UUID applicationId) {
-        return view(applications.findById(applicationId).orElseThrow(FounderReviewService::missing));
+    public FounderReviewDetail get(UUID applicationId) {
+        return detail(applications.findById(applicationId).orElseThrow(FounderReviewService::missing));
     }
 
     @Transactional
-    public FounderReviewView approve(UUID adminId, UUID applicationId) {
+    public FounderReviewDetail approve(UUID adminId, UUID applicationId) {
         FounderApplication application = lock(applicationId);
         return switch (FounderReviewRules.approve(application.getStatus())) {
-            case IDEMPOTENT -> view(application);
+            case IDEMPOTENT -> detail(application);
             case CONFLICT -> throw conflict();
             case APPLY -> {
                 Instant now = clock.instant();
@@ -84,13 +87,13 @@ public class FounderReviewService {
                         null,
                         now
                 ));
-                yield view(application);
+                yield detail(application);
             }
         };
     }
 
     @Transactional
-    public FounderReviewView reject(UUID adminId, UUID applicationId, String reason) {
+    public FounderReviewDetail reject(UUID adminId, UUID applicationId, String reason) {
         String trimmed = reason == null ? "" : reason.trim();
         if (trimmed.isEmpty() || trimmed.length() > REASON_MAX_LENGTH) {
             throw new FounderCommandException(
@@ -106,7 +109,7 @@ public class FounderReviewService {
                 existing == null ? "" : existing.getReason(),
                 trimmed
         )) {
-            case IDEMPOTENT -> view(application);
+            case IDEMPOTENT -> detail(application);
             case CONFLICT -> throw conflict();
             case APPLY -> {
                 Instant now = clock.instant();
@@ -119,7 +122,7 @@ public class FounderReviewService {
                         trimmed,
                         now
                 ));
-                yield view(application);
+                yield detail(application);
             }
         };
     }
@@ -128,14 +131,29 @@ public class FounderReviewService {
         return applications.lockById(applicationId).orElseThrow(FounderReviewService::missing);
     }
 
-    private FounderReviewView view(FounderApplication application) {
-        FounderReviewSnapshot snapshot = snapshots.findByApplicationId(application.getId()).orElse(null);
-        FounderReviewDecision decision = decisions.findByApplication_Id(application.getId()).orElse(null);
-        String email = identities.findByUser_IdAndProvider(application.getUserId(), IdentityProvider.GOOGLE)
+    private FounderReviewSummary summary(FounderApplication application) {
+        return FounderReviewSummary.from(
+                application,
+                verifiedEmail(application),
+                snapshots.findByApplicationId(application.getId()).orElse(null)
+        );
+    }
+
+    private FounderReviewDetail detail(FounderApplication application) {
+        return FounderReviewDetail.from(
+                application,
+                verifiedEmail(application),
+                snapshots.findByApplicationId(application.getId()).orElse(null),
+                events.findForReview(application.getId()),
+                decisions.findByApplication_Id(application.getId()).orElse(null)
+        );
+    }
+
+    private String verifiedEmail(FounderApplication application) {
+        return identities.findByUser_IdAndProvider(application.getUserId(), IdentityProvider.GOOGLE)
                 .filter(identity -> identity.isEmailVerified() && identity.getEmail() != null)
                 .map(identity -> identity.getEmail())
                 .orElse(null);
-        return FounderReviewView.from(application, email, snapshot, decision);
     }
 
     private static FounderCommandException missing() {

@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -113,13 +115,13 @@ fun OverviewCalendar(
                     expanded = false
                 },
                 onTodayBounds = onTodayBounds,
-                streakForWeek = { weekStart -> weeklyGoal.weeks[weekStart]?.streak ?: 0 }
+                progressForWeek = { weekStart -> weeklyGoal.progressOn(weekStart) }
             )
         } else {
             WeekCalendarHeader(
                 weekStart = weekStart,
                 isCurrentWeek = weekOffset == 0,
-                streak = weeklyGoal.progressOn(weekStart).streak,
+                progress = weeklyGoal.progressOn(weekStart),
                 onExpand = {
                     if (!WeekCalendar.fitsInMonth(displayedMonth, weekStart)) {
                         onDisplayedMonthChange(WeekCalendar.primaryMonth(weekStart))
@@ -160,10 +162,11 @@ fun OverviewCalendar(
 private fun WeekCalendarHeader(
     weekStart: LocalDate,
     isCurrentWeek: Boolean,
-    streak: Int,
+    progress: WeekProgress,
     onExpand: () -> Unit,
     onReturnToToday: () -> Unit
 ) {
+    val trophy = weekTrophyTreatment(progress, isCurrentWeek)
     val range = UiFormatters.inclusiveDateRange(weekStart, WeekCalendar.end(weekStart))
     val heading = if (isCurrentWeek) {
         stringResource(R.string.calendar_week_heading, range)
@@ -175,9 +178,11 @@ private fun WeekCalendarHeader(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (streak > 0) {
+        if (trophy != WeekTrophyTreatment.Hidden) {
             WeekStreakBadge(
-                streak = streak,
+                streak = progress.streak,
+                pending = trophy == WeekTrophyTreatment.Pending,
+                showCount = trophy == WeekTrophyTreatment.Achieved,
                 modifier = Modifier
                     .padding(end = 8.dp)
                     .testTag("overview-weekly-streak")
@@ -286,17 +291,25 @@ private fun WeekDateRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(WeekCellHeight)
+            .testTag("calendar-week-row")
     ) {
         cells.forEach { cell ->
-            CalendarDayCell(
-                cell = cell,
-                selected = selectedDate == cell.date,
-                enabled = true,
-                onClick = { onDayClick(cell.date) },
-                onTodayBounds = onTodayBounds,
-                cellHeight = WeekCellHeight,
-                modifier = Modifier.weight(1f)
-            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+                    .testTag("calendar-week-day")
+            ) {
+                CalendarDayCell(
+                    cell = cell,
+                    selected = selectedDate == cell.date,
+                    enabled = true,
+                    onClick = { onDayClick(cell.date) },
+                    onTodayBounds = onTodayBounds,
+                    cellHeight = WeekCellHeight,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }

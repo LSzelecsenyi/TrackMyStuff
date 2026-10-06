@@ -18,17 +18,19 @@ data class ThemeSeeds(
     fun detached(): ThemeSeeds = copy()
 
     companion object {
+        // Tertiary remains so stored custom palettes still decode. The default
+        // values are neutral compatibility colors, not a Strict brand accent.
         val DefaultLight = ThemeSeeds(
-            background = parseOrDefault("#F4F7FB"),
-            primary = parseOrDefault("#2457C5"),
+            background = StrictBrandTokens.LIGHT,
+            primary = StrictBrandTokens.BLUE,
             secondary = parseOrDefault("#DCE7FA"),
-            tertiary = parseOrDefault("#E8754F")
+            tertiary = parseOrDefault("#5C6770")
         )
         val DefaultDark = ThemeSeeds(
-            background = parseOrDefault("#0C121C"),
-            primary = parseOrDefault("#7FA6FF"),
+            background = StrictBrandTokens.DARK,
+            primary = StrictBrandTokens.LIME,
             secondary = parseOrDefault("#1C2D4A"),
-            tertiary = parseOrDefault("#FF9A78")
+            tertiary = parseOrDefault("#C5CED6")
         )
 
         fun copyOfFactoryLight(): ThemeSeeds = DefaultLight.detached()
@@ -78,5 +80,13 @@ data class AppearanceSettings(
 enum class ThemeMode {
     System,
     Light,
-    Dark
+    Dark;
+
+    fun isDark(systemInDarkTheme: Boolean): Boolean {
+        return when (this) {
+            System -> systemInDarkTheme
+            Light -> false
+            Dark -> true
+        }
+    }
 }

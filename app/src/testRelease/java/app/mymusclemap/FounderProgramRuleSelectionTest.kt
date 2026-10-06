@@ -9,7 +9,6 @@ class FounderProgramRuleSelectionTest {
     @Test
     fun releaseCompositionUsesProductionRules() {
         assertEquals(FounderProgramRules.Production, FounderProgramRuleSelection.rules)
-        assertEquals(false, FounderDebugReviewAccess.available)
         assertEquals(FounderProgramAvailability.Open, FounderProgramAvailabilitySelection.availability)
     }
 }

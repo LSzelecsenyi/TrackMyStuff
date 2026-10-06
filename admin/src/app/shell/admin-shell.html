@@ -28,11 +28,11 @@
   </header>
   @if (accountOpen()) {
     <section id="admin-account" class="account" aria-label="Account">
-      <p class="account-status">Not signed in</p>
-      <p>
-        Admin access uses its own Google sign-in and admin session. A Strict member token is not an admin token.
-        Sign-in is not connected on this screen.
-      </p>
+      <p class="account-status">{{ auth.account()?.email || 'Signed in' }}</p>
+      <button type="button" class="button" (click)="logout()">Log out</button>
+      @if (auth.errorMessage(); as message) {
+        <p role="alert">{{ message }}</p>
+      }
     </section>
   }
   <main id="main">

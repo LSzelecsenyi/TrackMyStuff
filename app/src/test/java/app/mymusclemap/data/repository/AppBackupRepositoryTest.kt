@@ -33,6 +33,7 @@ import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.MuscleRole
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
+import app.mymusclemap.domain.theme.AppearanceCodec
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.theme.HexColor
 import app.mymusclemap.domain.theme.HexParseResult
@@ -262,6 +263,57 @@ class AppBackupRepositoryTest {
     }
 
     @Test
+    fun importedCustomPaletteSurvivesStrictDefaultAndRoundTrips() = runTest {
+        val historical = historicalBlueCustomAppearance()
+        val json = AppBackupJson.encode(
+            representativeSnapshot().copy(
+                tables = emptyTables(),
+                settings = AppearanceCodec.encode(historical)
+            )
+        )
+        assertEquals(
+            AppBackupRestoreResult.Success,
+            AppBackupRepository(targetDb, themePreferences).restoreJson(json)
+        )
+        val restored = themePreferences.current()
+        assertEquals(ThemeMode.Dark, restored.mode)
+        assertEquals(PaletteType.Custom, restored.paletteType)
+        assertEquals(historical.customLight.canonical(), restored.customLight.canonical())
+        assertEquals(historical.customDark.canonical(), restored.activeSeeds(true).canonical())
+        assertEquals("#7FA6FF", restored.customDark.canonical().primary)
+        assertEquals("#E8754F", restored.customLight.canonical().tertiary)
+        assertEquals("#FF9A78", restored.customDark.canonical().tertiary)
+
+        themePreferences.setPaletteType(PaletteType.Default)
+        val onDefault = themePreferences.current()
+        assertEquals(ThemeMode.Dark, onDefault.mode)
+        assertEquals(PaletteType.Default, onDefault.paletteType)
+        assertEquals(ThemeSeeds.DefaultDark.canonical(), onDefault.activeSeeds(true).canonical())
+        assertEquals("#E2FD6D", onDefault.activeSeeds(true).canonical().primary)
+        assertEquals(historical.customLight.canonical(), onDefault.customLight.canonical())
+        assertEquals(historical.customDark.canonical(), onDefault.customDark.canonical())
+
+        themePreferences.setPaletteType(PaletteType.Custom)
+        val onCustom = themePreferences.current()
+        assertEquals(historical.customDark.canonical(), onCustom.activeSeeds(true).canonical())
+        assertEquals(historical.customLight.canonical(), onCustom.customLight.canonical())
+
+        val exported = AppBackupRepository(targetDb, themePreferences)
+            .exportJson(AppBackupSource("app.mymusclemap.debug", "2.0"))
+        themePreferences.replaceAppearance(AppearanceSettings.Default.copy(mode = ThemeMode.Light))
+        assertEquals(
+            AppBackupRestoreResult.Success,
+            AppBackupRepository(targetDb, themePreferences).restoreJson(exported)
+        )
+        val roundTrip = themePreferences.current()
+        assertEquals(ThemeMode.Dark, roundTrip.mode)
+        assertEquals(PaletteType.Custom, roundTrip.paletteType)
+        assertEquals(historical.customLight.canonical(), roundTrip.customLight.canonical())
+        assertEquals(historical.customDark.canonical(), roundTrip.customDark.canonical())
+        assertEquals("#7FA6FF", roundTrip.activeSeeds(true).canonical().primary)
+    }
+
+    @Test
     fun schema6BackupRestoresScheduledRowsByHydratingTemplateNames() = runTest {
         val json = schema6ScheduledBackup(representativeSnapshot())
         val parsed = AppBackupJson.parse(json) as AppBackupParseResult.Success
@@ -376,6 +428,26 @@ private fun schema6ScheduledBackup(snapshot: AppBackupSnapshot): String {
     }
     tables.put(AppBackupFormat.TABLE_SCHEDULED_WORKOUTS, schema6Rows)
     return root.toString()
+}
+
+private fun historicalBlueCustomAppearance(): AppearanceSettings {
+    fun rgb(hex: String): Int = (HexColor.parse(hex) as HexParseResult.Valid).rgb
+    return AppearanceSettings(
+        mode = ThemeMode.Dark,
+        paletteType = PaletteType.Custom,
+        customLight = ThemeSeeds(
+            background = rgb("#F4F7FB"),
+            primary = rgb("#2457C5"),
+            secondary = rgb("#DCE7FA"),
+            tertiary = rgb("#E8754F")
+        ),
+        customDark = ThemeSeeds(
+            background = rgb("#0C121C"),
+            primary = rgb("#7FA6FF"),
+            secondary = rgb("#1C2D4A"),
+            tertiary = rgb("#FF9A78")
+        )
+    )
 }
 
 private fun customAppearance(): AppearanceSettings {

@@ -11,8 +11,12 @@ public final class FounderStateMachine {
 
     public FounderEvaluation evaluate(FounderFacts facts, FounderRules rules, Instant now) {
         Count count = count(facts.workouts());
-        boolean trainingComplete = count.workouts >= rules.founderWorkoutCount()
-                && count.days >= rules.requiredDistinctWorkoutDays();
+        boolean trainingComplete = trainingRequirementsMet(
+                count.workouts,
+                count.days,
+                rules.founderWorkoutCount(),
+                rules.requiredDistinctWorkoutDays()
+        );
         boolean feedbackMet = !rules.feedbackRequired() || facts.feedbackSubmitted();
         boolean reportMet = !rules.testerAnalyticsReportRequired() || facts.reportSubmitted();
         boolean qualified = trainingComplete && feedbackMet && reportMet;
@@ -48,7 +52,7 @@ public final class FounderStateMachine {
                 if (now.isAfter(facts.deadlineAt())) {
                     yield FounderStatus.EXPIRED;
                 }
-                if (workouts >= rules.temporaryProWorkoutCount()) {
+                if (temporaryProMet(workouts, rules.temporaryProWorkoutCount())) {
                     yield FounderStatus.ACTIVE_PRO;
                 }
                 yield FounderStatus.ACTIVE_FREE;
@@ -92,6 +96,37 @@ public final class FounderStateMachine {
             return FounderNextAction.WAIT_FOR_REVIEW;
         }
         return FounderNextAction.COMPLETE_WORKOUTS;
+    }
+
+    /**
+     * The same comparisons used while an application is open, applied to counts and thresholds
+     * already stored on a review snapshot. Missing historical thresholds stay unknown.
+     */
+    static Boolean recordedTrainingComplete(
+            int qualifyingWorkouts,
+            int distinctWorkoutDays,
+            Integer requiredWorkouts,
+            Integer requiredDistinctDays
+    ) {
+        if (requiredWorkouts == null || requiredDistinctDays == null) {
+            return null;
+        }
+        return trainingRequirementsMet(qualifyingWorkouts, distinctWorkoutDays, requiredWorkouts, requiredDistinctDays);
+    }
+
+    static Boolean recordedTemporaryPro(int qualifyingWorkouts, Integer temporaryProWorkoutCount) {
+        if (temporaryProWorkoutCount == null) {
+            return null;
+        }
+        return temporaryProMet(qualifyingWorkouts, temporaryProWorkoutCount);
+    }
+
+    private static boolean trainingRequirementsMet(int workouts, int days, int requiredWorkouts, int requiredDays) {
+        return workouts >= requiredWorkouts && days >= requiredDays;
+    }
+
+    private static boolean temporaryProMet(int workouts, int temporaryProWorkoutCount) {
+        return workouts >= temporaryProWorkoutCount;
     }
 
     private static Count count(List<FounderWorkoutFact> workouts) {

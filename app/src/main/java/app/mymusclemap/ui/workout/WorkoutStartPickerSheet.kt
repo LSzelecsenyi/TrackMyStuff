@@ -42,6 +42,7 @@ import app.mymusclemap.R
 import app.mymusclemap.domain.workout.ScheduledWorkout
 import app.mymusclemap.domain.workout.TemplateListItem
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.sheetContainerColor
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 
@@ -83,7 +84,7 @@ fun WorkoutStartPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = sheetContainerColor(),
         tonalElevation = 0.dp,
         dragHandle = { CompactSheetHandle() },
         modifier = Modifier.testTag(START_PICKER_SHEET)

@@ -106,6 +106,7 @@ import app.mymusclemap.ui.templates.labelRes
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 import app.mymusclemap.ui.theme.WorkoutColors
 internal const val WORKOUT_HEADER_KEY = "workout-header"
 internal const val WORKOUT_FINISH_KEY = "workout-finish"
@@ -347,6 +348,7 @@ fun ActiveWorkoutScreen(
                         onClick = onRequestFinish,
                         enabled = !state.discarding && !state.finishing,
                         shape = AppShapeTokens.button,
+                        colors = StrictBrand.actionButtonColors(),
                         modifier = finishModifier
                     ) {
                         Text(stringResource(R.string.action_finish_workout))
@@ -882,6 +884,7 @@ private fun SetRow(
     )
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val currentGreen = WorkoutColors.accent(MaterialTheme.colorScheme.background.luminance())
+    val currentEmphasis = if (dark) StrictBrand.lime else currentGreen
     val glow = if (dark) Color(0x2281C784) else Color(0x182E7D32)
     val showFields = set.status != SessionSetStatus.SKIPPED &&
         (set.status == SessionSetStatus.PENDING || editing)
@@ -899,7 +902,11 @@ private fun SetRow(
                             ambientColor = glow,
                             spotColor = glow
                         )
-                        .border(AppDimens.strokeThin, currentGreen, AppShapeTokens.compact)
+                        .border(
+                            AppDimens.strokeThin,
+                            if (dark) StrictBrand.lime else StrictBrand.blue,
+                            AppShapeTokens.compact
+                        )
                         .clip(AppShapeTokens.compact)
                 } else {
                     Modifier
@@ -934,7 +941,7 @@ private fun SetRow(
                         .width(3.dp)
                         .height(28.dp)
                         .clip(AppShapeTokens.compact)
-                        .background(currentGreen)
+                        .background(currentEmphasis)
                 )
             }
             Text(
@@ -977,12 +984,12 @@ private fun SetRow(
                         Text(
                             text = currentBadge,
                             style = AppTypeTokens.statSecondary,
-                            color = currentGreen,
+                            color = currentEmphasis,
                             maxLines = 1
                         )
                     }
                     set.status == SessionSetStatus.COMPLETED -> {
-                        CompletedSetIndicator(accent = currentGreen)
+                        CompletedSetIndicator(accent = StrictBrand.lime)
                     }
                     set.status == SessionSetStatus.SKIPPED -> {
                         SkippedSetIndicator()
@@ -1039,7 +1046,7 @@ private fun SetRow(
                         )
                         CompleteSetAction(
                             completing = completing,
-                            accent = currentGreen,
+                            accent = StrictBrand.lime,
                             traversalIndex = 6f,
                             onClick = onComplete
                         )
@@ -1100,17 +1107,17 @@ private fun RepsStepButton(
     onClick: () -> Unit
 ) {
     val stroke = if (enabled) {
-        MaterialTheme.colorScheme.primary
+        StrictBrand.blue
     } else {
         MaterialTheme.colorScheme.outline
     }
     val glyph = if (enabled) {
-        MaterialTheme.colorScheme.primary
+        StrictBrand.blue
     } else {
         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
     }
     val fill = if (enabled) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        StrictBrand.blue.copy(alpha = 0.08f)
     } else {
         Color.Transparent
     }
@@ -1166,6 +1173,7 @@ private fun CompleteSetAction(
         Box(
             modifier = Modifier
                 .size(SetActionCircleSize)
+                .background(StrictBrand.dark, CircleShape)
                 .border(AppDimens.strokeThin, accent, CircleShape)
                 .testTag(SET_COMPLETE_CIRCLE),
             contentAlignment = Alignment.Center
@@ -1224,6 +1232,7 @@ private fun CompletedSetIndicator(accent: Color) {
         Box(
             modifier = Modifier
                 .size(22.dp)
+                .background(StrictBrand.dark, CircleShape)
                 .border(AppDimens.strokeThin, accent, CircleShape),
             contentAlignment = Alignment.Center
         ) {

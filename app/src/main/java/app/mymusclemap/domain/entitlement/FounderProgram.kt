@@ -127,8 +127,10 @@ sealed interface FounderProgramResult {
 }
 
 /**
- * Founder-program transitions. Approval and rejection are the manual review boundary.
- * They do not talk to a store.
+ * Founder-program transitions for tester-controlled progress.
+ *
+ * Approval and rejection are not local transitions. A backend snapshot is the only
+ * way those statuses are stored.
  *
  * The deadline date is inclusive when tester-controlled requirements are already complete.
  * If those requirements are still incomplete on the deadline date, the program expires.
@@ -183,25 +185,6 @@ class FounderProgramLogic(
             return FounderProgramResult.Unchanged(state)
         }
         return advance(state, workouts, today)
-    }
-
-    fun approve(state: FounderProgramState): FounderProgramResult {
-        if (state.status != FounderProgramStatus.PendingApproval) {
-            return FounderProgramResult.Unchanged(state)
-        }
-        return FounderProgramResult.Changed(state.copy(status = FounderProgramStatus.Approved))
-    }
-
-    fun reject(state: FounderProgramState, reason: String): FounderProgramResult {
-        if (state.status != FounderProgramStatus.PendingApproval || reason.isBlank()) {
-            return FounderProgramResult.Unchanged(state)
-        }
-        return FounderProgramResult.Changed(
-            state.copy(
-                status = FounderProgramStatus.Rejected,
-                rejectionReason = reason.trim()
-            )
-        )
     }
 
     private fun advance(

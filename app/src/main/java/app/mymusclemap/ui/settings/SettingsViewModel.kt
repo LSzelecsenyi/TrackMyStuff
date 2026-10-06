@@ -11,9 +11,7 @@ import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
-import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.domain.DateProvider
-import app.mymusclemap.domain.csv.WeightCsv
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.theme.PaletteDraft
 import app.mymusclemap.domain.theme.PaletteDraftLogic
@@ -30,7 +28,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
@@ -45,8 +42,6 @@ data class SettingsUiState(
     val appearance: AppearanceSettings = AppearanceSettings.Default,
     val draft: PaletteDraft? = null,
     val saveError: PaletteSaveResult? = null,
-    val showImportExplanation: Boolean = false,
-    val importErrors: List<WeightCsv.RowError> = emptyList(),
     val showRestoreExplanation: Boolean = false,
     val restoreErrors: List<AppBackupError> = emptyList(),
     val userMessage: UserMessage? = null,
@@ -71,7 +66,6 @@ private data class BackupChrome(
 )
 
 class SettingsViewModel(
-    private val repository: WeightRepository,
     private val themePreferences: ThemePreferences,
     private val dateProvider: DateProvider,
     private val appBackupRepository: AppBackupRepository,
@@ -83,8 +77,6 @@ class SettingsViewModel(
     private val appearance = MutableStateFlow(AppearanceSettings.Default)
     private val draft = MutableStateFlow<PaletteDraft?>(null)
     private val saveError = MutableStateFlow<PaletteSaveResult?>(null)
-    private val showImportExplanation = MutableStateFlow(false)
-    private val importErrors = MutableStateFlow<List<WeightCsv.RowError>>(emptyList())
     private val showRestoreExplanation = MutableStateFlow(false)
     private val restoreErrors = MutableStateFlow<List<AppBackupError>>(emptyList())
     private val userMessage = MutableStateFlow<UserMessage?>(null)
@@ -109,21 +101,17 @@ class SettingsViewModel(
 
     val uiState: StateFlow<SettingsUiState> = combine(
         chrome,
-        showImportExplanation,
-        importErrors,
         combine(userMessage, lockScreenEnabled, lockScreenPermissionRequested) { message, enabled, requested ->
             Triple(message, enabled, requested)
         },
         combine(backupChrome, weeklyGoalStatus) { backup, goal -> backup to goal }
-    ) { chromeState, explanation, errors, lockAndMessage, backupAndGoal ->
+    ) { chromeState, lockAndMessage, backupAndGoal ->
         val (message, enabled, requested) = lockAndMessage
         val (backup, goal) = backupAndGoal
         SettingsUiState(
             appearance = chromeState.appearance,
             draft = chromeState.draft,
             saveError = chromeState.saveError,
-            showImportExplanation = explanation,
-            importErrors = errors,
             showRestoreExplanation = backup.showRestoreExplanation,
             restoreErrors = backup.restoreErrors,
             userMessage = message,
@@ -274,51 +262,6 @@ class SettingsViewModel(
         val next = PaletteSessionLogic.resetCustomDraft(PaletteSession(appearance.value, draft.value))
         draft.value = next.draft
         saveError.value = null
-    }
-
-    suspend fun buildExportCsv(): String {
-        return WeightCsv.export(repository.observeAll().first())
-    }
-
-    fun onExportFinished(success: Boolean) {
-        userMessage.value = if (success) UserMessage.ExportSucceeded else UserMessage.ExportFailed
-    }
-
-    fun onImportClicked() {
-        showImportExplanation.value = true
-    }
-
-    fun dismissImportExplanation() {
-        showImportExplanation.value = false
-    }
-
-    fun confirmImportExplanation() {
-        showImportExplanation.value = false
-    }
-
-    fun importCsv(content: String) {
-        viewModelScope.launch {
-            when (val parsed = WeightCsv.parse(content, dateProvider.today())) {
-                is WeightCsv.ParseResult.Failure -> {
-                    importErrors.value = parsed.errors
-                }
-                is WeightCsv.ParseResult.Success -> {
-                    val summary = repository.importRows(parsed.rows)
-                    userMessage.value = UserMessage.ImportSucceeded(
-                        created = summary.createdCount,
-                        updated = summary.updatedCount
-                    )
-                }
-            }
-        }
-    }
-
-    fun onImportReadFailed() {
-        userMessage.value = UserMessage.ImportReadFailed
-    }
-
-    fun dismissImportErrors() {
-        importErrors.value = emptyList()
     }
 
     fun consumeMessage() {

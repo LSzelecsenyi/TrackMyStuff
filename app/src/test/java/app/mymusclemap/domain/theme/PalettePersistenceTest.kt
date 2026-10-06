@@ -15,8 +15,8 @@ class PalettePersistenceTest {
     fun editingCustomColorsDoesNotChangeFactoryPalette() {
         val session = PaletteSessionLogic.selectCustom(PaletteSession(AppearanceSettings.Default))
         val edited = PaletteDraftLogic.applyParsedColor(session.draft!!, SeedField.Primary, purple)
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
-        assertEquals("#7FA6FF", ThemeSeeds.DefaultDark.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#E2FD6D", ThemeSeeds.DefaultDark.canonical().primary)
         assertEquals("#8A2BE2", edited.lightPrimary)
         assertNotEquals(ThemeSeeds.DefaultLight.primary, edited.lightPreview.primary)
     }
@@ -25,8 +25,8 @@ class PalettePersistenceTest {
     fun savingCustomColorsDoesNotChangeFactoryPalette() {
         val opened = PaletteSessionLogic.selectCustom(PaletteSession(AppearanceSettings.Default))
         val saved = PaletteSessionLogic.saveCustom(opened, customLight, customDark)
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
-        assertEquals("#7FA6FF", ThemeSeeds.DefaultDark.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#E2FD6D", ThemeSeeds.DefaultDark.canonical().primary)
         assertEquals("#8A2BE2", saved.appearance.customLight.canonical().primary)
         assertEquals(PaletteType.Custom, saved.appearance.paletteType)
         assertEquals(customLight.canonical(), saved.appearance.activeSeeds(false).canonical())
@@ -40,7 +40,7 @@ class PalettePersistenceTest {
         assertNull(backToDefault.draft)
         assertEquals(ThemeSeeds.DefaultLight.canonical(), backToDefault.appearance.activeSeeds(false).canonical())
         assertEquals(ThemeSeeds.DefaultDark.canonical(), backToDefault.appearance.activeSeeds(true).canonical())
-        assertEquals("#2457C5", backToDefault.appearance.activeSeeds(false).canonical().primary)
+        assertEquals("#1548C6", backToDefault.appearance.activeSeeds(false).canonical().primary)
     }
 
     @Test
@@ -78,7 +78,7 @@ class PalettePersistenceTest {
         assertEquals(AppearanceCodec.VALUE_CUSTOM, store.snapshot()[AppearanceCodec.KEY_PALETTE_TYPE])
         assertEquals("#8A2BE2", restored.customLight.canonical().primary)
         assertEquals(customDark.canonical(), restored.customDark.canonical())
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
     }
 
     @Test
@@ -101,14 +101,14 @@ class PalettePersistenceTest {
         assertEquals("#8A2BE2", cancelled.appearance.customLight.canonical().primary)
         assertEquals("#8A2BE2", cancelled.draft!!.lightPrimary)
         assertEquals(PaletteType.Custom, cancelled.appearance.paletteType)
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
     }
 
     @Test
     fun resettingChangesOnlyDraftUntilSave() {
         val saved = savedCustomSession()
         val reset = PaletteSessionLogic.resetCustomDraft(saved)
-        assertEquals("#2457C5", reset.draft!!.lightPrimary)
+        assertEquals("#1548C6", reset.draft!!.lightPrimary)
         assertEquals("#8A2BE2", reset.appearance.customLight.canonical().primary)
         assertEquals(PaletteType.Custom, reset.appearance.paletteType)
         assertEquals("#8A2BE2", reset.appearance.activeSeeds(false).canonical().primary)
@@ -117,8 +117,8 @@ class PalettePersistenceTest {
             reset.draft.lightPreview,
             reset.draft.darkPreview
         )
-        assertEquals("#2457C5", afterSave.appearance.customLight.canonical().primary)
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#1548C6", afterSave.appearance.customLight.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
         assertNotSame(ThemeSeeds.DefaultLight, afterSave.appearance.customLight)
     }
 
@@ -128,7 +128,7 @@ class PalettePersistenceTest {
             themeMode = "Light",
             paletteType = AppearanceCodec.VALUE_CUSTOM,
             lightBackground = "not-a-color",
-            lightPrimary = "#2457C5",
+            lightPrimary = "#1548C6",
             lightSecondary = "#DCE7FA",
             lightTertiary = "#E8754F",
             darkBackground = "bad",
@@ -141,8 +141,8 @@ class PalettePersistenceTest {
         assertEquals(ThemeSeeds.DefaultDark.canonical(), decoded.customDark.canonical())
         assertNotSame(ThemeSeeds.DefaultLight, decoded.customLight)
         assertNotSame(ThemeSeeds.DefaultDark, decoded.customDark)
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
-        assertEquals("#7FA6FF", ThemeSeeds.DefaultDark.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#E2FD6D", ThemeSeeds.DefaultDark.canonical().primary)
     }
 
     @Test
@@ -151,15 +151,15 @@ class PalettePersistenceTest {
         assertNotSame(ThemeSeeds.DefaultLight, settings.customLight)
         assertNotSame(ThemeSeeds.DefaultDark, settings.customDark)
         val mutated = settings.customLight.copy(primary = purple)
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
-        assertEquals("#2457C5", settings.customLight.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#1548C6", settings.customLight.canonical().primary)
         assertEquals("#8A2BE2", HexColor.format(mutated.primary))
         val session = PaletteSessionLogic.saveCustom(
             PaletteSession(settings),
             mutated,
             ThemeSeeds.copyOfFactoryDark()
         )
-        assertEquals("#2457C5", ThemeSeeds.DefaultLight.canonical().primary)
+        assertEquals("#1548C6", ThemeSeeds.DefaultLight.canonical().primary)
         assertNotSame(ThemeSeeds.DefaultLight, session.appearance.customLight)
         assertEquals(ThemeSeeds.DefaultLight, session.appearance.copy(paletteType = PaletteType.Default).activeSeeds(false))
     }

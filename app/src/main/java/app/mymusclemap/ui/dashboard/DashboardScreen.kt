@@ -98,6 +98,7 @@ import app.mymusclemap.ui.health.HealthConnectOverviewCard
 import app.mymusclemap.ui.onboarding.OnboardingReminderCard
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
 import java.time.YearMonth
@@ -802,7 +803,7 @@ private fun WeeklyStatColumn(
         Text(
             text = value,
             style = AppTypeTokens.statBand,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = StrictBrand.result(),
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Clip,

@@ -12,10 +12,6 @@ fun UserMessage.stringRes(): Int {
         UserMessage.Deleted -> app.mymusclemap.R.string.message_deleted
         UserMessage.WorkoutDeleted -> app.mymusclemap.R.string.message_workout_deleted
         UserMessage.WorkoutDeleteFailed -> app.mymusclemap.R.string.message_workout_delete_failed
-        is UserMessage.ImportSucceeded -> app.mymusclemap.R.string.message_import_success
-        UserMessage.ExportSucceeded -> app.mymusclemap.R.string.message_export_success
-        UserMessage.ExportFailed -> app.mymusclemap.R.string.message_export_failed
-        UserMessage.ImportReadFailed -> app.mymusclemap.R.string.message_import_read_failed
         UserMessage.AppBackupExportSucceeded -> app.mymusclemap.R.string.message_app_backup_export_success
         is UserMessage.AppBackupExportSkippedPhotos ->
             app.mymusclemap.R.string.message_app_backup_export_skipped_photos
@@ -54,7 +50,6 @@ fun UserMessageEffect(
 
 private fun UserMessage.args(): Array<Any> {
     return when (this) {
-        is UserMessage.ImportSucceeded -> arrayOf(created, updated)
         is UserMessage.AppBackupExportSkippedPhotos -> arrayOf(count)
         else -> emptyArray()
     }

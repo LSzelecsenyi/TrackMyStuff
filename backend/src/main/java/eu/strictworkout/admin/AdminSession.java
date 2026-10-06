@@ -59,6 +59,10 @@ public class AdminSession {
         return admin.getId();
     }
 
+    public String getGoogleSubject() {
+        return admin.getGoogleSubject();
+    }
+
     public Instant getExpiresAt() {
         return expiresAt;
     }

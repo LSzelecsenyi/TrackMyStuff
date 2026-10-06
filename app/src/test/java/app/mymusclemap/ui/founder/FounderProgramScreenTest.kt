@@ -24,7 +24,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
-import app.mymusclemap.FounderDebugReviewAccess
 import app.mymusclemap.R
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
 import app.mymusclemap.domain.entitlement.FounderProgramRules
@@ -240,12 +239,9 @@ class FounderProgramScreenTest {
         composeRule.onNodeWithText(testString(R.string.founder_feedback_save)).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_report_submit)).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_deadline, UiFormatters.longDate(LocalDate.of(2026, 11, 17)))).assertDoesNotExist()
-        val approve = testString(R.string.founder_debug_approve)
-        if (FounderDebugReviewAccess.available) {
-            composeRule.onNodeWithText(approve).performScrollTo().assertIsDisplayed()
-        } else {
-            composeRule.onNodeWithText(approve).assertDoesNotExist()
-        }
+        composeRule.onNodeWithText("Debug review").assertDoesNotExist()
+        composeRule.onNodeWithText("Approve Founder").assertDoesNotExist()
+        composeRule.onNodeWithText("Reject").assertDoesNotExist()
     }
 
     @Test
@@ -282,7 +278,9 @@ class FounderProgramScreenTest {
         composeRule.onNodeWithText("Approved").assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_feedback_save)).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_report_submit)).assertDoesNotExist()
-        composeRule.onNodeWithText(testString(R.string.founder_debug_approve)).assertDoesNotExist()
+        composeRule.onNodeWithText("Approve Founder").assertDoesNotExist()
+        composeRule.onNodeWithText("Debug review").assertDoesNotExist()
+        composeRule.onNodeWithText("Reject").assertDoesNotExist()
         composeRule.onNodeWithContentDescription(testString(R.string.founder_mark_content_description)).assertDoesNotExist()
     }
 
@@ -347,9 +345,7 @@ class FounderProgramScreenTest {
                             onEnroll = onEnroll,
                             onFeedbackChange = {},
                             onSubmitReport = {},
-                            onAcknowledgeMilestone = onAcknowledge,
-                            onApprove = {},
-                            onReject = {}
+                            onAcknowledgeMilestone = onAcknowledge
                         )
                     }
                 }

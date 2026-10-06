@@ -48,6 +48,7 @@ import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 import java.time.LocalDate
 
 internal const val BODY_HISTORY_TAG = "body-measurement-history-"
@@ -139,7 +140,8 @@ fun BodyMeasurementDetailScreen(
             SegmentedControl(
                 options = ranges.map { stringResource(it.labelRes()) },
                 selectedIndex = ranges.indexOf(detail.range).coerceAtLeast(0),
-                onSelected = { onRangeSelected(ranges[it]) }
+                onSelected = { onRangeSelected(ranges[it]) },
+                brandFieldSelection = true
             )
             Spacer(Modifier.height(AppDimens.itemGap))
             if (detail.showChart) {

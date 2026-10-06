@@ -1,9 +1,49 @@
-<strict-state kind="empty">
-  <p class="kicker">Founder applications</p>
-  <h1>No applications loaded</h1>
-  <p>
-    Pending Founder reviews will be listed here after this page is connected to the admin API.
-    Sample applicants are not shown.
-  </p>
-  <p>An application opens at <span class="path">/founders/</span> followed by its id.</p>
-</strict-state>
+@switch (phase()) {
+  @case ('loading') {
+    <strict-state kind="loading" />
+  }
+  @case ('empty') {
+    <strict-state kind="empty">
+      <p class="kicker">Founder applications</p>
+      <h1>No Founder applications are waiting for review</h1>
+      <p>Applications appear here after a tester submits a Tester Report. The Founder program itself is unchanged.</p>
+    </strict-state>
+  }
+  @case ('error') {
+    <strict-state kind="error">
+      <h1>Founder applications could not be loaded</h1>
+      <p>The review queue did not respond. Try again.</p>
+      <button type="button" class="button" (click)="load()">Try again</button>
+    </strict-state>
+  }
+  @case ('ready') {
+    <strict-state kind="content">
+      <p class="kicker">Founder applications</p>
+      <h1>Waiting for review</h1>
+      <p class="lede">Oldest submissions are listed first. Open an application to read its stored evidence.</p>
+      <ol class="queue">
+        @for (application of applications(); track application.id) {
+          <li>
+            <a class="surface queue-card" [routerLink]="['/founders', application.id]">
+              <span class="badge">Status: {{ statusLabel(application.status) }}</span>
+              <span class="who">{{ emailLabel(application.testerEmail) }}</span>
+              <span class="meta">
+                <span>Waiting since <span class="tabular">{{ formatInstant(application.pendingAt) }}</span></span>
+                <span>Enrolled <span class="tabular">{{ formatInstant(application.enrolledAt) }}</span></span>
+                <span>Deadline <span class="tabular">{{ formatInstant(application.deadlineAt) }}</span></span>
+              </span>
+              @if (application.qualification; as qualification) {
+                <span class="meta">
+                  <span>Qualifying workouts <span class="tabular">{{ countPair(qualification.qualifyingWorkoutCount, qualification.requiredWorkoutCount) }}</span></span>
+                  <span>Distinct workout days <span class="tabular">{{ countPair(qualification.distinctWorkoutDayCount, qualification.requiredDistinctDayCount) }}</span></span>
+                </span>
+              } @else {
+                <span class="meta">Qualification was not included in this summary.</span>
+              }
+            </a>
+          </li>
+        }
+      </ol>
+    </strict-state>
+  }
+}

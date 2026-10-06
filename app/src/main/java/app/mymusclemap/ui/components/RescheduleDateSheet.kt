@@ -27,6 +27,7 @@ import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.workout.ScheduledWorkout
 import app.mymusclemap.domain.workout.ScheduledWorkoutUiLogic
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.sheetContainerColor
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.workout.CompactSheetHandle
 import java.time.LocalDate
@@ -55,7 +56,7 @@ fun RescheduleDateSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = sheetContainerColor(),
         tonalElevation = 0.dp,
         dragHandle = { CompactSheetHandle() },
         modifier = Modifier.testTag(RESCHEDULE_SHEET)

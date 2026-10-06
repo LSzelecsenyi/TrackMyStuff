@@ -70,7 +70,8 @@ class FounderInvitationScreenTest {
         show(offer(fastRules.temporaryProWorkoutCount))
         composeRule.onNodeWithText(bullet(R.plurals.founder_challenge_workouts, FounderProgramRules.Production.founderWorkoutCount)).assertDoesNotExist()
         composeRule.onNodeWithText(offer(FounderProgramRules.Production.temporaryProWorkoutCount)).assertDoesNotExist()
-        composeRule.onNodeWithText(testString(R.string.founder_debug_approve)).assertDoesNotExist()
+        composeRule.onNodeWithText("Approve Founder").assertDoesNotExist()
+        composeRule.onNodeWithText("Debug review").assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_invitation_not_now)).performScrollTo().assertIsDisplayed()
     }
 
@@ -82,7 +83,8 @@ class FounderInvitationScreenTest {
         show(offer(FounderProgramRules.Production.temporaryProWorkoutCount))
         composeRule.onNodeWithText(bullet(R.plurals.founder_challenge_workouts, fastRules.founderWorkoutCount)).assertDoesNotExist()
         composeRule.onNodeWithText(offer(fastRules.temporaryProWorkoutCount)).assertDoesNotExist()
-        composeRule.onNodeWithText(testString(R.string.founder_debug_approve)).assertDoesNotExist()
+        composeRule.onNodeWithText("Approve Founder").assertDoesNotExist()
+        composeRule.onNodeWithText("Debug review").assertDoesNotExist()
     }
 
     @Test

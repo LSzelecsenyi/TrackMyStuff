@@ -1,9 +1,18 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { AdminAuth } from './auth/admin-auth';
+import { StrictState } from './shared/strict-state';
 
 @Component({
   selector: 'strict-root',
-  imports: [RouterOutlet],
-  template: '<router-outlet />',
+  imports: [RouterOutlet, StrictState],
+  templateUrl: './app.html',
+  styleUrl: './app.css',
 })
-export class App {}
+export class App {
+  readonly auth = inject(AdminAuth);
+
+  constructor() {
+    this.auth.whenReady().subscribe();
+  }
+}

@@ -5,10 +5,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,12 +38,16 @@ import app.mymusclemap.ui.pro.LocalFeatureEntitlements
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 
 class MainActivity : ComponentActivity() {
+    @Volatile
+    private var splashReady = false
     private val openPrivacyPolicy = mutableStateOf(false)
     private val overviewRequest = mutableIntStateOf(0)
     private val activeWorkoutSessionId = mutableStateOf<Long?>(null)
     private val activeWorkoutGeneration = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition { !splashReady }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         openPrivacyPolicy.value = HealthConnectGateway.isPermissionUsage(intent)
@@ -59,17 +67,30 @@ class MainActivity : ComponentActivity() {
             var stage by remember { mutableStateOf<AppLaunchStage?>(null) }
             var openNewTemplate by rememberSaveable { mutableStateOf(false) }
             LaunchedEffect(Unit) {
-                val firstRun = container.firstRunCoordinator.prepare()
-                stage = if (firstRun == FirstRunDecision.ShowOnboarding) {
-                    AppLaunchStage.Onboarding
-                } else {
-                    AppLaunchStage.App
+                try {
+                    val firstRun = container.firstRunCoordinator.prepare()
+                    stage = if (firstRun == FirstRunDecision.ShowOnboarding) {
+                        AppLaunchStage.Onboarding
+                    } else {
+                        AppLaunchStage.App
+                    }
+                } catch (error: Throwable) {
+                    stage = AppLaunchStage.App
+                    throw error
                 }
+            }
+            if (stage != null) {
+                SideEffect { splashReady = true }
             }
             CompositionLocalProvider(
                 LocalFeatureEntitlements provides container.featureEntitlements
             ) {
                 WeightTrackerTheme(appearance = appearance) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                    ) {
                     when (stage) {
                         null -> Box(
                             modifier = Modifier.fillMaxSize(),
@@ -120,6 +141,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                    }
                 }
             }
         }
@@ -132,6 +154,7 @@ class MainActivity : ComponentActivity() {
         container.activeWorkoutNotifications.refresh()
         lifecycleScope.launch {
             container.refreshFounderProgramFromStore()
+            container.refreshFounderAuthority()
         }
     }
 

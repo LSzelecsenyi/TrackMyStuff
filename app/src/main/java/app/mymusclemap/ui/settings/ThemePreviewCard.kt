@@ -32,6 +32,7 @@ import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 
 @Composable
@@ -91,12 +92,17 @@ fun ThemePreviewCard(
                         style = AppTypeTokens.statCaption
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(MaterialTheme.colorScheme.tertiary, AppShapeTokens.compact)
-                )
+                val defaults = if (darkTheme) ThemeSeeds.DefaultDark else ThemeSeeds.DefaultLight
+                val showBrandField = seeds.background == defaults.background &&
+                    seeds.primary == defaults.primary
+                if (showBrandField) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(StrictBrand.field(darkTheme), AppShapeTokens.compact)
+                    )
+                }
             }
             Spacer(Modifier.height(8.dp))
             val lineColor = MaterialTheme.colorScheme.primary

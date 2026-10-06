@@ -6,9 +6,15 @@ export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
   factory: () => environment.apiBaseUrl,
 });
 
+export const GOOGLE_CLIENT_ID = new InjectionToken<string>('GOOGLE_CLIENT_ID', {
+  providedIn: 'root',
+  factory: () => environment.googleClientId,
+});
+
 export const adminPaths = {
-  session: '/api/v1/admin/session',
-  founderApplications: '/api/v1/admin/founder/applications',
+  csrf: '/v1/admin/csrf',
+  session: '/v1/admin/session',
+  founderApplications: '/v1/admin/founder/applications',
 } as const;
 
 export function adminUrl(base: string, path: string): string {

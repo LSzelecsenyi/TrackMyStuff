@@ -128,9 +128,11 @@ Stored Founder data is the Strict user (already linked to a Google subject and o
 
 Approval, rejection, and Lifetime Pro are separate from the mobile Founder routes. A normal bearer token cannot approve an application or create a grant.
 
-Admin sign-in is `POST /api/v1/admin/session` with a Google ID token. The Google subject must be listed in `STRICT_ADMIN_GOOGLE_SUBJECTS` (comma-separated). An empty list allows nobody. There is no password and no default admin. The server stores only the SHA-256 hash of a new opaque session in `admin_session`. The raw token is returned only as an HttpOnly `STRICT_ADMIN_SESSION` cookie (`Path=/api/v1/admin`, `SameSite=Strict`, no `Domain`). The response body is empty. The `prod` profile always marks that cookie `Secure`. Local HTTP development sets `strict.admin.cookie-secure=false`.
+Admin sign-in is `POST /api/v1/admin/session` with a Google ID token. The Google subject must be listed in `STRICT_ADMIN_GOOGLE_SUBJECTS` (comma-separated). An empty list allows nobody. There is no password and no default admin. The same allowlist is checked again on every admin request, using the Google subject stored on `admin_user` when that session was created. Email is not an admin identifier. The property is bound at process start, so changing it requires a restart; after that restart, the next request for a removed subject is rejected and that `admin_session` is revoked. Putting the subject back later does not revive the revoked cookie. A new Google login is required. An empty allowlist also rejects sessions that already exist. The server stores only the SHA-256 hash of a new opaque session in `admin_session`. The raw token is returned only as an HttpOnly `STRICT_ADMIN_SESSION` cookie (`Path=/api/v1/admin`, `SameSite=Strict`, no `Domain`). The response body is empty. The `prod` profile always marks that cookie `Secure`. Local HTTP development sets `strict.admin.cookie-secure=false`.
 
 Browser admin requests are same-origin and use CSRF. `GET /api/v1/admin/csrf` sets a readable `XSRF-TOKEN` cookie. State-changing admin requests send that value in `X-XSRF-TOKEN` and send the cookie back. Android bearer routes do not use this cookie and do not require CSRF.
+
+`GET /api/v1/admin/session` reads the current admin session. It requires the admin cookie and does not require CSRF. A missing, expired, revoked, or no-longer-allowlisted cookie is 401. The body is `{ "email": "<verified email or null>" }`. Email is display information copied from the verified Google identity at login. It is not used to authorize the request. The body does not include the session credential, its hash, the Google subject, or the session id.
 
 Logout is `DELETE /api/v1/admin/session` with the admin cookie and CSRF header. It revokes that server session and clears the cookie. A later login replaces any admin cookie presented with the request by revoking that session and setting a new one.
 
@@ -142,6 +144,9 @@ curl -si -X POST http://localhost:8082/api/v1/admin/session \
   -H "X-XSRF-TOKEN: <csrf-token>" \
   -H "Cookie: XSRF-TOKEN=<csrf-token>" \
   -d "{\"idToken\":\"<google-id-token>\"}"
+
+curl -s http://localhost:8082/api/v1/admin/session \
+  -H "Cookie: STRICT_ADMIN_SESSION=<admin-session>"
 
 curl -s http://localhost:8082/api/v1/admin/founder/applications \
   -H "Cookie: STRICT_ADMIN_SESSION=<admin-session>; XSRF-TOKEN=<csrf-token>"
@@ -165,7 +170,11 @@ Repeating the same decision is a success and does not create a second grant or a
 
 `GET /api/v1/entitlements` is the mobile read model. `access` is `PRO` when Founder Lifetime or Temporary Founder Pro applies. Founder Lifetime is the grant row, not a flag on the user. Temporary Founder Pro still comes from `ACTIVE_PRO` or `PENDING_APPROVAL`, and it is not reported once Lifetime applies. This endpoint does not write.
 
-The admin review payload includes the verified Google email when one is stored, so a reviewer can tell testers apart. It does not include the Google subject or any session secret.
+`GET /api/v1/admin/founder/applications` lists pending applications. Each row has the application id, status, verified tester email, enrollment and deadline instants, pending time, and a compact qualification summary: snapshot workout count, distinct-day count, and the required counts stored with that submission. The list does not include feedback or workout observations.
+
+`GET /api/v1/admin/founder/applications/{id}` is the review record. `application` is the current server state. `tester.email` is the verified email, when one is stored. `qualification` and `report` are the immutable Tester Report snapshot: backend-derived counts, the rule thresholds copied at submission, submission time, app version, platform, and the submitted feedback. `workouts` are the accepted qualifying events in local-date, then completion-time order. Each workout includes its client workout id and the observations stored at ingestion. `decision` is present after approval or rejection and does not rewrite the snapshot. A missing historical rule field stays null. The payload does not include the Google subject, the Strict user id, the report idempotency id, session credentials, token hashes, or workout row ids.
+
+Approval and rejection still return that same detail resource. Their transitions are unchanged: only `PENDING_APPROVAL` can be decided, approval writes one `FOUNDER_LIFETIME` grant, and rejection stores a reason and writes no grant.
 
 ## Tests
 

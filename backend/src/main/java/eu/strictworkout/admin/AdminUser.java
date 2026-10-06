@@ -49,4 +49,16 @@ public class AdminUser {
     public UUID getId() {
         return id;
     }
+
+    public String getGoogleSubject() {
+        return googleSubject;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
 }

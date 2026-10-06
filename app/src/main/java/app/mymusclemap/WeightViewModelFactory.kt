@@ -79,7 +79,8 @@ class WeightViewModelFactory(
     private val founderSessionRevision: Flow<Int> = flowOf(0),
     private val founderSessionPresent: () -> Boolean = { true },
     private val founderSubmitReport: suspend (submissionId: String, feedback: String, appVersion: String) -> FounderReportSubmission =
-        { _, _, _ -> FounderReportSubmission.Unavailable }
+        { _, _, _ -> FounderReportSubmission.Unavailable },
+    private val founderRefreshAuthority: suspend () -> Unit = {}
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -125,7 +126,6 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
                 SettingsViewModel(
-                    weightRepository,
                     themePreferences,
                     dateProvider,
                     appBackupRepository,
@@ -216,7 +216,8 @@ class WeightViewModelFactory(
                     joinFounder = founderJoin,
                     sessionRevision = founderSessionRevision,
                     sessionPresent = founderSessionPresent,
-                    submitReport = founderSubmitReport
+                    submitReport = founderSubmitReport,
+                    refreshAuthority = founderRefreshAuthority
                 )
             }
             modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {

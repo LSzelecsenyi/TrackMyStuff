@@ -1,0 +1,41 @@
+.login {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: var(--strict-space-screen);
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: min(32rem, 100%);
+  padding: var(--strict-space-screen);
+  background: var(--strict-surface);
+  border: 1px solid var(--strict-divider);
+  border-radius: var(--strict-radius-large);
+}
+
+.login-card strict-mark {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--strict-space-item);
+}
+
+.button-primary {
+  margin-top: var(--strict-space-section);
+  background: var(--strict-primary);
+  color: var(--strict-on-primary);
+}
+
+.button-primary:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.login-error {
+  margin: var(--strict-space-item) 0 0;
+  color: var(--strict-danger);
+  font-size: 14px;
+  line-height: 20px;
+}

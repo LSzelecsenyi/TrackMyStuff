@@ -574,7 +574,7 @@ private fun MuscleChip(
         text = label,
         style = AppTypeTokens.statCaption,
         color = when {
-            archived -> MaterialTheme.colorScheme.tertiary
+            archived -> MaterialTheme.colorScheme.onSurfaceVariant
             primary -> MaterialTheme.colorScheme.onSurface
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         },
@@ -582,7 +582,7 @@ private fun MuscleChip(
             .clip(AppShapeTokens.chip)
             .background(
                 when {
-                    archived -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
+                    archived -> MaterialTheme.colorScheme.surfaceVariant
                     primary -> MaterialTheme.colorScheme.surfaceContainer
                     else -> MaterialTheme.colorScheme.surfaceContainerHigh
                 }

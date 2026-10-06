@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.domain.workout.TemplateListItem
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.sheetContainerColor
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.workout.CompactSheetHandle
 import java.time.LocalDate
@@ -66,7 +67,7 @@ fun ScheduleWorkoutPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = sheetContainerColor(),
         tonalElevation = 0.dp,
         dragHandle = { CompactSheetHandle() },
         modifier = Modifier.testTag(SCHEDULE_PICKER_SHEET)

@@ -267,7 +267,7 @@ fun TemplateEditorScreen(
                             } else {
                                 Text(
                                     text = stringResource(R.string.exercise_archived_badge),
-                                    color = MaterialTheme.colorScheme.tertiary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }

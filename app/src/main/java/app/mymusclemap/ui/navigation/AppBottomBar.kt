@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.BarChart
@@ -29,6 +30,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInRoot
@@ -45,7 +48,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.domain.theme.StrictBrandTokens
+import app.mymusclemap.domain.theme.StrictNavigationSelection
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.StrictBrand
 
 internal const val BOTTOM_BAR = "app-bottom-bar"
 internal const val BOTTOM_OVERVIEW = "app-bottom-overview"
@@ -151,6 +157,13 @@ private fun WorkoutActionButton(
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
+        val actionContainer = StrictBrand.actionContainer()
+        val actionContent = StrictBrand.onAction()
+        val highlightColor = if (actionContainer == StrictBrand.lime) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.primary
+        }
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -159,19 +172,19 @@ private fun WorkoutActionButton(
                 }
                 .then(
                     if (highlight) {
-                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        Modifier.border(2.dp, highlightColor, CircleShape)
                     } else {
                         Modifier
                     }
                 )
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                .background(actionContainer),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Outlined.FitnessCenter,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = actionContent,
                 modifier = Modifier.size(26.dp)
             )
         }
@@ -186,10 +199,25 @@ private fun BottomTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val color = if (selected) {
-        MaterialTheme.colorScheme.onSurface
+    val scheme = MaterialTheme.colorScheme
+    val selection = StrictBrandTokens.navigationSelection(scheme.background.toArgb(), scheme.primary.toArgb())
+    val unselected = scheme.onSurfaceVariant
+    val labelColor = when {
+        !selected -> unselected
+        selection == StrictNavigationSelection.FieldBehindIcon -> StrictBrand.blue
+        selection == StrictNavigationSelection.Ink -> StrictBrand.lime
+        else -> scheme.onSurface
+    }
+    val iconColor = when {
+        !selected -> unselected
+        selection == StrictNavigationSelection.FieldBehindIcon -> StrictBrand.dark
+        selection == StrictNavigationSelection.Ink -> StrictBrand.lime
+        else -> scheme.onSurface
+    }
+    val indicator = if (selection == StrictNavigationSelection.Ink || selection == StrictNavigationSelection.Scheme) {
+        scheme.primary
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        Color.Transparent
     }
     Box(
         modifier = modifier
@@ -201,13 +229,13 @@ private fun BottomTab(
             .clickable(role = Role.Tab, onClick = onClick),
         contentAlignment = Alignment.TopCenter
     ) {
-        if (selected) {
+        if (selected && indicator != Color.Transparent) {
             Box(
                 modifier = Modifier
                     .padding(top = 2.dp)
                     .width(AppDimens.navIndicatorWidth)
                     .height(AppDimens.navIndicatorThickness)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(indicator)
             )
         }
         Column(
@@ -217,16 +245,35 @@ private fun BottomTab(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color
-            )
+            if (selected && selection == StrictNavigationSelection.FieldBehindIcon) {
+                Box(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .defaultMinSize(minWidth = 40.dp)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(StrictBrand.lime)
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor
+                )
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = color,
+                color = labelColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center

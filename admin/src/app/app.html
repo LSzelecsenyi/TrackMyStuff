@@ -1,0 +1,7 @@
+@if (auth.phase() === 'checking') {
+  <div class="boot">
+    <strict-state kind="loading" />
+  </div>
+} @else {
+  <router-outlet />
+}

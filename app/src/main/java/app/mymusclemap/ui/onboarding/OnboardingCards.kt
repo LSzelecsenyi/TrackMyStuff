@@ -26,6 +26,7 @@ import app.mymusclemap.domain.onboarding.OnboardingChecklist
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 
 @Composable
 fun OnboardingReminderCard(
@@ -79,6 +80,7 @@ fun OnboardingReminderCard(
                 Button(
                     onClick = onContinue,
                     shape = AppShapeTokens.button,
+                    colors = StrictBrand.actionButtonColors(),
                     modifier = Modifier
                         .defaultMinSize(minHeight = AppDimens.minTouch)
                         .testTag(ONBOARDING_REMINDER_CONTINUE)

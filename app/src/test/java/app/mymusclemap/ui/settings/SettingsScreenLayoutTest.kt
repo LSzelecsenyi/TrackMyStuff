@@ -151,6 +151,10 @@ class SettingsScreenLayoutTest {
     @Test
     fun givenDefaultPaletteThenCustomEditorIsHidden() {
         render()
+        composeRule.onNodeWithText(testString(R.string.theme_system)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.palette_default)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.palette_default_body)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.palette_custom_body)).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PALETTE_DEFAULT).assertIsSelected()
         composeRule.onNodeWithTag(SETTINGS_PALETTE_CUSTOM).assertIsNotSelected()
         composeRule.onAllNodesWithTag(SETTINGS_PREVIEW).assertCountEquals(0)
@@ -165,9 +169,10 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithTag(SETTINGS_PALETTE_CUSTOM).assertIsSelected()
         composeRule.onNodeWithTag(SETTINGS_PREVIEW).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.theme_preview_title).uppercase()).assertIsDisplayed()
-        SeedField.entries.forEach { field ->
+        SeedField.editorFields.forEach { field ->
             composeRule.onNodeWithTag(settingsColorRowTag(field)).assertIsDisplayed()
         }
+        composeRule.onAllNodesWithTag(settingsColorRowTag(SeedField.Tertiary)).assertCountEquals(0)
         composeRule.onNodeWithTag(SETTINGS_SAVE_BAR).assertIsDisplayed()
     }
 
@@ -175,12 +180,12 @@ class SettingsScreenLayoutTest {
     fun givenUnsavedHexWhenChangedThenPreviewUpdatesWithoutSaving() {
         val saves = intArrayOf(0)
         renderInteractive(initial = customState(), onSaveDraft = { saves[0] += 1 })
-        composeRule.onNodeWithTag(settingsPreviewPrimaryTag("#2457C5")).assertIsDisplayed()
+        composeRule.onNodeWithTag(settingsPreviewPrimaryTag("#1548C6")).assertIsDisplayed()
         composeRule.onNodeWithTag(settingsHexTag(SeedField.Primary))
             .performTextReplacement("#8A2BE2")
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(settingsPreviewPrimaryTag("#8A2BE2")).assertIsDisplayed()
-        composeRule.onAllNodesWithTag(settingsPreviewPrimaryTag("#2457C5")).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(settingsPreviewPrimaryTag("#1548C6")).assertCountEquals(0)
         assertEquals(0, saves[0])
     }
 
@@ -198,7 +203,7 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithTag(settingsHexTag(SeedField.Primary))
             .performTextReplacement("#8A2BE2")
         composeRule.onNodeWithTag(SETTINGS_CANCEL).performClick()
-        composeRule.onNodeWithTag(settingsPreviewPrimaryTag("#2457C5")).assertIsDisplayed()
+        composeRule.onNodeWithTag(settingsPreviewPrimaryTag("#1548C6")).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(testString(R.string.action_back)).performClick()
         assertEquals(0, saves[0])
         assertEquals(1, cancels[0])
@@ -260,19 +265,21 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
-    fun givenExportOrImportRowWhenTappedThenExistingSafFlowStartsOnce() {
+    fun settingsExposeFullBackupAndNotBodyWeightCsvTransfer() {
         val exports = intArrayOf(0)
-        val imports = intArrayOf(0)
+        val restores = intArrayOf(0)
         render(
-            onExportClick = { exports[0] += 1 },
-            onImportClick = { imports[0] += 1 }
+            onAppBackupExportClick = { exports[0] += 1 },
+            onRestoreClick = { restores[0] += 1 }
         )
-        composeRule.onNodeWithText(testString(R.string.data_title).uppercase()).assertIsDisplayed()
-        composeRule.onNodeWithTag(SETTINGS_EXPORT).performClick()
-        composeRule.onNodeWithTag(SETTINGS_IMPORT).performClick()
+        composeRule.onAllNodesWithTag("settings-export").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("settings-import").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Export body-weight data").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Import body-weight data").assertCountEquals(0)
+        composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_EXPORT).performScrollTo().performClick()
+        composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_RESTORE).performScrollTo().performClick()
         assertEquals(1, exports[0])
-        assertEquals(1, imports[0])
-        assertEquals(0, composeRule.onAllNodesWithText("Workout CSV").fetchSemanticsNodes().size)
+        assertEquals(1, restores[0])
     }
 
     @Test
@@ -299,8 +306,6 @@ class SettingsScreenLayoutTest {
             SETTINGS_RESET,
             SETTINGS_SAVE,
             SETTINGS_CANCEL,
-            SETTINGS_EXPORT,
-            SETTINGS_IMPORT,
             settingsColorRowTag(SeedField.Background),
             settingsSwatchTag(SeedField.Background),
             settingsHexTag(SeedField.Primary)
@@ -324,19 +329,12 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.theme_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.palette_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.theme_preview_title).uppercase()).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.data_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.privacy_title).uppercase()).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.privacy_body)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PREVIEW).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_EDITOR_MODE).assertIsDisplayed()
-        composeRule.onAllNodesWithText(testString(R.string.backup_body)).fetchSemanticsNodes().let { nodes ->
-            assertEquals(0, nodes.size)
-        }
-        composeRule.onAllNodesWithText(testString(R.string.action_export)).fetchSemanticsNodes().let { nodes ->
-            assertEquals(0, nodes.size)
-        }
-        composeRule.onNodeWithText(testString(R.string.action_export_weight)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.action_import_weight)).assertIsDisplayed()
+        composeRule.onAllNodesWithText("Export body-weight data").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Import body-weight data").assertCountEquals(0)
         composeRule.onNodeWithText(testString(R.string.app_backup_title).uppercase()).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.action_export_app_backup)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.action_export_app_backup_subtitle)).performScrollTo().assertIsDisplayed()
@@ -537,13 +535,8 @@ class SettingsScreenLayoutTest {
                                 )
                                 draft = next.draft
                             },
-                            onExportClick = {},
-                            onImportClick = {},
                             onAppBackupExportClick = {},
                             onRestoreClick = {},
-                            onConfirmImportExplanation = {},
-                            onDismissImportExplanation = {},
-                            onDismissImportErrors = {},
                             onConfirmRestoreExplanation = {},
                             onDismissRestoreExplanation = {},
                             onDismissRestoreErrors = {},
@@ -566,8 +559,8 @@ class SettingsScreenLayoutTest {
         height: Dp = 2000.dp,
         fontScale: Float = 1f,
         onSaveDraft: () -> Unit = {},
-        onExportClick: () -> Unit = {},
-        onImportClick: () -> Unit = {},
+        onAppBackupExportClick: () -> Unit = {},
+        onRestoreClick: () -> Unit = {},
         onSendFeedback: () -> Unit = {},
         onOpenPrivacyPolicy: () -> Unit = {},
         onOpenHelp: () -> Unit = {},
@@ -603,13 +596,8 @@ class SettingsScreenLayoutTest {
                             onSaveDraft = onSaveDraft,
                             onCancelDraft = {},
                             onResetCustomDraft = {},
-                            onExportClick = onExportClick,
-                            onImportClick = onImportClick,
-                            onAppBackupExportClick = {},
-                            onRestoreClick = {},
-                            onConfirmImportExplanation = {},
-                            onDismissImportExplanation = {},
-                            onDismissImportErrors = {},
+                            onAppBackupExportClick = onAppBackupExportClick,
+                            onRestoreClick = onRestoreClick,
                             onConfirmRestoreExplanation = {},
                             onDismissRestoreExplanation = {},
                             onDismissRestoreErrors = {},

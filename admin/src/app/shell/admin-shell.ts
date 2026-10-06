@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AdminAuth } from '../auth/admin-auth';
 import { StrictMark } from '../brand/strict-mark';
 import { ThemeController } from '../theme/theme-controller';
 
@@ -11,9 +12,14 @@ import { ThemeController } from '../theme/theme-controller';
 })
 export class AdminShell {
   readonly theme = inject(ThemeController);
+  readonly auth = inject(AdminAuth);
   readonly accountOpen = signal(false);
 
   toggleAccount(): void {
     this.accountOpen.update((open) => !open);
+  }
+
+  logout(): void {
+    this.auth.logout().subscribe();
   }
 }

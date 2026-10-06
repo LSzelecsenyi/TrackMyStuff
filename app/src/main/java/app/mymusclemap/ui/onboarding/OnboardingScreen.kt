@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -44,6 +45,7 @@ import app.mymusclemap.ui.founder.FounderJoinNotice
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 
 internal const val ONBOARDING_SCREEN = "onboarding-screen"
 internal const val ONBOARDING_TITLE = "onboarding-title"
@@ -165,6 +167,10 @@ fun OnboardingScreen(
                                 selected = selectedGoal == count,
                                 onClick = { selectedGoal = count },
                                 label = { Text(count.toString()) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = StrictBrand.actionContainer(),
+                                    selectedLabelColor = StrictBrand.onAction()
+                                ),
                                 modifier = Modifier.testTag("$ONBOARDING_GOAL_CHIP-$count")
                             )
                         }
@@ -181,6 +187,7 @@ fun OnboardingScreen(
                 },
                 enabled = step != OnboardingStep.WeeklyGoal || selectedGoal in WeeklyGoalLogic.MIN_GOAL..WeeklyGoalLogic.MAX_GOAL,
                 shape = AppShapeTokens.button,
+                colors = StrictBrand.actionButtonColors(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = AppDimens.minTouch)

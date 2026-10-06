@@ -2,7 +2,9 @@ package app.mymusclemap.ui.components
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -41,24 +43,14 @@ class OverviewCalendarGoalTest {
     }
 
     @Test
-    fun incompleteWeekShowsProgressAndKeepsTheExistingStreak() {
-        val monday = LocalDate.of(2026, 3, 2)
-        val status = WeeklyGoalLogic.evaluate(
-            listOf(WeeklyGoalRevision(monday, 4, graceWeek = false)),
-            mapOf(
-                LocalDate.of(2026, 3, 3) to 1,
-                LocalDate.of(2026, 3, 4) to 1,
-                LocalDate.of(2026, 3, 5) to 1,
-                LocalDate.of(2026, 3, 6) to 1,
-                LocalDate.of(2026, 3, 10) to 1,
-                LocalDate.of(2026, 3, 11) to 1
-            ),
-            today
-        )
-        render(status)
+    fun incompleteWeekShowsProgressWithoutTheCarriedStreakCount() {
+        render(incompleteWeek())
         composeRule.onNodeWithText(testString(R.string.weekly_goal_progress, 2, 4)).assertIsDisplayed()
         composeRule.onNodeWithTag("overview-weekly-streak").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(testQuantity(R.plurals.weekly_goal_streak, 1)).assertIsDisplayed()
+        composeRule.onNodeWithTag("calendar-trophy-pending", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.weekly_goal_streak_pending)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testQuantity(R.plurals.weekly_goal_streak, 1)).assertDoesNotExist()
+        composeRule.onAllNodesWithTag("calendar-trophy-count", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("0").assertCountEquals(0)
     }
 
@@ -71,7 +63,10 @@ class OverviewCalendarGoalTest {
         )
         render(status)
         composeRule.onNodeWithText(testString(R.string.weekly_goal_progress, 2, 2)).assertIsDisplayed()
+        composeRule.onNodeWithTag("calendar-trophy-achieved", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(testQuantity(R.plurals.weekly_goal_streak, 1)).assertIsDisplayed()
+        composeRule.onNodeWithTag("calendar-trophy-count", useUnmergedTree = true).assertTextEquals("1")
+        composeRule.onAllNodesWithTag("calendar-trophy-pending", useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test
@@ -87,21 +82,82 @@ class OverviewCalendarGoalTest {
         render(status, expanded = true)
         composeRule.onNodeWithContentDescription(testQuantity(R.plurals.weekly_goal_streak, 1)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(testQuantity(R.plurals.weekly_goal_streak, 2)).assertIsDisplayed()
+        val counts = composeRule.onAllNodesWithTag("calendar-trophy-count", useUnmergedTree = true)
+        counts.assertCountEquals(2)
+        counts[0].assertTextEquals("1")
+        counts[1].assertTextEquals("2")
+        composeRule.onAllNodesWithTag("calendar-trophy-pending", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun currentWeekBelowGoalShowsAnOutlineTrophyAndKeepsThePreviousWeekCount() {
+        render(incompleteWeek(), expanded = true)
+        composeRule.onAllNodesWithTag("calendar-trophy-pending", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onNodeWithContentDescription(testString(R.string.weekly_goal_streak_pending)).assertIsDisplayed()
+        composeRule.onAllNodesWithTag("calendar-trophy-achieved", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription(testQuantity(R.plurals.weekly_goal_streak, 1)).assertCountEquals(1)
+        val counts = composeRule.onAllNodesWithTag("calendar-trophy-count", useUnmergedTree = true)
+        counts.assertCountEquals(1)
+        counts[0].assertTextEquals("1")
+    }
+
+    @Test
+    fun futureWeeksStayUnmarkedWhileTheCurrentWeekIsStillOpen() {
+        render(incompleteWeek(), expanded = true)
+        composeRule.onAllNodesWithTag("calendar-trophy-pending", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithTag("calendar-trophy-achieved", useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun plannedAndCompletedDaysStayDistinctWhenTodayIsSelected() {
+        render(
+            status = WeeklyGoalLogic.evaluate(emptyList(), emptyMap(), today),
+            planned = mapOf(today to 1),
+            completed = mapOf(LocalDate.of(2026, 3, 11) to 1),
+            selectedDate = today
+        )
+        composeRule.onAllNodesWithTag("calendar-planned-outline", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithTag("calendar-completed-fill", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithTag("calendar-today-marker", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithTag("calendar-selection-ring", useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    private fun incompleteWeek(): app.mymusclemap.domain.workout.WeeklyGoalStatus {
+        return WeeklyGoalLogic.evaluate(
+            listOf(WeeklyGoalRevision(LocalDate.of(2026, 3, 2), 4, graceWeek = false)),
+            mapOf(
+                LocalDate.of(2026, 3, 3) to 1,
+                LocalDate.of(2026, 3, 4) to 1,
+                LocalDate.of(2026, 3, 5) to 1,
+                LocalDate.of(2026, 3, 6) to 1,
+                LocalDate.of(2026, 3, 10) to 1,
+                LocalDate.of(2026, 3, 11) to 1
+            ),
+            today
+        )
     }
 
     private fun render(
         status: app.mymusclemap.domain.workout.WeeklyGoalStatus,
         expanded: Boolean = false,
-        onConfigureGoal: () -> Unit = {}
+        onConfigureGoal: () -> Unit = {},
+        planned: Map<LocalDate, Int> = emptyMap(),
+        completed: Map<LocalDate, Int> = emptyMap(),
+        selectedDate: LocalDate? = null
     ) {
         val month = java.time.YearMonth.from(today)
         composeRule.setContent {
             WeightTrackerThemeForPreview {
                 OverviewCalendar(
-                    monthGrid = MonthGridCalculator.grid(month, today),
+                    monthGrid = MonthGridCalculator.grid(
+                        month = month,
+                        today = today,
+                        completedWorkoutCounts = completed,
+                        plannedWorkoutCounts = planned
+                    ),
                     displayedMonth = month,
                     today = today,
-                    selectedDate = null,
+                    selectedDate = selectedDate,
                     onDisplayedMonthChange = {},
                     onPreviousMonth = {},
                     onNextMonth = {},

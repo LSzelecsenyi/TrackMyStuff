@@ -37,8 +37,6 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.FileDownload
-import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material3.AlertDialog
@@ -86,7 +84,6 @@ import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.data.appbackup.AppBackupError
 import app.mymusclemap.data.appbackup.AppBackupErrorCode
-import app.mymusclemap.domain.csv.WeightCsv
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.theme.PaletteDraft
 import app.mymusclemap.domain.theme.PaletteDraftLogic
@@ -125,8 +122,6 @@ internal const val SETTINGS_RESET = "settings-reset"
 internal const val SETTINGS_SAVE_BAR = "settings-save-bar"
 internal const val SETTINGS_SAVE = "settings-save"
 internal const val SETTINGS_CANCEL = "settings-cancel"
-internal const val SETTINGS_EXPORT = "settings-export"
-internal const val SETTINGS_IMPORT = "settings-import"
 internal const val SETTINGS_APP_BACKUP_EXPORT = "settings-app-backup-export"
 internal const val SETTINGS_APP_BACKUP_RESTORE = "settings-app-backup-restore"
 internal const val SETTINGS_HELP_TIPS = "settings-help-tips"
@@ -170,13 +165,8 @@ fun SettingsScreen(
     onSaveDraft: () -> Unit,
     onCancelDraft: () -> Unit,
     onResetCustomDraft: () -> Unit,
-    onExportClick: () -> Unit,
-    onImportClick: () -> Unit,
     onAppBackupExportClick: () -> Unit,
     onRestoreClick: () -> Unit,
-    onConfirmImportExplanation: () -> Unit,
-    onDismissImportExplanation: () -> Unit,
-    onDismissImportErrors: () -> Unit,
     onConfirmRestoreExplanation: () -> Unit,
     onDismissRestoreExplanation: () -> Unit,
     onDismissRestoreErrors: () -> Unit,
@@ -281,11 +271,6 @@ fun SettingsScreen(
                     onOpenLockScreenAccessSettings = onOpenLockScreenAccessSettings
                 )
                 CompactEditorDivider()
-                DataSection(
-                    onExportClick = onExportClick,
-                    onImportClick = onImportClick
-                )
-                CompactEditorDivider()
                 AppBackupSection(
                     onExportClick = onAppBackupExportClick,
                     onRestoreClick = onRestoreClick
@@ -365,47 +350,6 @@ fun SettingsScreen(
                     modifier = Modifier.testTag(SETTINGS_LOCK_SCREEN_NOT_NOW)
                 ) {
                     Text(stringResource(R.string.settings_lock_screen_not_now))
-                }
-            }
-        )
-    }
-    if (state.showImportExplanation) {
-        AlertDialog(
-            onDismissRequest = onDismissImportExplanation,
-            title = { Text(stringResource(R.string.import_explain_title)) },
-            text = { Text(stringResource(R.string.import_explain_body)) },
-            confirmButton = {
-                TextButton(onClick = onConfirmImportExplanation) {
-                    Text(stringResource(R.string.action_continue))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissImportExplanation) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
-    if (state.importErrors.isNotEmpty()) {
-        AlertDialog(
-            onDismissRequest = onDismissImportErrors,
-            title = { Text(stringResource(R.string.import_error_title)) },
-            text = {
-                Column {
-                    state.importErrors.take(8).forEach { error ->
-                        Text(
-                            text = stringResource(
-                                R.string.import_error_line,
-                                error.lineNumber,
-                                csvErrorText(error)
-                            )
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onDismissImportErrors) {
-                    Text(stringResource(R.string.action_ok))
                 }
             }
         )
@@ -565,12 +509,14 @@ private fun AppearanceSection(
         Column(modifier = Modifier.selectableGroup()) {
             ChoiceRow(
                 label = stringResource(R.string.palette_default),
+                supporting = stringResource(R.string.palette_default_body),
                 selected = !customSelected,
                 testTag = SETTINGS_PALETTE_DEFAULT,
                 onClick = onSelectDefaultPalette
             )
             ChoiceRow(
                 label = stringResource(R.string.palette_custom),
+                supporting = stringResource(R.string.palette_custom_body),
                 selected = customSelected,
                 testTag = SETTINGS_PALETTE_CUSTOM,
                 onClick = onSelectCustomPalette
@@ -625,7 +571,7 @@ private fun CustomPaletteEditor(
             onEditingDarkChange = onEditingDarkChange
         )
         Spacer(Modifier.height(AppDimens.itemGap))
-        SeedField.entries.forEach { field ->
+        SeedField.editorFields.forEach { field ->
             key(field, draft.editingDark) {
                 ColorFieldRow(
                     field = field,
@@ -881,7 +827,8 @@ private fun ChoiceRow(
     label: String,
     selected: Boolean,
     testTag: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    supporting: String? = null
 ) {
     Row(
         modifier = Modifier
@@ -896,14 +843,25 @@ private fun ChoiceRow(
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            style = AppTypeTokens.sectionTitle,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (supporting != null) {
+                Spacer(Modifier.height(AppDimens.statSecondaryGap))
+                Text(
+                    text = supporting,
+                    style = AppTypeTokens.sectionSubtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
         if (selected) {
             Icon(
                 imageVector = Icons.Filled.Check,
@@ -998,29 +956,6 @@ private fun LockScreenSetCompletionRow(
         TextButton(onClick = onOpenSettings) {
             Text(stringResource(R.string.action_open_settings))
         }
-    }
-}
-
-@Composable
-private fun DataSection(
-    onExportClick: () -> Unit,
-    onImportClick: () -> Unit
-) {
-    CompactEditorSection(title = settingsKicker(stringResource(R.string.data_title))) {
-        DataActionRow(
-            icon = Icons.Outlined.FileUpload,
-            title = stringResource(R.string.action_export_weight),
-            subtitle = stringResource(R.string.action_export_weight_subtitle),
-            testTag = SETTINGS_EXPORT,
-            onClick = onExportClick
-        )
-        DataActionRow(
-            icon = Icons.Outlined.FileDownload,
-            title = stringResource(R.string.action_import_weight),
-            subtitle = stringResource(R.string.action_import_weight_subtitle),
-            testTag = SETTINGS_IMPORT,
-            onClick = onImportClick
-        )
     }
 }
 
@@ -1184,20 +1119,6 @@ private fun DataActionRow(
 }
 
 @Composable
-private fun csvErrorText(error: WeightCsv.RowError): String {
-    val reason = when (error.reason) {
-        WeightCsv.CsvErrorReason.MissingHeader -> stringResource(R.string.csv_error_missing_header)
-        WeightCsv.CsvErrorReason.InvalidHeader -> stringResource(R.string.csv_error_invalid_header)
-        WeightCsv.CsvErrorReason.WrongColumnCount -> stringResource(R.string.csv_error_columns)
-        WeightCsv.CsvErrorReason.InvalidDate -> stringResource(R.string.csv_error_date)
-        WeightCsv.CsvErrorReason.FutureDate -> stringResource(R.string.csv_error_future)
-        WeightCsv.CsvErrorReason.InvalidWeight -> stringResource(R.string.csv_error_weight)
-        WeightCsv.CsvErrorReason.DuplicateDateInFile -> stringResource(R.string.csv_error_duplicate)
-    }
-    return if (error.detail.isNullOrBlank()) reason else "$reason (${error.detail})"
-}
-
-@Composable
 private fun restoreErrorText(error: AppBackupError): String {
     val reason = when (error.code) {
         AppBackupErrorCode.UnsupportedFormatVersion,
@@ -1309,13 +1230,8 @@ private fun SettingsPreview() {
             onSaveDraft = {},
             onCancelDraft = {},
             onResetCustomDraft = {},
-            onExportClick = {},
-            onImportClick = {},
             onAppBackupExportClick = {},
             onRestoreClick = {},
-            onConfirmImportExplanation = {},
-            onDismissImportExplanation = {},
-            onDismissImportErrors = {},
             onConfirmRestoreExplanation = {},
             onDismissRestoreExplanation = {},
             onDismissRestoreErrors = {},

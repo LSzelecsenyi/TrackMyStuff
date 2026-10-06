@@ -16,7 +16,6 @@ class FounderProgramRuleSelectionTest {
         assertEquals(true, rules.feedbackRequired)
         assertEquals(true, rules.testerAnalyticsReportRequired)
         assertEquals(false, rules == FounderProgramRules.Production)
-        assertEquals(true, FounderDebugReviewAccess.available)
         assertEquals(FounderProgramAvailability.Open, FounderProgramAvailabilitySelection.availability)
     }
 }

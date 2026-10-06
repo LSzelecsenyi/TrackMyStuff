@@ -46,7 +46,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.domain.entitlement.FounderProgramRules
-import app.mymusclemap.domain.entitlement.FounderProgramStatus
 import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.AppDimens
@@ -76,9 +75,7 @@ fun FounderProgramScreen(
     onResumeSession: () -> Unit = {},
     onFeedbackChange: (String) -> Unit,
     onSubmitReport: () -> Unit,
-    onAcknowledgeMilestone: () -> Unit,
-    onApprove: () -> Unit,
-    onReject: (String) -> Unit
+    onAcknowledgeMilestone: () -> Unit
 ) {
     Scaffold(
         modifier = Modifier
@@ -167,11 +164,6 @@ fun FounderProgramScreen(
                             onSubmitReport = onSubmitReport
                         )
                     }
-                    FounderDebugReview(
-                        status = state.status,
-                        onApprove = onApprove,
-                        onReject = onReject
-                    )
                     Spacer(Modifier.height(AppDimens.sectionGap))
                 }
             }
@@ -845,9 +837,7 @@ fun FounderProgramRoute(
     onResumeSession: () -> Unit = {},
     onFeedbackChange: (String) -> Unit,
     onSubmitReport: () -> Unit,
-    onAcknowledgeMilestone: () -> Unit,
-    onApprove: () -> Unit,
-    onReject: (String) -> Unit
+    onAcknowledgeMilestone: () -> Unit
 ) {
     FounderProgramScreen(
         state = state,
@@ -856,8 +846,6 @@ fun FounderProgramRoute(
         onResumeSession = onResumeSession,
         onFeedbackChange = onFeedbackChange,
         onSubmitReport = onSubmitReport,
-        onAcknowledgeMilestone = onAcknowledgeMilestone,
-        onApprove = onApprove,
-        onReject = onReject
+        onAcknowledgeMilestone = onAcknowledgeMilestone
     )
 }

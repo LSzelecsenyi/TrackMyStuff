@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 
 @Composable
 fun SegmentedControl(
@@ -41,7 +42,8 @@ fun SegmentedControl(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     optionTestTags: List<String> = emptyList(),
-    lockedIndices: Set<Int> = emptySet()
+    lockedIndices: Set<Int> = emptySet(),
+    brandFieldSelection: Boolean = false
 ) {
     val shape = if (compact) AppShapeTokens.compact else RoundedCornerShape(16.dp)
     val rowModifier = if (compact) {
@@ -59,6 +61,9 @@ fun SegmentedControl(
             .padding(4.dp)
     }
     val lockedState = stringResource(R.string.pro_badge)
+    val filledBrandSelection = brandFieldSelection && !compact
+    val brandContainer = StrictBrand.actionContainer()
+    val brandContent = StrictBrand.onAction()
     Row(
         modifier = rowModifier,
         horizontalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp)
@@ -82,6 +87,7 @@ fun SegmentedControl(
                         when {
                             compact && selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                             compact -> Color.Transparent
+                            selected && filledBrandSelection -> brandContainer
                             selected -> MaterialTheme.colorScheme.primary
                             else -> MaterialTheme.colorScheme.surfaceContainer
                         }
@@ -103,6 +109,7 @@ fun SegmentedControl(
                     color = when {
                         compact && selected -> MaterialTheme.colorScheme.primary
                         compact -> MaterialTheme.colorScheme.onSurfaceVariant
+                        selected && filledBrandSelection -> brandContent
                         selected -> MaterialTheme.colorScheme.onPrimary
                         else -> MaterialTheme.colorScheme.onSurface
                     },

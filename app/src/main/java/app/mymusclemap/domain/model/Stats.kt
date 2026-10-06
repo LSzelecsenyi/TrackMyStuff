@@ -35,8 +35,3 @@ enum class SaveOutcome {
     Created,
     Updated
 }
-
-data class UpsertSummary(
-    val createdCount: Int,
-    val updatedCount: Int
-)

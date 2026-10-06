@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalResources
@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
@@ -49,11 +50,13 @@ import app.mymusclemap.domain.calendar.CalendarCell
 import app.mymusclemap.domain.calendar.CalendarDayCopy
 import app.mymusclemap.domain.calendar.CalendarWorkoutMark
 import app.mymusclemap.domain.calendar.MonthGrid
+import app.mymusclemap.domain.calendar.WeekCalendar
 import app.mymusclemap.domain.locale.AppLocale
+import app.mymusclemap.domain.workout.WeekProgress
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
-import app.mymusclemap.ui.theme.WorkoutColors
+import app.mymusclemap.ui.theme.StrictBrand
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -70,10 +73,17 @@ fun MonthCalendar(
     showLegend: Boolean = true,
     onCollapse: (() -> Unit)? = null,
     onTodayBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
-    streakForWeek: (LocalDate) -> Int = { 0 }
+    progressForWeek: (LocalDate) -> WeekProgress? = { null }
 ) {
     val locale = AppLocale.UI
-    val showStreakColumn = grid.weeks.any { week -> streakForWeek(week.first().date) > 0 }
+    val currentWeekStart = grid.cells.firstOrNull { it.isToday }?.let { WeekCalendar.start(it.date) }
+    fun treatmentFor(weekStart: LocalDate): WeekTrophyTreatment {
+        val progress = progressForWeek(weekStart) ?: return WeekTrophyTreatment.Hidden
+        return weekTrophyTreatment(progress, weekStart == currentWeekStart)
+    }
+    val showTrophyLane = grid.weeks.any { week ->
+        treatmentFor(week.first().date) != WeekTrophyTreatment.Hidden
+    }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -119,42 +129,57 @@ fun MonthCalendar(
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            if (showStreakColumn) {
-                Spacer(Modifier.width(StreakColumnWidth))
-            }
-            weekdayOrder().forEach { day ->
-                Text(
-                    text = day.getDisplayName(TextStyle.SHORT, locale),
-                    style = AppTypeTokens.statCaption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1
-                )
-            }
-        }
-        Spacer(Modifier.height(2.dp))
-        grid.weeks.forEach { week ->
-            val weekStart = week.first().date
-            val streak = streakForWeek(weekStart)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                if (showStreakColumn) {
-                    WeekStreakMark(streak)
-                }
-                week.forEach { cell ->
-                    CalendarDayCell(
-                        cell = cell,
-                        selected = selectedDate == cell.date,
-                        enabled = isDayEnabled(cell),
-                        onClick = { onDayClick(cell.date) },
-                        onTodayBounds = onTodayBounds,
-                        modifier = Modifier.weight(1f)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("calendar-month-grid")
+        ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                if (showTrophyLane) {
+                    Spacer(
+                        Modifier
+                            .width(WeekTrophyLane)
+                            .testTag("calendar-trophy-lane")
                     )
+                }
+                weekdayOrder().forEach { day ->
+                    Text(
+                        text = day.getDisplayName(TextStyle.SHORT, locale),
+                        style = AppTypeTokens.statCaption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("calendar-weekday"),
+                        maxLines = 1
+                    )
+                }
+            }
+            Spacer(Modifier.height(2.dp))
+            grid.weeks.forEach { week ->
+                val weekStart = week.first().date
+                val progress = progressForWeek(weekStart)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (showTrophyLane) {
+                        WeekStreakMark(
+                            progress = progress,
+                            isCurrentWeek = weekStart == currentWeekStart
+                        )
+                    }
+                    week.forEach { cell ->
+                        CalendarDayCell(
+                            cell = cell,
+                            selected = selectedDate == cell.date,
+                            enabled = isDayEnabled(cell),
+                            onClick = { onDayClick(cell.date) },
+                            onTodayBounds = onTodayBounds,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }
@@ -165,46 +190,95 @@ fun MonthCalendar(
     }
 }
 
-private val StreakColumnWidth = 52.dp
+private val WeekTrophyLane = 28.dp
 internal val WeeklyStreakIconSize = 22.dp
+internal val PlannedOutlineWidth = 3.dp
 
 @Composable
 internal fun WeekStreakBadge(
     streak: Int,
-    modifier: Modifier = Modifier
+    pending: Boolean,
+    showCount: Boolean,
+    modifier: Modifier = Modifier,
+    stacked: Boolean = false
 ) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Filled.EmojiEvents,
-            contentDescription = pluralStringResource(R.plurals.weekly_goal_streak, streak, streak),
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(WeeklyStreakIconSize)
-        )
-        Text(
-            text = streak.toString(),
-            style = AppTypeTokens.sectionTitle,
-            color = MaterialTheme.colorScheme.primary,
-            maxLines = 1
-        )
+    val description = if (pending) {
+        stringResource(R.string.weekly_goal_streak_pending)
+    } else {
+        pluralStringResource(R.plurals.weekly_goal_streak, streak, streak)
+    }
+    val icon = if (pending) Icons.Outlined.EmojiEvents else Icons.Filled.EmojiEvents
+    val iconTag = if (pending) "calendar-trophy-pending" else "calendar-trophy-achieved"
+    if (stacked) {
+        Column(
+            modifier = modifier,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            TrophyIcon(icon, description, iconTag)
+            if (showCount) {
+                TrophyCount(streak, stacked = true)
+            }
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            TrophyIcon(icon, description, iconTag)
+            if (showCount) {
+                TrophyCount(streak, stacked = false)
+            }
+        }
     }
 }
 
 @Composable
-private fun WeekStreakMark(streak: Int) {
+private fun TrophyIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    iconTag: String
+) {
+    Icon(
+        imageVector = icon,
+        contentDescription = description,
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .size(WeeklyStreakIconSize)
+            .testTag(iconTag)
+    )
+}
+
+@Composable
+private fun TrophyCount(streak: Int, stacked: Boolean) {
+    Text(
+        text = streak.toString(),
+        style = if (stacked) AppTypeTokens.statCaption else AppTypeTokens.sectionTitle,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        overflow = TextOverflow.Clip,
+        modifier = Modifier.testTag("calendar-trophy-count")
+    )
+}
+
+@Composable
+private fun WeekStreakMark(progress: WeekProgress?, isCurrentWeek: Boolean) {
+    val treatment = progress?.let { weekTrophyTreatment(it, isCurrentWeek) } ?: WeekTrophyTreatment.Hidden
     Box(
         modifier = Modifier
-            .width(StreakColumnWidth)
+            .width(WeekTrophyLane)
             .height(AppDimens.calendarCell)
-            .padding(start = 4.dp, end = 2.dp)
             .testTag("calendar-week-streak"),
-        contentAlignment = Alignment.CenterEnd
+        contentAlignment = Alignment.Center
     ) {
-        if (streak > 0) {
-            WeekStreakBadge(streak)
+        if (progress != null && treatment != WeekTrophyTreatment.Hidden) {
+            WeekStreakBadge(
+                streak = progress.streak,
+                pending = treatment == WeekTrophyTreatment.Pending,
+                showCount = treatment == WeekTrophyTreatment.Achieved,
+                stacked = true
+            )
         }
     }
 }
@@ -227,7 +301,7 @@ private fun CalendarLegend() {
             Box(
                 modifier = Modifier
                     .size(12.dp)
-                    .background(workoutAccent(), AppShapeTokens.compact)
+                    .background(StrictBrand.lime, AppShapeTokens.compact)
             )
             Text(
                 text = stringResource(R.string.calendar_legend_workout),
@@ -243,7 +317,7 @@ private fun CalendarLegend() {
             Box(
                 modifier = Modifier
                     .size(12.dp)
-                    .border(1.5.dp, workoutAccent(), AppShapeTokens.compact)
+                    .border(2.dp, StrictBrand.lime, AppShapeTokens.compact)
             )
             Text(
                 text = stringResource(R.string.calendar_legend_planned),
@@ -273,23 +347,22 @@ internal fun CalendarDayCell(
         isFuture = cell.isFuture,
         plannedWorkoutCount = cell.plannedWorkoutCount
     )
-    val luminance = MaterialTheme.colorScheme.background.luminance()
-    val workout = WorkoutColors.accent(luminance)
-    val onWorkout = WorkoutColors.onAccent(luminance)
+    val onCompleted = StrictBrand.dark
+    val chrome = calendarDayChrome(
+        mark = mark,
+        selected = selected,
+        selectionColor = MaterialTheme.colorScheme.primary,
+        selectionRingColor = MaterialTheme.colorScheme.onSurface
+    )
     val shape = AppShapeTokens.compact
     val textColor = when {
-        mark == CalendarWorkoutMark.Completed -> onWorkout
+        mark == CalendarWorkoutMark.Completed -> onCompleted
         !cell.inDisplayedMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
         !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
         selected -> MaterialTheme.colorScheme.primary
         cell.isFuture && mark == CalendarWorkoutMark.None ->
             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
         else -> MaterialTheme.colorScheme.onSurface
-    }
-    val borderColor = when (mark) {
-        CalendarWorkoutMark.Planned -> workout
-        CalendarWorkoutMark.None -> if (selected) MaterialTheme.colorScheme.primary else null
-        CalendarWorkoutMark.Completed -> null
     }
     val workoutTag = when (mark) {
         CalendarWorkoutMark.Completed -> "calendar-completed-fill"
@@ -301,14 +374,14 @@ internal fun CalendarDayCell(
             .height(cellHeight)
             .padding(horizontal = 2.dp, vertical = 1.dp)
             .then(
-                if (borderColor != null) {
-                    Modifier.border(1.5.dp, borderColor, shape)
+                if (chrome.outline != null) {
+                    Modifier.border(chrome.outlineWidth, chrome.outline, shape)
                 } else {
                     Modifier
                 }
             )
             .clip(shape)
-            .background(if (mark == CalendarWorkoutMark.Completed) workout else Color.Transparent)
+            .background(chrome.fill ?: Color.Transparent)
             .clickable(enabled = enabled, onClick = onClick)
             .then(
                 if (cell.isToday) {
@@ -323,12 +396,14 @@ internal fun CalendarDayCell(
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center
     ) {
-        if (selected && mark == CalendarWorkoutMark.Completed) {
+        if (chrome.selectionRing != null) {
+            val ringInset = if (mark == CalendarWorkoutMark.Planned) PlannedOutlineWidth + 1.dp else 3.dp
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(3.dp)
-                    .border(1.dp, onWorkout, shape)
+                    .padding(ringInset)
+                    .border(1.dp, chrome.selectionRing, shape)
+                    .testTag("calendar-selection-ring")
             )
         }
         Text(
@@ -347,20 +422,64 @@ internal fun CalendarDayCell(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 3.dp)
+                    .padding(bottom = if (mark == CalendarWorkoutMark.Planned) PlannedOutlineWidth + 2.dp else 3.dp)
                     .width(12.dp)
                     .height(2.dp)
                     .clip(CircleShape)
-                    .background(if (mark == CalendarWorkoutMark.Completed) onWorkout else MaterialTheme.colorScheme.onSurface)
+                    .background(if (mark == CalendarWorkoutMark.Completed) onCompleted else MaterialTheme.colorScheme.onSurface)
                     .testTag("calendar-today-marker")
             )
         }
     }
 }
 
-@Composable
-internal fun workoutAccent(): Color {
-    return WorkoutColors.accent(MaterialTheme.colorScheme.background.luminance())
+internal enum class WeekTrophyTreatment {
+    Hidden,
+    Pending,
+    Achieved
+}
+
+internal fun weekTrophyTreatment(progress: WeekProgress, isCurrentWeek: Boolean): WeekTrophyTreatment {
+    if (progress.goal == null) return WeekTrophyTreatment.Hidden
+    if (isCurrentWeek && !progress.achieved) return WeekTrophyTreatment.Pending
+    if (isCurrentWeek && progress.achieved) return WeekTrophyTreatment.Achieved
+    if (progress.streak > 0) return WeekTrophyTreatment.Achieved
+    return WeekTrophyTreatment.Hidden
+}
+
+internal data class CalendarDayChrome(
+    val fill: Color?,
+    val outline: Color?,
+    val outlineWidth: Dp,
+    val selectionRing: Color?
+)
+
+internal fun calendarDayChrome(
+    mark: CalendarWorkoutMark,
+    selected: Boolean,
+    selectionColor: Color,
+    selectionRingColor: Color
+): CalendarDayChrome {
+    return when (mark) {
+        CalendarWorkoutMark.Completed -> CalendarDayChrome(
+            fill = StrictBrand.lime,
+            outline = null,
+            outlineWidth = 0.dp,
+            selectionRing = if (selected) StrictBrand.dark else null
+        )
+        CalendarWorkoutMark.Planned -> CalendarDayChrome(
+            fill = null,
+            outline = StrictBrand.lime,
+            outlineWidth = PlannedOutlineWidth,
+            selectionRing = if (selected) selectionRingColor else null
+        )
+        CalendarWorkoutMark.None -> CalendarDayChrome(
+            fill = null,
+            outline = if (selected) selectionColor else null,
+            outlineWidth = if (selected) 1.5.dp else 0.dp,
+            selectionRing = null
+        )
+    }
 }
 
 internal fun weekdayOrder(): List<DayOfWeek> {

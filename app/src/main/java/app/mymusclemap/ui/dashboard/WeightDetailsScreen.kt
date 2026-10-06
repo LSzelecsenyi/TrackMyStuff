@@ -63,6 +63,7 @@ import app.mymusclemap.ui.progress.ProgressPhotosOverviewCard
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,7 +132,8 @@ fun WeightDetailsScreen(
             SegmentedControl(
                 options = ranges.map { stringResource(it.labelRes()) },
                 selectedIndex = ranges.indexOf(state.chartRange).coerceAtLeast(0),
-                onSelected = { onChartRangeSelected(ranges[it]) }
+                onSelected = { onChartRangeSelected(ranges[it]) },
+                brandFieldSelection = true
             )
             Spacer(Modifier.height(AppDimens.itemGap))
             WeightChartBlock(
@@ -238,7 +240,8 @@ internal fun WeightHeroSection(
         Spacer(Modifier.height(16.dp))
         Button(
             onClick = onAddToday,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = StrictBrand.actionButtonColors()
         ) {
             Text(
                 text = stringResource(
