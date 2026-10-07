@@ -1206,9 +1206,15 @@ fun WeightTrackerNavHost(
                 )
             }
             composable(AppRoutes.ACHIEVEMENTS) {
+                val wall by achievementsViewModel.presentation.collectAsStateWithLifecycle()
+                val openedBadge by achievementsViewModel.openedBadgeId.collectAsStateWithLifecycle()
                 AchievementsScreen(
-                    items = achievementBoard.items,
-                    onBack = { navController.popBackStack() }
+                    presentation = wall,
+                    onBack = { navController.popBackStack() },
+                    onFilterSelected = achievementsViewModel::selectFilter,
+                    selectedBadgeId = openedBadge,
+                    onBadgeSelected = achievementsViewModel::openBadge,
+                    onDismissBadge = achievementsViewModel::closeBadge
                 )
             }
             composable(

@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.time.Clock
+import kotlin.coroutines.cancellation.CancellationException
 
 class WorkoutTemplateRepository(
     private val templateDao: WorkoutTemplateDao,
@@ -33,7 +34,8 @@ class WorkoutTemplateRepository(
     private val clock: Clock,
     private val sessionDao: WorkoutSessionDao? = null,
     private val scheduledWorkoutDao: ScheduledWorkoutDao? = null,
-    private val dateProvider: DateProvider = SystemDateProvider(clock)
+    private val dateProvider: DateProvider = SystemDateProvider(clock),
+    private val onPlansChanged: suspend () -> Unit = {}
 ) {
     fun observeActiveCount(): Flow<Int> = templateDao.observeActiveCount()
 
@@ -169,6 +171,7 @@ class WorkoutTemplateRepository(
         return try {
             val id = templateDao.saveAggregate(template, children)
             if (existing == null) {
+                notifyPlansChanged()
                 TemplateSaveResult.Created(id)
             } else {
                 TemplateSaveResult.Updated(id)
@@ -214,7 +217,17 @@ class WorkoutTemplateRepository(
             cancelledAt = clock.millis()
         )
         templateDao.deleteTemplate(id)
+        notifyPlansChanged()
         return TemplateDeleteResult.Deleted
+    }
+
+    private suspend fun notifyPlansChanged() {
+        try {
+            onPlansChanged()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+        }
     }
 
     suspend fun hasTemplateReferences(exerciseId: Long): Boolean {

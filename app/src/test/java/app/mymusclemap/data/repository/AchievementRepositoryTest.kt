@@ -68,19 +68,31 @@ class AchievementRepositoryTest {
                 AchievementId.WORKOUTS_10,
                 AchievementId.WORKOUTS_30,
                 AchievementId.WORKOUTS_50,
-                AchievementId.WORKOUTS_100
+                AchievementId.WORKOUTS_100,
+                AchievementId.FIRST_WORKOUT
             ),
             board.items.filter { it.unlocked }.map { it.id }.toSet()
         )
-        assertEquals(137, board.items.single { it.id == AchievementId.WORKOUTS_200 }.workoutProgress!!.current)
+        assertEquals(20L, board.items.single { it.id == AchievementId.FIRST_WORKOUT }.unlockedAt)
+        assertEquals(137, board.items.single { it.id == AchievementId.WORKOUTS_200 }.countProgress!!.current)
         assertTrue(board.items.filter { it.unlocked }.all { it.unlockedAt != null })
-        assertTrue(database.achievementDao().unlocks().all { it.celebratedAt != null })
-        val pending = board.pending.single()
-        assertTrue(pending is PendingCelebration.HistoryRecognized)
-        assertEquals(5, (pending as PendingCelebration.HistoryRecognized).badgeCount)
+        val workoutUnlocks = database.achievementDao().unlocks()
+            .filter { AchievementId.fromStorage(it.achievementId)?.workoutThreshold != null }
+        assertTrue(workoutUnlocks.all { it.celebratedAt != null })
+        assertNull(
+            database.achievementDao().unlocks()
+                .single { it.achievementId == AchievementId.FIRST_WORKOUT.name }
+                .celebratedAt
+        )
+        val history = board.pending.filterIsInstance<PendingCelebration.HistoryRecognized>().single()
+        assertEquals(5, history.badgeCount)
+        assertTrue(
+            board.pending.filterIsInstance<PendingCelebration.JourneyUnlocked>()
+                .single().achievementId == AchievementId.FIRST_WORKOUT
+        )
         repository.reconcile()
-        assertEquals(1, repository.board().pending.size)
-        repository.acknowledge(listOf(pending.acknowledgement))
+        assertEquals(2, repository.board().pending.size)
+        repository.acknowledge(repository.board().pending.map { it.acknowledgement })
         assertTrue(repository.board().pending.isEmpty())
         repository.reconcile()
         assertTrue(repository.board().pending.isEmpty())
@@ -135,7 +147,8 @@ class AchievementRepositoryTest {
         )
         repository.reconcile()
         assertEquals(2, repository.board().completedWorkoutCount)
-        assertTrue(repository.board().items.none { it.unlocked })
+        assertTrue(repository.board().items.none { it.unlocked && it.id.workoutThreshold != null })
+        assertTrue(repository.board().items.single { it.id == AchievementId.FIRST_WORKOUT }.unlocked)
     }
 
     @Test

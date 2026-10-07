@@ -28,6 +28,9 @@ abstract class WorkoutTemplateDao {
     @Query("SELECT COUNT(*) FROM workout_templates")
     abstract suspend fun countAll(): Int
 
+    @Query("SELECT MIN(createdAt) FROM workout_templates")
+    abstract suspend fun earliestCreatedAt(): Long?
+
     @Query("SELECT * FROM workout_template_exercises ORDER BY templateId ASC, position ASC, id ASC")
     abstract fun observeExercises(): Flow<List<WorkoutTemplateExerciseEntity>>
 

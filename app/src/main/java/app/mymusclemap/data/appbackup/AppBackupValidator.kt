@@ -4,6 +4,7 @@ import app.mymusclemap.data.local.ProgressEventEntity
 import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.progress.ProgressPhotoStore
 import app.mymusclemap.domain.achievements.AchievementId
+import app.mymusclemap.domain.achievements.JourneyEvaluator
 import app.mymusclemap.domain.achievements.ProgressEventKind
 import app.mymusclemap.domain.achievements.TargetWeightDirection
 import app.mymusclemap.domain.achievements.TargetWeightProgressEvaluator
@@ -419,6 +420,13 @@ object AppBackupValidator {
                 val goalId = TargetWeightProgressEvaluator.goalIdFromKey(row.dedupeKey)
                 val suffix = row.dedupeKey.substringAfterLast(':')
                 if (milestone == null || goalId == null || milestone.keySuffix != suffix) {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.dedupeKey")
+                }
+            }
+            ProgressEventKind.JOURNEY_MARKER -> {
+                if (row.dedupeKey != JourneyEvaluator.MONTHLY_REPORT_KEY ||
+                    row.payload != JourneyEvaluator.MONTHLY_REPORT_PAYLOAD
+                ) {
                     errors += AppBackupError(AppBackupErrorCode.InvalidValue, "progress_events.dedupeKey")
                 }
             }

@@ -130,6 +130,16 @@ abstract class WorkoutSessionDao {
 
     @Query(
         """
+        SELECT finishedAt, startedAt FROM workout_sessions
+        WHERE status = 'COMPLETED' AND importFingerprint IS NULL
+        ORDER BY COALESCE(finishedAt, startedAt) ASC, id ASC
+        LIMIT 1
+        """
+    )
+    abstract suspend fun earliestNativeCompleted(): NativeCompletedStamp?
+
+    @Query(
+        """
         SELECT e.* FROM workout_session_exercises e
         INNER JOIN workout_sessions s ON s.id = e.sessionId
         WHERE s.status = 'COMPLETED'

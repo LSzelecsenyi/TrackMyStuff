@@ -76,6 +76,9 @@ fun celebrationTitle(celebration: PendingCelebration): String {
         is PendingCelebration.HistoryRecognized -> stringResource(R.string.celebration_history_title)
         is PendingCelebration.WeeklyGoalCompleted -> stringResource(R.string.celebration_weekly_title)
         is PendingCelebration.WorkoutCountUnlocked -> stringResource(R.string.celebration_workout_title)
+        is PendingCelebration.WeeklyStreakUnlocked ->
+            stringResource(R.string.achievement_streak_name, celebration.weeks)
+        is PendingCelebration.JourneyUnlocked -> achievementTitle(celebration.achievementId)
         is PendingCelebration.TargetWeightMilestone -> when {
             celebration.includesLifetimeUnlock -> stringResource(R.string.achievement_on_target_name)
             celebration.milestone == app.mymusclemap.domain.achievements.WeightMilestone.HALFWAY ->
@@ -107,6 +110,11 @@ fun celebrationBody(celebration: PendingCelebration): String {
             R.string.celebration_workout_body,
             celebration.threshold
         )
+        is PendingCelebration.WeeklyStreakUnlocked -> stringResource(
+            R.string.celebration_streak_body,
+            celebration.weeks
+        )
+        is PendingCelebration.JourneyUnlocked -> achievementRequirement(celebration.achievementId)
         is PendingCelebration.TargetWeightMilestone -> when (celebration.milestone) {
             app.mymusclemap.domain.achievements.WeightMilestone.HALFWAY ->
                 stringResource(R.string.celebration_weight_halfway_body)

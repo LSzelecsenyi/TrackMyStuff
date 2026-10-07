@@ -69,8 +69,7 @@ class AchievementBackupTest {
     fun archiveRoundTripPreservesUnlocksEventsAndAcknowledgement() = runTest {
         repeat(5) { insertCompleted("kept-$it") }
         achievements.reconcile()
-        val summary = achievements.board().pending.single()
-        achievements.acknowledge(listOf(summary.acknowledgement))
+        achievements.acknowledge(achievements.board().pending.map { it.acknowledgement })
         val beforeUnlocks = database.achievementDao().unlocks()
         val beforeEvents = database.achievementDao().events()
         val beforeState = database.achievementDao().state()
@@ -81,7 +80,10 @@ class AchievementBackupTest {
         database.achievementDao().deleteEvents(beforeEvents.map { it.dedupeKey })
         val restored = backup().restore(ByteArrayInputStream(exported.toByteArray()))
         assertEquals(AppBackupRestoreResult.Success, restored)
-        assertEquals(beforeUnlocks, database.achievementDao().unlocks())
+        assertEquals(
+            beforeUnlocks.sortedBy { it.achievementId },
+            database.achievementDao().unlocks().sortedBy { it.achievementId }
+        )
         assertEquals(beforeEvents.map { it.copy(id = it.id) }, database.achievementDao().events())
         assertEquals(beforeState, database.achievementDao().state())
         assertTrue(achievements.board().pending.isEmpty())
@@ -139,6 +141,40 @@ class AchievementBackupTest {
     }
 
     @Test
+    fun archiveRoundTripPreservesAnEarnedStreakAndRestoredHistoryCanQualifyAgain() = runTest {
+        database.weeklyWorkoutGoalDao().insertAll(
+            listOf(
+                app.mymusclemap.data.local.WeeklyWorkoutGoalEntity(
+                    effectiveWeekStart = today.toString(),
+                    workoutsPerWeek = 1,
+                    graceWeek = false,
+                    createdAt = 1L,
+                    updatedAt = 1L
+                )
+            )
+        )
+        repeat(4) { week ->
+            insertCompleted("streak-$week", workoutDate = today.plusWeeks(week.toLong()))
+        }
+        val exported = ByteArrayOutputStream()
+        backup().exportArchive(source(), exported)
+        val later = AchievementRepository(
+            database,
+            clock,
+            FixedDateProvider(today.plusWeeks(3).plusDays(6))
+        )
+        val restored = backup(onAfterRestore = { later.reconcile() })
+            .restore(ByteArrayInputStream(exported.toByteArray()))
+        assertEquals(AppBackupRestoreResult.Success, restored)
+        val bronze = database.achievementDao().unlocks()
+            .single { it.achievementId == "WEEKLY_GOAL_STREAK_4" }
+        assertEquals(
+            today.plusWeeks(3).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli(),
+            bronze.unlockedAt
+        )
+    }
+
+    @Test
     fun olderBackupRestoresAndReconcilesHistoryWithoutIndividualCelebrations() = runTest {
         repeat(10) { insertCompleted("old-$it") }
         achievements.reconcile()
@@ -162,9 +198,22 @@ class AchievementBackupTest {
         val board = achievements.board()
         assertTrue(board.items.single { it.id == app.mymusclemap.domain.achievements.AchievementId.WORKOUTS_5 }.unlocked)
         assertTrue(board.items.single { it.id == app.mymusclemap.domain.achievements.AchievementId.WORKOUTS_10 }.unlocked)
+        assertTrue(board.items.single { it.id == app.mymusclemap.domain.achievements.AchievementId.FIRST_WORKOUT }.unlocked)
+        assertEquals(
+            2L,
+            board.items.single { it.id == app.mymusclemap.domain.achievements.AchievementId.FIRST_WORKOUT }.unlockedAt
+        )
         assertTrue(board.items.none { it.id == app.mymusclemap.domain.achievements.AchievementId.WORKOUTS_200 && it.unlocked })
-        assertTrue(database.achievementDao().unlocks().all { it.celebratedAt != null })
-        assertTrue(board.pending.single() is PendingCelebration.HistoryRecognized)
+        assertTrue(
+            database.achievementDao().unlocks()
+                .filter { it.achievementId.startsWith("WORKOUTS_") }
+                .all { it.celebratedAt != null }
+        )
+        assertTrue(board.pending.filterIsInstance<PendingCelebration.HistoryRecognized>().size == 1)
+        assertTrue(
+            board.pending.filterIsInstance<PendingCelebration.JourneyUnlocked>()
+                .single().achievementId == app.mymusclemap.domain.achievements.AchievementId.FIRST_WORKOUT
+        )
         assertEquals(AchievementStateEntity.SINGLETON_ID, database.achievementDao().state()!!.id)
         assertTrue(database.achievementDao().state()!!.initialized)
     }
@@ -181,13 +230,13 @@ class AchievementBackupTest {
 
     private fun source() = AppBackupSource("app.mymusclemap", "test")
 
-    private suspend fun insertCompleted(clientId: String) {
+    private suspend fun insertCompleted(clientId: String, workoutDate: LocalDate = today) {
         database.workoutSessionDao().insertSession(
             WorkoutSessionEntity(
                 templateId = null,
                 templateName = "Push",
                 status = "COMPLETED",
-                workoutDate = today.toString(),
+                workoutDate = workoutDate.toString(),
                 startedAt = 1L,
                 finishedAt = 2L,
                 abandonedAt = null,

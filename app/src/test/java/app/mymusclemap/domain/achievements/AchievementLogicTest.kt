@@ -57,8 +57,8 @@ class WorkoutCountEvaluatorTest {
         val board = AchievementBoardAssembler.assemble(137, emptyList(), emptyList())
         val twoHundred = board.items.single { it.id == AchievementId.WORKOUTS_200 }
         assertFalse(twoHundred.unlocked)
-        assertEquals(137, twoHundred.workoutProgress!!.current)
-        assertEquals(200, twoHundred.workoutProgress!!.threshold)
+        assertEquals(137, twoHundred.countProgress!!.current)
+        assertEquals(200, twoHundred.countProgress!!.threshold)
     }
 
     @Test
@@ -78,6 +78,25 @@ class WorkoutCountEvaluatorTest {
         assertFalse(AchievementId.TARGET_WEIGHT_REACHED.revokesWhenWorkoutCountDrops)
         assertEquals(AchievementCategory.GOALS, AchievementId.TARGET_WEIGHT_REACHED.category)
         assertNull(AchievementId.TARGET_WEIGHT_REACHED.workoutThreshold)
+        assertFalse(AchievementId.WEEKLY_GOAL_STREAK_12.revokesWhenWorkoutCountDrops)
+        assertEquals(BadgeFamily.WEEKLY_GOAL_STREAK, AchievementId.WEEKLY_GOAL_STREAK_4.badgeFamily)
+        assertEquals(BadgeTier.BRONZE, AchievementId.WEEKLY_GOAL_STREAK_4.badgeTier)
+        assertEquals(BadgeTier.SILVER, AchievementId.WEEKLY_GOAL_STREAK_8.badgeTier)
+        assertEquals(BadgeTier.GOLD, AchievementId.WEEKLY_GOAL_STREAK_12.badgeTier)
+        assertEquals(AchievementCategory.JOURNEY, AchievementId.FIRST_WORKOUT.category)
+        assertEquals(JourneyMilestone.FIRST_WORKOUT, AchievementId.FIRST_WORKOUT.journeyMilestone)
+        assertEquals(JourneyMilestone.FIRST_PLAN, AchievementId.FIRST_CUSTOM_WORKOUT_PLAN.journeyMilestone)
+        assertEquals(JourneyMilestone.FIRST_MONTHLY_REPORT, AchievementId.FIRST_MONTHLY_REPORT.journeyMilestone)
+        assertTrue(AchievementCatalog.journey.none { it.revokesWhenWorkoutCountDrops })
+        assertTrue(AchievementCatalog.journey.all { it.workoutThreshold == null && it.streakWeeks == null })
+        assertEquals(
+            listOf(
+                AchievementId.FIRST_WORKOUT,
+                AchievementId.FIRST_CUSTOM_WORKOUT_PLAN,
+                AchievementId.FIRST_MONTHLY_REPORT
+            ),
+            AchievementCatalog.journey
+        )
     }
 }
 

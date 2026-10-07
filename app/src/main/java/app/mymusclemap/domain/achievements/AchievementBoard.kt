@@ -1,6 +1,6 @@
 package app.mymusclemap.domain.achievements
 
-data class WorkoutCountProgress(
+data class CountProgress(
     val current: Int,
     val threshold: Int
 )
@@ -9,9 +9,11 @@ data class BadgeWallItem(
     val id: AchievementId,
     val category: AchievementCategory,
     val badgeKey: String,
+    val badgeFamily: BadgeFamily?,
+    val badgeTier: BadgeTier?,
     val unlocked: Boolean,
     val unlockedAt: Long?,
-    val workoutProgress: WorkoutCountProgress?
+    val countProgress: CountProgress?
 )
 
 data class CelebrationAcknowledgement(
@@ -44,6 +46,19 @@ sealed interface PendingCelebration {
         override val acknowledgement: CelebrationAcknowledgement
     ) : PendingCelebration
 
+    data class WeeklyStreakUnlocked(
+        val achievementId: AchievementId,
+        val weeks: Int,
+        override val triggerClientWorkoutId: String?,
+        override val acknowledgement: CelebrationAcknowledgement
+    ) : PendingCelebration
+
+    data class JourneyUnlocked(
+        val achievementId: AchievementId,
+        override val triggerClientWorkoutId: String?,
+        override val acknowledgement: CelebrationAcknowledgement
+    ) : PendingCelebration
+
     data class TargetWeightMilestone(
         val milestone: WeightMilestone,
         val includesLifetimeUnlock: Boolean,
@@ -72,30 +87,42 @@ data class AchievementBoard(
     val completedWorkoutCount: Int,
     val items: List<BadgeWallItem>,
     val next: NextWorkoutMilestone,
-    val pending: List<PendingCelebration>
+    val pending: List<PendingCelebration>,
+    /** Active target journey, when a baseline exists. Not stored as achievement progress. */
+    val targetWeightProgress: TargetWeightProgress? = null
 )
 
 object AchievementBoardAssembler {
     fun assemble(
         completedWorkoutCount: Int,
         unlocks: List<UnlockSnapshot>,
-        events: List<ProgressEventSnapshot>
+        events: List<ProgressEventSnapshot>,
+        currentStreak: Int = 0
     ): AchievementBoard {
         val unlockById = unlocks.associateBy { it.achievementId }
+        val streak = currentStreak.coerceAtLeast(0)
         val items = AchievementId.entries.map { id ->
             val unlock = unlockById[id]
-            val threshold = id.workoutThreshold
+            val workoutThreshold = id.workoutThreshold
+            val streakWeeks = id.streakWeeks
             BadgeWallItem(
                 id = id,
                 category = id.category,
                 badgeKey = id.badgeKey,
+                badgeFamily = id.badgeFamily,
+                badgeTier = id.badgeTier,
                 unlocked = unlock != null,
                 unlockedAt = unlock?.unlockedAt,
-                workoutProgress = threshold?.let { goal ->
-                    WorkoutCountProgress(
-                        current = completedWorkoutCount.coerceAtLeast(0).coerceAtMost(goal),
-                        threshold = goal
+                countProgress = when {
+                    workoutThreshold != null -> CountProgress(
+                        current = completedWorkoutCount.coerceAtLeast(0).coerceAtMost(workoutThreshold),
+                        threshold = workoutThreshold
                     )
+                    streakWeeks != null -> CountProgress(
+                        current = streak.coerceAtMost(streakWeeks),
+                        threshold = streakWeeks
+                    )
+                    else -> null
                 }
             )
         }
@@ -122,6 +149,17 @@ object AchievementBoardAssembler {
                 acknowledgement = CelebrationAcknowledgement(progressEventKey = event.dedupeKey)
             )
         }
+        val streaks = unlocks
+            .filter { it.celebratedAt == null && it.achievementId.streakWeeks != null }
+            .sortedByDescending { it.achievementId.streakWeeks }
+            .map { unlock ->
+                PendingCelebration.WeeklyStreakUnlocked(
+                    achievementId = unlock.achievementId,
+                    weeks = unlock.achievementId.streakWeeks!!,
+                    triggerClientWorkoutId = unlock.triggerClientWorkoutId,
+                    acknowledgement = CelebrationAcknowledgement(achievementId = unlock.achievementId.name)
+                )
+            }
         val weeks = events.mapNotNull { event ->
             if (event.celebratedAt != null || event.kind != ProgressEventKind.WEEKLY_GOAL_COMPLETED) {
                 return@mapNotNull null
@@ -163,6 +201,16 @@ object AchievementBoardAssembler {
                 )
             )
         }.sortedByDescending { it.milestone.priority }
-        return history + weeks + awards + weight
+        val journeys = unlocks
+            .filter { it.celebratedAt == null && it.achievementId.journeyMilestone != null }
+            .sortedByDescending { it.unlockedAt }
+            .map { unlock ->
+                PendingCelebration.JourneyUnlocked(
+                    achievementId = unlock.achievementId,
+                    triggerClientWorkoutId = unlock.triggerClientWorkoutId,
+                    acknowledgement = CelebrationAcknowledgement(achievementId = unlock.achievementId.name)
+                )
+            }
+        return history + journeys + streaks + weeks + awards + weight
     }
 }

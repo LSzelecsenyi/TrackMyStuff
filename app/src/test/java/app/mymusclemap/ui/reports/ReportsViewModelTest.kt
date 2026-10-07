@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.local.WorkoutSessionEntity
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
@@ -279,11 +280,65 @@ class ReportsViewModelTest {
         assertTrue(ReportKind.Yearly in state.lockedKinds)
     }
 
+    @Test
+    fun openingTheReportListDoesNotRecordAMonthlyReview() = runTest {
+        weights.save(LocalDate.of(2026, 8, 10), 80.0)
+        insertClosedMonthWorkout()
+        var generated = 0
+        val viewModel = viewModel(onMonthlyReportGenerated = { generated += 1 })
+        val state = viewModel.uiState.first { !it.loading && it.reports.size >= 2 }
+        assertEquals(0, generated)
+        val august = state.reports.single { it.period.startInclusive == LocalDate.of(2026, 8, 1) }.period
+        assertEquals(0, viewModel.summary(ReportKind.Monthly.name, "2026-08-01")!!.activity.workoutCount)
+        viewModel.openReport(august) {}
+        assertEquals(0, generated)
+        val september = state.reports.single { it.period.startInclusive == LocalDate.of(2026, 9, 1) }.period
+        assertTrue(viewModel.summary(ReportKind.Monthly.name, "2026-09-01")!!.activity.workoutCount > 0)
+        viewModel.onKindSelected(ReportKind.Quarterly)
+        val quarter = viewModel.uiState.first { it.kind == ReportKind.Quarterly }.reports.single().period
+        viewModel.openReport(quarter) {}
+        assertEquals(0, generated)
+        viewModel.onKindSelected(ReportKind.Monthly)
+        viewModel.openReport(september) {}
+        assertEquals(1, generated)
+    }
+
     private fun viewModel(
         entitlements: FeatureEntitlements = OpenFeatureEntitlements,
-        savedStateHandle: SavedStateHandle = SavedStateHandle()
+        savedStateHandle: SavedStateHandle = SavedStateHandle(),
+        onMonthlyReportGenerated: suspend () -> Unit = {}
     ): ReportsViewModel {
-        return ReportsViewModel(sessions, scheduled, weights, dateProvider, entitlements, savedStateHandle)
+        return ReportsViewModel(
+            sessions,
+            scheduled,
+            weights,
+            dateProvider,
+            entitlements,
+            savedStateHandle,
+            onMonthlyReportGenerated
+        )
+    }
+
+    private suspend fun insertClosedMonthWorkout() {
+        database.workoutSessionDao().insertSession(
+            WorkoutSessionEntity(
+                templateId = null,
+                templateName = "Push",
+                status = "COMPLETED",
+                workoutDate = "2026-09-15",
+                startedAt = 1L,
+                finishedAt = 2L,
+                abandonedAt = null,
+                notes = null,
+                bodyWeightKg = null,
+                bodyWeightSource = "UNKNOWN",
+                bodyWeightSourceDate = null,
+                createdAt = 1L,
+                updatedAt = 1L,
+                activeLock = null,
+                clientWorkoutId = java.util.UUID.randomUUID().toString()
+            )
+        )
     }
 
     private suspend fun completeScheduled(templateId: Long, scheduleId: Long) {

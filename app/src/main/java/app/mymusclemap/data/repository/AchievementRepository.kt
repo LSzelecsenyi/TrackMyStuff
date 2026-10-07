@@ -12,6 +12,7 @@ import app.mymusclemap.domain.achievements.AchievementBoardAssembler
 import app.mymusclemap.domain.achievements.AchievementId
 import app.mymusclemap.domain.achievements.AchievementReconciler
 import app.mymusclemap.domain.achievements.CelebrationAcknowledgement
+import app.mymusclemap.domain.achievements.JourneyEvaluator
 import app.mymusclemap.domain.achievements.ProgressEventKind
 import app.mymusclemap.domain.achievements.ProgressEventSnapshot
 import app.mymusclemap.domain.achievements.ReconcilePlan
@@ -20,9 +21,11 @@ import app.mymusclemap.domain.achievements.StoredProgressEvent
 import app.mymusclemap.domain.achievements.StoredUnlock
 import app.mymusclemap.domain.achievements.TargetWeightGoalFacts
 import app.mymusclemap.domain.achievements.TargetWeightMilestonePlanner
+import app.mymusclemap.domain.achievements.TargetWeightProgress
 import app.mymusclemap.domain.achievements.TargetWeightProgressEvaluator
 import app.mymusclemap.domain.achievements.UnlockSnapshot
 import app.mymusclemap.domain.achievements.WeeklyGoalCompletionEvaluator
+import app.mymusclemap.domain.achievements.WeeklyGoalStreakEvaluator
 import app.mymusclemap.domain.achievements.WeightMilestonePlan
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.domain.workout.WeeklyGoalRevision
@@ -41,28 +44,73 @@ class AchievementRepository(
     private val dateProvider: DateProvider
 ) {
     fun observeBoard(): Flow<AchievementBoard> {
-        return combine(
+        val awards = combine(
             database.workoutSessionDao().observeCompletedCount(),
             database.achievementDao().observeUnlocks(),
-            database.achievementDao().observeEvents()
-        ) { count, unlocks, events ->
+            database.achievementDao().observeEvents(),
+            database.weeklyWorkoutGoalDao().observeAll(),
+            database.workoutSessionDao().observeAllCompletedCounts()
+        ) { count, unlocks, events, goals, dateCounts ->
+            val status = weeklyStatus(goals, dateCounts)
             AchievementBoardAssembler.assemble(
                 completedWorkoutCount = count,
                 unlocks = unlocks.mapNotNull { it.toSnapshot() },
-                events = events.mapNotNull { it.toSnapshot() }
+                events = events.mapNotNull { it.toSnapshot() },
+                currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status)
             )
+        }
+        return combine(
+            awards,
+            database.targetWeightGoalDao().observeActive(),
+            database.weightMeasurementDao().observeAllAscending()
+        ) { board, goal, measurements ->
+            board.copy(targetWeightProgress = targetProgress(goal, measurements))
         }
     }
 
     suspend fun board(): AchievementBoard {
-        return AchievementBoardAssembler.assemble(
+        val status = weeklyStatus(
+            database.weeklyWorkoutGoalDao().getAll(),
+            database.workoutSessionDao().allCompletedCounts()
+        )
+        val assembled = AchievementBoardAssembler.assemble(
             completedWorkoutCount = database.workoutSessionDao().countCompleted(),
             unlocks = database.achievementDao().unlocks().mapNotNull { it.toSnapshot() },
-            events = database.achievementDao().events().mapNotNull { it.toSnapshot() }
+            events = database.achievementDao().events().mapNotNull { it.toSnapshot() },
+            currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status)
+        )
+        return assembled.copy(
+            targetWeightProgress = targetProgress(
+                database.targetWeightGoalDao().active(),
+                database.weightMeasurementDao().getAllAscending()
+            )
         )
     }
 
-    suspend fun reconcile(triggerClientWorkoutId: String? = null) {
+    private fun weeklyStatus(
+        goals: List<WeeklyWorkoutGoalEntity>,
+        dateCounts: List<app.mymusclemap.data.local.WorkoutDateCount>
+    ): app.mymusclemap.domain.workout.WeeklyGoalStatus {
+        return WeeklyGoalLogic.evaluate(
+            history = goals.map { it.toRevision() },
+            completedByDate = dateCounts.associate { LocalDate.parse(it.date) to it.completedCount },
+            today = dateProvider.today()
+        )
+    }
+
+    /**
+     * Records that a monthly report was generated, then reconciles.
+     * Calling this again does not move the original unlock time.
+     * There is no report history to reconstruct generations from before this marker.
+     */
+    suspend fun recordMonthlyReportGenerated() {
+        reconcile(recordMonthlyReport = true)
+    }
+
+    suspend fun reconcile(
+        triggerClientWorkoutId: String? = null,
+        recordMonthlyReport: Boolean = false
+    ) {
         database.withTransaction {
             captureWeightBaseline()
             val sessions = database.workoutSessionDao()
@@ -79,7 +127,8 @@ class AchievementRepository(
                     StoredUnlock(achievementId = id, celebratedAt = row.celebratedAt)
                 }
             }
-            val storedEvents = achievementDao.events().mapNotNull { row ->
+            val storedEventRows = achievementDao.events()
+            val storedEvents = storedEventRows.mapNotNull { row ->
                 ProgressEventKind.fromStorage(row.kind)?.let { kind ->
                     StoredProgressEvent(
                         dedupeKey = row.dedupeKey,
@@ -89,13 +138,26 @@ class AchievementRepository(
                 }
             }
             val now = clock.millis()
+            val monthlyMarkerAt = storedEventRows
+                .firstOrNull { it.dedupeKey == JourneyEvaluator.MONTHLY_REPORT_KEY }
+                ?.occurredAt
+            val native = sessions.earliestNativeCompleted()
             val plan = AchievementReconciler.plan(
                 request = ReconcileRequest(
                     initialized = achievementDao.state()?.initialized == true,
                     completedWorkoutCount = sessions.countCompleted(),
                     achievedWeeks = WeeklyGoalCompletionEvaluator.achievedWeeks(status),
                     nowMillis = now,
-                    triggerClientWorkoutId = triggerClientWorkoutId
+                    triggerClientWorkoutId = triggerClientWorkoutId,
+                    streakQualifications = WeeklyGoalStreakEvaluator.qualifications(status),
+                    journeyQualifications = JourneyEvaluator.qualifications(
+                        earliestNativeCompletedAt = native?.let {
+                            JourneyEvaluator.nativeCompletedAt(it.finishedAt, it.startedAt)
+                        },
+                        earliestCustomPlanAt = database.workoutTemplateDao().earliestCreatedAt(),
+                        monthlyReportGeneratedAt = monthlyMarkerAt ?: if (recordMonthlyReport) now else null
+                    ),
+                    recordMonthlyReportMarker = recordMonthlyReport && monthlyMarkerAt == null
                 ),
                 unlocks = storedUnlocks,
                 events = storedEvents
@@ -131,6 +193,16 @@ class AchievementRepository(
                 dao.acknowledgeEvents(eventKeys, now)
             }
         }
+    }
+
+    private fun targetProgress(
+        goal: app.mymusclemap.data.local.TargetWeightGoalEntity?,
+        measurements: List<app.mymusclemap.data.local.WeightMeasurementEntity>
+    ): TargetWeightProgress? {
+        val facts = goal?.toFacts() ?: return null
+        val inJourney = measurements.filter { it.createdAt >= facts.createdAt }
+        val current = inJourney.maxByOrNull { it.date }?.weightKg ?: facts.baselineKg
+        return TargetWeightProgressEvaluator.progress(facts, current)
     }
 
     private suspend fun weightsForJourney(createdAt: Long?): WeightJourneyWeights {

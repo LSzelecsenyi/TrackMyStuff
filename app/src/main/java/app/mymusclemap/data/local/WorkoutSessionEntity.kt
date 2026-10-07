@@ -11,6 +11,12 @@ data class NativeCompletedWorkoutRow(
     val templateName: String
 )
 
+/** Earliest completed native Strict session, used as a stable Journey timestamp. */
+data class NativeCompletedStamp(
+    val finishedAt: Long?,
+    val startedAt: Long
+)
+
 @Entity(
     tableName = "workout_sessions",
     foreignKeys = [

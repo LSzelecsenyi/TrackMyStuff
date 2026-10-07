@@ -3,7 +3,9 @@ package app.mymusclemap.domain.achievements
 enum class ProgressEventKind {
     WEEKLY_GOAL_COMPLETED,
     HISTORY_RECOGNIZED,
-    WEIGHT_GOAL_MILESTONE;
+    WEIGHT_GOAL_MILESTONE,
+    /** A recorded product milestone used as source data. It is not itself a celebration. */
+    JOURNEY_MARKER;
 
     companion object {
         fun fromStorage(raw: String): ProgressEventKind? = entries.firstOrNull { it.name == raw }
@@ -26,7 +28,11 @@ data class ReconcileRequest(
     val completedWorkoutCount: Int,
     val achievedWeeks: List<AchievedWeek>,
     val nowMillis: Long,
-    val triggerClientWorkoutId: String?
+    val triggerClientWorkoutId: String?,
+    val streakQualifications: List<StreakQualification> = emptyList(),
+    val journeyQualifications: List<JourneyQualification> = emptyList(),
+    /** Writes the monthly-report marker when this generation has not been recorded yet. */
+    val recordMonthlyReportMarker: Boolean = false
 )
 
 data class UnlockInsert(
@@ -99,7 +105,42 @@ object AchievementReconciler {
         val newWeeks = request.achievedWeeks.filter {
             WeeklyGoalCompletionEvaluator.dedupeKey(it.weekStart) !in existingWeekKeys
         }
-        val silenceWeeks = silentAwards || newWeeks.size > 1
+        val storedIdsAfterRevoke = storedIds - revoke
+        val missingStreaks = request.streakQualifications
+            .filter { it.achievementId !in storedIdsAfterRevoke }
+            .distinctBy { it.achievementId }
+        val topStreak = missingStreaks.maxByOrNull { it.achievementId.streakWeeks ?: 0 }
+        val streakInserts = missingStreaks.map { qualification ->
+            val show = qualification.achievementId == topStreak?.achievementId
+            UnlockInsert(
+                achievementId = qualification.achievementId,
+                unlockedAt = qualification.unlockedAt,
+                celebratedAt = if (show) null else request.nowMillis,
+                triggerClientWorkoutId = if (show) request.triggerClientWorkoutId else null
+            )
+        }
+        val missingJourney = request.journeyQualifications
+            .filter { it.achievementId.journeyMilestone != null && it.achievementId !in storedIdsAfterRevoke }
+            .distinctBy { it.achievementId }
+        val featuredJourney = missingJourney.maxWithOrNull(
+            compareBy<JourneyQualification> { it.unlockedAt }.thenBy { journeyRank(it.achievementId) }
+        )
+        val journeyInserts = missingJourney.map { qualification ->
+            val show = qualification.achievementId == featuredJourney?.achievementId
+            UnlockInsert(
+                achievementId = qualification.achievementId,
+                unlockedAt = qualification.unlockedAt,
+                celebratedAt = if (show) null else request.nowMillis,
+                triggerClientWorkoutId = if (
+                    show && qualification.achievementId == AchievementId.FIRST_WORKOUT
+                ) {
+                    request.triggerClientWorkoutId
+                } else {
+                    null
+                }
+            )
+        }
+        val silenceWeeks = silentAwards || newWeeks.size > 1 || missingStreaks.isNotEmpty()
         val weekInserts = newWeeks.map { week ->
             ProgressEventInsert(
                 dedupeKey = WeeklyGoalCompletionEvaluator.dedupeKey(week.weekStart),
@@ -114,6 +155,21 @@ object AchievementReconciler {
             .filter { it.celebratedAt == null && it.dedupeKey !in achievedByKey }
             .map { it.dedupeKey }
             .toSet()
+
+        val markerKey = JourneyEvaluator.MONTHLY_REPORT_KEY
+        val markerExists = events.any { it.dedupeKey == markerKey }
+        val markerInsert = if (request.recordMonthlyReportMarker && !markerExists) {
+            ProgressEventInsert(
+                dedupeKey = markerKey,
+                kind = ProgressEventKind.JOURNEY_MARKER,
+                payload = JourneyEvaluator.MONTHLY_REPORT_PAYLOAD,
+                occurredAt = request.nowMillis,
+                celebratedAt = request.nowMillis,
+                triggerClientWorkoutId = null
+            )
+        } else {
+            null
+        }
 
         val historyKey = WeeklyGoalCompletionEvaluator.HISTORY_RECOGNIZED_KEY
         val historyExists = events.any { it.dedupeKey == historyKey }
@@ -131,11 +187,21 @@ object AchievementReconciler {
         }
 
         return ReconcilePlan(
-            insertUnlocks = insertUnlocks,
+            insertUnlocks = insertUnlocks + streakInserts + journeyInserts,
             revoke = revoke,
-            insertEvents = weekInserts + listOfNotNull(historyInsert),
+            insertEvents = weekInserts + listOfNotNull(historyInsert, markerInsert),
             deleteEventKeys = deleteEventKeys,
             markInitialized = !request.initialized
         )
+    }
+
+    /** Later timestamp wins. A tie prefers the later product milestone. */
+    private fun journeyRank(id: AchievementId): Int {
+        return when (id.journeyMilestone) {
+            JourneyMilestone.FIRST_MONTHLY_REPORT -> 3
+            JourneyMilestone.FIRST_PLAN -> 2
+            JourneyMilestone.FIRST_WORKOUT -> 1
+            null -> 0
+        }
     }
 }

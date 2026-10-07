@@ -239,7 +239,10 @@ class WeightViewModelFactory(
                     weightRepository,
                     dateProvider,
                     featureEntitlements,
-                    extras.createSavedStateHandle()
+                    extras.createSavedStateHandle(),
+                    onMonthlyReportGenerated = {
+                        checkNotNull(achievementRepository).recordMonthlyReportGenerated()
+                    }
                 )
             }
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")

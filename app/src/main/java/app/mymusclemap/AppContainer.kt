@@ -84,6 +84,7 @@ class AppContainer(context: Context) {
     private val customExerciseCreate = AtomicReference<(Int) -> Boolean> { true }
     private val nativeWorkoutCompleted = AtomicReference<suspend (String) -> Unit> { _ -> }
     private val weightChanged = AtomicReference<suspend () -> Unit> { }
+    private val plansChanged = AtomicReference<suspend () -> Unit> { }
     val exerciseRepository = ExerciseRepository(
         dao = database.exerciseDao(),
         clock = clock,
@@ -96,7 +97,8 @@ class AppContainer(context: Context) {
         exerciseDao = database.exerciseDao(),
         clock = clock,
         sessionDao = database.workoutSessionDao(),
-        scheduledWorkoutDao = database.scheduledWorkoutDao()
+        scheduledWorkoutDao = database.scheduledWorkoutDao(),
+        onPlansChanged = { plansChanged.get().invoke() }
     )
     val scheduledWorkoutRepository = ScheduledWorkoutRepository(
         scheduledWorkoutDao = database.scheduledWorkoutDao(),
@@ -191,6 +193,7 @@ class AppContainer(context: Context) {
             entitlementComposer.policy().customExercises(count).canCreate
         }
         weightChanged.set { achievementRepository.reconcile() }
+        plansChanged.set { achievementRepository.reconcile() }
         nativeWorkoutCompleted.set { clientWorkoutId ->
             val state = founderProgram.currentState()
             if (FounderWorkoutSync.accepts(state.status, state.backendOwned)) {

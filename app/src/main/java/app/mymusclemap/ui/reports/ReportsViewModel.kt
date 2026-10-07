@@ -13,6 +13,7 @@ import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.entitlement.ProAccess
 import app.mymusclemap.domain.model.WeightMeasurement
 import app.mymusclemap.domain.reports.AvailableReport
+import app.mymusclemap.domain.achievements.JourneyEvaluator
 import app.mymusclemap.domain.reports.ReportCatalog
 import app.mymusclemap.domain.reports.ReportHistory
 import app.mymusclemap.domain.reports.ReportHistoryEvidence
@@ -25,6 +26,7 @@ import app.mymusclemap.domain.workout.ScheduledWorkout
 import app.mymusclemap.domain.workout.WorkoutSession
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -49,7 +51,8 @@ class ReportsViewModel(
     weightRepository: WeightRepository,
     dateProvider: DateProvider,
     private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
-    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    private val onMonthlyReportGenerated: suspend () -> Unit = {}
 ) : ViewModel() {
     private val selectedKind = savedStateHandle.getStateFlow(KIND, ReportKind.Monthly.name)
     private val previewKind = MutableStateFlow<ReportKind?>(null)
@@ -135,16 +138,31 @@ class ReportsViewModel(
 
     fun openReport(period: ReportPeriod, onAllowed: () -> Unit) {
         val feature = period.kind.requiredFeature
-        if (feature == null) {
+        val allow = {
+            recordMonthlyReportIfGenerated(period)
             onAllowed()
+        }
+        if (feature == null) {
+            allow()
             return
         }
         ProAccess.run(
             entitlements = entitlements,
             feature = feature,
             onLocked = { lockedFeature.value = feature },
-            onAllowed = onAllowed
+            onAllowed = allow
         )
+    }
+
+    private fun recordMonthlyReportIfGenerated(period: ReportPeriod) {
+        val workouts = summary(period.kind.name, period.startInclusive.toString())
+            ?.activity
+            ?.workoutCount
+            ?: 0
+        if (!JourneyEvaluator.monthlyReportQualifies(period.kind == ReportKind.Monthly, workouts)) {
+            return
+        }
+        viewModelScope.launch { onMonthlyReportGenerated() }
     }
 
     fun showLockedReports() {
