@@ -15,7 +15,9 @@ enum class AchievementCategory {
 
 /** Awards that are the same badge at different lengths. Later tiers can be added here. */
 enum class BadgeFamily {
-    WEEKLY_GOAL_STREAK
+    WEEKLY_GOAL_STREAK,
+    PR_HUNTER,
+    EXERCISE_MASTERY
 }
 
 enum class BadgeTier {
@@ -60,7 +62,11 @@ enum class AchievementId(
      */
     val lifetimeWorkoutTarget: Int? = null,
     /** Lifetime eligible kilogram volume required to satisfy the requirement. */
-    val volumeThresholdKg: Double? = null
+    val volumeThresholdKg: Double? = null,
+    /** Personal-record events required by a PR Hunter tier. */
+    val prHunterTarget: Int? = null,
+    /** Completed sets of one exercise required by an Exercise Mastery tier. */
+    val masterySetTarget: Int? = null
 ) {
     WORKOUTS_5(AchievementCategory.CONSISTENCY, workoutThreshold = 5),
     WORKOUTS_10(AchievementCategory.CONSISTENCY, workoutThreshold = 10),
@@ -87,6 +93,20 @@ enum class AchievementId(
         badgeFamily = BadgeFamily.WEEKLY_GOAL_STREAK,
         badgeTier = BadgeTier.GOLD
     ),
+    WEEKLY_GOAL_STREAK_26(
+        AchievementCategory.GOALS,
+        streakWeeks = 26,
+        badgeFamily = BadgeFamily.WEEKLY_GOAL_STREAK,
+        badgeTier = BadgeTier.GOLD,
+        access = AchievementAccess.PRO
+    ),
+    WEEKLY_GOAL_STREAK_52(
+        AchievementCategory.GOALS,
+        streakWeeks = 52,
+        badgeFamily = BadgeFamily.WEEKLY_GOAL_STREAK,
+        badgeTier = BadgeTier.GOLD,
+        access = AchievementAccess.PRO
+    ),
     FIRST_WORKOUT(
         AchievementCategory.JOURNEY,
         journeyMilestone = JourneyMilestone.FIRST_WORKOUT
@@ -112,6 +132,62 @@ enum class AchievementId(
         AchievementCategory.PERFORMANCE,
         access = AchievementAccess.PRO,
         volumeThresholdKg = 100_000.0
+    ),
+    PR_HUNTER_10(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        badgeFamily = BadgeFamily.PR_HUNTER,
+        badgeTier = BadgeTier.BRONZE,
+        prHunterTarget = 10
+    ),
+    PR_HUNTER_25(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        badgeFamily = BadgeFamily.PR_HUNTER,
+        badgeTier = BadgeTier.SILVER,
+        prHunterTarget = 25
+    ),
+    PR_HUNTER_50(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        badgeFamily = BadgeFamily.PR_HUNTER,
+        badgeTier = BadgeTier.GOLD,
+        prHunterTarget = 50
+    ),
+    PR_HUNTER_100(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        badgeFamily = BadgeFamily.PR_HUNTER,
+        badgeTier = BadgeTier.GOLD,
+        prHunterTarget = 100
+    ),
+    EXERCISE_MASTERY_100(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        badgeFamily = BadgeFamily.EXERCISE_MASTERY,
+        badgeTier = BadgeTier.BRONZE,
+        masterySetTarget = 100
+    ),
+    EXERCISE_MASTERY_250(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        badgeFamily = BadgeFamily.EXERCISE_MASTERY,
+        badgeTier = BadgeTier.SILVER,
+        masterySetTarget = 250
+    ),
+    EXERCISE_MASTERY_500(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        badgeFamily = BadgeFamily.EXERCISE_MASTERY,
+        badgeTier = BadgeTier.GOLD,
+        masterySetTarget = 500
+    ),
+    EXERCISE_MASTERY_1000(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        badgeFamily = BadgeFamily.EXERCISE_MASTERY,
+        badgeTier = BadgeTier.GOLD,
+        masterySetTarget = 1000
     ),
     FOUNDER(
         AchievementCategory.SPECIAL,
@@ -142,7 +218,25 @@ enum class AchievementId(
             require(lifetimeWorkoutTarget == null)
             require(streakWeeks == null)
             require(journeyMilestone == null)
-            require(badgeFamily == null)
+            require(
+                badgeFamily == null ||
+                    badgeFamily == BadgeFamily.PR_HUNTER ||
+                    badgeFamily == BadgeFamily.EXERCISE_MASTERY
+            )
+        }
+        if (badgeFamily == BadgeFamily.PR_HUNTER || prHunterTarget != null) {
+            require(badgeFamily == BadgeFamily.PR_HUNTER)
+            require(prHunterTarget != null && prHunterTarget > 0)
+            require(access == AchievementAccess.PRO)
+            require(badgeTier != null)
+            require(category == AchievementCategory.PERFORMANCE)
+        }
+        if (badgeFamily == BadgeFamily.EXERCISE_MASTERY || masterySetTarget != null) {
+            require(badgeFamily == BadgeFamily.EXERCISE_MASTERY)
+            require(masterySetTarget != null && masterySetTarget > 0)
+            require(access == AchievementAccess.PRO)
+            require(badgeTier != null)
+            require(category == AchievementCategory.PERFORMANCE)
         }
         if (lifetimeWorkoutTarget != null) {
             require(lifetimeWorkoutTarget > 0)
@@ -181,6 +275,14 @@ object AchievementCatalog {
     val weeklyStreaks: List<AchievementId> = AchievementId.entries
         .filter { it.badgeFamily == BadgeFamily.WEEKLY_GOAL_STREAK }
         .sortedBy { it.streakWeeks }
+
+    val prHunter: List<AchievementId> = AchievementId.entries
+        .filter { it.badgeFamily == BadgeFamily.PR_HUNTER }
+        .sortedBy { it.prHunterTarget }
+
+    val exerciseMastery: List<AchievementId> = AchievementId.entries
+        .filter { it.badgeFamily == BadgeFamily.EXERCISE_MASTERY }
+        .sortedBy { it.masterySetTarget }
 
     val journey: List<AchievementId> = AchievementId.entries.filter { it.journeyMilestone != null }
 

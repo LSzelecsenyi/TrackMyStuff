@@ -96,6 +96,8 @@ object BadgeWallPresenter {
         val candidates = listOfNotNull(
             nextCountMilestone(board.items) { it.workoutCountTarget },
             nextCountMilestone(board.items) { it.streakWeeks },
+            nextCountMilestone(board.items) { it.prHunterTarget },
+            nextCountMilestone(board.items) { it.masterySetTarget },
             nextVolumeMilestone(board.items),
             targetWeightMilestone(board)
         )
@@ -164,7 +166,14 @@ object BadgeWallPresenter {
         val rightWorkouts = right.achievementId.workoutCountTarget != null
         val leftStreak = left.achievementId.streakWeeks != null
         val rightStreak = right.achievementId.streakWeeks != null
-        return (leftWorkouts && rightWorkouts) || (leftStreak && rightStreak)
+        val leftHunter = left.achievementId.prHunterTarget != null
+        val rightHunter = right.achievementId.prHunterTarget != null
+        val leftMastery = left.achievementId.masterySetTarget != null
+        val rightMastery = right.achievementId.masterySetTarget != null
+        return (leftWorkouts && rightWorkouts) ||
+            (leftStreak && rightStreak) ||
+            (leftHunter && rightHunter) ||
+            (leftMastery && rightMastery)
     }
 
     private const val MAX_ALMOST_THERE = 3

@@ -81,7 +81,7 @@ class AchievementsScreenTest {
         }
         composeRule.onAllNodesWithTag("achievement-badge-unlocked-WORKOUTS_50", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onAllNodesWithTag("achievement-badge-locked-WORKOUTS_100", useUnmergedTree = true).assertCountEquals(2)
-        composeRule.onNodeWithTag("badge-almost-WORKOUTS_100").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-almost-WORKOUTS_100").performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.achievements_progress_count, 73, 100)).assertCountEquals(2)
         composeRule.onAllNodesWithText(testString(R.string.achievements_progress_count, 73, 200)).assertCountEquals(0)
         composeRule.onAllNodesWithTag("achievement-badge-locked-TARGET_WEIGHT_REACHED", useUnmergedTree = true)
@@ -244,7 +244,7 @@ class AchievementsScreenTest {
         composeRule.onNodeWithTag("badge-section-CONSISTENCY").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-section-PERFORMANCE").assertIsDisplayed()
         composeRule.onAllNodesWithTag("badge-section-JOURNEY").assertCountEquals(0)
-        composeRule.onAllNodesWithTag("badge-section-GOALS").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-section-GOALS").assertIsDisplayed()
         composeRule.onNodeWithText(
             testString(R.string.badge_wall_section_progress, 0, AchievementCatalog.pro.size)
         ).assertIsDisplayed()

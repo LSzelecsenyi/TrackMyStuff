@@ -62,6 +62,7 @@ import app.mymusclemap.domain.achievements.AchievementAccess
 import app.mymusclemap.domain.achievements.AchievementCategory
 import app.mymusclemap.domain.achievements.AchievementId
 import app.mymusclemap.domain.achievements.AlmostThereEntry
+import app.mymusclemap.domain.achievements.BadgeFamily
 import app.mymusclemap.domain.achievements.BadgeTier
 import app.mymusclemap.domain.achievements.BadgeVisualState
 import app.mymusclemap.domain.achievements.BadgeWallItem
@@ -657,6 +658,8 @@ internal fun achievementTitle(id: AchievementId): String {
         id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_name)
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_name)
         id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_name)
+        id.badgeFamily == BadgeFamily.PR_HUNTER -> stringResource(R.string.achievement_pr_hunter_name)
+        id.badgeFamily == BadgeFamily.EXERCISE_MASTERY -> stringResource(R.string.achievement_exercise_mastery_name)
         workouts != null -> stringResource(R.string.achievements_workouts_name, workouts)
         weeks != null -> stringResource(R.string.achievement_streak_name, weeks)
         id.journeyMilestone != null -> stringResource(journeyTitleRes(id.journeyMilestone))
@@ -673,6 +676,11 @@ internal fun achievementRequirement(id: AchievementId): String {
         id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_requirement)
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_requirement)
         id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_requirement)
+        id.prHunterTarget != null -> stringResource(R.string.achievement_pr_hunter_requirement, id.prHunterTarget)
+        id.masterySetTarget != null -> stringResource(
+            R.string.achievement_exercise_mastery_requirement,
+            id.masterySetTarget
+        )
         workouts != null -> stringResource(R.string.achievements_workouts_requirement, workouts)
         weeks != null -> stringResource(R.string.achievement_streak_requirement, weeks)
         id.journeyMilestone != null -> stringResource(journeyRequirementRes(id.journeyMilestone))

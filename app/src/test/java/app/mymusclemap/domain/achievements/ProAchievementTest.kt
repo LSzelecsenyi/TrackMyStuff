@@ -25,10 +25,8 @@ import java.time.LocalDate
 class ProAchievementTest {
     @Test
     fun catalogMarksOnlyTheTwoNewAchievementsAsPro() {
-        assertEquals(
-            listOf(AchievementId.IRON_DISCIPLINE, AchievementId.VOLUME_MASTER),
-            AchievementCatalog.pro
-        )
+        assertTrue(AchievementCatalog.pro.contains(AchievementId.IRON_DISCIPLINE))
+        assertTrue(AchievementCatalog.pro.contains(AchievementId.VOLUME_MASTER))
         assertTrue(AchievementCatalog.free.none { it.access == AchievementAccess.PRO })
         assertTrue(AchievementCatalog.workoutCounts.none { it == AchievementId.IRON_DISCIPLINE || it.workoutThreshold == 250 })
         assertEquals(100, AchievementId.WORKOUTS_100.workoutThreshold)

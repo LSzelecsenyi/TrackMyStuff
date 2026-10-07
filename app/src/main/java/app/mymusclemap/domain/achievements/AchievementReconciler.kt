@@ -1,5 +1,9 @@
 package app.mymusclemap.domain.achievements
 
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+
 enum class ProgressEventKind {
     WEEKLY_GOAL_COMPLETED,
     HISTORY_RECOGNIZED,
@@ -40,6 +44,8 @@ data class ReconcileRequest(
      */
     val founderLifetime: Boolean = false,
     val proQualifications: List<ProQualification> = emptyList(),
+    /** Local date of the workout that triggered this reconcile, when there is one. */
+    val triggerWorkoutDate: LocalDate? = null,
     /** Writes the monthly-report marker when this generation has not been recorded yet. */
     val recordMonthlyReportMarker: Boolean = false
 )
@@ -118,8 +124,14 @@ object AchievementReconciler {
         val missingStreaks = request.streakQualifications
             .filter { it.achievementId !in storedIdsAfterRevoke }
             .distinctBy { it.achievementId }
-        val topStreak = missingStreaks.maxByOrNull { it.achievementId.streakWeeks ?: 0 }
-        val streakInserts = missingStreaks.map { qualification ->
+        val missingFreeStreaks = missingStreaks.filter { it.achievementId.access != AchievementAccess.PRO }
+        val missingProStreaks = if (request.grantsPro) {
+            missingStreaks.filter { it.achievementId.access == AchievementAccess.PRO }
+        } else {
+            emptyList()
+        }
+        val topStreak = missingFreeStreaks.maxByOrNull { it.achievementId.streakWeeks ?: 0 }
+        val streakInserts = missingFreeStreaks.map { qualification ->
             val show = qualification.achievementId == topStreak?.achievementId
             UnlockInsert(
                 achievementId = qualification.achievementId,
@@ -171,7 +183,7 @@ object AchievementReconciler {
             )
         }
         val missingPro = if (request.grantsPro) {
-            request.proQualifications
+            (request.proQualifications + missingProStreaks.map { it.toProQualification(request) })
                 .filter { it.achievementId.access == AchievementAccess.PRO }
                 .filter { it.achievementId !in storedIdsAfterRevoke }
                 .distinctBy { it.achievementId }
@@ -194,7 +206,8 @@ object AchievementReconciler {
                 triggerClientWorkoutId = if (show) request.triggerClientWorkoutId else null
             )
         }
-        val silenceWeeks = silentAwards || newWeeks.size > 1 || missingStreaks.isNotEmpty()
+        val silenceWeeks = silentAwards || newWeeks.size > 1 ||
+            missingFreeStreaks.isNotEmpty() || missingProStreaks.isNotEmpty()
         val weekInserts = newWeeks.map { week ->
             ProgressEventInsert(
                 dedupeKey = WeeklyGoalCompletionEvaluator.dedupeKey(week.weekStart),
@@ -267,13 +280,26 @@ object AchievementReconciler {
         )
     }
 
-    /** Later completion wins. A tie prefers Volume Master over Iron Discipline. */
+    /** Later completion wins. A tie prefers the higher threshold, then Volume Master. */
     private fun proCelebrationRank(id: AchievementId): Int {
+        id.prHunterTarget?.let { return 1_000 + it }
+        id.masterySetTarget?.let { return 1_000 + it }
+        id.streakWeeks?.let { return 1_000 + it }
         return when (id) {
             AchievementId.VOLUME_MASTER -> 2
             AchievementId.IRON_DISCIPLINE -> 1
             else -> 0
         }
+    }
+
+    private fun StreakQualification.toProQualification(request: ReconcileRequest): ProQualification {
+        val crossedOn = Instant.ofEpochMilli(unlockedAt).atZone(ZoneOffset.UTC).toLocalDate()
+        val live = request.triggerWorkoutDate != null && request.triggerWorkoutDate == crossedOn
+        return ProQualification(
+            achievementId = achievementId,
+            unlockedAt = unlockedAt,
+            clientWorkoutId = if (live) request.triggerClientWorkoutId else null
+        )
     }
 
     /**

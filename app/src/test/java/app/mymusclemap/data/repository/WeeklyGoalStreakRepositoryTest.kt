@@ -118,7 +118,7 @@ class WeeklyGoalStreakRepositoryTest {
         val row = database.achievementDao().unlocks()
             .single { it.achievementId == AchievementId.WEEKLY_GOAL_STREAK_4.name }
         assertEquals(unlockedAt, row.unlockedAt)
-        assertEquals(0, repository.board().items.single { it.id == AchievementId.WEEKLY_GOAL_STREAK_8 }.countProgress!!.current)
+        assertEquals(4, repository.board().items.single { it.id == AchievementId.WEEKLY_GOAL_STREAK_8 }.countProgress!!.current)
         assertNull(database.achievementDao().unlocks().find { it.achievementId == AchievementId.WEEKLY_GOAL_STREAK_8.name })
     }
 

@@ -24,6 +24,20 @@ data class PerformanceQualification(
     val clientWorkoutId: String?
 )
 
+/** One strict improvement over the previous comparable record. The first performance is not an event. */
+enum class PerformanceRecordKind {
+    WEIGHT,
+    REPS,
+    VOLUME
+}
+
+data class PerformanceRecordEvent(
+    val kind: PerformanceRecordKind,
+    val unlockedAt: Long,
+    val clientWorkoutId: String?,
+    val sessionId: Long
+)
+
 private data class OrderedSet(
     val exerciseId: Long,
     val measurement: MeasurementType,
@@ -33,18 +47,22 @@ private data class OrderedSet(
 
 object PerformanceRecordEvaluator {
     fun qualifications(history: List<WorkoutSessionAggregate>): List<PerformanceQualification> {
-        val ordered = history
-            .filter { it.session.status == SessionStatus.COMPLETED }
-            .sortedWith(compareBy({ completedAt(it) }, { it.session.id }))
+        return qualificationsFrom(events(history))
+    }
+
+    /**
+     * Chronological record events. Lifetime Performance badges use the first event of each kind.
+     * Later events stay in this list for PR Hunter and are not stored.
+     */
+    fun events(history: List<WorkoutSessionAggregate>): List<PerformanceRecordEvent> {
         val bestWeight = HashMap<Long, Double>()
         val bestReps = HashMap<Long, Int>()
         var bestVolume: Double? = null
-        var weight: PerformanceQualification? = null
-        var reps: PerformanceQualification? = null
-        var volume: PerformanceQualification? = null
-        ordered.forEach { aggregate ->
+        val found = ArrayList<PerformanceRecordEvent>()
+        completedInOrder(history).forEach { aggregate ->
             val at = completedAt(aggregate)
             val client = aggregate.session.clientWorkoutId.takeIf { it.isNotBlank() }
+            val sessionId = aggregate.session.id
             setsInOrder(aggregate).forEach { item ->
                 comparableWeightKg(item)?.let { load ->
                     val previous = bestWeight[item.exerciseId]
@@ -52,9 +70,7 @@ object PerformanceRecordEvaluator {
                         bestWeight[item.exerciseId] = load
                     } else if (load > previous) {
                         bestWeight[item.exerciseId] = load
-                        if (weight == null) {
-                            weight = PerformanceQualification(AchievementId.WEIGHT_PR, at, client)
-                        }
+                        found += PerformanceRecordEvent(PerformanceRecordKind.WEIGHT, at, client, sessionId)
                     }
                 }
                 comparableReps(item)?.let { count ->
@@ -63,9 +79,7 @@ object PerformanceRecordEvaluator {
                         bestReps[item.exerciseId] = count
                     } else if (count > previous) {
                         bestReps[item.exerciseId] = count
-                        if (reps == null) {
-                            reps = PerformanceQualification(AchievementId.REP_RECORD, at, client)
-                        }
+                        found += PerformanceRecordEvent(PerformanceRecordKind.REPS, at, client, sessionId)
                     }
                 }
             }
@@ -76,12 +90,20 @@ object PerformanceRecordEvaluator {
                     bestVolume = workoutVolume
                 } else if (workoutVolume > previous) {
                     bestVolume = workoutVolume
-                    if (volume == null) {
-                        volume = PerformanceQualification(AchievementId.VOLUME_RECORD, at, client)
-                    }
+                    found += PerformanceRecordEvent(PerformanceRecordKind.VOLUME, at, client, sessionId)
                 }
             }
         }
+        return found
+    }
+
+    fun qualificationsFrom(events: List<PerformanceRecordEvent>): List<PerformanceQualification> {
+        val weight = events.firstOrNull { it.kind == PerformanceRecordKind.WEIGHT }
+            ?.toQualification(AchievementId.WEIGHT_PR)
+        val reps = events.firstOrNull { it.kind == PerformanceRecordKind.REPS }
+            ?.toQualification(AchievementId.REP_RECORD)
+        val volume = events.firstOrNull { it.kind == PerformanceRecordKind.VOLUME }
+            ?.toQualification(AchievementId.VOLUME_RECORD)
         val records = listOfNotNull(weight, reps, volume)
         val first = records.minWithOrNull(
             compareBy<PerformanceQualification> { it.unlockedAt }.thenBy { recordRank(it.achievementId) }
@@ -98,6 +120,12 @@ object PerformanceRecordEvaluator {
             }
             addAll(records)
         }
+    }
+
+    fun completedInOrder(history: List<WorkoutSessionAggregate>): List<WorkoutSessionAggregate> {
+        return history
+            .filter { it.session.status == SessionStatus.COMPLETED }
+            .sortedWith(compareBy({ completedAt(it) }, { it.session.id }))
     }
 
     /** Session completion instant. [app.mymusclemap.domain.workout.WorkoutSession.finishedAt] is that instant. */
@@ -155,6 +183,10 @@ object PerformanceRecordEvaluator {
                         )
                     }
             }
+    }
+
+    private fun PerformanceRecordEvent.toQualification(id: AchievementId): PerformanceQualification {
+        return PerformanceQualification(id, unlockedAt, clientWorkoutId)
     }
 
     /** Earlier rank wins a timestamp tie so First PR follows a stable record. */

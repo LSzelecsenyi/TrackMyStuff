@@ -121,17 +121,24 @@ object AchievementBoardAssembler {
         unlocks: List<UnlockSnapshot>,
         events: List<ProgressEventSnapshot>,
         currentStreak: Int = 0,
-        lifetimeVolumeKg: Double = 0.0
+        bestStreak: Int = currentStreak,
+        lifetimeVolumeKg: Double = 0.0,
+        prEventCount: Int = 0,
+        leadingExerciseSets: Int = 0
     ): AchievementBoard {
         val unlockById = unlocks.associateBy { it.achievementId }
-        val streak = currentStreak.coerceAtLeast(0)
+        val streak = bestStreak.coerceAtLeast(0)
         val workouts = completedWorkoutCount.coerceAtLeast(0)
         val volume = lifetimeVolumeKg.coerceAtLeast(0.0)
+        val records = prEventCount.coerceAtLeast(0)
+        val mastery = leadingExerciseSets.coerceAtLeast(0)
         val items = AchievementId.entries.map { id ->
             val unlock = unlockById[id]
             val workoutTarget = id.workoutCountTarget
             val streakWeeks = id.streakWeeks
             val volumeThreshold = id.volumeThresholdKg
+            val hunterTarget = id.prHunterTarget
+            val masteryTarget = id.masterySetTarget
             val countProgress = when {
                 workoutTarget != null -> CountProgress(
                     current = workouts.coerceAtMost(workoutTarget),
@@ -140,6 +147,14 @@ object AchievementBoardAssembler {
                 streakWeeks != null -> CountProgress(
                     current = streak.coerceAtMost(streakWeeks),
                     threshold = streakWeeks
+                )
+                hunterTarget != null -> CountProgress(
+                    current = records.coerceAtMost(hunterTarget),
+                    threshold = hunterTarget
+                )
+                masteryTarget != null -> CountProgress(
+                    current = mastery.coerceAtMost(masteryTarget),
+                    threshold = masteryTarget
                 )
                 else -> null
             }
@@ -150,6 +165,8 @@ object AchievementBoardAssembler {
                 volumeThreshold != null -> volume >= volumeThreshold
                 workoutTarget != null -> workouts >= workoutTarget
                 streakWeeks != null -> streak >= streakWeeks
+                hunterTarget != null -> records >= hunterTarget
+                masteryTarget != null -> mastery >= masteryTarget
                 else -> unlock != null
             }
             BadgeWallItem(
@@ -190,7 +207,11 @@ object AchievementBoardAssembler {
             )
         }
         val streaks = unlocks
-            .filter { it.celebratedAt == null && it.achievementId.streakWeeks != null }
+            .filter {
+                it.celebratedAt == null &&
+                    it.achievementId.streakWeeks != null &&
+                    it.achievementId.access != AchievementAccess.PRO
+            }
             .sortedByDescending { it.achievementId.streakWeeks }
             .map { unlock ->
                 PendingCelebration.WeeklyStreakUnlocked(

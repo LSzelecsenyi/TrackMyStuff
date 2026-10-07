@@ -10,6 +10,8 @@ import app.mymusclemap.data.local.toModel
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.achievements.AchievementBoard
 import app.mymusclemap.domain.achievements.AchievementBoardAssembler
+import app.mymusclemap.domain.achievements.BadgeWallItem
+import app.mymusclemap.domain.achievements.CountProgress
 import app.mymusclemap.domain.achievements.AchievementId
 import app.mymusclemap.domain.achievements.AchievementReconciler
 import app.mymusclemap.domain.achievements.CelebrationAcknowledgement
@@ -27,6 +29,8 @@ import app.mymusclemap.domain.achievements.TargetWeightProgressEvaluator
 import app.mymusclemap.domain.achievements.UnlockSnapshot
 import app.mymusclemap.domain.achievements.VolumeProgress
 import app.mymusclemap.domain.achievements.PerformanceRecordEvaluator
+import app.mymusclemap.domain.achievements.ExerciseMasteryEvaluator
+import app.mymusclemap.domain.achievements.PrHunterEvaluator
 import app.mymusclemap.domain.achievements.ProAchievementEvaluator
 import app.mymusclemap.domain.achievements.WeeklyGoalCompletionEvaluator
 import app.mymusclemap.domain.achievements.WeeklyGoalStreakEvaluator
@@ -65,20 +69,13 @@ class AchievementRepository(
                     completedWorkoutCount = count,
                     unlocks = unlocks.mapNotNull { it.toSnapshot() },
                     events = events.mapNotNull { it.toSnapshot() },
-                    currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status)
+                    currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status),
+                    bestStreak = WeeklyGoalStreakEvaluator.bestStreak(status)
                 )
             },
-            observeLifetimeVolumeKg()
-        ) { board, volumeKg ->
-            board.copy(
-                items = board.items.map { item ->
-                    val threshold = item.id.volumeThresholdKg ?: return@map item
-                    item.copy(
-                        volumeProgress = VolumeProgress(currentKg = volumeKg, thresholdKg = threshold),
-                        requirementMet = volumeKg >= threshold
-                    )
-                }
-            )
+            observePractice()
+        ) { board, practice ->
+            board.copy(items = board.items.map { applyPractice(it, practice) })
         }
         return combine(
             awards,
@@ -94,12 +91,17 @@ class AchievementRepository(
             database.weeklyWorkoutGoalDao().getAll(),
             database.workoutSessionDao().allCompletedCounts()
         )
+        val history = completedAggregates()
+        val recordEvents = PerformanceRecordEvaluator.events(history)
         val assembled = AchievementBoardAssembler.assemble(
             completedWorkoutCount = database.workoutSessionDao().countCompleted(),
             unlocks = database.achievementDao().unlocks().mapNotNull { it.toSnapshot() },
             events = database.achievementDao().events().mapNotNull { it.toSnapshot() },
             currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status),
-            lifetimeVolumeKg = ProAchievementEvaluator.lifetimeVolumeKg(completedAggregates())
+            bestStreak = WeeklyGoalStreakEvaluator.bestStreak(status),
+            lifetimeVolumeKg = ProAchievementEvaluator.lifetimeVolumeKg(history),
+            prEventCount = recordEvents.size,
+            leadingExerciseSets = ExerciseMasteryEvaluator.leadingCount(history)
         )
         return assembled.copy(
             targetWeightProgress = targetProgress(
@@ -161,6 +163,10 @@ class AchievementRepository(
             }
             val now = clock.millis()
             val history = completedAggregates()
+            val recordEvents = PerformanceRecordEvaluator.events(history)
+            val triggerDate = triggerClientWorkoutId?.let { id ->
+                sessions.getByClientWorkoutId(id)?.workoutDate?.let(LocalDate::parse)
+            }
             val monthlyMarkerAt = storedEventRows
                 .firstOrNull { it.dedupeKey == JourneyEvaluator.MONTHLY_REPORT_KEY }
                 ?.occurredAt
@@ -180,10 +186,13 @@ class AchievementRepository(
                         earliestCustomPlanAt = database.workoutTemplateDao().earliestCreatedAt(),
                         monthlyReportGeneratedAt = monthlyMarkerAt ?: if (recordMonthlyReport) now else null
                     ),
-                    performanceQualifications = PerformanceRecordEvaluator.qualifications(history),
+                    performanceQualifications = PerformanceRecordEvaluator.qualificationsFrom(recordEvents),
                     grantsPro = grantsPro(),
                     founderLifetime = founderLifetime(),
-                    proQualifications = ProAchievementEvaluator.qualifications(history),
+                    proQualifications = ProAchievementEvaluator.qualifications(history) +
+                        PrHunterEvaluator.qualifications(recordEvents) +
+                        ExerciseMasteryEvaluator.qualifications(history),
+                    triggerWorkoutDate = triggerDate,
                     recordMonthlyReportMarker = recordMonthlyReport && monthlyMarkerAt == null
                 ),
                 unlocks = storedUnlocks,
@@ -246,17 +255,57 @@ class AchievementRepository(
         )
     }
 
-    private fun observeLifetimeVolumeKg(): Flow<Double> {
+    private data class PracticeFacts(
+        val lifetimeVolumeKg: Double,
+        val prEventCount: Int,
+        val leadingExerciseSets: Int
+    )
+
+    private fun observePractice(): Flow<PracticeFacts> {
         val sessions = database.workoutSessionDao()
         return combine(
             sessions.observeCompletedSessions(),
             sessions.observeCompletedExercises(),
             sessions.observeCompletedSets()
         ) { completedSessions, exercises, sets ->
-            ProAchievementEvaluator.lifetimeVolumeKg(
-                aggregatesFrom(completedSessions, exercises, sets)
+            val history = aggregatesFrom(completedSessions, exercises, sets)
+            PracticeFacts(
+                lifetimeVolumeKg = ProAchievementEvaluator.lifetimeVolumeKg(history),
+                prEventCount = PerformanceRecordEvaluator.events(history).size,
+                leadingExerciseSets = ExerciseMasteryEvaluator.leadingCount(history)
             )
         }
+    }
+
+    private fun applyPractice(item: BadgeWallItem, practice: PracticeFacts): BadgeWallItem {
+        val volumeThreshold = item.id.volumeThresholdKg
+        if (volumeThreshold != null) {
+            return item.copy(
+                volumeProgress = VolumeProgress(currentKg = practice.lifetimeVolumeKg, thresholdKg = volumeThreshold),
+                requirementMet = practice.lifetimeVolumeKg >= volumeThreshold
+            )
+        }
+        val hunter = item.id.prHunterTarget
+        if (hunter != null) {
+            return item.copy(
+                countProgress = CountProgress(
+                    current = practice.prEventCount.coerceAtMost(hunter),
+                    threshold = hunter
+                ),
+                requirementMet = practice.prEventCount >= hunter
+            )
+        }
+        val mastery = item.id.masterySetTarget
+        if (mastery != null) {
+            return item.copy(
+                countProgress = CountProgress(
+                    current = practice.leadingExerciseSets.coerceAtMost(mastery),
+                    threshold = mastery
+                ),
+                requirementMet = practice.leadingExerciseSets >= mastery
+            )
+        }
+        return item
     }
 
     private suspend fun completedAggregates(): List<WorkoutSessionAggregate> {

@@ -57,11 +57,26 @@ class BadgeArtworkResolverTest {
         assertEquals(R.drawable.volume_master_badge, drawable(AchievementId.VOLUME_MASTER))
         assertEquals(R.drawable.iron_discipline_badge, drawable(AchievementId.IRON_DISCIPLINE))
         assertEquals(R.drawable.founder_badge, drawable(AchievementId.FOUNDER))
-        val mapped = AchievementId.entries.map { drawable(it) }
+        val awaitingArtwork = setOf(
+            AchievementId.PR_HUNTER_10,
+            AchievementId.PR_HUNTER_25,
+            AchievementId.PR_HUNTER_50,
+            AchievementId.PR_HUNTER_100,
+            AchievementId.EXERCISE_MASTERY_100,
+            AchievementId.EXERCISE_MASTERY_250,
+            AchievementId.EXERCISE_MASTERY_500,
+            AchievementId.EXERCISE_MASTERY_1000,
+            AchievementId.WEEKLY_GOAL_STREAK_26,
+            AchievementId.WEEKLY_GOAL_STREAK_52
+        )
+        val mapped = AchievementId.entries.filter { it !in awaitingArtwork }.map { drawable(it) }
         assertEquals(mapped.size, mapped.toSet().size)
-        AchievementId.entries.forEach { id ->
+        AchievementId.entries.filter { it !in awaitingArtwork }.forEach { id ->
             assertTrue(BadgeArtworkResolver.isProductionArtwork(id.badgeKey))
             assertNotEquals(R.drawable.ic_badge_placeholder, drawable(id))
+        }
+        awaitingArtwork.forEach { id ->
+            assertEquals(R.drawable.ic_badge_placeholder, drawable(id))
         }
         assertTrue(AchievementId.entries.none { it.name == "IRON_YEAR" })
         assertEquals(AchievementAccess.PRO, AchievementId.VOLUME_MASTER.access)

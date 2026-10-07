@@ -220,6 +220,94 @@ class WeeklyGoalStreakTest {
         assertTrue(plan.insertUnlocks.none { it.achievementId.streakWeeks != null })
     }
 
+    @Test
+    fun twentyFiveDoesNotReachTwentySixAndFiftyOneDoesNotReachFiftyTwo() {
+        assertFalse(qualified(25).contains(AchievementId.WEEKLY_GOAL_STREAK_26))
+        assertTrue(qualified(26).contains(AchievementId.WEEKLY_GOAL_STREAK_26))
+        assertFalse(qualified(26).contains(AchievementId.WEEKLY_GOAL_STREAK_52))
+        assertFalse(qualified(51).contains(AchievementId.WEEKLY_GOAL_STREAK_52))
+        assertTrue(qualified(52).contains(AchievementId.WEEKLY_GOAL_STREAK_52))
+    }
+
+    @Test
+    fun proStreakTiersStayProAndTheFamilyOrderIsUnchanged() {
+        assertEquals(AchievementAccess.FREE, AchievementId.WEEKLY_GOAL_STREAK_4.access)
+        assertEquals(AchievementAccess.FREE, AchievementId.WEEKLY_GOAL_STREAK_8.access)
+        assertEquals(AchievementAccess.FREE, AchievementId.WEEKLY_GOAL_STREAK_12.access)
+        assertEquals(AchievementAccess.PRO, AchievementId.WEEKLY_GOAL_STREAK_26.access)
+        assertEquals(AchievementAccess.PRO, AchievementId.WEEKLY_GOAL_STREAK_52.access)
+        assertEquals(
+            listOf(4, 8, 12, 26, 52),
+            AchievementCatalog.weeklyStreaks.map { it.streakWeeks }
+        )
+    }
+
+    @Test
+    fun aLaterMissKeepsTheHistoricalTwentySixDiscoverable() {
+        val counts = (0 until 26).associate { start.plusWeeks(it.toLong()) to 1 }
+        val afterMiss = evaluate(listOf(goal(start, 1)), counts, start.plusWeeks(28))
+        assertEquals(0, WeeklyGoalStreakEvaluator.currentStreak(afterMiss))
+        assertEquals(26, WeeklyGoalStreakEvaluator.bestStreak(afterMiss))
+        assertTrue(qualifiedIds(afterMiss).contains(AchievementId.WEEKLY_GOAL_STREAK_26))
+    }
+
+    @Test
+    fun aFreeUserCompletesTwentySixWithoutAnEarnedRowUntilUpgrade() {
+        val qualifications = WeeklyGoalStreakEvaluator.qualifications(achievedWeeks(26))
+        val locked = AchievementReconciler.plan(
+            request = request(qualifications),
+            unlocks = emptyList(),
+            events = emptyList()
+        )
+        assertTrue(locked.insertUnlocks.none { it.achievementId == AchievementId.WEEKLY_GOAL_STREAK_26 })
+        val crossing = qualifications.single { it.achievementId == AchievementId.WEEKLY_GOAL_STREAK_26 }
+        val upgraded = AchievementReconciler.plan(
+            request = request(qualifications).copy(grantsPro = true),
+            unlocks = emptyList(),
+            events = emptyList()
+        )
+        val row = upgraded.insertUnlocks.single { it.achievementId == AchievementId.WEEKLY_GOAL_STREAK_26 }
+        assertEquals(crossing.unlockedAt, row.unlockedAt)
+        assertEquals(1_000L, row.celebratedAt)
+        val kept = AchievementReconciler.plan(
+            request = request(emptyList()).copy(grantsPro = false),
+            unlocks = listOf(StoredUnlock(AchievementId.WEEKLY_GOAL_STREAK_26, celebratedAt = 1_000L)),
+            events = emptyList()
+        )
+        assertTrue(kept.revoke.none { it == AchievementId.WEEKLY_GOAL_STREAK_26 })
+    }
+
+    @Test
+    fun almostThereShowsOnlyTheNextStreakTierAcrossFreeAndPro() {
+        val atTen = BadgeWallPresenter.present(
+            board(10, listOf(AchievementId.WEEKLY_GOAL_STREAK_4, AchievementId.WEEKLY_GOAL_STREAK_8))
+        )
+        assertEquals(
+            listOf(AchievementId.WEEKLY_GOAL_STREAK_12),
+            atTen.almostThere.filter { it.achievementId.streakWeeks != null }.map { it.achievementId }
+        )
+        val earned = listOf(
+            AchievementId.WEEKLY_GOAL_STREAK_4,
+            AchievementId.WEEKLY_GOAL_STREAK_8,
+            AchievementId.WEEKLY_GOAL_STREAK_12
+        )
+        val atEighteen = BadgeWallPresenter.present(board(18, earned))
+        assertEquals(
+            listOf(AchievementId.WEEKLY_GOAL_STREAK_26),
+            atEighteen.almostThere.filter { it.achievementId.streakWeeks != null }.map { it.achievementId }
+        )
+        val atThirtyFour = BadgeWallPresenter.present(
+            board(
+                34,
+                earned + AchievementId.WEEKLY_GOAL_STREAK_26
+            )
+        )
+        assertEquals(
+            listOf(AchievementId.WEEKLY_GOAL_STREAK_52),
+            atThirtyFour.almostThere.filter { it.achievementId.streakWeeks != null }.map { it.achievementId }
+        )
+    }
+
     private fun qualified(weeks: Int): Set<AchievementId> = qualifiedIds(achievedWeeks(weeks))
 
     private fun qualifiedIds(status: WeeklyGoalStatus): Set<AchievementId> {

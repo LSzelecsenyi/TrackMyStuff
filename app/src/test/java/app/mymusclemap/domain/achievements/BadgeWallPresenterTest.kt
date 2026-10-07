@@ -38,7 +38,14 @@ class BadgeWallPresenterTest {
         assertEquals(AchievementId.entries.map { it }, presentation.catalog.map { it.id })
         assertFalse(presentation.catalog.any { it.id.name == "FIRST_PROGRESS_PHOTO" })
         assertFalse(AchievementId.entries.any { it.name.contains("EXERCISE_GOAL") })
-        assertTrue(presentation.catalog.filter { it.category == AchievementCategory.PERFORMANCE }.all { it.countProgress == null })
+        assertTrue(
+            presentation.catalog.filter {
+                it.id == AchievementId.FIRST_PR ||
+                    it.id == AchievementId.WEIGHT_PR ||
+                    it.id == AchievementId.REP_RECORD ||
+                    it.id == AchievementId.VOLUME_RECORD
+            }.all { it.countProgress == null }
+        )
         assertTrue(presentation.almostThere.none { it.achievementId.category == AchievementCategory.PERFORMANCE })
         assertTrue(presentation.almostThere.none { it.achievementId == AchievementId.FOUNDER })
         val founder = presentation.catalog.single { it.id == AchievementId.FOUNDER }
@@ -68,10 +75,14 @@ class BadgeWallPresenterTest {
         assertEquals(AchievementCatalog.special.size, special.totalCount)
         assertEquals(listOf(AchievementId.FOUNDER), special.sections.flatMap { it.items }.map { it.id })
         assertTrue(special.almostThere.none { it.achievementId == AchievementId.FOUNDER })
-        assertEquals(
-            listOf(AchievementId.IRON_DISCIPLINE, AchievementId.VOLUME_MASTER),
-            pro.sections.flatMap { it.items }.map { it.id }
-        )
+        val proOrder = listOf(
+            AchievementCategory.CONSISTENCY,
+            AchievementCategory.JOURNEY,
+            AchievementCategory.GOALS,
+            AchievementCategory.PERFORMANCE,
+            AchievementCategory.SPECIAL
+        ).flatMap { category -> AchievementCatalog.pro.filter { it.category == category } }
+        assertEquals(proOrder, pro.sections.flatMap { it.items }.map { it.id })
         assertTrue(pro.almostThere.none { it.achievementId == AchievementId.VOLUME_MASTER })
     }
 
@@ -213,7 +224,9 @@ class BadgeWallPresenterTest {
                 AchievementId.TARGET_WEIGHT_REACHED,
                 AchievementId.WEEKLY_GOAL_STREAK_4,
                 AchievementId.WEEKLY_GOAL_STREAK_8,
-                AchievementId.WEEKLY_GOAL_STREAK_12
+                AchievementId.WEEKLY_GOAL_STREAK_12,
+                AchievementId.WEEKLY_GOAL_STREAK_26,
+                AchievementId.WEEKLY_GOAL_STREAK_52
             ),
             goals
         )

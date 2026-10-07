@@ -1203,6 +1203,10 @@
     <string name="achievement_iron_discipline_requirement">Complete 250 workouts</string>
     <string name="achievement_founder_name">Founder</string>
     <string name="achievement_founder_requirement">Founder member of Strict.</string>
+    <string name="achievement_pr_hunter_name">PR Hunter</string>
+    <string name="achievement_pr_hunter_requirement">Record %1$d personal records</string>
+    <string name="achievement_exercise_mastery_name">Exercise Mastery</string>
+    <string name="achievement_exercise_mastery_requirement">Complete %1$d sets of the same exercise</string>
     <string name="celebration_streak_body">You\'ve reached your weekly workout goal for %1$d consecutive weeks.</string>
     <string name="celebration_weight_halfway_title">Halfway there!</string>
     <string name="celebration_weight_halfway_body">You\'re halfway to your target weight.</string>

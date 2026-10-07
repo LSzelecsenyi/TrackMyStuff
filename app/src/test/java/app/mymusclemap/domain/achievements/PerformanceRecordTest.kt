@@ -267,7 +267,14 @@ class PerformanceRecordTest {
             events = emptyList()
         )
         assertTrue(board.pending.none { it is PendingCelebration.PerformanceUnlocked })
-        assertTrue(board.items.filter { it.category == AchievementCategory.PERFORMANCE }.all { it.countProgress == null })
+        assertTrue(
+            listOf(
+                AchievementId.FIRST_PR,
+                AchievementId.WEIGHT_PR,
+                AchievementId.REP_RECORD,
+                AchievementId.VOLUME_RECORD
+            ).all { id -> board.items.single { it.id == id }.countProgress == null }
+        )
     }
 
     @Test
