@@ -95,6 +95,18 @@ object WorkoutSetCopy {
         return RepetitionTarget.display(minReps, maxReps)
     }
 
+    fun loadText(
+        resources: Resources,
+        kind: PlannedLoadKind?,
+        weightKg: Double?,
+        interpretation: WeightInterpretation,
+        markTotalWeight: Boolean = false
+    ): String? = loadLabel(resources, kind, weightKg, interpretation, markTotalWeight)
+
+    fun durationText(resources: Resources, seconds: Int): String = durationLabel(resources, seconds)
+
+    fun distanceText(resources: Resources, meters: Double): String = distanceLabel(resources, meters)
+
     private fun loadLabel(
         resources: Resources,
         kind: PlannedLoadKind?,

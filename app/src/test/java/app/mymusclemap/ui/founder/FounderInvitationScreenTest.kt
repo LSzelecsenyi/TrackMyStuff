@@ -28,6 +28,9 @@ import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.R
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.testString
+import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.ui.components.STRICT_SYMBOL_DARK
+import app.mymusclemap.ui.components.STRICT_SYMBOL_LIGHT
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -55,6 +58,8 @@ class FounderInvitationScreenTest {
     fun invitationReusesWelcomeCopyAndTheRulesItIsGiven() {
         render(fastRules)
         composeRule.onNodeWithTag(FOUNDER_MARK).assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_SYMBOL_LIGHT).assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_SYMBOL_DARK).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(testString(R.string.founder_mark_content_description)).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_welcome_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_welcome_lead)).assertIsDisplayed()
@@ -153,6 +158,19 @@ class FounderInvitationScreenTest {
         revision = 1
         composeRule.waitForIdle()
         composeRule.onAllNodesWithTag(FOUNDER_INVITATION).assertCountEquals(1)
+    }
+
+    @Test
+    fun darkThemeUsesTheDarkSymbol() {
+        composeRule.setContent {
+            WeightTrackerThemeForPreview(seeds = ThemeSeeds.DefaultDark, darkTheme = true) {
+                FounderProgramMark()
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(FOUNDER_MARK).assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_SYMBOL_DARK).assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_SYMBOL_LIGHT).assertDoesNotExist()
     }
 
     private fun render(

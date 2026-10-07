@@ -9,7 +9,11 @@ import app.mymusclemap.domain.workout.ActualSetDraft
 import app.mymusclemap.domain.workout.ActualSetLogic
 import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.domain.workout.ElapsedTime
+import app.mymusclemap.domain.workout.ExerciseHistoryGate
+import app.mymusclemap.domain.workout.ExerciseHistorySelection
 import app.mymusclemap.domain.workout.FinishWorkoutResult
+import app.mymusclemap.domain.workout.InWorkoutExerciseHistory
+import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
 import app.mymusclemap.domain.workout.SessionFocusLogic
@@ -69,7 +73,8 @@ data class ActiveWorkoutUiState(
     val focusedSetId: Long? = null,
     val expandedExerciseIds: Set<Long> = emptySet(),
     val finishing: Boolean = false,
-    val completionSummary: WorkoutCompletionSummary? = null
+    val completionSummary: WorkoutCompletionSummary? = null,
+    val exerciseHistory: InWorkoutExerciseHistory = InWorkoutExerciseHistory.Loading
 ) {
     val progress: SessionProgress
         get() = aggregate?.let(SessionProgressLogic::fromAggregate) ?: SessionProgress(0, 0, 0, 0)
@@ -93,7 +98,9 @@ sealed interface ActiveWorkoutMessage {
 class ActiveWorkoutViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val sessionRepository: WorkoutSessionRepository,
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    private val loadExerciseHistory: suspend (WorkoutSessionAggregate, SessionExercise) -> ExerciseHistorySelection? =
+        { aggregate, exercise -> sessionRepository.loadPreviousExerciseHistory(aggregate, exercise) }
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(SESSION_ID) ?: -1L
     private val selectedIndex = savedStateHandle.getStateFlow(SELECTED_INDEX, 0)
@@ -115,6 +122,13 @@ class ActiveWorkoutViewModel(
     private val expandedIds = MutableStateFlow<Set<Long>>(emptySet())
     private var focusGeneration = 0L
     private val draftJobs = mutableMapOf<Long, Job>()
+    private val exerciseHistory = MutableStateFlow<InWorkoutExerciseHistory>(InWorkoutExerciseHistory.Loading)
+    private val historyGate = ExerciseHistoryGate()
+    private var historyJob: Job? = null
+    private var historyInitialized = false
+    private var loadedHistoryExerciseId: Long? = null
+    internal var historyLoadCount: Int = 0
+        private set
     private val draftEpoch = ConcurrentHashMap<Long, Long>()
     private val locallyResolving = mutableSetOf<Long>()
     private var statusesInitialized = false
@@ -145,7 +159,7 @@ class ActiveWorkoutViewModel(
         val expanded: Set<Long>
     )
 
-    val uiState: StateFlow<ActiveWorkoutUiState> = combine(
+    private val workoutState: StateFlow<ActiveWorkoutUiState> = combine(
         sessionRepository.observeAggregate(sessionId),
         selectedIndex,
         combine(drafts, dirtyIds, completingIds, setErrors, combine(message, completionSummary) { currentMessage, summary ->
@@ -230,7 +244,47 @@ class ActiveWorkoutViewModel(
         initialValue = ActiveWorkoutUiState()
     )
 
+    val uiState: StateFlow<ActiveWorkoutUiState> = combine(workoutState, exerciseHistory) { workout, history ->
+        workout.copy(exerciseHistory = history)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = ActiveWorkoutUiState()
+    )
+
     init {
+        viewModelScope.launch {
+            sessionRepository.observeAggregate(sessionId).collect { aggregate ->
+                if (aggregate == null) return@collect
+                val exercise = SessionFocusLogic.currentPendingExercise(aggregate)?.exercise
+                val key = exercise?.id
+                if (historyInitialized && key == loadedHistoryExerciseId) return@collect
+                historyInitialized = true
+                loadedHistoryExerciseId = key
+                val generation = historyGate.begin(key)
+                exerciseHistory.value = InWorkoutExerciseHistory.Loading
+                historyJob?.cancel()
+                historyJob = viewModelScope.launch {
+                    if (exercise == null) {
+                        if (historyGate.accepts(generation, null)) {
+                            exerciseHistory.value = InWorkoutExerciseHistory.None
+                        }
+                        return@launch
+                    }
+                    historyLoadCount += 1
+                    val selection = withContext(Dispatchers.IO) {
+                        loadExerciseHistory(aggregate, exercise)
+                    }
+                    if (historyGate.accepts(generation, exercise.id)) {
+                        exerciseHistory.value = if (selection == null) {
+                            InWorkoutExerciseHistory.None
+                        } else {
+                            InWorkoutExerciseHistory.Found(exercise.id, selection)
+                        }
+                    }
+                }
+            }
+        }
         viewModelScope.launch(Dispatchers.Default) {
             while (isActive) {
                 nowMillis.value = clock.millis()

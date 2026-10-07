@@ -42,6 +42,8 @@ import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.ui.components.STRICT_WORDMARK_DARK
+import app.mymusclemap.ui.components.STRICT_WORDMARK_LIGHT
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -346,6 +348,10 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_EXPORT).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_RESTORE).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.app_name)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.brand_tagline)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.about_product)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_HELP_TIPS).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performScrollTo().assertIsDisplayed()
@@ -361,6 +367,16 @@ class SettingsScreenLayoutTest {
             "save should not be a full-width capsule",
             save.right - save.left < 200.dp
         )
+    }
+
+    @Test
+    fun aboutDarkThemeUsesTheDarkWordmark() {
+        render(darkTheme = true)
+        composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_WORDMARK_DARK).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.brand_tagline)).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("My Muscle Map").assertCountEquals(0)
     }
 
     @Test
@@ -600,6 +616,7 @@ class SettingsScreenLayoutTest {
         onOpenFounderProgram: () -> Unit = {},
         showFounderProgram: Boolean = true,
         showFounderBadge: Boolean = false,
+        darkTheme: Boolean = false,
         onBack: () -> Unit = {},
         onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
         lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
@@ -611,7 +628,10 @@ class SettingsScreenLayoutTest {
             CompositionLocalProvider(
                 LocalDensity provides Density(density = density.density, fontScale = fontScale)
             ) {
-                WeightTrackerThemeForPreview {
+                WeightTrackerThemeForPreview(
+                    seeds = if (darkTheme) ThemeSeeds.DefaultDark else ThemeSeeds.DefaultLight,
+                    darkTheme = darkTheme
+                ) {
                     Box(
                         modifier = Modifier
                             .width(width)

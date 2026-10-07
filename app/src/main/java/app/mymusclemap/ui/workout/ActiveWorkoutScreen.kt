@@ -89,6 +89,8 @@ import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.workout.ActualSetDraft
 import app.mymusclemap.domain.workout.ActualSetLogic
+import app.mymusclemap.domain.workout.CurrentSetHistoryLine
+import app.mymusclemap.domain.workout.ExerciseHistoryLogic
 import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
@@ -244,6 +246,10 @@ fun ActiveWorkoutScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var pendingSkipId by remember { mutableStateOf<Long?>(null) }
+    var historyOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(state.currentExerciseId, state.currentSetId) {
+        historyOpen = false
+    }
     val dismissInput = {
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
@@ -428,7 +434,8 @@ fun ActiveWorkoutScreen(
                         },
                         onUndoSkip = onUndoSkip,
                         onAddExtra = { onAddExtra(item.exercise.id) },
-                        onRemoveExtra = onRemoveExtra
+                        onRemoveExtra = onRemoveExtra,
+                        onOpenHistory = { historyOpen = true }
                     )
                 }
                 item(key = WORKOUT_FINISH_KEY) {
@@ -512,6 +519,30 @@ fun ActiveWorkoutScreen(
                 }
             )
         }
+    }
+    val historyExercise = exercises.firstOrNull { it.exercise.id == state.currentExerciseId }
+    val historySet = historyExercise?.sets?.firstOrNull { it.id == state.currentSetId }
+    val historyLine = if (historyExercise != null && historySet != null) {
+        ExerciseHistoryLogic.currentLine(
+            history = state.exerciseHistory,
+            sessionExerciseId = historyExercise.exercise.id,
+            setPosition = historySet.position
+        )
+    } else {
+        CurrentSetHistoryLine.Hidden
+    }
+    val historySelection = when (val line = historyLine) {
+        is CurrentSetHistoryLine.Recorded -> line.selection
+        is CurrentSetHistoryLine.NoMatchingSet -> line.selection
+        else -> null
+    }
+    if (historyOpen && historyExercise != null && historySet != null && historySelection != null) {
+        ExerciseHistorySheet(
+            exerciseName = historyExercise.exercise.name,
+            selection = historySelection,
+            comparisonPosition = historySet.position,
+            onDismiss = { historyOpen = false }
+        )
     }
     if (state.confirmAbandon) {
         AlertDialog(
@@ -714,7 +745,8 @@ private fun ExerciseBlock(
     onSkip: (Long) -> Unit,
     onUndoSkip: (Long) -> Unit,
     onAddExtra: () -> Unit,
-    onRemoveExtra: (Long) -> Unit
+    onRemoveExtra: (Long) -> Unit,
+    onOpenHistory: () -> Unit
 ) {
     val done = item.sets.isNotEmpty() && item.sets.none { it.status == SessionSetStatus.PENDING }
     val completedCount = item.sets.count { it.status == SessionSetStatus.COMPLETED }
@@ -812,7 +844,17 @@ private fun ExerciseBlock(
                     onSkip = { onSkip(set.id) },
                     onUndoSkip = { onUndoSkip(set.id) },
                     onRemoveExtra = { onRemoveExtra(set.id) },
-                    onEdit = { editingIds = editingIds + set.id }
+                    onEdit = { editingIds = editingIds + set.id },
+                    historyLine = if (set.id == currentSetId) {
+                        ExerciseHistoryLogic.currentLine(
+                            history = state.exerciseHistory,
+                            sessionExerciseId = item.exercise.id,
+                            setPosition = set.position
+                        )
+                    } else {
+                        CurrentSetHistoryLine.Hidden
+                    },
+                    onOpenHistory = onOpenHistory
                 )
                 if (index != item.sets.lastIndex) {
                     HorizontalDivider(
@@ -863,7 +905,9 @@ private fun SetRow(
     onSkip: () -> Unit,
     onUndoSkip: () -> Unit,
     onRemoveExtra: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    historyLine: CurrentSetHistoryLine,
+    onOpenHistory: () -> Unit
 ) {
     val planned = buildPlannedLabel(set, stringResource(R.string.set_copy_bodyweight))
     val currentBadge = stringResource(R.string.active_exercise_badge)
@@ -1000,8 +1044,12 @@ private fun SetRow(
         Text(
             text = stringResource(R.string.active_set_planned, planned),
             style = AppTypeTokens.statSecondary,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = if (current) Modifier.testTag(SET_PLAN_LINE) else Modifier
         )
+        if (current && historyLine != CurrentSetHistoryLine.Hidden) {
+            LastTimeRow(line = historyLine, onOpen = onOpenHistory)
+        }
         if (set.status == SessionSetStatus.COMPLETED && !editing) {
             Spacer(Modifier.height(AppDimens.statSecondaryGap))
             Text(

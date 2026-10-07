@@ -94,6 +94,7 @@ import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.health.HealthSettingsState
 import app.mymusclemap.ui.components.CompactEditorDivider
+import app.mymusclemap.ui.components.StrictBrandLockup
 import app.mymusclemap.domain.workout.PendingWeeklyGoal
 import app.mymusclemap.ui.components.WeeklyGoalEditorSheet
 import app.mymusclemap.ui.health.HealthConnectSettingsSection
@@ -1029,6 +1030,11 @@ private fun AboutSection(
         stringResource(R.string.about_version, state.appVersionName)
     }
     CompactEditorSection(title = settingsKicker(stringResource(R.string.about_title))) {
+        StrictBrandLockup(
+            showTagline = true,
+            wordmarkWidth = 200.dp
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
         Text(
             text = stringResource(R.string.about_product),
             style = AppTypeTokens.sectionTitle,

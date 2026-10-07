@@ -213,6 +213,69 @@ abstract class WorkoutSessionDao {
     @Query("SELECT * FROM workout_session_exercise_muscles WHERE sessionExerciseId = :sessionExerciseId")
     abstract suspend fun getMuscles(sessionExerciseId: Long): List<WorkoutSessionExerciseMuscleEntity>
 
+    @Query(
+        """
+        SELECT
+            s.id AS sessionId,
+            s.templateId AS templateId,
+            s.templateName AS templateName,
+            s.workoutDate AS workoutDate,
+            s.startedAt AS startedAt,
+            s.status AS status,
+            e.id AS sessionExerciseId,
+            e.exerciseId AS exerciseId,
+            e.position AS exercisePosition,
+            e.measurementType AS measurementType,
+            e.resistanceBasis AS resistanceBasis,
+            e.weightInterpretation AS weightInterpretation
+        FROM workout_session_exercises e
+        INNER JOIN workout_sessions s ON s.id = e.sessionId
+        WHERE e.exerciseId = :exerciseId
+            AND s.id != :currentSessionId
+            AND s.status = 'COMPLETED'
+            AND (
+                s.startedAt < :currentStartedAt
+                OR (s.startedAt = :currentStartedAt AND s.id < :currentSessionId)
+            )
+        ORDER BY s.startedAt DESC, s.id DESC, e.position ASC, e.id ASC
+        """
+    )
+    abstract suspend fun previousExerciseOccurrences(
+        exerciseId: Long,
+        currentSessionId: Long,
+        currentStartedAt: Long
+    ): List<PreviousExerciseOccurrenceRow>
+
+    @Query(
+        """
+        SELECT
+            st.sessionExerciseId AS sessionExerciseId,
+            st.position AS position,
+            st.status AS status,
+            st.actualReps AS actualReps,
+            st.actualLoadKind AS actualLoadKind,
+            st.actualWeightKg AS actualWeightKg,
+            st.actualDurationSeconds AS actualDurationSeconds,
+            st.actualDistanceMeters AS actualDistanceMeters
+        FROM workout_session_sets st
+        INNER JOIN workout_session_exercises e ON e.id = st.sessionExerciseId
+        INNER JOIN workout_sessions s ON s.id = e.sessionId
+        WHERE e.exerciseId = :exerciseId
+            AND s.id != :currentSessionId
+            AND s.status = 'COMPLETED'
+            AND (
+                s.startedAt < :currentStartedAt
+                OR (s.startedAt = :currentStartedAt AND s.id < :currentSessionId)
+            )
+        ORDER BY st.sessionExerciseId ASC, st.position ASC, st.id ASC
+        """
+    )
+    abstract suspend fun previousExerciseSets(
+        exerciseId: Long,
+        currentSessionId: Long,
+        currentStartedAt: Long
+    ): List<PreviousExerciseSetRow>
+
     @Query("SELECT COUNT(*) FROM workout_sessions WHERE templateId = :templateId")
     abstract suspend fun countTemplateReferences(templateId: Long): Int
 

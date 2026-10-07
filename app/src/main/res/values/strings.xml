@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">My Muscle Map</string>
+    <string name="app_name">Strict</string>
     <string name="nav_dashboard">Overview</string>
     <string name="nav_workout">Workout</string>
     <string name="nav_journal">Journal</string>
@@ -275,8 +275,8 @@
     <string name="message_app_backup_export_failed">The backup file could not be saved.</string>
     <string name="message_app_backup_restore_success">Data restored.</string>
     <string name="message_app_backup_read_failed">The backup file could not be read.</string>
-    <string name="onboarding_kicker">My Muscle Map</string>
-    <string name="onboarding_welcome_title">Track your training</string>
+    <string name="onboarding_kicker">Strict</string>
+    <string name="brand_tagline">TRACK WHAT YOU DID</string>
     <string name="onboarding_welcome_body">Track workouts, see which muscles you trained, and follow your progress. A starter catalog of common exercises is ready to use.</string>
     <string name="onboarding_setup_title">Create your first workout</string>
     <string name="onboarding_setup_body">Add exercises from the starter catalog to a plan. After you save it, you can start it anytime from Workout.</string>
@@ -586,6 +586,23 @@
     <string name="action_collapse_exercise">Collapse exercise</string>
     <string name="active_workout_all_sets_done">Every set is done. You can finish the workout.</string>
     <string name="active_set_planned">Plan: %1$s</string>
+    <string name="active_set_last_time">Last time: %1$s</string>
+    <string name="active_set_last_time_none">No previous data</string>
+    <string name="active_set_last_time_no_set">Last time: no matching set</string>
+    <string name="active_set_last_time_a11y">%1$s. Opens the previous sets.</string>
+    <string name="active_set_history_source">%1$s · %2$s</string>
+    <string name="active_set_history_other_plan">From another workout plan</string>
+    <string name="active_set_history_comparison_note">The highlighted row is the matching set from that workout. It is not a completed set from today.</string>
+    <string name="active_set_history_no_comparison">No set from that workout matches this set.</string>
+    <string name="active_set_history_comparison_row">Comparison row from the previous workout</string>
+    <string name="active_set_history_comparison_label">Comparison</string>
+    <string name="active_set_history_close">Close</string>
+    <string name="active_set_history_column_set">Set</string>
+    <string name="active_set_history_column_reps">Reps</string>
+    <string name="active_set_history_column_weight">Weight</string>
+    <string name="active_set_history_column_time">Time</string>
+    <string name="active_set_history_column_distance">Distance</string>
+    <string name="active_set_history_empty_value">—</string>
     <string name="active_set_actual">Actual</string>
     <string name="set_status_pending">In progress</string>
     <string name="set_status_completed">Done</string>
@@ -672,7 +689,7 @@
     <string name="heatmap_title">Muscle heatmap</string>
     <string name="heatmap_subtitle">Based on recent completed workouts</string>
     <string name="widget_heatmap_description">Front and back muscle heatmap from your completed workouts</string>
-    <string name="widget_heatmap_content_description">Muscle heatmap. Tap to open My Muscle Map.</string>
+    <string name="widget_heatmap_content_description">Muscle heatmap. Tap to open Strict.</string>
     <string name="widget_heatmap_front">Front body</string>
     <string name="widget_heatmap_back">Back body</string>
     <string name="heatmap_empty">There are no completed workouts yet, so the heatmap is empty.</string>
@@ -889,11 +906,11 @@
     <string name="set_copy_distance_m">%1$s m</string>
     <string name="set_copy_weight_total">%1$s kg total</string>
     <string name="pro_badge">Pro</string>
-    <string name="pro_badge_description">My Muscle Map Pro capability</string>
-    <string name="pro_info_kicker">My Muscle Map</string>
-    <string name="pro_info_title">My Muscle Map Pro</string>
-    <string name="pro_info_body">This capability is part of My Muscle Map Pro.</string>
-    <string name="pro_info_feature_body">%1$s is part of My Muscle Map Pro.</string>
+    <string name="pro_badge_description">Strict Pro capability</string>
+    <string name="pro_info_kicker">Strict</string>
+    <string name="pro_info_title">Strict Pro</string>
+    <string name="pro_info_body">This capability is part of Strict Pro.</string>
+    <string name="pro_info_feature_body">%1$s is part of Strict Pro.</string>
     <string name="pro_info_statistics_title">Unlock your full training history</string>
     <string name="pro_info_statistics_body">Your existing workout history is already there. Go Pro to explore your progress beyond the last 30 days.</string>
     <string name="pro_info_statistics_range_3m">3-month history</string>

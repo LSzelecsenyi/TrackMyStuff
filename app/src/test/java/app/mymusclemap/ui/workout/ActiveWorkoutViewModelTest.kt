@@ -20,8 +20,16 @@ import app.mymusclemap.domain.exercise.MovementPattern
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
+import app.mymusclemap.data.local.WorkoutSessionEntity
+import app.mymusclemap.data.local.WorkoutSessionExerciseEntity
+import app.mymusclemap.data.local.WorkoutSessionSetEntity
+import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.ElapsedTime
+import app.mymusclemap.domain.workout.ExerciseHistorySelection
+import app.mymusclemap.domain.workout.InWorkoutExerciseHistory
 import app.mymusclemap.domain.workout.NotificationSetCompletion
+import app.mymusclemap.domain.workout.SessionExercise
+import app.mymusclemap.domain.workout.WorkoutSessionAggregate
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedSetDraft
 import app.mymusclemap.domain.workout.SessionSetStatus
@@ -31,7 +39,10 @@ import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
 import app.mymusclemap.domain.workout.TemplateSaveResult
 import app.mymusclemap.domain.workout.WorkoutFocusTarget
+import java.util.UUID
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -581,6 +592,99 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
+    fun editingRepsDoesNotReloadOrCopyPreviousHistory() = runTest {
+        val pull = savePull()
+        val templateId = saveTemplate(
+            "Push A",
+            listOf(pull to listOf(PlannedSetDraft(-1, "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
+        )
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        insertCompletedHistory(
+            templateId = templateId,
+            templateName = "Old Push",
+            exerciseId = pull,
+            startedAt = 100L,
+            actualReps = 5
+        )
+        val viewModel = active(sessionId)
+        val loaded = awaitReal {
+            viewModel.uiState.first { state ->
+                val history = state.exerciseHistory
+                history is InWorkoutExerciseHistory.Found && history.selection.sets.single().reps == 5
+            }
+        }
+        val setId = loaded.aggregate!!.exercises.single().sets.single().id
+        assertEquals(1, viewModel.historyLoadCount)
+        viewModel.onReps(setId, "11")
+        mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        awaitReal { awaitDraft(setId) }
+        awaitReal { delay(150) }
+        val state = viewModel.uiState.value
+        assertEquals("11", state.drafts[setId]?.repsText)
+        assertEquals(1, viewModel.historyLoadCount)
+        val history = state.exerciseHistory as InWorkoutExerciseHistory.Found
+        assertEquals(5, history.selection.sets.single().reps)
+        assertEquals(SessionSetStatus.PENDING, state.aggregate!!.exercises.single().sets.single().status)
+    }
+
+    @Test
+    fun lateHistoryForThePreviousExerciseIsIgnored() = runTest {
+        val pull = savePull()
+        val dip = saveDip()
+        val templateId = saveTemplate("Push A", listOf(pull to twoSets(), dip to twoSets()))
+        insertCompletedHistory(
+            templateId = templateId,
+            templateName = "Old Push",
+            exerciseId = pull,
+            startedAt = 100L,
+            actualReps = 5
+        )
+        insertCompletedHistory(
+            templateId = templateId,
+            templateName = "Old Push",
+            exerciseId = dip,
+            startedAt = 200L,
+            actualReps = 12
+        )
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        val startedLoad = CompletableDeferred<Unit>()
+        val releaseLoad = CompletableDeferred<Unit>()
+        val viewModel = active(sessionId) { aggregate, exercise ->
+            if (exercise.name == "Húzódzkodás") {
+                startedLoad.complete(Unit)
+                releaseLoad.await()
+            }
+            sessions.loadPreviousExerciseHistory(aggregate, exercise)
+        }
+        awaitReal { startedLoad.await() }
+        val loaded = viewModel.loaded()
+        val dipId = loaded.aggregate!!.exercises[1].exercise.id
+        val firstSets = loaded.aggregate!!.exercises[0].sets
+        viewModel.completeSet(firstSets[0].id)
+        awaitReal { viewModel.uiState.first { it.currentSetId == firstSets[1].id } }
+        viewModel.completeSet(firstSets[1].id)
+        val switched = awaitReal {
+            viewModel.uiState.first { state ->
+                val history = state.exerciseHistory
+                state.currentExerciseId == dipId &&
+                    history is InWorkoutExerciseHistory.Found &&
+                    history.sessionExerciseId == dipId &&
+                    history.selection.sets.first().reps == 12
+            }
+        }
+        releaseLoad.complete(Unit)
+        awaitReal { delay(200) }
+        val history = viewModel.uiState.value.exerciseHistory as InWorkoutExerciseHistory.Found
+        assertEquals(dipId, history.sessionExerciseId)
+        assertEquals(12, history.selection.sets.first().reps)
+        assertEquals(switched.currentExerciseId, viewModel.uiState.value.currentExerciseId)
+        assertEquals("8", viewModel.uiState.value.drafts[viewModel.uiState.value.currentSetId]?.repsText)
+    }
+
+    @Test
     fun completingDuringAPendingDraftWriteDoesNotRestoreTheDraft() = runTest {
         val viewModel = startSingleSet()
         val setId = viewModel.loaded().aggregate!!.exercises.single().sets.single().id
@@ -638,13 +742,90 @@ class ActiveWorkoutViewModelTest {
         return active(started.sessionId)
     }
 
-    private fun active(sessionId: Long): ActiveWorkoutViewModel {
-        val viewModel = ActiveWorkoutViewModel(
-            SavedStateHandle(mapOf(ActiveWorkoutViewModel.SESSION_ID to sessionId)),
-            sessions
-        )
+    private fun active(
+        sessionId: Long,
+        loadExerciseHistory: (suspend (WorkoutSessionAggregate, SessionExercise) -> ExerciseHistorySelection?)? = null
+    ): ActiveWorkoutViewModel {
+        val viewModel = if (loadExerciseHistory == null) {
+            ActiveWorkoutViewModel(
+                SavedStateHandle(mapOf(ActiveWorkoutViewModel.SESSION_ID to sessionId)),
+                sessions
+            )
+        } else {
+            ActiveWorkoutViewModel(
+                SavedStateHandle(mapOf(ActiveWorkoutViewModel.SESSION_ID to sessionId)),
+                sessions,
+                loadExerciseHistory = loadExerciseHistory
+            )
+        }
         viewModelStore.put("active-${viewModelKey++}", viewModel)
         return viewModel
+    }
+
+    private suspend fun insertCompletedHistory(
+        templateId: Long,
+        templateName: String,
+        exerciseId: Long,
+        startedAt: Long,
+        actualReps: Int
+    ) {
+        database.workoutSessionDao().insertAggregate(
+            WorkoutSessionEntity(
+                templateId = templateId,
+                templateName = templateName,
+                status = SessionStatus.COMPLETED.name,
+                workoutDate = "2026-09-01",
+                startedAt = startedAt,
+                finishedAt = startedAt + 10,
+                abandonedAt = null,
+                notes = null,
+                bodyWeightKg = null,
+                bodyWeightSource = BodyWeightSource.UNKNOWN.name,
+                bodyWeightSourceDate = null,
+                createdAt = startedAt,
+                updatedAt = startedAt,
+                activeLock = null,
+                clientWorkoutId = UUID.randomUUID().toString()
+            ),
+            listOf(
+                Triple(
+                    WorkoutSessionExerciseEntity(
+                        sessionId = 0L,
+                        exerciseId = exerciseId,
+                        position = 0,
+                        name = "Exercise",
+                        category = ExerciseCategory.STRENGTH.name,
+                        movementPattern = MovementPattern.VERTICAL_PULL.name,
+                        measurementType = MeasurementType.REPETITIONS.name,
+                        resistanceBasis = ResistanceBasis.BODYWEIGHT.name,
+                        weightInterpretation = WeightInterpretation.NOT_APPLICABLE.name,
+                        primaryMuscle = MuscleGroup.LATS.name,
+                        notes = null
+                    ),
+                    emptyList(),
+                    listOf(
+                        WorkoutSessionSetEntity(
+                            sessionExerciseId = 0L,
+                            position = 0,
+                            plannedMinReps = 8,
+                            plannedMaxReps = 8,
+                            plannedLoadKind = PlannedLoadKind.BODYWEIGHT_ONLY.name,
+                            plannedWeightKg = null,
+                            plannedDurationSeconds = null,
+                            plannedDistanceMeters = null,
+                            actualReps = actualReps,
+                            actualLoadKind = PlannedLoadKind.BODYWEIGHT_ONLY.name,
+                            actualWeightKg = null,
+                            actualDurationSeconds = null,
+                            actualDistanceMeters = null,
+                            status = SessionSetStatus.COMPLETED.name,
+                            completedAt = startedAt + 5,
+                            addedDuringWorkout = false
+                        )
+                    )
+                )
+            )
+        )
     }
 
     private suspend fun ActiveWorkoutViewModel.loaded(): ActiveWorkoutUiState {

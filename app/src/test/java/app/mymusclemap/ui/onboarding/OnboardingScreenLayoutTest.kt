@@ -8,11 +8,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.ui.components.STRICT_WORDMARK_DARK
+import app.mymusclemap.ui.components.STRICT_WORDMARK_LIGHT
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -32,8 +36,12 @@ class OnboardingScreenLayoutTest {
         var continued = 0
         render(OnboardingStep.Welcome, onContinue = { continued += 1 })
         composeRule.onNodeWithTag(ONBOARDING_SCREEN).assertIsDisplayed()
-        composeRule.onNodeWithText("MY MUSCLE MAP").assertIsDisplayed()
-        composeRule.onNodeWithText("Track your training").assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Strict").assertIsDisplayed()
+        composeRule.onNodeWithText("TRACK WHAT YOU DID").assertIsDisplayed()
+        composeRule.onNodeWithText("MY MUSCLE MAP").assertDoesNotExist()
+        composeRule.onNodeWithText("Track your training").assertDoesNotExist()
+        composeRule.onNodeWithText("STRICT").assertDoesNotExist()
         composeRule.onNodeWithText(
             "Track workouts, see which muscles you trained, and follow your progress. A starter catalog of common exercises is ready to use.",
             substring = true
@@ -53,6 +61,9 @@ class OnboardingScreenLayoutTest {
             onSetWeeklyGoal = { saved = it },
             onSkipWeeklyGoal = { skipped += 1 }
         )
+        composeRule.onNodeWithText("STRICT").assertIsDisplayed()
+        composeRule.onNodeWithText("TRACK WHAT YOU DID").assertDoesNotExist()
+        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
         composeRule.onNodeWithText("Set a weekly workout goal").assertIsDisplayed()
         composeRule.onNodeWithText("How many workouts would you like to complete each week?").assertIsDisplayed()
         composeRule.onNodeWithText("Meet your weekly goal to build your workout streak.").assertIsDisplayed()
@@ -74,6 +85,9 @@ class OnboardingScreenLayoutTest {
             onCreatePlan = { createPlan += 1 },
             onSkip = { skip += 1 }
         )
+        composeRule.onNodeWithText("STRICT").assertIsDisplayed()
+        composeRule.onNodeWithText("TRACK WHAT YOU DID").assertDoesNotExist()
+        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
         composeRule.onNodeWithText("Create your first workout").assertIsDisplayed()
         composeRule.onNodeWithText(
             "Add exercises from the starter catalog to a plan. After you save it, you can start it anytime from Workout.",
@@ -87,8 +101,18 @@ class OnboardingScreenLayoutTest {
         assertEquals(1, skip)
     }
 
+    @Test
+    fun welcomeDarkThemeUsesTheDarkWordmark() {
+        render(OnboardingStep.Welcome, darkTheme = true)
+        composeRule.onNodeWithTag(STRICT_WORDMARK_DARK).assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Strict").assertIsDisplayed()
+        composeRule.onNodeWithText("TRACK WHAT YOU DID").assertIsDisplayed()
+    }
+
     private fun render(
         step: OnboardingStep,
+        darkTheme: Boolean = false,
         onContinue: () -> Unit = {},
         onCreatePlan: () -> Unit = {},
         onSkip: () -> Unit = {},
@@ -100,7 +124,10 @@ class OnboardingScreenLayoutTest {
             CompositionLocalProvider(
                 LocalDensity provides Density(density = density.density, fontScale = 1f)
             ) {
-                WeightTrackerThemeForPreview {
+                WeightTrackerThemeForPreview(
+                    seeds = if (darkTheme) ThemeSeeds.DefaultDark else ThemeSeeds.DefaultLight,
+                    darkTheme = darkTheme
+                ) {
                     Box(
                         modifier = Modifier
                             .width(360.dp)

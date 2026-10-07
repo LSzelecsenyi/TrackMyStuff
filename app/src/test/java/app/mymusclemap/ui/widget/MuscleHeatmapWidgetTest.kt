@@ -80,7 +80,7 @@ class MuscleHeatmapWidgetTest {
             }
         onNode(hasTestTag(HEATMAP_WIDGET_FRONT_TAG)).assertExists()
         onNode(hasTestTag(HEATMAP_WIDGET_BACK_TAG)).assertExists()
-        onNode(hasContentDescription("Muscle heatmap. Tap to open My Muscle Map."))
+        onNode(hasContentDescription("Muscle heatmap. Tap to open Strict."))
             .assertHasStartActivityClickAction(HeatmapWidgetIntents.openOverview(context))
     }
 

@@ -36,6 +36,13 @@ import app.mymusclemap.domain.workout.WorkoutSession
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
 import app.mymusclemap.domain.workout.ElapsedTime
+import app.mymusclemap.domain.workout.ExerciseHistoryCandidate
+import app.mymusclemap.domain.workout.ExerciseHistoryLogic
+import app.mymusclemap.domain.workout.ExerciseHistoryOccurrence
+import app.mymusclemap.domain.workout.ExerciseHistoryRequest
+import app.mymusclemap.domain.workout.ExerciseHistorySelection
+import app.mymusclemap.domain.workout.ExerciseHistorySet
+import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workoutimport.WorkoutImportDatabaseFailure
 import app.mymusclemap.domain.workoutimport.WorkoutImportFingerprint
 import app.mymusclemap.domain.workoutimport.WorkoutImportPersistenceResult
@@ -240,6 +247,74 @@ class WorkoutSessionRepository(
             sessionDao.getExercises(sessionId),
             sessionDao.getExercises(sessionId).flatMap { sessionDao.getSets(it.id) },
             sessionDao.getExercises(sessionId).flatMap { sessionDao.getMuscles(it.id) }
+        )
+    }
+
+    /**
+     * Read-only lookup of one previous occurrence for [exercise]. Actual recorded
+     * values are used. Planned values and set drafts are not read.
+     */
+    suspend fun loadPreviousExerciseHistory(
+        current: WorkoutSessionAggregate,
+        exercise: SessionExercise
+    ): ExerciseHistorySelection? {
+        val ordinal = ExerciseHistoryLogic.occurrenceOrdinal(current.exercises.map { it.exercise }, exercise.id)
+            ?: return null
+        val occurrenceRows = sessionDao.previousExerciseOccurrences(
+            exerciseId = exercise.exerciseId,
+            currentSessionId = current.session.id,
+            currentStartedAt = current.session.startedAt
+        )
+        if (occurrenceRows.isEmpty()) return null
+        val setsByExercise = sessionDao.previousExerciseSets(
+            exerciseId = exercise.exerciseId,
+            currentSessionId = current.session.id,
+            currentStartedAt = current.session.startedAt
+        ).groupBy { it.sessionExerciseId }
+        val candidates = occurrenceRows.groupBy { it.sessionId }.map { (sessionId, rows) ->
+            val session = rows.first()
+            ExerciseHistoryCandidate(
+                sessionId = sessionId,
+                templateId = session.templateId,
+                templateName = session.templateName,
+                workoutDate = LocalDate.parse(session.workoutDate),
+                startedAt = session.startedAt,
+                status = runCatching { SessionStatus.valueOf(session.status) }
+                    .getOrDefault(SessionStatus.ABANDONED),
+                occurrences = rows.map { row ->
+                    ExerciseHistoryOccurrence(
+                        sessionExerciseId = row.sessionExerciseId,
+                        position = row.exercisePosition,
+                        measurementType = ExerciseEnumCodec.measurement(row.measurementType),
+                        resistanceBasis = ExerciseEnumCodec.resistance(row.resistanceBasis),
+                        weightInterpretation = ExerciseEnumCodec.weight(row.weightInterpretation),
+                        sets = setsByExercise[row.sessionExerciseId].orEmpty().map { set ->
+                            ExerciseHistorySet(
+                                position = set.position,
+                                status = runCatching { SessionSetStatus.valueOf(set.status) }
+                                    .getOrDefault(SessionSetStatus.PENDING),
+                                reps = set.actualReps,
+                                loadKind = set.actualLoadKind?.let { kind ->
+                                    runCatching { PlannedLoadKind.valueOf(kind) }.getOrNull()
+                                },
+                                weightKg = set.actualWeightKg,
+                                durationSeconds = set.actualDurationSeconds,
+                                distanceMeters = set.actualDistanceMeters
+                            )
+                        }
+                    )
+                }
+            )
+        }
+        return ExerciseHistoryLogic.select(
+            ExerciseHistoryRequest(
+                currentSessionId = current.session.id,
+                currentStartedAt = current.session.startedAt,
+                currentTemplateId = current.session.templateId,
+                currentMeasurement = exercise.measurementType,
+                occurrenceOrdinal = ordinal
+            ),
+            candidates
         )
     }
 

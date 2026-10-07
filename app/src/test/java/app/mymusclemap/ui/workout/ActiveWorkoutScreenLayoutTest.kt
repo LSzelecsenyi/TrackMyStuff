@@ -6,10 +6,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.getBoundsInRoot
@@ -34,6 +39,9 @@ import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.workout.ActualSetDraft
 import app.mymusclemap.domain.workout.ActualSetLogic
+import app.mymusclemap.domain.workout.ExerciseHistorySelection
+import app.mymusclemap.domain.workout.ExerciseHistorySet
+import app.mymusclemap.domain.workout.InWorkoutExerciseHistory
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.SessionExercise
@@ -52,6 +60,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
@@ -560,6 +570,111 @@ class ActiveWorkoutScreenLayoutTest {
         assertTrue("field=$field minus=$minus", field.right <= minus.left + 1.dp)
     }
 
+    @Test
+    fun lastTimeRowSitsUnderThePlanAndAboveTheInputs() {
+        render(state = weightedHistoryState(), width = 360.dp, fontScale = 1f)
+        val plan = composeRule.onNodeWithTag(SET_PLAN_LINE).getBoundsInRoot()
+        val lastTime = composeRule.onNodeWithTag(SET_LAST_TIME).getBoundsInRoot()
+        val field = composeRule.onAllNodesWithTag("set-numeric-field")[0].getBoundsInRoot()
+        assertTrue(lastTime.top >= plan.bottom - 1.dp)
+        assertTrue(field.top >= lastTime.bottom - 1.dp)
+        assertTrue(lastTime.bottom - lastTime.top >= 48.dp)
+        composeRule.onNodeWithText("Last time: 8 · 12 kg").assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_LAST_TIME).assertHasClickAction()
+        val icon = composeRule.onNodeWithTag(SET_LAST_TIME_ICON, useUnmergedTree = true).getBoundsInRoot()
+        assertTrue(icon.right - icon.left >= 16.dp)
+        assertTrue(icon.bottom - icon.top >= 16.dp)
+        assertTrue(icon.left >= lastTime.left)
+        assertTrue(icon.right <= lastTime.right + 1.dp)
+        composeRule.onAllNodesWithTag(SET_LAST_TIME).assertCountEquals(1)
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertIsDisplayed()
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
+    }
+
+    @Test
+    fun noPreviousDataIsNotClickableAndOtherSetsHaveNoHistoryRow() {
+        render(state = weightedHistoryState(history = InWorkoutExerciseHistory.None), width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithText(testString(R.string.active_set_last_time_none)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_LAST_TIME_NONE).assertHasNoClickAction()
+        composeRule.onNodeWithTag(SET_LAST_TIME).assertDoesNotExist()
+        composeRule.onAllNodesWithTag(SET_LAST_TIME_NONE).assertCountEquals(1)
+    }
+
+    @Test
+    fun historySheetShowsRecordedSetsAndDismissalKeepsTheDraft() {
+        val repsChanges = AtomicInteger(0)
+        val completes = AtomicInteger(0)
+        render(
+            state = weightedHistoryState(),
+            width = 360.dp,
+            fontScale = 1f,
+            onReps = { _, _ -> repsChanges.incrementAndGet() },
+            onComplete = { completes.incrementAndGet() }
+        )
+        composeRule.onNodeWithTag(SET_LAST_TIME).performClick()
+        composeRule.onNodeWithTag(SET_HISTORY_SHEET).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_HISTORY_TITLE).assertIsDisplayed()
+        composeRule.onNodeWithText("Evening Pull", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_set_history_other_plan)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_set_history_comparison_note)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_set_history_column_set)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_set_history_column_reps)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_set_history_column_weight)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_HISTORY_COMPARISON).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_set_history_comparison_label)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_HISTORY_CLOSE).performClick()
+        composeRule.onNodeWithTag(SET_HISTORY_SHEET).assertDoesNotExist()
+        composeRule.onNode(hasStateDescription("9")).assertIsDisplayed()
+        composeRule.onNodeWithText("Last time: 8 · 12 kg").assertIsDisplayed()
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertIsDisplayed()
+        assertEquals(0, repsChanges.get())
+        assertEquals(0, completes.get())
+    }
+
+    @Test
+    fun historySheetClosesOnBackWithoutChangingTheSet() {
+        render(
+            state = weightedHistoryState(),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_LAST_TIME).performClick()
+        composeRule.onNodeWithTag(SET_HISTORY_SHEET).assertIsDisplayed()
+        composeRule.runOnIdle {
+            val dialog = checkNotNull(org.robolectric.shadows.ShadowDialog.getLatestDialog()) {
+                "History sheet did not open a dialog"
+            }
+            dialog.onBackPressed()
+        }
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(SET_HISTORY_SHEET).assertDoesNotExist()
+        composeRule.onNode(hasStateDescription("9")).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_LAST_TIME).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h640dp")
+    fun longHistoryScrollsAtLargeFontAndKeepsTheComparison() {
+        render(state = weightedHistoryState(setCount = 24), width = 360.dp, fontScale = 2f, height = 640.dp)
+        composeRule.onNodeWithTag(SET_LAST_TIME).performClick()
+        composeRule.onNodeWithTag(SET_HISTORY_SHEET).assertIsDisplayed()
+        val last = composeRule.onNodeWithTag(historyRowTag(23), useUnmergedTree = true)
+        last.performScrollTo().assertIsDisplayed()
+        val comparison = composeRule.onNodeWithTag(SET_HISTORY_COMPARISON, useUnmergedTree = true)
+        comparison.performScrollTo().assertIsDisplayed()
+        val comparisonBounds = comparison.getBoundsInRoot()
+        assertTrue(comparisonBounds.bottom - comparisonBounds.top >= 32.dp)
+        composeRule.onNodeWithText(testString(R.string.active_set_history_comparison_note), useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_HISTORY_CLOSE, useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.onNodeWithTag(SET_HISTORY_SHEET).assertDoesNotExist()
+        composeRule.onNode(hasStateDescription("9")).performScrollTo().assertIsDisplayed()
+    }
+
     private fun overlaps(a: androidx.compose.ui.unit.DpRect, b: androidx.compose.ui.unit.DpRect): Boolean {
         return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
     }
@@ -588,10 +703,16 @@ class ActiveWorkoutScreenLayoutTest {
         height: Dp? = null,
         onRequestAbandon: () -> Unit = {},
         onComplete: (Long) -> Unit = {},
-        onSkip: (Long) -> Unit = {}
+        onSkip: (Long) -> Unit = {},
+        onReps: (Long, String) -> Unit = { _, _ -> },
+        backDispatcher: AtomicReference<OnBackPressedDispatcher?>? = null
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
+            if (backDispatcher != null) {
+                val owner = LocalOnBackPressedDispatcherOwner.current
+                SideEffect { backDispatcher.set(owner?.onBackPressedDispatcher) }
+            }
             CompositionLocalProvider(
                 LocalDensity provides Density(density = density.density, fontScale = fontScale)
             ) {
@@ -604,7 +725,7 @@ class ActiveWorkoutScreenLayoutTest {
                         ActiveWorkoutScreen(
                             state = state,
                             onBack = {},
-                            onReps = { _, _ -> },
+                            onReps = onReps,
                             onStepReps = { _, _ -> },
                             onLoadKind = { _, _ -> },
                             onWeight = { _, _ -> },
@@ -761,6 +882,98 @@ class ActiveWorkoutScreenLayoutTest {
                 }
             }
         )
+    }
+
+    private fun weightedHistoryState(
+        history: InWorkoutExerciseHistory = recordedHistory(),
+        setCount: Int = 4
+    ): ActiveWorkoutUiState {
+        val current = set(2L, 10L, 1, SessionSetStatus.PENDING).copy(
+            plannedLoadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+            plannedWeightKg = 10.0
+        )
+        val earlier = set(1L, 10L, 0, SessionSetStatus.COMPLETED).copy(
+            plannedLoadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+            plannedWeightKg = 10.0,
+            actualLoadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+            actualWeightKg = 10.0
+        )
+        val first = item(
+            id = 10L,
+            name = "Bench press",
+            position = 0,
+            sets = listOf(earlier, current),
+            measurement = MeasurementType.REPETITIONS_AND_WEIGHT
+        )
+        val selection = if (history is InWorkoutExerciseHistory.Found) {
+            history.selection.copy(sets = historicalSets(setCount))
+        } else {
+            null
+        }
+        val resolved = if (selection == null) {
+            history
+        } else {
+            InWorkoutExerciseHistory.Found(sessionExerciseId = 10L, selection = selection)
+        }
+        return ActiveWorkoutUiState(
+            loading = false,
+            aggregate = WorkoutSessionAggregate(session(), listOf(first)),
+            currentExerciseId = 10L,
+            currentSetId = current.id,
+            focusedSetId = current.id,
+            expandedExerciseIds = setOf(10L),
+            nowMillis = 61_000L,
+            drafts = mapOf(
+                earlier.id to ActualSetDraft(
+                    repsText = "8",
+                    loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                    weightText = "10"
+                ),
+                current.id to ActualSetDraft(
+                    repsText = "9",
+                    loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                    weightText = "20"
+                )
+            ),
+            exerciseHistory = resolved
+        )
+    }
+
+    private fun recordedHistory(): InWorkoutExerciseHistory {
+        return InWorkoutExerciseHistory.Found(
+            sessionExerciseId = 10L,
+            selection = ExerciseHistorySelection(
+                sessionId = 4L,
+                templateId = 9L,
+                templateName = "Evening Pull",
+                workoutDate = LocalDate.parse("2026-09-01"),
+                startedAt = 100L,
+                fromOtherPlan = true,
+                measurementType = MeasurementType.REPETITIONS_AND_WEIGHT,
+                resistanceBasis = ResistanceBasis.EXTERNAL,
+                weightInterpretation = WeightInterpretation.TOTAL,
+                sets = historicalSets(4)
+            )
+        )
+    }
+
+    private fun historicalSets(count: Int): List<ExerciseHistorySet> {
+        return List(count) { index ->
+            val reps = when (index) {
+                0 -> 10
+                1 -> 8
+                2 -> 8
+                3 -> 7
+                else -> 6
+            }
+            ExerciseHistorySet(
+                position = index,
+                status = SessionSetStatus.COMPLETED,
+                reps = reps,
+                loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                weightKg = 12.0
+            )
+        }
     }
 
     private fun session(): WorkoutSession {

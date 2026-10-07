@@ -17,6 +17,32 @@ data class NativeCompletedStamp(
     val startedAt: Long
 )
 
+data class PreviousExerciseOccurrenceRow(
+    val sessionId: Long,
+    val templateId: Long?,
+    val templateName: String,
+    val workoutDate: String,
+    val startedAt: Long,
+    val status: String,
+    val sessionExerciseId: Long,
+    val exerciseId: Long,
+    val exercisePosition: Int,
+    val measurementType: String,
+    val resistanceBasis: String,
+    val weightInterpretation: String
+)
+
+data class PreviousExerciseSetRow(
+    val sessionExerciseId: Long,
+    val position: Int,
+    val status: String,
+    val actualReps: Int?,
+    val actualLoadKind: String?,
+    val actualWeightKg: Double?,
+    val actualDurationSeconds: Int?,
+    val actualDistanceMeters: Double?
+)
+
 @Entity(
     tableName = "workout_sessions",
     foreignKeys = [

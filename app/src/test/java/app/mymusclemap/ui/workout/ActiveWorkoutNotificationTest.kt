@@ -146,6 +146,7 @@ class ActiveWorkoutNotificationTest {
         val content = shadowOf(firstNotification.contentIntent).savedIntent
         assertEquals(7L, content.getLongExtra(MainActivity.EXTRA_OPEN_ACTIVE_WORKOUT, -1L))
         val redacted = firstNotification.publicVersion
+        assertEquals("Strict", redacted.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertFalse(redacted.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Dips"))
         assertFalse(redacted.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("15"))
         assertEquals(context.getString(R.string.notification_workout_in_progress), redacted.extras.getCharSequence(Notification.EXTRA_TEXT).toString())

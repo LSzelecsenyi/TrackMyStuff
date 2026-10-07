@@ -38,10 +38,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.ui.founder.FounderInvitationScreen
 import app.mymusclemap.ui.founder.FounderJoinNotice
+import app.mymusclemap.ui.components.StrictBrandLockup
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
@@ -81,7 +83,7 @@ fun OnboardingScreen(
     }
     var selectedGoal by rememberSaveable { mutableIntStateOf(0) }
     val title = when (step) {
-        OnboardingStep.Welcome -> stringResource(R.string.onboarding_welcome_title)
+        OnboardingStep.Welcome -> null
         OnboardingStep.WeeklyGoal -> stringResource(R.string.weekly_goal_onboarding_title)
         OnboardingStep.CreatePlan -> stringResource(R.string.onboarding_setup_title)
     }
@@ -117,20 +119,30 @@ fun OnboardingScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = stringResource(R.string.onboarding_kicker).uppercase(),
-                    style = AppTypeTokens.sectionKicker,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(AppDimens.itemGap))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .testTag(ONBOARDING_TITLE)
-                        .semantics { heading() }
-                )
+                if (step == OnboardingStep.Welcome) {
+                    StrictBrandLockup(
+                        showTagline = true,
+                        centered = true,
+                        wordmarkWidth = 240.dp,
+                        taglineIsHeading = true,
+                        modifier = Modifier.testTag(ONBOARDING_TITLE)
+                    )
+                } else {
+                    Text(
+                        text = stringResource(R.string.onboarding_kicker).uppercase(AppLocale.UI),
+                        style = AppTypeTokens.sectionKicker,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(AppDimens.itemGap))
+                    Text(
+                        text = title.orEmpty(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .testTag(ONBOARDING_TITLE)
+                            .semantics { heading() }
+                    )
+                }
                 Spacer(Modifier.height(AppDimens.itemGap))
                 Text(
                     text = body,
