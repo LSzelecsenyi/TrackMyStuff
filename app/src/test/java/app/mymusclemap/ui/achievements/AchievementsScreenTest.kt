@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -19,7 +20,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import app.mymusclemap.domain.achievements.AchievementBoardAssembler
-import app.mymusclemap.domain.achievements.AchievementCategory
+import app.mymusclemap.domain.achievements.AchievementAccess
+import app.mymusclemap.domain.achievements.AchievementCatalog
 import app.mymusclemap.domain.achievements.AchievementId
 import app.mymusclemap.domain.achievements.BadgeWallPresenter
 import app.mymusclemap.domain.achievements.CelebrationAcknowledgement
@@ -66,9 +68,13 @@ class AchievementsScreenTest {
         }
         val total = AchievementId.entries.size
         composeRule.onNodeWithTag("badge-summary-count").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-filter-ALL").assertIsSelected()
         composeRule.onNodeWithText(testString(R.string.badge_wall_section_progress, 4, total)).assertIsDisplayed()
-        composeRule.onAllNodesWithTag("badge-filter-PERFORMANCE").assertCountEquals(0)
-        composeRule.onAllNodesWithTag("badge-section-PERFORMANCE").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-filter-FREE").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-filter-PRO").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("badge-filter-SPECIAL").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-section-PERFORMANCE").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.achievement_first_pr_name)).performScrollTo().assertIsDisplayed()
         AchievementId.entries.forEach { id ->
             composeRule.onNodeWithTag("achievement-${id.name}").performScrollTo().assertIsDisplayed()
         }
@@ -210,14 +216,14 @@ class AchievementsScreenTest {
     }
 
     @Test
-    fun selectingGoalsShowsOnlyThatCollection() {
+    fun selectingProShowsOnlyProAchievementsAndChangesTheSummary() {
         val board = AchievementBoardAssembler.assemble(
             completedWorkoutCount = 12,
             unlocks = emptyList(),
             events = emptyList()
         )
         composeRule.setContent {
-            var filter by remember { mutableStateOf<AchievementCategory?>(null) }
+            var filter by remember { mutableStateOf<AchievementAccess?>(null) }
             WeightTrackerThemeForPreview(seeds = ThemeSeeds.DefaultLight, darkTheme = true) {
                 AchievementsScreen(
                     presentation = BadgeWallPresenter.present(board, filter),
@@ -227,14 +233,98 @@ class AchievementsScreenTest {
             }
         }
         val total = AchievementId.entries.size
+        composeRule.onNodeWithTag("badge-filter-ALL").assertIsSelected()
+        composeRule.onNodeWithTag("badge-filter-FREE").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-filter-PRO").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("badge-filter-SPECIAL").assertCountEquals(0)
         composeRule.onNodeWithTag("badge-section-CONSISTENCY").assertIsDisplayed()
-        composeRule.onNodeWithTag("badge-filter-GOALS").performClick()
-        composeRule.onNodeWithTag("badge-section-GOALS").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("badge-section-CONSISTENCY").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-filter-PRO").performClick()
+        composeRule.onNodeWithTag("badge-filter-PRO").assertIsSelected()
+        composeRule.onNodeWithTag("badge-section-CONSISTENCY").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-section-PERFORMANCE").assertIsDisplayed()
         composeRule.onAllNodesWithTag("badge-section-JOURNEY").assertCountEquals(0)
-        composeRule.onNodeWithText(testString(R.string.badge_wall_section_progress, 0, total)).assertIsDisplayed()
-        composeRule.onNodeWithTag("achievement-TARGET_WEIGHT_REACHED").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("badge-section-GOALS").assertCountEquals(0)
+        composeRule.onNodeWithText(
+            testString(R.string.badge_wall_section_progress, 0, AchievementCatalog.pro.size)
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("achievement-IRON_YEAR").assertIsDisplayed()
+        composeRule.onNodeWithTag("achievement-VOLUME_MASTER").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-pro-VOLUME_MASTER", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onAllNodesWithTag("achievement-WORKOUTS_5").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-filter-FREE").performClick()
+        composeRule.onAllNodesWithTag("achievement-VOLUME_MASTER").assertCountEquals(0)
+        composeRule.onNodeWithTag("achievement-WORKOUTS_5").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-filter-ALL").performClick()
+        composeRule.onNodeWithTag("badge-filter-ALL").assertIsSelected()
+        composeRule.onNodeWithText(testString(R.string.badge_wall_section_progress, 0, total)).assertIsDisplayed()
+        composeRule.onNodeWithTag("achievement-VOLUME_MASTER").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun realisticProgressKeepsEarnedAndLockedArtworkDistinctInLight() {
+        realisticProgress(dark = false)
+    }
+
+    @Test
+    fun realisticProgressKeepsEarnedAndLockedArtworkDistinctInDark() {
+        realisticProgress(dark = true)
+    }
+
+    private fun realisticProgress(dark: Boolean) {
+        val unlockedAt = 1L
+        fun unlock(id: AchievementId) = UnlockSnapshot(id, unlockedAt, unlockedAt, null)
+        val board = AchievementBoardAssembler.assemble(
+            completedWorkoutCount = 28,
+            unlocks = listOf(
+                unlock(AchievementId.WORKOUTS_5),
+                unlock(AchievementId.WORKOUTS_10),
+                unlock(AchievementId.FIRST_WORKOUT),
+                unlock(AchievementId.FIRST_CUSTOM_WORKOUT_PLAN),
+                unlock(AchievementId.WEEKLY_GOAL_STREAK_4)
+            ),
+            events = emptyList(),
+            currentStreak = 4
+        )
+        val presentation = BadgeWallPresenter.present(board)
+        composeRule.setContent {
+            WeightTrackerThemeForPreview(seeds = ThemeSeeds.DefaultLight, darkTheme = dark) {
+                AchievementsScreen(presentation = presentation, onBack = {})
+            }
+        }
+        composeRule.onNodeWithText(testString(R.string.badge_wall_section_progress, 5, AchievementId.entries.size))
+            .assertIsDisplayed()
+            listOf(
+                AchievementId.WORKOUTS_5,
+                AchievementId.WORKOUTS_10,
+                AchievementId.FIRST_WORKOUT,
+                AchievementId.FIRST_CUSTOM_WORKOUT_PLAN,
+                AchievementId.WEEKLY_GOAL_STREAK_4
+            ).forEach { id ->
+                composeRule.onNodeWithTag("achievement-${id.name}").performScrollTo().assertIsDisplayed()
+                composeRule.onAllNodesWithTag("achievement-badge-unlocked-${id.name}", useUnmergedTree = true)
+                    .assertCountEquals(1)
+            }
+            listOf(
+                AchievementId.WORKOUTS_50,
+                AchievementId.WORKOUTS_100,
+                AchievementId.WORKOUTS_200,
+                AchievementId.FIRST_MONTHLY_REPORT,
+                AchievementId.TARGET_WEIGHT_REACHED,
+                AchievementId.WEEKLY_GOAL_STREAK_12
+            ).forEach { id ->
+                composeRule.onAllNodesWithTag("achievement-badge-unlocked-${id.name}", useUnmergedTree = true)
+                    .assertCountEquals(0)
+                composeRule.onAllNodesWithTag("achievement-badge-locked-${id.name}", useUnmergedTree = true)
+                    .assertCountEquals(1)
+            }
+            composeRule.onNodeWithTag("badge-almost-WORKOUTS_30").assertIsDisplayed()
+            composeRule.onNodeWithTag("badge-almost-WEEKLY_GOAL_STREAK_8").assertIsDisplayed()
+            composeRule.onAllNodesWithTag("achievement-badge-locked-WORKOUTS_30", useUnmergedTree = true)
+                .assertCountEquals(2)
+            composeRule.onAllNodesWithText(testString(R.string.achievements_progress_count, 28, 30))
+                .assertCountEquals(2)
+            composeRule.onAllNodesWithText(testString(R.string.achievements_progress_count, 4, 8))
+                .assertCountEquals(2)
     }
 
     @Test

@@ -1212,6 +1212,7 @@ fun WeightTrackerNavHost(
                     presentation = wall,
                     onBack = { navController.popBackStack() },
                     onFilterSelected = achievementsViewModel::selectFilter,
+                    onOpenPro = { navController.navigateInternal(AppRoutes.PRO_INFO) },
                     selectedBadgeId = openedBadge,
                     onBadgeSelected = achievementsViewModel::openBadge,
                     onDismissBadge = achievementsViewModel::closeBadge

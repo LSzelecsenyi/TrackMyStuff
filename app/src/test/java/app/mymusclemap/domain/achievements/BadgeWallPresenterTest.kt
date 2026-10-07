@@ -2,7 +2,6 @@ package app.mymusclemap.domain.achievements
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,34 +23,39 @@ class BadgeWallPresenterTest {
     @Test
     fun emptyCategoriesAreNotFiltersOrAchievements() {
         val presentation = BadgeWallPresenter.present(board(completed = 0))
-        assertFalse(presentation.filters.contains(AchievementCategory.PERFORMANCE))
-        assertTrue(presentation.sections.none { it.category == AchievementCategory.PERFORMANCE })
+        assertEquals(listOf(AchievementAccess.FREE, AchievementAccess.PRO), presentation.filters)
+        assertFalse(presentation.filters.any { it.name == "SPECIAL" })
         assertEquals(
-            listOf(
-                AchievementCategory.CONSISTENCY,
-                AchievementCategory.JOURNEY,
-                AchievementCategory.GOALS
-            ),
-            presentation.filters
+            AchievementCatalog.performance,
+            presentation.sections.single { it.category == AchievementCategory.PERFORMANCE }.items.map { it.id }
         )
         assertEquals(AchievementId.entries.map { it }, presentation.catalog.map { it.id })
         assertFalse(presentation.catalog.any { it.id.name == "FIRST_PROGRESS_PHOTO" })
-        assertFalse(AchievementId.entries.any { it.name.contains("VOLUME") || it.name.contains("PR") })
+        assertFalse(AchievementId.entries.any { it.name.contains("EXERCISE_GOAL") })
+        assertTrue(presentation.catalog.filter { it.category == AchievementCategory.PERFORMANCE }.all { it.countProgress == null })
+        assertTrue(presentation.almostThere.none { it.achievementId.category == AchievementCategory.PERFORMANCE })
     }
 
     @Test
-    fun filterChangesTheCollectionWithoutChangingTheSummary() {
+    fun accessFilterChangesTheCollectionAndTheSummary() {
         val source = board(completed = 8, unlocks = listOf(AchievementId.WORKOUTS_5))
         val all = BadgeWallPresenter.present(source, null)
-        val journey = BadgeWallPresenter.present(source, AchievementCategory.JOURNEY)
-        assertEquals(all.earnedCount, journey.earnedCount)
-        assertEquals(all.totalCount, journey.totalCount)
-        assertEquals(listOf(AchievementCategory.JOURNEY), journey.sections.map { it.category })
-        assertTrue(journey.sections.single().items.all { it.category == AchievementCategory.JOURNEY })
-        assertEquals(AchievementCategory.JOURNEY, journey.selectedFilter)
-        val unknown = BadgeWallPresenter.present(source, AchievementCategory.PERFORMANCE)
-        assertNull(unknown.selectedFilter)
-        assertEquals(all.sections.map { it.category }, unknown.sections.map { it.category })
+        val free = BadgeWallPresenter.present(source, AchievementAccess.FREE)
+        val pro = BadgeWallPresenter.present(source, AchievementAccess.PRO)
+        assertEquals(1, all.earnedCount)
+        assertEquals(AchievementId.entries.size, all.totalCount)
+        assertEquals(AchievementCatalog.free.size, free.totalCount)
+        assertEquals(1, free.earnedCount)
+        assertTrue(free.catalog.filter { it.access == AchievementAccess.PRO }.isNotEmpty())
+        assertTrue(free.sections.all { section -> section.items.all { it.access == AchievementAccess.FREE } })
+        assertEquals(AchievementAccess.FREE, free.selectedFilter)
+        assertEquals(0, pro.earnedCount)
+        assertEquals(AchievementCatalog.pro.size, pro.totalCount)
+        assertEquals(
+            listOf(AchievementId.IRON_YEAR, AchievementId.VOLUME_MASTER),
+            pro.sections.flatMap { it.items }.map { it.id }
+        )
+        assertTrue(pro.almostThere.none { it.achievementId == AchievementId.VOLUME_MASTER })
     }
 
     @Test
@@ -201,7 +205,7 @@ class BadgeWallPresenterTest {
             .single { it.category == AchievementCategory.CONSISTENCY }
             .items
             .map { it.id }
-        assertEquals(AchievementCatalog.workoutCounts, consistency)
+        assertEquals(AchievementCatalog.workoutCounts + AchievementId.IRON_YEAR, consistency)
     }
 
     private fun board(

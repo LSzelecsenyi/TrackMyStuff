@@ -85,6 +85,7 @@ class AppContainer(context: Context) {
     private val nativeWorkoutCompleted = AtomicReference<suspend (String) -> Unit> { _ -> }
     private val weightChanged = AtomicReference<suspend () -> Unit> { }
     private val plansChanged = AtomicReference<suspend () -> Unit> { }
+    private val grantsPro = AtomicReference<() -> Boolean> { false }
     val exerciseRepository = ExerciseRepository(
         dao = database.exerciseDao(),
         clock = clock,
@@ -114,7 +115,8 @@ class AppContainer(context: Context) {
     val achievementRepository = AchievementRepository(
         database = database,
         clock = clock,
-        dateProvider = dateProvider
+        dateProvider = dateProvider,
+        grantsPro = { grantsPro.get().invoke() }
     )
     val workoutSessionRepository = WorkoutSessionRepository(
         sessionDao = database.workoutSessionDao(),
@@ -159,6 +161,7 @@ class AppContainer(context: Context) {
     val founderProgramStore = FounderProgramStore(appContext)
     val founderMilestoneAcknowledgements = FounderMilestoneAcknowledgementStore(appContext)
     private val entitlementRevision = MutableStateFlow(0)
+    val entitlementRevisions: kotlinx.coroutines.flow.StateFlow<Int> get() = entitlementRevision
     private val founderAuthorityRefresh = Mutex()
     private val founderCacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val strictSessionRevision = MutableStateFlow(0)
@@ -181,7 +184,8 @@ class AppContainer(context: Context) {
         founderLifetimeProvider = founderLifetimeProvider,
         clock = clock,
         founderProgram = founderProgram::currentState,
-        backendFounder = founderEntitlementCache::current
+        backendFounder = founderEntitlementCache::current,
+        adjustSources = EntitlementOverrideSelection::adjust
     )
     val featureEntitlements: FeatureEntitlements = PolicyBackedEntitlements(
         policySource = { entitlementComposer.policy() },
@@ -192,6 +196,7 @@ class AppContainer(context: Context) {
         customExerciseCreate.set { count ->
             entitlementComposer.policy().customExercises(count).canCreate
         }
+        grantsPro.set { entitlementComposer.resolve().grantsPro }
         weightChanged.set { achievementRepository.reconcile() }
         plansChanged.set { achievementRepository.reconcile() }
         nativeWorkoutCompleted.set { clientWorkoutId ->

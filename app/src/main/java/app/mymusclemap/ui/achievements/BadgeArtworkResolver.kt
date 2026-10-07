@@ -18,11 +18,16 @@ object BadgeArtworkResolver {
             AchievementId.WORKOUTS_100.name -> R.drawable.consistency_badge_gold_2star
             AchievementId.WORKOUTS_200.name -> R.drawable.consistency_badge_gold_3star
             AchievementId.WEEKLY_GOAL_STREAK_4.name -> R.drawable.weekly_goal_4times_badge
+            AchievementId.WEEKLY_GOAL_STREAK_8.name -> R.drawable.weekly_goal_8times_badge
             AchievementId.WEEKLY_GOAL_STREAK_12.name -> R.drawable.weekly_goal_12times_badge
             AchievementId.TARGET_WEIGHT_REACHED.name -> R.drawable.weight_goal_badge
             AchievementId.FIRST_WORKOUT.name -> R.drawable.first_workout_badge
             AchievementId.FIRST_CUSTOM_WORKOUT_PLAN.name -> R.drawable.first_workout_plan_badge
             AchievementId.FIRST_MONTHLY_REPORT.name -> R.drawable.first_monthly_report_badge
+            AchievementId.FIRST_PR.name -> R.drawable.first_pr_badge
+            AchievementId.WEIGHT_PR.name -> R.drawable.weight_pr_badge
+            AchievementId.REP_RECORD.name -> R.drawable.highest_rep_count_badge
+            AchievementId.VOLUME_RECORD.name -> R.drawable.highest_total_volume_badge
             else -> R.drawable.ic_badge_placeholder
         }
     }

@@ -11,7 +11,8 @@ class EntitlementComposer(
     private val founderLifetimeProvider: FounderLifetimeProvider,
     private val clock: Clock,
     private val founderProgram: () -> FounderProgramState = { FounderProgramState() },
-    private val backendFounder: () -> BackendFounderEntitlement = { BackendFounderEntitlement() }
+    private val backendFounder: () -> BackendFounderEntitlement = { BackendFounderEntitlement() },
+    private val adjustSources: (EntitlementSources) -> EntitlementSources = { it }
 ) {
     fun sources(): EntitlementSources {
         return EntitlementSources.of(
@@ -23,7 +24,7 @@ class EntitlementComposer(
     }
 
     fun resolve(): EffectiveEntitlement {
-        return EntitlementResolver.resolve(sources(), clock.instant())
+        return EntitlementResolver.resolve(adjustSources(sources()), clock.instant())
     }
 
     fun policy(): FeatureAccessPolicy = FeatureAccessPolicy(resolve())

@@ -6,6 +6,7 @@ import app.mymusclemap.data.local.ProgressEventEntity
 import app.mymusclemap.data.local.UnlockedAchievementEntity
 import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.local.toModel
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.achievements.AchievementBoard
 import app.mymusclemap.domain.achievements.AchievementBoardAssembler
@@ -24,10 +25,15 @@ import app.mymusclemap.domain.achievements.TargetWeightMilestonePlanner
 import app.mymusclemap.domain.achievements.TargetWeightProgress
 import app.mymusclemap.domain.achievements.TargetWeightProgressEvaluator
 import app.mymusclemap.domain.achievements.UnlockSnapshot
+import app.mymusclemap.domain.achievements.VolumeProgress
+import app.mymusclemap.domain.achievements.PerformanceRecordEvaluator
+import app.mymusclemap.domain.achievements.ProAchievementEvaluator
 import app.mymusclemap.domain.achievements.WeeklyGoalCompletionEvaluator
 import app.mymusclemap.domain.achievements.WeeklyGoalStreakEvaluator
 import app.mymusclemap.domain.achievements.WeightMilestonePlan
+import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
+import app.mymusclemap.domain.workout.WorkoutSessionAggregate
 import app.mymusclemap.domain.workout.WeeklyGoalRevision
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -41,22 +47,36 @@ import java.time.LocalDate
 class AchievementRepository(
     private val database: WeightDatabase,
     private val clock: Clock,
-    private val dateProvider: DateProvider
+    private val dateProvider: DateProvider,
+    private val grantsPro: () -> Boolean = { false }
 ) {
     fun observeBoard(): Flow<AchievementBoard> {
         val awards = combine(
-            database.workoutSessionDao().observeCompletedCount(),
-            database.achievementDao().observeUnlocks(),
-            database.achievementDao().observeEvents(),
-            database.weeklyWorkoutGoalDao().observeAll(),
-            database.workoutSessionDao().observeAllCompletedCounts()
-        ) { count, unlocks, events, goals, dateCounts ->
-            val status = weeklyStatus(goals, dateCounts)
-            AchievementBoardAssembler.assemble(
-                completedWorkoutCount = count,
-                unlocks = unlocks.mapNotNull { it.toSnapshot() },
-                events = events.mapNotNull { it.toSnapshot() },
-                currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status)
+            combine(
+                database.workoutSessionDao().observeCompletedCount(),
+                database.achievementDao().observeUnlocks(),
+                database.achievementDao().observeEvents(),
+                database.weeklyWorkoutGoalDao().observeAll(),
+                database.workoutSessionDao().observeAllCompletedCounts()
+            ) { count, unlocks, events, goals, dateCounts ->
+                val status = weeklyStatus(goals, dateCounts)
+                AchievementBoardAssembler.assemble(
+                    completedWorkoutCount = count,
+                    unlocks = unlocks.mapNotNull { it.toSnapshot() },
+                    events = events.mapNotNull { it.toSnapshot() },
+                    currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status)
+                )
+            },
+            observeLifetimeVolumeKg()
+        ) { board, volumeKg ->
+            board.copy(
+                items = board.items.map { item ->
+                    val threshold = item.id.volumeThresholdKg ?: return@map item
+                    item.copy(
+                        volumeProgress = VolumeProgress(currentKg = volumeKg, thresholdKg = threshold),
+                        requirementMet = volumeKg >= threshold
+                    )
+                }
             )
         }
         return combine(
@@ -77,7 +97,8 @@ class AchievementRepository(
             completedWorkoutCount = database.workoutSessionDao().countCompleted(),
             unlocks = database.achievementDao().unlocks().mapNotNull { it.toSnapshot() },
             events = database.achievementDao().events().mapNotNull { it.toSnapshot() },
-            currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status)
+            currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status),
+            lifetimeVolumeKg = ProAchievementEvaluator.lifetimeVolumeKg(completedAggregates())
         )
         return assembled.copy(
             targetWeightProgress = targetProgress(
@@ -138,6 +159,7 @@ class AchievementRepository(
                 }
             }
             val now = clock.millis()
+            val history = completedAggregates()
             val monthlyMarkerAt = storedEventRows
                 .firstOrNull { it.dedupeKey == JourneyEvaluator.MONTHLY_REPORT_KEY }
                 ?.occurredAt
@@ -157,6 +179,9 @@ class AchievementRepository(
                         earliestCustomPlanAt = database.workoutTemplateDao().earliestCreatedAt(),
                         monthlyReportGeneratedAt = monthlyMarkerAt ?: if (recordMonthlyReport) now else null
                     ),
+                    performanceQualifications = PerformanceRecordEvaluator.qualifications(history),
+                    grantsPro = grantsPro(),
+                    proQualifications = ProAchievementEvaluator.qualifications(history),
                     recordMonthlyReportMarker = recordMonthlyReport && monthlyMarkerAt == null
                 ),
                 unlocks = storedUnlocks,
@@ -217,6 +242,52 @@ class AchievementRepository(
             currentKg = current,
             historicalKg = inJourney.map { it.weightKg }
         )
+    }
+
+    private fun observeLifetimeVolumeKg(): Flow<Double> {
+        val sessions = database.workoutSessionDao()
+        return combine(
+            sessions.observeCompletedSessions(),
+            sessions.observeCompletedExercises(),
+            sessions.observeCompletedSets()
+        ) { completedSessions, exercises, sets ->
+            ProAchievementEvaluator.lifetimeVolumeKg(
+                aggregatesFrom(completedSessions, exercises, sets)
+            )
+        }
+    }
+
+    private suspend fun completedAggregates(): List<WorkoutSessionAggregate> {
+        val sessions = database.workoutSessionDao()
+        return aggregatesFrom(
+            sessions.getCompletedSessions(),
+            sessions.getCompletedExercises(),
+            sessions.getCompletedSets()
+        )
+    }
+
+    private fun aggregatesFrom(
+        sessions: List<app.mymusclemap.data.local.WorkoutSessionEntity>,
+        exercises: List<app.mymusclemap.data.local.WorkoutSessionExerciseEntity>,
+        sets: List<app.mymusclemap.data.local.WorkoutSessionSetEntity>
+    ): List<WorkoutSessionAggregate> {
+        val setsByExercise = sets.groupBy { it.sessionExerciseId }
+        val exercisesBySession = exercises.groupBy { it.sessionId }
+        return sessions.map { session ->
+            WorkoutSessionAggregate(
+                session = session.toModel(),
+                exercises = exercisesBySession[session.id].orEmpty()
+                    .sortedWith(compareBy({ it.position }, { it.id }))
+                    .map { exercise ->
+                        SessionExerciseItem(
+                            exercise = exercise.toModel(emptyList()),
+                            sets = setsByExercise[exercise.id].orEmpty()
+                                .sortedWith(compareBy({ it.position }, { it.id }))
+                                .map { it.toModel() }
+                        )
+                    }
+            )
+        }
     }
 
     private suspend fun captureWeightBaseline() {

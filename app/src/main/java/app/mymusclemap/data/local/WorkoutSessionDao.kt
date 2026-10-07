@@ -119,6 +119,28 @@ abstract class WorkoutSessionDao {
     @Query("SELECT * FROM workout_sessions WHERE status = 'COMPLETED' ORDER BY workoutDate DESC, id DESC")
     abstract fun observeCompletedSessions(): Flow<List<WorkoutSessionEntity>>
 
+    @Query("SELECT * FROM workout_sessions WHERE status = 'COMPLETED'")
+    abstract suspend fun getCompletedSessions(): List<WorkoutSessionEntity>
+
+    @Query(
+        """
+        SELECT e.* FROM workout_session_exercises e
+        INNER JOIN workout_sessions s ON s.id = e.sessionId
+        WHERE s.status = 'COMPLETED'
+        """
+    )
+    abstract suspend fun getCompletedExercises(): List<WorkoutSessionExerciseEntity>
+
+    @Query(
+        """
+        SELECT st.* FROM workout_session_sets st
+        INNER JOIN workout_session_exercises e ON e.id = st.sessionExerciseId
+        INNER JOIN workout_sessions s ON s.id = e.sessionId
+        WHERE s.status = 'COMPLETED'
+        """
+    )
+    abstract suspend fun getCompletedSets(): List<WorkoutSessionSetEntity>
+
     @Query(
         """
         SELECT id, workoutDate, templateName FROM workout_sessions

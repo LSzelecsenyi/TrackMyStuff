@@ -22,6 +22,15 @@ enum class BadgeTier {
     GOLD
 }
 
+/**
+ * Static catalog access. This is not a stored subscription flag.
+ * [PRO] requirements are still evaluated for Free users; only the unlock requires Pro.
+ */
+enum class AchievementAccess {
+    FREE,
+    PRO
+}
+
 /** Lifetime product milestones. These are not numeric progress awards. */
 enum class JourneyMilestone {
     FIRST_WORKOUT,
@@ -40,7 +49,15 @@ enum class AchievementId(
     val streakWeeks: Int? = null,
     val badgeFamily: BadgeFamily? = null,
     val badgeTier: BadgeTier? = null,
-    val journeyMilestone: JourneyMilestone? = null
+    val journeyMilestone: JourneyMilestone? = null,
+    val access: AchievementAccess = AchievementAccess.FREE,
+    /**
+     * Sticky completed-workout target. Unlike [workoutThreshold], earning it is not revoked
+     * when later history no longer reaches the count.
+     */
+    val lifetimeWorkoutTarget: Int? = null,
+    /** Lifetime eligible kilogram volume required to satisfy the requirement. */
+    val volumeThresholdKg: Double? = null
 ) {
     WORKOUTS_5(AchievementCategory.CONSISTENCY, workoutThreshold = 5),
     WORKOUTS_10(AchievementCategory.CONSISTENCY, workoutThreshold = 10),
@@ -78,6 +95,20 @@ enum class AchievementId(
     FIRST_MONTHLY_REPORT(
         AchievementCategory.JOURNEY,
         journeyMilestone = JourneyMilestone.FIRST_MONTHLY_REPORT
+    ),
+    FIRST_PR(AchievementCategory.PERFORMANCE),
+    WEIGHT_PR(AchievementCategory.PERFORMANCE),
+    REP_RECORD(AchievementCategory.PERFORMANCE),
+    VOLUME_RECORD(AchievementCategory.PERFORMANCE),
+    IRON_YEAR(
+        AchievementCategory.CONSISTENCY,
+        access = AchievementAccess.PRO,
+        lifetimeWorkoutTarget = 250
+    ),
+    VOLUME_MASTER(
+        AchievementCategory.PERFORMANCE,
+        access = AchievementAccess.PRO,
+        volumeThresholdKg = 100_000.0
     );
 
     val badgeKey: String = name
@@ -99,7 +130,28 @@ enum class AchievementId(
             require(streakWeeks == null)
             require(badgeFamily == null)
         }
+        if (category == AchievementCategory.PERFORMANCE) {
+            require(workoutThreshold == null)
+            require(lifetimeWorkoutTarget == null)
+            require(streakWeeks == null)
+            require(journeyMilestone == null)
+            require(badgeFamily == null)
+        }
+        if (lifetimeWorkoutTarget != null) {
+            require(lifetimeWorkoutTarget > 0)
+            require(workoutThreshold == null)
+            require(access == AchievementAccess.PRO)
+        }
+        if (volumeThresholdKg != null) {
+            require(volumeThresholdKg > 0.0)
+            require(access == AchievementAccess.PRO)
+            require(workoutThreshold == null)
+            require(lifetimeWorkoutTarget == null)
+        }
     }
+
+    /** Completed-workout target used for progress, including the sticky Pro milestone. */
+    val workoutCountTarget: Int? get() = workoutThreshold ?: lifetimeWorkoutTarget
 
     companion object {
         fun fromStorage(raw: String): AchievementId? = entries.firstOrNull { it.name == raw }
@@ -114,6 +166,13 @@ object AchievementCatalog {
         .sortedBy { it.streakWeeks }
 
     val journey: List<AchievementId> = AchievementId.entries.filter { it.journeyMilestone != null }
+
+    val performance: List<AchievementId> = AchievementId.entries
+        .filter { it.category == AchievementCategory.PERFORMANCE }
+
+    val pro: List<AchievementId> = AchievementId.entries.filter { it.access == AchievementAccess.PRO }
+
+    val free: List<AchievementId> = AchievementId.entries.filter { it.access == AchievementAccess.FREE }
 
     fun byCategory(category: AchievementCategory): List<AchievementId> {
         return AchievementId.entries.filter { it.category == category }

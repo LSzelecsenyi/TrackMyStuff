@@ -5,6 +5,13 @@ data class CountProgress(
     val threshold: Int
 )
 
+data class VolumeProgress(
+    val currentKg: Double,
+    val thresholdKg: Double
+) {
+    val met: Boolean get() = currentKg >= thresholdKg
+}
+
 data class BadgeWallItem(
     val id: AchievementId,
     val category: AchievementCategory,
@@ -13,7 +20,11 @@ data class BadgeWallItem(
     val badgeTier: BadgeTier?,
     val unlocked: Boolean,
     val unlockedAt: Long?,
-    val countProgress: CountProgress?
+    val countProgress: CountProgress?,
+    val access: AchievementAccess = AchievementAccess.FREE,
+    val volumeProgress: VolumeProgress? = null,
+    /** Requirement is satisfied. For Pro this can be true before the badge is earned. */
+    val requirementMet: Boolean = unlocked
 )
 
 data class CelebrationAcknowledgement(
@@ -59,6 +70,18 @@ sealed interface PendingCelebration {
         override val acknowledgement: CelebrationAcknowledgement
     ) : PendingCelebration
 
+    data class PerformanceUnlocked(
+        val achievementId: AchievementId,
+        override val triggerClientWorkoutId: String?,
+        override val acknowledgement: CelebrationAcknowledgement
+    ) : PendingCelebration
+
+    data class ProUnlocked(
+        val achievementId: AchievementId,
+        override val triggerClientWorkoutId: String?,
+        override val acknowledgement: CelebrationAcknowledgement
+    ) : PendingCelebration
+
     data class TargetWeightMilestone(
         val milestone: WeightMilestone,
         val includesLifetimeUnlock: Boolean,
@@ -97,14 +120,38 @@ object AchievementBoardAssembler {
         completedWorkoutCount: Int,
         unlocks: List<UnlockSnapshot>,
         events: List<ProgressEventSnapshot>,
-        currentStreak: Int = 0
+        currentStreak: Int = 0,
+        lifetimeVolumeKg: Double = 0.0
     ): AchievementBoard {
         val unlockById = unlocks.associateBy { it.achievementId }
         val streak = currentStreak.coerceAtLeast(0)
+        val workouts = completedWorkoutCount.coerceAtLeast(0)
+        val volume = lifetimeVolumeKg.coerceAtLeast(0.0)
         val items = AchievementId.entries.map { id ->
             val unlock = unlockById[id]
-            val workoutThreshold = id.workoutThreshold
+            val workoutTarget = id.workoutCountTarget
             val streakWeeks = id.streakWeeks
+            val volumeThreshold = id.volumeThresholdKg
+            val countProgress = when {
+                workoutTarget != null -> CountProgress(
+                    current = workouts.coerceAtMost(workoutTarget),
+                    threshold = workoutTarget
+                )
+                streakWeeks != null -> CountProgress(
+                    current = streak.coerceAtMost(streakWeeks),
+                    threshold = streakWeeks
+                )
+                else -> null
+            }
+            val volumeProgress = volumeThreshold?.let {
+                VolumeProgress(currentKg = volume, thresholdKg = it)
+            }
+            val requirementMet = when {
+                volumeThreshold != null -> volume >= volumeThreshold
+                workoutTarget != null -> workouts >= workoutTarget
+                streakWeeks != null -> streak >= streakWeeks
+                else -> unlock != null
+            }
             BadgeWallItem(
                 id = id,
                 category = id.category,
@@ -113,17 +160,10 @@ object AchievementBoardAssembler {
                 badgeTier = id.badgeTier,
                 unlocked = unlock != null,
                 unlockedAt = unlock?.unlockedAt,
-                countProgress = when {
-                    workoutThreshold != null -> CountProgress(
-                        current = completedWorkoutCount.coerceAtLeast(0).coerceAtMost(workoutThreshold),
-                        threshold = workoutThreshold
-                    )
-                    streakWeeks != null -> CountProgress(
-                        current = streak.coerceAtMost(streakWeeks),
-                        threshold = streakWeeks
-                    )
-                    else -> null
-                }
+                countProgress = countProgress,
+                access = id.access,
+                volumeProgress = volumeProgress,
+                requirementMet = requirementMet
             )
         }
         return AchievementBoard(
@@ -211,6 +251,40 @@ object AchievementBoardAssembler {
                     acknowledgement = CelebrationAcknowledgement(achievementId = unlock.achievementId.name)
                 )
             }
-        return history + journeys + streaks + weeks + awards + weight
+        val performance = unlocks
+            .filter {
+                it.celebratedAt == null &&
+                    it.achievementId.category == AchievementCategory.PERFORMANCE &&
+                    it.achievementId.access != AchievementAccess.PRO
+            }
+            .sortedByDescending { performanceCelebrationRank(it.achievementId) }
+            .map { unlock ->
+                PendingCelebration.PerformanceUnlocked(
+                    achievementId = unlock.achievementId,
+                    triggerClientWorkoutId = unlock.triggerClientWorkoutId,
+                    acknowledgement = CelebrationAcknowledgement(achievementId = unlock.achievementId.name)
+                )
+            }
+        val proAwards = unlocks
+            .filter { it.celebratedAt == null && it.achievementId.access == AchievementAccess.PRO }
+            .sortedByDescending { it.unlockedAt }
+            .map { unlock ->
+                PendingCelebration.ProUnlocked(
+                    achievementId = unlock.achievementId,
+                    triggerClientWorkoutId = unlock.triggerClientWorkoutId,
+                    acknowledgement = CelebrationAcknowledgement(achievementId = unlock.achievementId.name)
+                )
+            }
+        return history + journeys + performance + proAwards + streaks + weeks + awards + weight
+    }
+
+    private fun performanceCelebrationRank(id: AchievementId): Int {
+        return when (id) {
+            AchievementId.WEIGHT_PR -> 3
+            AchievementId.REP_RECORD -> 2
+            AchievementId.VOLUME_RECORD -> 1
+            AchievementId.FIRST_PR -> 0
+            else -> -1
+        }
     }
 }

@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.AchievementRepository
 import app.mymusclemap.domain.achievements.AchievementBoard
 import app.mymusclemap.domain.achievements.AchievementBoardAssembler
-import app.mymusclemap.domain.achievements.AchievementCategory
+import app.mymusclemap.domain.achievements.AchievementAccess
 import app.mymusclemap.domain.achievements.AchievementId
 import app.mymusclemap.domain.achievements.BadgeWallPresentation
 import app.mymusclemap.domain.achievements.BadgeWallPresenter
@@ -26,7 +26,7 @@ class AchievementsViewModel(
     val board: StateFlow<AchievementBoard> = repository.observeBoard()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmptyAchievementBoard)
 
-    private val selectedFilter = MutableStateFlow<AchievementCategory?>(null)
+    private val selectedFilter = MutableStateFlow<AchievementAccess?>(null)
     private val openedBadge = MutableStateFlow<AchievementId?>(null)
 
     val presentation: StateFlow<BadgeWallPresentation> = combine(board, selectedFilter) { current, filter ->
@@ -43,8 +43,8 @@ class AchievementsViewModel(
         .map { it.next }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), board.value.next)
 
-    fun selectFilter(category: AchievementCategory?) {
-        selectedFilter.value = category
+    fun selectFilter(access: AchievementAccess?) {
+        selectedFilter.value = access
     }
 
     fun openBadge(id: AchievementId) {

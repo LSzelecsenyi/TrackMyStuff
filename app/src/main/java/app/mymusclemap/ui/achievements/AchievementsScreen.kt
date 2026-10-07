@@ -3,12 +3,10 @@ package app.mymusclemap.ui.achievements
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -36,12 +34,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -56,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.domain.achievements.AchievementAccess
 import app.mymusclemap.domain.achievements.AchievementCategory
 import app.mymusclemap.domain.achievements.AchievementId
 import app.mymusclemap.domain.achievements.AlmostThereEntry
@@ -66,6 +69,8 @@ import app.mymusclemap.domain.achievements.BadgeWallPresentation
 import app.mymusclemap.domain.achievements.BadgeWallSection
 import app.mymusclemap.domain.achievements.JourneyMilestone
 import app.mymusclemap.domain.achievements.visualState
+import app.mymusclemap.ui.components.SegmentedControl
+import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
@@ -80,8 +85,10 @@ internal const val BADGE_ALMOST_THERE = "badge-almost-there"
 internal const val BADGE_DETAIL = "badge-detail"
 
 private val CardShape = RoundedCornerShape(16.dp)
-private val ChipShape = RoundedCornerShape(50)
 private val MinBadgeColumnWidth = 108.dp
+private const val LockedBadgeAlpha = 0.40f
+private const val NextBadgeAlpha = 0.48f
+private const val LockedBadgeSaturation = 0.50f
 
 internal fun badgeColumnCount(width: Dp): Int {
     return (width / MinBadgeColumnWidth).toInt().coerceIn(3, 6)
@@ -92,10 +99,11 @@ internal fun badgeColumnCount(width: Dp): Int {
 fun AchievementsScreen(
     presentation: BadgeWallPresentation,
     onBack: () -> Unit,
-    onFilterSelected: (AchievementCategory?) -> Unit = {},
+    onFilterSelected: (AchievementAccess?) -> Unit = {},
     selectedBadgeId: AchievementId? = null,
     onBadgeSelected: (AchievementId) -> Unit = {},
-    onDismissBadge: () -> Unit = {}
+    onDismissBadge: () -> Unit = {},
+    onOpenPro: (() -> Unit)? = null
 ) {
     Scaffold(
         modifier = Modifier
@@ -123,6 +131,9 @@ fun AchievementsScreen(
                 FilterRow(presentation, onFilterSelected)
                 Spacer(Modifier.height(AppDimens.itemGap))
                 SummaryCard(presentation)
+                if (presentation.catalog.any { it.visualState() == BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED }) {
+                    ProRequirementTeaser(onOpenPro)
+                }
                 if (presentation.almostThere.isNotEmpty()) {
                     Spacer(Modifier.height(AppDimens.sectionGap))
                     AlmostThereCard(presentation, onBadgeSelected)
@@ -166,47 +177,45 @@ private fun AchievementsBar(onBack: () -> Unit) {
 @Composable
 private fun FilterRow(
     presentation: BadgeWallPresentation,
-    onFilterSelected: (AchievementCategory?) -> Unit
+    onFilterSelected: (AchievementAccess?) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterChip(
-            label = stringResource(R.string.badge_wall_filter_all),
-            selected = presentation.selectedFilter == null,
-            tag = "badge-filter-ALL",
-            onClick = { onFilterSelected(null) }
-        )
-        presentation.filters.forEach { category ->
-            FilterChip(
-                label = stringResource(category.labelRes()),
-                selected = presentation.selectedFilter == category,
-                tag = "badge-filter-${category.name}",
-                onClick = { onFilterSelected(category) }
-            )
-        }
-    }
+    val filters = presentation.filters
+    val selectedIndex = presentation.selectedFilter?.let { filters.indexOf(it) + 1 }?.takeIf { it > 0 } ?: 0
+    SegmentedControl(
+        options = listOf(stringResource(R.string.badge_wall_filter_all)) +
+            filters.map { stringResource(it.labelRes()) },
+        selectedIndex = selectedIndex,
+        onSelected = { index ->
+            onFilterSelected(filters.getOrNull(index - 1))
+        },
+        compact = true,
+        optionTestTags = listOf("badge-filter-ALL") + filters.map { "badge-filter-${it.name}" },
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
-private fun FilterChip(label: String, selected: Boolean, tag: String, onClick: () -> Unit) {
-    val background = if (selected) StrictBrand.actionContainer() else MaterialTheme.colorScheme.surfaceVariant
-    val content = if (selected) StrictBrand.onAction() else MaterialTheme.colorScheme.onSurfaceVariant
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        color = content,
-        modifier = Modifier
-            .clip(ChipShape)
-            .background(background)
-            .defaultMinSize(minHeight = AppDimens.minTouch)
-            .clickable(onClick = onClick, role = Role.Button)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-            .testTag(tag)
-    )
+private fun ProRequirementTeaser(onOpenPro: (() -> Unit)?) {
+    val label = stringResource(R.string.badge_wall_unlock_with_pro)
+    if (onOpenPro == null) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = StrictBrand.result(),
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .testTag("badge-pro-teaser")
+        )
+    } else {
+        TextButton(
+            onClick = onOpenPro,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .testTag("badge-pro-teaser")
+        ) {
+            Text(text = label, color = StrictBrand.result())
+        }
+    }
 }
 
 @Composable
@@ -296,16 +305,23 @@ private fun AlmostThereRow(
             .testTag("badge-almost-${item.id.name}"),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        BadgeArtwork(item, size = 44.dp, earned = false)
+        BadgeArtwork(item, size = 44.dp, emphasis = BadgeArtworkEmphasis.Next)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = achievementTitle(item.id),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = achievementTitle(item.id),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (item.access == AchievementAccess.PRO) {
+                    Spacer(Modifier.width(6.dp))
+                    ProMark(item.id)
+                }
+            }
             Text(
                 text = achievementRequirement(item.id),
                 style = MaterialTheme.typography.bodySmall,
@@ -330,6 +346,14 @@ private fun almostThereProgress(entry: AlmostThereEntry): String {
     val count = entry.countProgress
     if (count != null) {
         return stringResource(R.string.achievements_progress_count, count.current, count.threshold)
+    }
+    val volume = entry.volumeProgress
+    if (volume != null) {
+        return stringResource(
+            R.string.badge_wall_volume_progress,
+            volumeAmount(volume.currentKg),
+            volumeAmount(volume.thresholdKg)
+        )
     }
     val remaining = entry.remainingKg
     if (remaining != null) {
@@ -429,7 +453,11 @@ private fun BadgeCell(
             },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        BadgeArtwork(item, imageSize, earned = item.unlocked)
+        BadgeArtwork(
+            item,
+            imageSize,
+            emphasis = if (item.unlocked) BadgeArtworkEmphasis.Earned else BadgeArtworkEmphasis.Locked
+        )
         Spacer(Modifier.height(6.dp))
         Text(
             text = achievementTitle(item.id),
@@ -443,13 +471,26 @@ private fun BadgeCell(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        if (showProgress && item.countProgress != null) {
+        if (item.access == AchievementAccess.PRO) {
+            Spacer(Modifier.height(4.dp))
+            ProMark(item.id)
+        }
+        val progressLabel = when {
+            showProgress && item.countProgress != null -> stringResource(
+                R.string.achievements_progress_count,
+                item.countProgress.current,
+                item.countProgress.threshold
+            )
+            showProgress && item.volumeProgress != null -> stringResource(
+                R.string.badge_wall_volume_progress,
+                volumeAmount(item.volumeProgress.currentKg),
+                volumeAmount(item.volumeProgress.thresholdKg)
+            )
+            else -> null
+        }
+        if (progressLabel != null) {
             Text(
-                text = stringResource(
-                    R.string.achievements_progress_count,
-                    item.countProgress.current,
-                    item.countProgress.threshold
-                ),
+                text = progressLabel,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -459,21 +500,38 @@ private fun BadgeCell(
     }
 }
 
+private enum class BadgeArtworkEmphasis {
+    Earned,
+    Next,
+    Locked
+}
+
 @Composable
-private fun BadgeArtwork(item: BadgeWallItem, size: Dp, earned: Boolean) {
+private fun BadgeArtwork(item: BadgeWallItem, size: Dp, emphasis: BadgeArtworkEmphasis) {
+    val earned = emphasis == BadgeArtworkEmphasis.Earned
     val modifier = Modifier
         .size(size)
-        .alpha(if (earned) 1f else 0.48f)
+        .alpha(
+            when (emphasis) {
+                BadgeArtworkEmphasis.Earned -> 1f
+                BadgeArtworkEmphasis.Next -> NextBadgeAlpha
+                BadgeArtworkEmphasis.Locked -> LockedBadgeAlpha
+            }
+        )
         .testTag(
             if (earned) "achievement-badge-unlocked-${item.id.name}"
             else "achievement-badge-locked-${item.id.name}"
         )
     val painter = painterResource(BadgeArtworkResolver.drawableFor(item.badgeKey))
+    val lockedFilter = remember {
+        ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(LockedBadgeSaturation) })
+    }
     if (BadgeArtworkResolver.isProductionArtwork(item.badgeKey)) {
         Image(
             painter = painter,
             contentDescription = null,
             contentScale = ContentScale.Fit,
+            colorFilter = if (emphasis == BadgeArtworkEmphasis.Locked) lockedFilter else null,
             modifier = modifier
         )
     } else {
@@ -517,7 +575,11 @@ private fun BadgeDetailSheet(item: BadgeWallItem, onDismiss: () -> Unit) {
                 .testTag(BADGE_DETAIL),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            BadgeArtwork(item, size = 140.dp, earned = item.unlocked)
+            BadgeArtwork(
+                item,
+                size = 140.dp,
+                emphasis = if (item.unlocked) BadgeArtworkEmphasis.Earned else BadgeArtworkEmphasis.Locked
+            )
             Spacer(Modifier.height(16.dp))
             Text(
                 text = achievementTitle(item.id),
@@ -531,6 +593,10 @@ private fun BadgeDetailSheet(item: BadgeWallItem, onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (item.access == AchievementAccess.PRO) {
+                Spacer(Modifier.height(8.dp))
+                ProMark(item.id)
+            }
             item.badgeTier?.let { tier ->
                 Text(
                     text = stringResource(tier.labelRes()),
@@ -550,13 +616,19 @@ private fun BadgeDetailSheet(item: BadgeWallItem, onDismiss: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             val state = item.visualState()
             Text(
-                text = stringResource(
-                    if (item.unlocked) R.string.badge_wall_earned else R.string.badge_wall_locked
-                ),
+                text = stringResource(detailStateRes(state)),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.testTag("badge-detail-state")
             )
+            if (state == BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED) {
+                Text(
+                    text = stringResource(R.string.badge_wall_unlock_with_pro),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("badge-detail-pro-lock")
+                )
+            }
             if (item.unlocked) {
                 item.unlockedAt?.let { unlockedAt ->
                     val date = Instant.ofEpochMilli(unlockedAt).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -570,22 +642,8 @@ private fun BadgeDetailSheet(item: BadgeWallItem, onDismiss: () -> Unit) {
                         modifier = Modifier.testTag("badge-detail-earned-date")
                     )
                 }
-            } else if (state == BadgeVisualState.LOCKED_PROGRESS && item.countProgress != null) {
-                Spacer(Modifier.height(12.dp))
-                val progress = item.countProgress
-                ThinProgress(progress.current.toFloat() / progress.threshold.toFloat())
-                Text(
-                    text = stringResource(
-                        R.string.achievements_progress_count,
-                        progress.current,
-                        progress.threshold
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .padding(top = 6.dp)
-                        .testTag("badge-detail-progress")
-                )
+            } else if (state == BadgeVisualState.LOCKED_PROGRESS || state == BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED) {
+                ProgressDetail(item)
             }
         }
     }
@@ -596,9 +654,12 @@ internal fun achievementTitle(id: AchievementId): String {
     val workouts = id.workoutThreshold
     val weeks = id.streakWeeks
     return when {
+        id == AchievementId.IRON_YEAR -> stringResource(R.string.achievement_iron_year_name)
+        id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_name)
         workouts != null -> stringResource(R.string.achievements_workouts_name, workouts)
         weeks != null -> stringResource(R.string.achievement_streak_name, weeks)
         id.journeyMilestone != null -> stringResource(journeyTitleRes(id.journeyMilestone))
+        id.category == AchievementCategory.PERFORMANCE -> stringResource(performanceTitleRes(id))
         else -> stringResource(R.string.achievement_on_target_name)
     }
 }
@@ -608,9 +669,12 @@ internal fun achievementRequirement(id: AchievementId): String {
     val workouts = id.workoutThreshold
     val weeks = id.streakWeeks
     return when {
+        id == AchievementId.IRON_YEAR -> stringResource(R.string.achievement_iron_year_requirement)
+        id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_requirement)
         workouts != null -> stringResource(R.string.achievements_workouts_requirement, workouts)
         weeks != null -> stringResource(R.string.achievement_streak_requirement, weeks)
         id.journeyMilestone != null -> stringResource(journeyRequirementRes(id.journeyMilestone))
+        id.category == AchievementCategory.PERFORMANCE -> stringResource(performanceRequirementRes(id))
         else -> stringResource(R.string.achievement_on_target_requirement)
     }
 }
@@ -623,12 +687,103 @@ private fun journeyTitleRes(milestone: JourneyMilestone): Int {
     }
 }
 
+private fun performanceTitleRes(id: AchievementId): Int {
+    return when (id) {
+        AchievementId.FIRST_PR -> R.string.achievement_first_pr_name
+        AchievementId.WEIGHT_PR -> R.string.achievement_weight_pr_name
+        AchievementId.REP_RECORD -> R.string.achievement_rep_record_name
+        AchievementId.VOLUME_RECORD -> R.string.achievement_volume_record_name
+        else -> R.string.achievement_first_pr_name
+    }
+}
+
+private fun performanceRequirementRes(id: AchievementId): Int {
+    return when (id) {
+        AchievementId.FIRST_PR -> R.string.achievement_first_pr_requirement
+        AchievementId.WEIGHT_PR -> R.string.achievement_weight_pr_requirement
+        AchievementId.REP_RECORD -> R.string.achievement_rep_record_requirement
+        AchievementId.VOLUME_RECORD -> R.string.achievement_volume_record_requirement
+        else -> R.string.achievement_first_pr_requirement
+    }
+}
+
 private fun journeyRequirementRes(milestone: JourneyMilestone): Int {
     return when (milestone) {
         JourneyMilestone.FIRST_WORKOUT -> R.string.achievement_first_step_requirement
         JourneyMilestone.FIRST_PLAN -> R.string.achievement_planner_requirement
         JourneyMilestone.FIRST_MONTHLY_REPORT -> R.string.achievement_monthly_review_requirement
     }
+}
+
+private fun AchievementAccess.labelRes(): Int {
+    return when (this) {
+        AchievementAccess.FREE -> R.string.badge_wall_filter_free
+        AchievementAccess.PRO -> R.string.badge_wall_filter_pro
+    }
+}
+
+private fun detailStateRes(state: BadgeVisualState): Int {
+    return when (state) {
+        BadgeVisualState.EARNED -> R.string.badge_wall_earned
+        BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED -> R.string.badge_wall_requirement_complete
+        BadgeVisualState.LOCKED_PROGRESS,
+        BadgeVisualState.LOCKED -> R.string.badge_wall_locked
+    }
+}
+
+@Composable
+private fun ProMark(id: AchievementId) {
+    Text(
+        text = stringResource(R.string.badge_wall_pro),
+        style = MaterialTheme.typography.labelSmall,
+        color = StrictBrand.onAction(),
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(StrictBrand.actionContainer())
+            .padding(horizontal = 5.dp, vertical = 1.dp)
+            .testTag("badge-pro-${id.name}")
+    )
+}
+
+@Composable
+private fun ProgressDetail(item: BadgeWallItem) {
+    val count = item.countProgress
+    val volume = item.volumeProgress
+    if (count == null && volume == null) return
+    Spacer(Modifier.height(12.dp))
+    val fraction = when {
+        count != null && count.threshold > 0 -> count.current.toFloat() / count.threshold.toFloat()
+        volume != null && volume.thresholdKg > 0.0 ->
+            (volume.currentKg / volume.thresholdKg).toFloat()
+        else -> 0f
+    }
+    ThinProgress(fraction)
+    val label = when {
+        count != null -> stringResource(
+            R.string.achievements_progress_count,
+            count.current,
+            count.threshold
+        )
+        volume != null -> stringResource(
+            R.string.badge_wall_volume_progress,
+            volumeAmount(volume.currentKg),
+            volumeAmount(volume.thresholdKg)
+        )
+        else -> return
+    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .padding(top = 6.dp)
+            .testTag("badge-detail-progress")
+    )
+}
+
+private fun volumeAmount(value: Double): String {
+    val whole = value.toLong()
+    return if (value == whole.toDouble()) "%,d".format(AppLocale.UI, whole) else UiFormatters.weightValue(value)
 }
 
 private fun AchievementCategory.labelRes(): Int {

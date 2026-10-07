@@ -7,7 +7,8 @@ data class AlmostThereEntry(
     val achievementId: AchievementId,
     val fraction: Double,
     val countProgress: CountProgress? = null,
-    val remainingKg: Double? = null
+    val remainingKg: Double? = null,
+    val volumeProgress: VolumeProgress? = null
 )
 
 data class BadgeWallSection(
@@ -20,8 +21,8 @@ data class BadgeWallPresentation(
     val totalCount: Int,
     val overallFraction: Float,
     val almostThere: List<AlmostThereEntry>,
-    val filters: List<AchievementCategory>,
-    val selectedFilter: AchievementCategory?,
+    val filters: List<AchievementAccess>,
+    val selectedFilter: AchievementAccess?,
     val sections: List<BadgeWallSection>,
     val catalog: List<BadgeWallItem>
 ) {
@@ -30,6 +31,7 @@ data class BadgeWallPresentation(
 
 enum class BadgeVisualState {
     EARNED,
+    REQUIREMENT_MET_PRO_LOCKED,
     LOCKED_PROGRESS,
     LOCKED
 }
@@ -37,9 +39,17 @@ enum class BadgeVisualState {
 fun BadgeWallItem.visualState(): BadgeVisualState {
     return when {
         unlocked -> BadgeVisualState.EARNED
-        countProgress != null && countProgress.current > 0 -> BadgeVisualState.LOCKED_PROGRESS
+        access == AchievementAccess.PRO && requirementMet -> BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED
+        progressStarted() -> BadgeVisualState.LOCKED_PROGRESS
         else -> BadgeVisualState.LOCKED
     }
+}
+
+private fun BadgeWallItem.progressStarted(): Boolean {
+    val count = countProgress
+    if (count != null && count.current > 0) return true
+    val volume = volumeProgress
+    return volume != null && volume.currentKg > 0.0
 }
 
 object BadgeWallPresenter {
@@ -52,14 +62,15 @@ object BadgeWallPresenter {
 
     fun present(
         board: AchievementBoard,
-        selectedFilter: AchievementCategory? = null
+        selectedFilter: AchievementAccess? = null
     ): BadgeWallPresentation {
         val catalog = board.items
-        val earned = catalog.count { it.unlocked }
-        val total = catalog.size
-        val filters = categoryOrder.filter { category -> catalog.any { it.category == category } }
+        val filters = listOf(AchievementAccess.FREE, AchievementAccess.PRO)
+            .filter { access -> catalog.any { it.access == access } }
         val active = selectedFilter?.takeIf { it in filters }
-        val visible = if (active == null) catalog else catalog.filter { it.category == active }
+        val visible = if (active == null) catalog else catalog.filter { it.access == active }
+        val earned = visible.count { it.unlocked }
+        val total = visible.size
         val sections = categoryOrder.mapNotNull { category ->
             val items = visible.filter { it.category == category }
             if (items.isEmpty()) null else BadgeWallSection(category, items)
@@ -82,8 +93,9 @@ object BadgeWallPresenter {
      */
     fun almostThere(board: AchievementBoard): List<AlmostThereEntry> {
         val candidates = listOfNotNull(
-            nextCountMilestone(board.items) { it.workoutThreshold },
+            nextCountMilestone(board.items) { it.workoutCountTarget },
             nextCountMilestone(board.items) { it.streakWeeks },
+            nextVolumeMilestone(board.items),
             targetWeightMilestone(board)
         )
         return candidates.sortedWith(almostThereOrder()).take(MAX_ALMOST_THERE)
@@ -96,14 +108,28 @@ object BadgeWallPresenter {
         val next = items
             .filter { threshold(it.id) != null }
             .sortedBy { threshold(it.id) }
-            .firstOrNull { !it.unlocked }
+            .firstOrNull { !it.unlocked && !it.requirementMet }
             ?: return null
         val progress = next.countProgress ?: return null
         if (progress.current <= 0 || progress.threshold <= 0) return null
+        if (progress.current >= progress.threshold) return null
         return AlmostThereEntry(
             achievementId = next.id,
             fraction = (progress.current.toDouble() / progress.threshold.toDouble()).coerceIn(0.0, 1.0),
             countProgress = progress
+        )
+    }
+
+    private fun nextVolumeMilestone(items: List<BadgeWallItem>): AlmostThereEntry? {
+        val next = items.firstOrNull { item ->
+            item.id.volumeThresholdKg != null && !item.unlocked && !item.requirementMet
+        } ?: return null
+        val progress = next.volumeProgress ?: return null
+        if (progress.currentKg <= 0.0 || progress.thresholdKg <= 0.0 || progress.met) return null
+        return AlmostThereEntry(
+            achievementId = next.id,
+            fraction = (progress.currentKg / progress.thresholdKg).coerceIn(0.0, 1.0),
+            volumeProgress = progress
         )
     }
 
@@ -133,8 +159,8 @@ object BadgeWallPresenter {
     }
 
     private fun sameCounter(left: AlmostThereEntry, right: AlmostThereEntry): Boolean {
-        val leftWorkouts = left.achievementId.workoutThreshold != null
-        val rightWorkouts = right.achievementId.workoutThreshold != null
+        val leftWorkouts = left.achievementId.workoutCountTarget != null
+        val rightWorkouts = right.achievementId.workoutCountTarget != null
         val leftStreak = left.achievementId.streakWeeks != null
         val rightStreak = right.achievementId.streakWeeks != null
         return (leftWorkouts && rightWorkouts) || (leftStreak && rightStreak)

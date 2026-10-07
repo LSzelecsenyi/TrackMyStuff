@@ -4,6 +4,7 @@ import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 class WeightTrackerApplication : Application() {
@@ -22,6 +23,9 @@ class WeightTrackerApplication : Application() {
             container.refreshFounderAuthority()
             container.appBackupRepository.recoverInterruptedPhotoRestore()
             container.achievementRepository.reconcile()
+            container.entitlementRevisions.drop(1).collect {
+                container.achievementRepository.reconcile()
+            }
         }
     }
 }

@@ -31,6 +31,10 @@ data class ReconcileRequest(
     val triggerClientWorkoutId: String?,
     val streakQualifications: List<StreakQualification> = emptyList(),
     val journeyQualifications: List<JourneyQualification> = emptyList(),
+    val performanceQualifications: List<PerformanceQualification> = emptyList(),
+    /** Canonical Pro grant at reconcile time. Not stored on the achievement row. */
+    val grantsPro: Boolean = false,
+    val proQualifications: List<ProQualification> = emptyList(),
     /** Writes the monthly-report marker when this generation has not been recorded yet. */
     val recordMonthlyReportMarker: Boolean = false
 )
@@ -140,6 +144,51 @@ object AchievementReconciler {
                 }
             )
         }
+        val missingPerformance = request.performanceQualifications
+            .filter { it.achievementId.category == AchievementCategory.PERFORMANCE }
+            .filter { it.achievementId !in storedIdsAfterRevoke }
+            .distinctBy { it.achievementId }
+        val livePerformance = missingPerformance.filter { qualification ->
+            val trigger = request.triggerClientWorkoutId
+            trigger != null && qualification.clientWorkoutId == trigger
+        }
+        val featuredPerformance = livePerformance
+            .filter { it.achievementId != AchievementId.FIRST_PR }
+            .maxByOrNull { performanceCelebrationRank(it.achievementId) }
+            ?: livePerformance.firstOrNull { it.achievementId == AchievementId.FIRST_PR }
+        val performanceInserts = missingPerformance.map { qualification ->
+            val show = qualification.achievementId == featuredPerformance?.achievementId
+            UnlockInsert(
+                achievementId = qualification.achievementId,
+                unlockedAt = qualification.unlockedAt,
+                celebratedAt = if (show) null else request.nowMillis,
+                triggerClientWorkoutId = if (show) request.triggerClientWorkoutId else null
+            )
+        }
+        val missingPro = if (request.grantsPro) {
+            request.proQualifications
+                .filter { it.achievementId.access == AchievementAccess.PRO }
+                .filter { it.achievementId !in storedIdsAfterRevoke }
+                .distinctBy { it.achievementId }
+        } else {
+            emptyList()
+        }
+        val livePro = missingPro.filter { qualification ->
+            val trigger = request.triggerClientWorkoutId
+            trigger != null && qualification.clientWorkoutId == trigger
+        }
+        val featuredPro = livePro.maxWithOrNull(
+            compareBy<ProQualification> { it.unlockedAt }.thenByDescending { proCelebrationRank(it.achievementId) }
+        )
+        val proInserts = missingPro.map { qualification ->
+            val show = qualification.achievementId == featuredPro?.achievementId
+            UnlockInsert(
+                achievementId = qualification.achievementId,
+                unlockedAt = qualification.unlockedAt,
+                celebratedAt = if (show) null else request.nowMillis,
+                triggerClientWorkoutId = if (show) request.triggerClientWorkoutId else null
+            )
+        }
         val silenceWeeks = silentAwards || newWeeks.size > 1 || missingStreaks.isNotEmpty()
         val weekInserts = newWeeks.map { week ->
             ProgressEventInsert(
@@ -187,12 +236,35 @@ object AchievementReconciler {
         }
 
         return ReconcilePlan(
-            insertUnlocks = insertUnlocks + streakInserts + journeyInserts,
+            insertUnlocks = insertUnlocks + streakInserts + journeyInserts + performanceInserts + proInserts,
             revoke = revoke,
             insertEvents = weekInserts + listOfNotNull(historyInsert, markerInsert),
             deleteEventKeys = deleteEventKeys,
             markInitialized = !request.initialized
         )
+    }
+
+    /** Later completion wins. A tie prefers Volume Master over Iron Year. */
+    private fun proCelebrationRank(id: AchievementId): Int {
+        return when (id) {
+            AchievementId.VOLUME_MASTER -> 2
+            AchievementId.IRON_YEAR -> 1
+            else -> 0
+        }
+    }
+
+    /**
+     * One popup for a record just set in the triggering workout.
+     * A specific record is shown ahead of First PR. Historical discoveries stay silent.
+     */
+    private fun performanceCelebrationRank(id: AchievementId): Int {
+        return when (id) {
+            AchievementId.WEIGHT_PR -> 3
+            AchievementId.REP_RECORD -> 2
+            AchievementId.VOLUME_RECORD -> 1
+            AchievementId.FIRST_PR -> 0
+            else -> -1
+        }
     }
 
     /** Later timestamp wins. A tie prefers the later product milestone. */

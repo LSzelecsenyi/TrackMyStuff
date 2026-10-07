@@ -49,6 +49,15 @@ val strictGoogleServerClientId = optionalBuildValue(
     "strict.google.serverClientId",
     "STRICT_GOOGLE_SERVER_CLIENT_ID"
 ).orEmpty()
+val allowedEntitlementOverrides = setOf("AUTO", "FOUNDER", "NON_FOUNDER")
+val strictEntitlementOverride = optionalBuildValue(
+    "strict.entitlementOverride",
+    "STRICT_ENTITLEMENT_OVERRIDE"
+) ?: "AUTO"
+require(strictEntitlementOverride in allowedEntitlementOverrides) {
+    "strict.entitlementOverride must be AUTO, FOUNDER, or NON_FOUNDER. " +
+        "Found \"$strictEntitlementOverride\"."
+}
 
 fun releaseSigningValue(propertyName: String, envName: String): String? {
     System.getenv(envName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -121,6 +130,11 @@ android {
             versionNameSuffix = "-debug"
             buildConfigField("String", "STRICT_API_BASE_URL", buildConfigString(strictDebugApiUrl))
             buildConfigField("String", "STRICT_GOOGLE_SERVER_CLIENT_ID", buildConfigString(strictGoogleServerClientId))
+            buildConfigField(
+                "String",
+                "STRICT_ENTITLEMENT_OVERRIDE",
+                buildConfigString(strictEntitlementOverride)
+            )
         }
     }
 
@@ -168,6 +182,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     if (name == "testReleaseUnitTest") {
         filter {
             includeTestsMatching("app.mymusclemap.FounderProgramRuleSelectionTest")
+            includeTestsMatching("app.mymusclemap.EntitlementOverrideSelectionReleaseTest")
         }
     }
     systemProperty("demo.backup.write", (findProperty("demo.backup.write") ?: "false").toString())
