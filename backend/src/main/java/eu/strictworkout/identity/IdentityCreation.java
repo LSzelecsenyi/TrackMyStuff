@@ -13,11 +13,18 @@ class IdentityCreation {
 
     private final ExternalIdentityRepository identities;
     private final AppUserRepository users;
+    private final eu.strictworkout.account.EarlyAdopterAssignment earlyAdopters;
     private final Clock clock;
 
-    IdentityCreation(ExternalIdentityRepository identities, AppUserRepository users, Clock clock) {
+    IdentityCreation(
+            ExternalIdentityRepository identities,
+            AppUserRepository users,
+            eu.strictworkout.account.EarlyAdopterAssignment earlyAdopters,
+            Clock clock
+    ) {
         this.identities = identities;
         this.users = users;
+        this.earlyAdopters = earlyAdopters;
         this.clock = clock;
     }
 
@@ -34,6 +41,7 @@ class IdentityCreation {
                 verifiedEmail(verified) != null,
                 now
         ));
+        earlyAdopters.assignNewUser(user);
         return user;
     }
 

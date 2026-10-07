@@ -10,14 +10,14 @@ class BadgeWallPresenterTest {
     fun summaryCountsOnlyTheCurrentCatalog() {
         val empty = BadgeWallPresenter.present(board(completed = 0))
         assertEquals(0, empty.earnedCount)
-        assertEquals(AchievementId.entries.size, empty.totalCount)
+        assertEquals(listedAchievementCount(), empty.totalCount)
         assertEquals(0f, empty.overallFraction)
         val earned = BadgeWallPresenter.present(
             board(completed = 12, unlocks = listOf(AchievementId.WORKOUTS_5, AchievementId.FIRST_WORKOUT))
         )
         assertEquals(2, earned.earnedCount)
-        assertEquals(AchievementId.entries.size, earned.totalCount)
-        assertEquals(2f / AchievementId.entries.size, earned.overallFraction)
+        assertEquals(listedAchievementCount(), earned.totalCount)
+        assertEquals(2f / listedAchievementCount(), earned.overallFraction)
     }
 
     @Test
@@ -28,14 +28,17 @@ class BadgeWallPresenterTest {
             presentation.filters
         )
         assertEquals(
-            listOf(AchievementId.FOUNDER),
+            listOf(AchievementId.FOUNDER, AchievementId.EARLY_ADOPTER),
             presentation.sections.single { it.category == AchievementCategory.SPECIAL }.items.map { it.id }
         )
         assertEquals(
             AchievementCatalog.performance,
             presentation.sections.single { it.category == AchievementCategory.PERFORMANCE }.items.map { it.id }
         )
-        assertEquals(AchievementId.entries.map { it }, presentation.catalog.map { it.id })
+        assertEquals(
+            AchievementId.entries.filter { it.visibility == AchievementVisibility.ALWAYS },
+            presentation.catalog.map { it.id }
+        )
         assertFalse(presentation.catalog.any { it.id.name == "FIRST_PROGRESS_PHOTO" })
         assertFalse(AchievementId.entries.any { it.name.contains("EXERCISE_GOAL") })
         assertTrue(
@@ -48,6 +51,7 @@ class BadgeWallPresenterTest {
         )
         assertTrue(presentation.almostThere.none { it.achievementId.category == AchievementCategory.PERFORMANCE })
         assertTrue(presentation.almostThere.none { it.achievementId == AchievementId.FOUNDER })
+        assertTrue(presentation.almostThere.none { it.achievementId == AchievementId.EARLY_ADOPTER })
         val founder = presentation.catalog.single { it.id == AchievementId.FOUNDER }
         assertEquals(AchievementAccess.SPECIAL, founder.access)
         assertEquals(null, founder.countProgress)
@@ -62,7 +66,7 @@ class BadgeWallPresenterTest {
         val free = BadgeWallPresenter.present(source, AchievementAccess.FREE)
         val pro = BadgeWallPresenter.present(source, AchievementAccess.PRO)
         assertEquals(1, all.earnedCount)
-        assertEquals(AchievementId.entries.size, all.totalCount)
+        assertEquals(listedAchievementCount(), all.totalCount)
         assertEquals(AchievementCatalog.free.size, free.totalCount)
         assertEquals(1, free.earnedCount)
         assertTrue(free.catalog.filter { it.access == AchievementAccess.PRO }.isNotEmpty())
@@ -72,9 +76,16 @@ class BadgeWallPresenterTest {
         assertEquals(0, pro.earnedCount)
         assertEquals(AchievementCatalog.pro.size, pro.totalCount)
         assertEquals(0, special.earnedCount)
-        assertEquals(AchievementCatalog.special.size, special.totalCount)
-        assertEquals(listOf(AchievementId.FOUNDER), special.sections.flatMap { it.items }.map { it.id })
+        assertEquals(
+            AchievementCatalog.special.count { it.visibility == AchievementVisibility.ALWAYS },
+            special.totalCount
+        )
+        assertEquals(
+            listOf(AchievementId.FOUNDER, AchievementId.EARLY_ADOPTER),
+            special.sections.flatMap { it.items }.map { it.id }
+        )
         assertTrue(special.almostThere.none { it.achievementId == AchievementId.FOUNDER })
+        assertTrue(special.almostThere.none { it.achievementId == AchievementId.EARLY_ADOPTER })
         val proOrder = listOf(
             AchievementCategory.CONSISTENCY,
             AchievementCategory.JOURNEY,
@@ -184,12 +195,50 @@ class BadgeWallPresenterTest {
 
     @Test
     fun aCompletedCatalogHasNoAlmostThereCandidate() {
-        val earned = AchievementId.entries
+        val earned = AchievementId.entries.map {
+            UnlockSnapshot(it, unlockedAt = 10L, celebratedAt = 10L, triggerClientWorkoutId = null)
+        }
         val presentation = BadgeWallPresenter.present(
-            board(completed = 200, streak = 12, unlocks = earned, weight = weightProgress(1.0, remaining = 0.0))
+            AchievementBoardAssembler.assemble(
+                completedWorkoutCount = 250,
+                unlocks = earned,
+                events = emptyList(),
+                currentStreak = 52,
+                bestStreak = 52,
+                lifetimeVolumeKg = 100_000.0,
+                prEventCount = 100,
+                leadingExerciseSets = 1000,
+                grantsPro = true,
+                accountAuthority = AccountAchievementAuthority(
+                    founderLifetime = true,
+                    founderGrantedAtMillis = 10L,
+                    earlyAdopterGrantedAtMillis = 10L,
+                    developerGrantedAtMillis = 10L
+                )
+            ).copy(targetWeightProgress = weightProgress(1.0, remaining = 0.0))
         )
-        assertEquals(earned.size, presentation.earnedCount)
+        assertEquals(AchievementId.entries.size, presentation.earnedCount)
         assertTrue(presentation.almostThere.isEmpty())
+        assertTrue(presentation.catalog.any { it.id == AchievementId.DEVELOPER })
+    }
+
+    @Test
+    fun developerIsHiddenUntilGrantedAndDoesNotChangeOrdinaryTotals() {
+        val hidden = BadgeWallPresenter.present(board(completed = 0))
+        assertTrue(hidden.catalog.none { it.id == AchievementId.DEVELOPER })
+        assertEquals(listedAchievementCount(), hidden.totalCount)
+        val granted = BadgeWallPresenter.present(
+            AchievementBoardAssembler.assemble(
+                completedWorkoutCount = 0,
+                unlocks = emptyList(),
+                events = emptyList(),
+                accountAuthority = AccountAchievementAuthority(developerGrantedAtMillis = 20L)
+            )
+        )
+        assertTrue(granted.catalog.single { it.id == AchievementId.DEVELOPER }.unlocked)
+        assertEquals(listedAchievementCount() + 1, granted.totalCount)
+        assertEquals(BadgeVisualState.EARNED, granted.item(AchievementId.DEVELOPER)!!.visualState())
+        assertTrue(granted.almostThere.none { it.achievementId.isAccountStatus })
     }
 
     @Test
@@ -236,6 +285,10 @@ class BadgeWallPresenterTest {
             .items
             .map { it.id }
         assertEquals(AchievementCatalog.workoutCounts + AchievementId.IRON_DISCIPLINE, consistency)
+    }
+
+    private fun listedAchievementCount(): Int {
+        return AchievementId.entries.count { it.visibility == AchievementVisibility.ALWAYS }
     }
 
     private fun board(

@@ -1,8 +1,10 @@
-package eu.strictworkout.entitlement;
+package eu.strictworkout.account;
 
-import eu.strictworkout.founder.FounderApplication;
+import eu.strictworkout.identity.AppUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -15,24 +17,19 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "entitlement_grant")
-public class EntitlementGrant {
-
-    public static final String FOUNDER_LIFETIME = "FOUNDER_LIFETIME";
+@Table(name = "account_status_grant")
+public class AccountStatusGrant {
 
     @Id
     private UUID id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private eu.strictworkout.identity.AppUser user;
+    private AppUser user;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
-    private String source;
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "founder_application_id", nullable = false)
-    private FounderApplication application;
+    private AccountStatus status;
 
     @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
     @Column(name = "granted_at", nullable = false)
@@ -42,20 +39,27 @@ public class EntitlementGrant {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    protected EntitlementGrant() {
+    protected AccountStatusGrant() {
     }
 
-    public EntitlementGrant(UUID id, eu.strictworkout.identity.AppUser user, FounderApplication application, Instant grantedAt) {
+    public AccountStatusGrant(UUID id, AppUser user, AccountStatus status, Instant grantedAt, Instant createdAt) {
         this.id = id;
         this.user = user;
-        this.source = FOUNDER_LIFETIME;
-        this.application = application;
+        this.status = status;
         this.grantedAt = grantedAt;
-        this.createdAt = grantedAt;
+        this.createdAt = createdAt;
     }
 
-    public String getSource() {
-        return source;
+    public UUID getId() {
+        return id;
+    }
+
+    public AppUser getUser() {
+        return user;
+    }
+
+    public AccountStatus getStatus() {
+        return status;
     }
 
     public Instant getGrantedAt() {

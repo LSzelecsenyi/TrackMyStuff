@@ -171,6 +171,13 @@ class FounderReviewIT {
         assertEquals("PRO", entitlements.get("access"));
         assertFlag(true, entitlements.get("founderLifetime"));
         assertFlag(false, entitlements.get("temporaryFounderPro"));
+        assertNotNull(entitlements.get("founderGrantedAt"));
+        assertTrue(specialKeys(entitlements).stream().noneMatch("FOUNDER"::equals));
+        assertEquals(0, jdbc.queryForObject(
+                "select count(*) from account_status_grant where user_id = ? and status = 'FOUNDER'",
+                Integer.class,
+                UUID.fromString(userId)
+        ));
 
         String reinstalled = login("lifetime-user", "lifetime-user");
         assertEquals(userId, userId(reinstalled));
@@ -500,6 +507,13 @@ class FounderReviewIT {
         if (accessToken != null) {
             request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> specialKeys(Map<String, Object> entitlements) {
+        List<Map<String, Object>> specials = (List<Map<String, Object>>) entitlements.get("specialAchievements");
+        assertNotNull(specials);
+        return specials.stream().map(item -> String.valueOf(item.get("key"))).toList();
     }
 
     private String ensureCsrf() {

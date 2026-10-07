@@ -28,12 +28,23 @@ enum class BadgeTier {
 
 /**
  * Static catalog access. This is not a stored subscription flag.
- * [PRO] requirements are still evaluated for Free users; only the unlock requires Pro.
+ * [PRO] requirements are still evaluated for Free users. A Pro badge is earned only while
+ * the current entitlement grants Pro and the requirement is already complete. Downgrade
+ * locks it again. The historical completion time stays on the stored row.
  */
 enum class AchievementAccess {
     FREE,
     PRO,
     SPECIAL
+}
+
+/**
+ * [WHEN_EARNED] stays out of Badge Wall totals until the badge is actually earned.
+ * Developer uses that so a normal account never sees a locked badge it cannot earn.
+ */
+enum class AchievementVisibility {
+    ALWAYS,
+    WHEN_EARNED
 }
 
 /** Lifetime product milestones. These are not numeric progress awards. */
@@ -47,7 +58,9 @@ enum class AchievementId(
     val category: AchievementCategory,
     /**
      * Set only for awards that mean "the current completed-workout count is at least this".
-     * Those awards are revoked when history no longer qualifies. Other awards are sticky.
+     * Those awards are revoked when history no longer qualifies.
+     * Pro rows stay stored so the historical completion time survives a downgrade.
+     * Account statuses are not owned by these rows.
      */
     val workoutThreshold: Int? = null,
     /** Consecutive successful weekly-goal weeks required by a streak tier. */
@@ -66,7 +79,8 @@ enum class AchievementId(
     /** Personal-record events required by a PR Hunter tier. */
     val prHunterTarget: Int? = null,
     /** Completed sets of one exercise required by an Exercise Mastery tier. */
-    val masterySetTarget: Int? = null
+    val masterySetTarget: Int? = null,
+    val visibility: AchievementVisibility = AchievementVisibility.ALWAYS
 ) {
     WORKOUTS_5(AchievementCategory.CONSISTENCY, workoutThreshold = 5),
     WORKOUTS_10(AchievementCategory.CONSISTENCY, workoutThreshold = 10),
@@ -192,7 +206,30 @@ enum class AchievementId(
     FOUNDER(
         AchievementCategory.SPECIAL,
         access = AchievementAccess.SPECIAL
+    ),
+    /**
+     * Visible locked status badge. Earned only from a trusted backend Early Adopter grant.
+     * Nothing in the client may infer eligibility.
+     */
+    EARLY_ADOPTER(
+        AchievementCategory.SPECIAL,
+        access = AchievementAccess.SPECIAL
+    ),
+    /**
+     * Hidden until a trusted backend Developer grant exists.
+     */
+    DEVELOPER(
+        AchievementCategory.SPECIAL,
+        access = AchievementAccess.SPECIAL,
+        visibility = AchievementVisibility.WHEN_EARNED
     );
+
+    fun listed(unlocked: Boolean): Boolean {
+        return visibility == AchievementVisibility.ALWAYS || unlocked
+    }
+
+    val isAccountStatus: Boolean
+        get() = this == FOUNDER || this == EARLY_ADOPTER || this == DEVELOPER
 
     val badgeKey: String = name
 

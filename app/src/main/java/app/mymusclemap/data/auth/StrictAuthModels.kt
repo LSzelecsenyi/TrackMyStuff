@@ -105,7 +105,9 @@ sealed interface FounderReportSubmission {
 sealed interface FounderEntitlementCall {
     data class Loaded(
         val temporaryFounderPro: Boolean,
-        val founderLifetime: Boolean
+        val founderLifetime: Boolean,
+        val founderGrantedAt: java.time.Instant? = null,
+        val specialAchievements: List<app.mymusclemap.domain.entitlement.SpecialAchievementGrant> = emptyList()
     ) : FounderEntitlementCall
     data object NoSession : FounderEntitlementCall
     data object Unauthenticated : FounderEntitlementCall

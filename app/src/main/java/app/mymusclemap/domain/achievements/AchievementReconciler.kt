@@ -39,8 +39,8 @@ data class ReconcileRequest(
     /** Canonical Pro grant at reconcile time. Not stored on the achievement row. */
     val grantsPro: Boolean = false,
     /**
-     * Canonical Founder lifetime grant. Subscription Pro and temporary tester Pro do not set this.
-     * Not stored on the achievement row.
+     * Retained so callers stay source-compatible. Founder, Early Adopter, and Developer are
+     * not written into Room. Their ownership comes from the trusted account authority.
      */
     val founderLifetime: Boolean = false,
     val proQualifications: List<ProQualification> = emptyList(),
@@ -253,26 +253,9 @@ object AchievementReconciler {
             null
         }
 
-        val founderInsert = if (
-            request.founderLifetime &&
-            AchievementId.FOUNDER !in storedIdsAfterRevoke
-        ) {
-            // No Founder-lifetime source carries an acquisition instant. The first insert uses
-            // reconcile time, then the stored row is left unchanged. Startup and entitlement
-            // refresh have no separate live-grant signal, so the award is stored already acknowledged.
-            UnlockInsert(
-                achievementId = AchievementId.FOUNDER,
-                unlockedAt = request.nowMillis,
-                celebratedAt = request.nowMillis,
-                triggerClientWorkoutId = null
-            )
-        } else {
-            null
-        }
-
         return ReconcilePlan(
             insertUnlocks = insertUnlocks + streakInserts + journeyInserts + performanceInserts +
-                proInserts + listOfNotNull(founderInsert),
+                proInserts,
             revoke = revoke,
             insertEvents = weekInserts + listOfNotNull(historyInsert, markerInsert),
             deleteEventKeys = deleteEventKeys,

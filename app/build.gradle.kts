@@ -152,6 +152,9 @@ android {
         unitTests {
             isReturnDefaultValues = true
             isIncludeAndroidResources = true
+            all {
+                it.maxHeapSize = "2048m"
+            }
         }
     }
 

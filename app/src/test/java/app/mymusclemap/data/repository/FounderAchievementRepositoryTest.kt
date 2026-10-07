@@ -3,13 +3,16 @@ package app.mymusclemap.data.repository
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import app.mymusclemap.data.local.UnlockedAchievementEntity
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.domain.FixedDateProvider
+import app.mymusclemap.domain.achievements.AccountAchievementAuthority
 import app.mymusclemap.domain.achievements.AchievementId
 import app.mymusclemap.domain.achievements.PendingCelebration
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -30,8 +33,7 @@ class FounderAchievementRepositoryTest {
         override fun getZone(): ZoneId = ZoneOffset.UTC
         override fun withZone(zone: ZoneId?): Clock = this
     }
-    private var founderLifetime = false
-    private var grantsPro = false
+    private var authority = AccountAchievementAuthority()
     private lateinit var database: WeightDatabase
     private lateinit var repository: AchievementRepository
 
@@ -45,8 +47,8 @@ class FounderAchievementRepositoryTest {
             database = database,
             clock = clock,
             dateProvider = FixedDateProvider(LocalDate.of(2026, 10, 7)),
-            grantsPro = { grantsPro },
-            founderLifetime = { founderLifetime }
+            grantsPro = { authority.founderLifetime },
+            accountAuthority = { authority }
         )
     }
 
@@ -56,35 +58,41 @@ class FounderAchievementRepositoryTest {
     }
 
     @Test
-    fun founderLifetimePersistsOnceAndStaysAfterTheGrantEnds() = runTest {
-        grantsPro = true
-        repository.reconcile()
-        assertNull(unlockOrNull())
+    fun founderFollowsTrustedAuthorityAndIgnoresALegacyRow() = runTest {
+        database.achievementDao().insertUnlocks(
+            listOf(
+                UnlockedAchievementEntity(
+                    achievementId = AchievementId.FOUNDER.name,
+                    unlockedAt = 1L,
+                    celebratedAt = 1L,
+                    triggerClientWorkoutId = null
+                )
+            )
+        )
+        val ignored = repository.board().items.single { it.id == AchievementId.FOUNDER }
+        assertFalse(ignored.unlocked)
+        assertNull(ignored.unlockedAt)
 
-        founderLifetime = true
-        repository.reconcile()
-        val unlockedAt = unlockOrNull()!!.unlockedAt
-        assertEquals(now.toEpochMilli(), unlockedAt)
-        assertEquals(now.toEpochMilli(), unlockOrNull()!!.celebratedAt)
+        val grantedAt = Instant.parse("2024-03-01T00:00:00Z").toEpochMilli()
+        authority = AccountAchievementAuthority(
+            founderLifetime = true,
+            founderGrantedAtMillis = grantedAt
+        )
+        repository.notifyEntitlementChanged()
+        val earned = repository.board().items.single { it.id == AchievementId.FOUNDER }
+        assertTrue(earned.unlocked)
+        assertEquals(grantedAt, earned.unlockedAt)
         assertTrue(repository.board().pending.none { it is PendingCelebration.ProUnlocked })
 
         now = now.plusSeconds(3_600)
         repository.reconcile()
-        assertEquals(unlockedAt, unlockOrNull()!!.unlockedAt)
-
-        founderLifetime = false
-        grantsPro = false
-        now = now.plusSeconds(3_600)
-        repository.reconcile()
-        assertEquals(unlockedAt, unlockOrNull()!!.unlockedAt)
+        assertEquals(1L, unlockOrNull()!!.unlockedAt)
         assertEquals(1, database.achievementDao().unlocks().count { it.achievementId == AchievementId.FOUNDER.name })
 
-        founderLifetime = true
-        grantsPro = true
-        now = now.plusSeconds(3_600)
-        repository.reconcile()
-        assertEquals(unlockedAt, unlockOrNull()!!.unlockedAt)
-        assertEquals(1, database.achievementDao().unlocks().count { it.achievementId == AchievementId.FOUNDER.name })
+        authority = AccountAchievementAuthority()
+        repository.notifyEntitlementChanged()
+        assertFalse(repository.board().items.single { it.id == AchievementId.FOUNDER }.unlocked)
+        assertEquals(1L, unlockOrNull()!!.unlockedAt)
     }
 
     private suspend fun unlockOrNull() =

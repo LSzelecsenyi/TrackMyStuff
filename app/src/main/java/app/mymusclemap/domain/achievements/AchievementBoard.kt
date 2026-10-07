@@ -106,6 +106,17 @@ data class ProgressEventSnapshot(
     val triggerClientWorkoutId: String?
 )
 
+/**
+ * Trusted account statuses for the signed-in user.
+ * Room unlock rows are not ownership for these three badges.
+ */
+data class AccountAchievementAuthority(
+    val founderLifetime: Boolean = false,
+    val founderGrantedAtMillis: Long? = null,
+    val earlyAdopterGrantedAtMillis: Long? = null,
+    val developerGrantedAtMillis: Long? = null
+)
+
 data class AchievementBoard(
     val completedWorkoutCount: Int,
     val items: List<BadgeWallItem>,
@@ -113,7 +124,84 @@ data class AchievementBoard(
     val pending: List<PendingCelebration>,
     /** Active target journey, when a baseline exists. Not stored as achievement progress. */
     val targetWeightProgress: TargetWeightProgress? = null
-)
+) {
+    /**
+     * Pro is earned only while the current entitlement grants Pro and history still meets
+     * the requirement. The stored completion instant is left on [BadgeWallItem.unlockedAt].
+     * Founder, Early Adopter, and Developer ignore Room rows and use [account].
+     */
+    fun withCurrentOwnership(
+        grantsPro: Boolean,
+        account: AccountAchievementAuthority
+    ): AchievementBoard {
+        return copy(
+            items = items.map { it.withCurrentOwnership(grantsPro, account) },
+            pending = pending.filter { celebration ->
+                val id = celebration.referencedAchievement()
+                if (id != null && id.isAccountStatus) {
+                    return@filter false
+                }
+                grantsPro || celebration !is PendingCelebration.ProUnlocked
+            }
+        )
+    }
+}
+
+private fun BadgeWallItem.withCurrentOwnership(
+    grantsPro: Boolean,
+    account: AccountAchievementAuthority
+): BadgeWallItem {
+    return when (id) {
+        AchievementId.FOUNDER -> {
+            val owned = account.founderLifetime
+            copy(
+                unlocked = owned,
+                unlockedAt = if (owned) account.founderGrantedAtMillis else null,
+                requirementMet = owned,
+                countProgress = null,
+                volumeProgress = null
+            )
+        }
+        AchievementId.EARLY_ADOPTER -> {
+            val grantedAt = account.earlyAdopterGrantedAtMillis
+            copy(
+                unlocked = grantedAt != null,
+                unlockedAt = grantedAt,
+                requirementMet = grantedAt != null,
+                countProgress = null,
+                volumeProgress = null
+            )
+        }
+        AchievementId.DEVELOPER -> {
+            val grantedAt = account.developerGrantedAtMillis
+            copy(
+                unlocked = grantedAt != null,
+                unlockedAt = grantedAt,
+                requirementMet = grantedAt != null,
+                countProgress = null,
+                volumeProgress = null
+            )
+        }
+        else -> if (access == AchievementAccess.PRO) {
+            copy(unlocked = grantsPro && requirementMet)
+        } else {
+            this
+        }
+    }
+}
+
+private fun PendingCelebration.referencedAchievement(): AchievementId? {
+    return when (this) {
+        is PendingCelebration.WorkoutCountUnlocked -> achievementId
+        is PendingCelebration.WeeklyStreakUnlocked -> achievementId
+        is PendingCelebration.JourneyUnlocked -> achievementId
+        is PendingCelebration.PerformanceUnlocked -> achievementId
+        is PendingCelebration.ProUnlocked -> achievementId
+        is PendingCelebration.HistoryRecognized,
+        is PendingCelebration.WeeklyGoalCompleted,
+        is PendingCelebration.TargetWeightMilestone -> null
+    }
+}
 
 object AchievementBoardAssembler {
     fun assemble(
@@ -124,7 +212,9 @@ object AchievementBoardAssembler {
         bestStreak: Int = currentStreak,
         lifetimeVolumeKg: Double = 0.0,
         prEventCount: Int = 0,
-        leadingExerciseSets: Int = 0
+        leadingExerciseSets: Int = 0,
+        grantsPro: Boolean = false,
+        accountAuthority: AccountAchievementAuthority = AccountAchievementAuthority()
     ): AchievementBoard {
         val unlockById = unlocks.associateBy { it.achievementId }
         val streak = bestStreak.coerceAtLeast(0)
@@ -188,7 +278,7 @@ object AchievementBoardAssembler {
             items = items,
             next = WorkoutCountEvaluator.next(completedWorkoutCount),
             pending = pending(unlocks, events)
-        )
+        ).withCurrentOwnership(grantsPro, accountAuthority)
     }
 
     private fun pending(

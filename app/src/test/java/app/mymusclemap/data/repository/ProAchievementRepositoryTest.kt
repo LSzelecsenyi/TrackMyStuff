@@ -66,7 +66,7 @@ class ProAchievementRepositoryTest {
     }
 
     @Test
-    fun satisfiedVolumeStaysLockedUntilProThenRemainsEarned() = runTest {
+    fun satisfiedVolumeStaysLockedUntilProAndRelocksOnDowngrade() = runTest {
         val exerciseId = insertExercise()
         val baseline = insertVolume(client = "baseline", finishedAt = 1_000L, exerciseId = exerciseId, kilograms = 20_000.0)
         val crossing = insertVolume(client = "cross", finishedAt = 2_000L, exerciseId = exerciseId, kilograms = 80_000.0)
@@ -87,18 +87,32 @@ class ProAchievementRepositoryTest {
         assertEquals(1, database.achievementDao().unlocks().count { it.achievementId == AchievementId.VOLUME_MASTER.name })
 
         grantsPro = false
-        database.workoutSessionDao().deleteSessionById(baseline)
-        database.workoutSessionDao().deleteSessionById(crossing)
         repository.reconcile()
+        val downgraded = repository.board().items.single { it.id == AchievementId.VOLUME_MASTER }
+        assertFalse(downgraded.unlocked)
+        assertTrue(downgraded.requirementMet)
+        assertEquals(BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED, downgraded.visualState())
+        assertEquals(100_000.0, downgraded.volumeProgress!!.currentKg, 0.0)
         assertEquals(earnedAt, unlockAt(AchievementId.VOLUME_MASTER))
-        assertTrue(repository.board().items.single { it.id == AchievementId.VOLUME_MASTER }.unlocked)
-        assertEquals(0.0, repository.board().items.single { it.id == AchievementId.VOLUME_MASTER }.volumeProgress!!.currentKg, 0.0)
+        assertTrue(repository.board().pending.none { it is PendingCelebration.ProUnlocked })
 
         grantsPro = true
-        repository.reconcile(triggerClientWorkoutId = "cross")
+        repository.reconcile()
+        val restored = repository.board().items.single { it.id == AchievementId.VOLUME_MASTER }
+        assertTrue(restored.unlocked)
+        assertEquals(earnedAt, restored.unlockedAt)
         assertEquals(earnedAt, unlockAt(AchievementId.VOLUME_MASTER))
         assertEquals(1, database.achievementDao().unlocks().count { it.achievementId == AchievementId.VOLUME_MASTER.name })
         assertTrue(repository.board().pending.none { it is PendingCelebration.ProUnlocked })
+
+        database.workoutSessionDao().deleteSessionById(baseline)
+        database.workoutSessionDao().deleteSessionById(crossing)
+        repository.reconcile()
+        val forgotten = repository.board().items.single { it.id == AchievementId.VOLUME_MASTER }
+        assertFalse(forgotten.requirementMet)
+        assertFalse(forgotten.unlocked)
+        assertEquals(0.0, forgotten.volumeProgress!!.currentKg, 0.0)
+        assertEquals(earnedAt, unlockAt(AchievementId.VOLUME_MASTER))
     }
 
     @Test

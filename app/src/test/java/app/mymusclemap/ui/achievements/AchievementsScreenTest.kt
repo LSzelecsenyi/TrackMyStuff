@@ -67,7 +67,7 @@ class AchievementsScreenTest {
                 AchievementsScreen(presentation = BadgeWallPresenter.present(board), onBack = {})
             }
         }
-        val total = AchievementId.entries.size
+        val total = board.items.count { it.id.listed(it.unlocked) }
         composeRule.onNodeWithTag("badge-summary-count").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-filter-ALL").assertIsSelected()
         composeRule.onNodeWithText(testString(R.string.badge_wall_section_progress, 4, total)).assertIsDisplayed()
@@ -76,9 +76,10 @@ class AchievementsScreenTest {
         composeRule.onNodeWithTag("badge-filter-SPECIAL").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-section-PERFORMANCE").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.achievement_first_pr_name)).performScrollTo().assertIsDisplayed()
-        AchievementId.entries.forEach { id ->
-            composeRule.onNodeWithTag("achievement-${id.name}").performScrollTo().assertIsDisplayed()
+        board.items.filter { it.id.listed(it.unlocked) }.forEach { item ->
+            composeRule.onNodeWithTag("achievement-${item.id.name}").performScrollTo().assertIsDisplayed()
         }
+        composeRule.onAllNodesWithTag("achievement-DEVELOPER").assertCountEquals(0)
         composeRule.onAllNodesWithTag("achievement-badge-unlocked-WORKOUTS_50", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onAllNodesWithTag("achievement-badge-locked-WORKOUTS_100", useUnmergedTree = true).assertCountEquals(2)
         composeRule.onNodeWithTag("badge-almost-WORKOUTS_100").performScrollTo().assertIsDisplayed()
@@ -233,7 +234,7 @@ class AchievementsScreenTest {
                 )
             }
         }
-        val total = AchievementId.entries.size
+        val total = board.items.count { it.id.listed(it.unlocked) }
         composeRule.onNodeWithTag("badge-filter-ALL").assertIsSelected()
         composeRule.onNodeWithTag("badge-filter-FREE").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-filter-PRO").assertIsDisplayed()
@@ -250,16 +251,26 @@ class AchievementsScreenTest {
         ).assertIsDisplayed()
         composeRule.onNodeWithTag("achievement-IRON_DISCIPLINE").assertIsDisplayed()
         composeRule.onAllNodesWithTag("achievement-FOUNDER").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("achievement-EARLY_ADOPTER").assertCountEquals(0)
         composeRule.onNodeWithTag("badge-filter-SPECIAL").performClick()
         composeRule.onNodeWithTag("badge-filter-SPECIAL").assertIsSelected()
         composeRule.onNodeWithTag("achievement-FOUNDER").assertIsDisplayed()
+        composeRule.onNodeWithTag("achievement-EARLY_ADOPTER").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-special-EARLY_ADOPTER", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onAllNodesWithTag("badge-pro-EARLY_ADOPTER", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onAllNodesWithTag("achievement-progress-EARLY_ADOPTER").assertCountEquals(0)
         composeRule.onNodeWithTag("badge-special-FOUNDER", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onAllNodesWithTag("badge-pro-FOUNDER", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onAllNodesWithTag("achievement-progress-FOUNDER").assertCountEquals(0)
         composeRule.onAllNodesWithTag("achievement-VOLUME_MASTER").assertCountEquals(0)
         composeRule.onAllNodesWithText(testString(R.string.badge_wall_unlock_with_pro)).assertCountEquals(0)
+        composeRule.onAllNodesWithTag("achievement-DEVELOPER").assertCountEquals(0)
         composeRule.onNodeWithTag("badge-summary-count").assertTextEquals(
-            testString(R.string.badge_wall_section_progress, 0, AchievementCatalog.special.size)
+            testString(
+                R.string.badge_wall_section_progress,
+                0,
+                board.items.count { it.access == AchievementAccess.SPECIAL && it.id.listed(it.unlocked) }
+            )
         )
         composeRule.onNodeWithTag("badge-filter-PRO").performClick()
         composeRule.onNodeWithTag("achievement-IRON_DISCIPLINE").assertIsDisplayed()
@@ -337,7 +348,13 @@ class AchievementsScreenTest {
                 AchievementsScreen(presentation = presentation, onBack = {})
             }
         }
-        composeRule.onNodeWithText(testString(R.string.badge_wall_section_progress, 5, AchievementId.entries.size))
+        composeRule.onNodeWithText(
+            testString(
+                R.string.badge_wall_section_progress,
+                5,
+                board.items.count { it.id.listed(it.unlocked) }
+            )
+        )
             .assertIsDisplayed()
             listOf(
                 AchievementId.WORKOUTS_5,

@@ -85,10 +85,12 @@ class StrictFoundationIT {
                 String.class
         );
         assertEquals(List.of(
+                "account_status_grant",
                 "admin_session",
                 "admin_user",
                 "app_user",
                 "auth_session",
+                "early_adopter_cohort",
                 "entitlement_grant",
                 "external_identity",
                 "flyway_schema_history",

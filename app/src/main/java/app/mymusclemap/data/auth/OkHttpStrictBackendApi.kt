@@ -285,19 +285,43 @@ class OkHttpStrictBackendApi(
         return StoredStrictSession(StrictBearerToken(token), expiresAt, parsedUserId)
     }
 
-    private fun parseEntitlements(raw: String): FounderEntitlementCall? {
-        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
-        if (!json.has("temporaryFounderPro") || !json.has("founderLifetime")) {
-            return null
-        }
-        return FounderEntitlementCall.Loaded(
-            temporaryFounderPro = json.optBoolean("temporaryFounderPro", false),
-            founderLifetime = json.optBoolean("founderLifetime", false)
-        )
-    }
+    private fun parseEntitlements(raw: String): FounderEntitlementCall? = parseEntitlementPayload(raw)
 
     private fun parseUserId(raw: String): String? {
         val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
         return runCatching { UUID.fromString(json.optString("id")).toString() }.getOrNull()
     }
+}
+
+internal fun parseEntitlementPayload(raw: String): FounderEntitlementCall? {
+    val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+    if (!json.has("temporaryFounderPro") || !json.has("founderLifetime")) {
+        return null
+    }
+    val founderLifetime = json.optBoolean("founderLifetime", false)
+    val founderGrantedAt = if (
+        !founderLifetime || !json.has("founderGrantedAt") || json.isNull("founderGrantedAt")
+    ) {
+        null
+    } else {
+        runCatching { Instant.parse(json.getString("founderGrantedAt")) }.getOrNull()
+    }
+    val specials = buildList {
+        val array = json.optJSONArray("specialAchievements") ?: return@buildList
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val key = item.optString("key")
+            if (key != "EARLY_ADOPTER" && key != "DEVELOPER") {
+                continue
+            }
+            val instant = runCatching { Instant.parse(item.optString("grantedAt")) }.getOrNull() ?: continue
+            add(app.mymusclemap.domain.entitlement.SpecialAchievementGrant(key, instant))
+        }
+    }
+    return FounderEntitlementCall.Loaded(
+        temporaryFounderPro = json.optBoolean("temporaryFounderPro", false),
+        founderLifetime = founderLifetime,
+        founderGrantedAt = founderGrantedAt,
+        specialAchievements = specials
+    )
 }

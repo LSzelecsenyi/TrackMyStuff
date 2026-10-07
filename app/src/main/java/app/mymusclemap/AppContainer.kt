@@ -29,6 +29,7 @@ import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.domain.achievements.AccountAchievementAuthority
 import app.mymusclemap.data.repository.AchievementRepository
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
@@ -87,6 +88,8 @@ class AppContainer(context: Context) {
     private val plansChanged = AtomicReference<suspend () -> Unit> { }
     private val grantsPro = AtomicReference<() -> Boolean> { false }
     private val founderLifetime = AtomicReference<() -> Boolean> { false }
+    private val accountAuthorityState = AtomicReference(AccountAchievementAuthority())
+    private val authenticatedUserId = AtomicReference<String?>(null)
     val exerciseRepository = ExerciseRepository(
         dao = database.exerciseDao(),
         clock = clock,
@@ -118,7 +121,8 @@ class AppContainer(context: Context) {
         clock = clock,
         dateProvider = dateProvider,
         grantsPro = { grantsPro.get().invoke() },
-        founderLifetime = { founderLifetime.get().invoke() }
+        founderLifetime = { founderLifetime.get().invoke() },
+        accountAuthority = { accountAuthorityState.get() }
     )
     val workoutSessionRepository = WorkoutSessionRepository(
         sessionDao = database.workoutSessionDao(),
@@ -170,7 +174,11 @@ class AppContainer(context: Context) {
     val founderEntitlementCache = FounderEntitlementCache(
         context = appContext,
         scope = founderCacheScope,
-        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+        sessionUserId = { authenticatedUserId.get() },
+        onChanged = {
+            refreshAccountAuthority()
+            entitlementRevision.value = entitlementRevision.value + 1
+        }
     )
     val subscriptionProvider = InactiveSubscriptionProvider
     val founderLifetimeProvider = InactiveFounderLifetimeProvider
@@ -179,7 +187,10 @@ class AppContainer(context: Context) {
         sessions = database.workoutSessionDao(),
         dateProvider = dateProvider,
         rules = founderProgramRules,
-        onEntitlementChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+        onEntitlementChanged = {
+            refreshAccountAuthority()
+            entitlementRevision.value = entitlementRevision.value + 1
+        }
     )
     val entitlementComposer = EntitlementComposer(
         subscriptionProvider = subscriptionProvider,
@@ -200,6 +211,7 @@ class AppContainer(context: Context) {
         }
         grantsPro.set { entitlementComposer.resolve().grantsPro }
         founderLifetime.set { entitlementComposer.resolve().founderLifetime }
+        refreshAccountAuthority()
         weightChanged.set { achievementRepository.reconcile() }
         plansChanged.set { achievementRepository.reconcile() }
         nativeWorkoutCompleted.set { clientWorkoutId ->
@@ -217,6 +229,7 @@ class AppContainer(context: Context) {
     }
 
     suspend fun restoreFounderEntitlementCache() {
+        authenticatedUserId.set(strictAccount.sessions.read()?.userId)
         founderEntitlementCache.load()
     }
 
@@ -236,11 +249,7 @@ class AppContainer(context: Context) {
             else -> Unit
         }
         when (val entitlements = strictAccount.api.currentEntitlements()) {
-            is FounderEntitlementCall.Loaded -> founderEntitlementCache.save(
-                temporaryFounderPro = entitlements.temporaryFounderPro,
-                founderLifetime = entitlements.founderLifetime,
-                validUntil = clock.instant().plus(FounderEntitlementCache.TRUST)
-            )
+            is FounderEntitlementCall.Loaded -> saveLoadedEntitlements(entitlements)
             FounderEntitlementCall.Unauthenticated -> founderEntitlementCache.drop()
             else -> Unit
         }
@@ -268,10 +277,14 @@ class AppContainer(context: Context) {
     private val strictAccount by lazy {
         val sessions = EncryptedFileStrictSessionStore.create(appContext)
         sessions.onCleared = {
+            authenticatedUserId.set(null)
             founderEntitlementCache.drop()
             strictSessionRevision.value = strictSessionRevision.value + 1
         }
         sessions.onWritten = {
+            val userId = sessions.read()?.userId
+            authenticatedUserId.set(userId)
+            founderEntitlementCache.retainAccount(userId)
             strictSessionRevision.value = strictSessionRevision.value + 1
         }
         val google = ActivityBoundGoogleIdentityProvider(
@@ -363,21 +376,52 @@ class AppContainer(context: Context) {
     private suspend fun publishFounderSnapshot(snapshot: BackendFounderSnapshot) {
         founderProgram.applyBackendEnrollment(snapshot)
         when (val entitlements = strictAccount.api.currentEntitlements()) {
-            is FounderEntitlementCall.Loaded -> founderEntitlementCache.save(
-                temporaryFounderPro = entitlements.temporaryFounderPro,
-                founderLifetime = entitlements.founderLifetime,
-                validUntil = clock.instant().plus(FounderEntitlementCache.TRUST)
-            )
+            is FounderEntitlementCall.Loaded -> saveLoadedEntitlements(entitlements)
             FounderEntitlementCall.Unauthenticated -> founderEntitlementCache.drop()
             else -> {
                 val trusted = founderEntitlementCache.current().trusted(clock.instant())
+                val userId = authenticatedUserId.get() ?: return
                 founderEntitlementCache.save(
                     temporaryFounderPro = snapshot.temporaryProActive,
                     founderLifetime = trusted.founderLifetime,
-                    validUntil = clock.instant().plus(FounderEntitlementCache.TRUST)
+                    validUntil = clock.instant().plus(FounderEntitlementCache.TRUST),
+                    userId = userId,
+                    founderGrantedAt = trusted.founderGrantedAt,
+                    specialGrants = trusted.specialGrants
                 )
             }
         }
+    }
+
+    private suspend fun saveLoadedEntitlements(entitlements: FounderEntitlementCall.Loaded) {
+        val userId = authenticatedUserId.get() ?: strictAccount.sessions.read()?.userId ?: return
+        authenticatedUserId.set(userId)
+        founderEntitlementCache.save(
+            temporaryFounderPro = entitlements.temporaryFounderPro,
+            founderLifetime = entitlements.founderLifetime,
+            validUntil = clock.instant().plus(FounderEntitlementCache.TRUST),
+            userId = userId,
+            founderGrantedAt = entitlements.founderGrantedAt,
+            specialGrants = entitlements.specialAchievements
+        )
+    }
+
+    private fun refreshAccountAuthority() {
+        val resolved = entitlementComposer.resolve()
+        val trusted = founderEntitlementCache.current().trusted(clock.instant())
+        accountAuthorityState.set(
+            AccountAchievementAuthority(
+                founderLifetime = resolved.founderLifetime,
+                founderGrantedAtMillis = if (trusted.founderLifetime) {
+                    trusted.founderGrantedAt?.toEpochMilli()
+                } else {
+                    null
+                },
+                earlyAdopterGrantedAtMillis = trusted.specialGrantedAtMillis("EARLY_ADOPTER"),
+                developerGrantedAtMillis = trusted.specialGrantedAtMillis("DEVELOPER")
+            )
+        )
+        achievementRepository.notifyEntitlementChanged()
     }
 
     val strictSessionStore: StrictSessionStore

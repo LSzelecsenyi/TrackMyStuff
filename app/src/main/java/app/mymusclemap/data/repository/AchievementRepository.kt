@@ -8,6 +8,7 @@ import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.local.toModel
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.achievements.AccountAchievementAuthority
 import app.mymusclemap.domain.achievements.AchievementBoard
 import app.mymusclemap.domain.achievements.AchievementBoardAssembler
 import app.mymusclemap.domain.achievements.BadgeWallItem
@@ -38,6 +39,7 @@ import app.mymusclemap.domain.achievements.WeightMilestonePlan
 import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
+import kotlinx.coroutines.flow.MutableStateFlow
 import app.mymusclemap.domain.workout.WeeklyGoalRevision
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -53,8 +55,15 @@ class AchievementRepository(
     private val clock: Clock,
     private val dateProvider: DateProvider,
     private val grantsPro: () -> Boolean = { false },
-    private val founderLifetime: () -> Boolean = { false }
+    private val founderLifetime: () -> Boolean = { false },
+    private val accountAuthority: () -> AccountAchievementAuthority = { AccountAchievementAuthority() }
 ) {
+    private val entitlementEpoch = MutableStateFlow(0)
+
+    fun notifyEntitlementChanged() {
+        entitlementEpoch.value = entitlementEpoch.value + 1
+    }
+
     fun observeBoard(): Flow<AchievementBoard> {
         val awards = combine(
             combine(
@@ -70,7 +79,9 @@ class AchievementRepository(
                     unlocks = unlocks.mapNotNull { it.toSnapshot() },
                     events = events.mapNotNull { it.toSnapshot() },
                     currentStreak = WeeklyGoalStreakEvaluator.currentStreak(status),
-                    bestStreak = WeeklyGoalStreakEvaluator.bestStreak(status)
+                    bestStreak = WeeklyGoalStreakEvaluator.bestStreak(status),
+                    grantsPro = grantsPro(),
+                    accountAuthority = accountAuthority()
                 )
             },
             observePractice()
@@ -80,9 +91,11 @@ class AchievementRepository(
         return combine(
             awards,
             database.targetWeightGoalDao().observeActive(),
-            database.weightMeasurementDao().observeAllAscending()
-        ) { board, goal, measurements ->
+            database.weightMeasurementDao().observeAllAscending(),
+            entitlementEpoch
+        ) { board, goal, measurements, _ ->
             board.copy(targetWeightProgress = targetProgress(goal, measurements))
+                .withCurrentOwnership(grantsPro(), accountAuthority())
         }
     }
 
@@ -101,7 +114,9 @@ class AchievementRepository(
             bestStreak = WeeklyGoalStreakEvaluator.bestStreak(status),
             lifetimeVolumeKg = ProAchievementEvaluator.lifetimeVolumeKg(history),
             prEventCount = recordEvents.size,
-            leadingExerciseSets = ExerciseMasteryEvaluator.leadingCount(history)
+            leadingExerciseSets = ExerciseMasteryEvaluator.leadingCount(history),
+            grantsPro = grantsPro(),
+            accountAuthority = accountAuthority()
         )
         return assembled.copy(
             targetWeightProgress = targetProgress(

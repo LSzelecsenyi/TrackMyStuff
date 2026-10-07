@@ -16,8 +16,11 @@ class FounderAchievementTest {
     private val now = Instant.parse("2026-10-07T08:00:00Z")
 
     @Test
-    fun founderIsTheOnlyReleasedSpecialAchievement() {
-        assertEquals(listOf(AchievementId.FOUNDER), AchievementCatalog.special)
+    fun founderStaysASeparateSpecialAchievement() {
+        assertEquals(
+            listOf(AchievementId.FOUNDER, AchievementId.EARLY_ADOPTER, AchievementId.DEVELOPER),
+            AchievementCatalog.special
+        )
         assertEquals(AchievementAccess.SPECIAL, AchievementId.FOUNDER.access)
         assertEquals(AchievementCategory.SPECIAL, AchievementId.FOUNDER.category)
         assertNull(AchievementId.FOUNDER.workoutCountTarget)
@@ -70,16 +73,12 @@ class FounderAchievementTest {
         assertTrue(backendLifetime.founderLifetime)
         assertFalse(backendLifetime.temporaryTesterPro)
 
-        assertTrue(plan(grantsPro = true, founderLifetime = false).insertUnlocks.none { it.achievementId == AchievementId.FOUNDER })
-        assertTrue(plan(grantsPro = false, founderLifetime = false).insertUnlocks.none { it.achievementId == AchievementId.FOUNDER })
-        val awarded = plan(grantsPro = false, founderLifetime = true).insertUnlocks.single { it.achievementId == AchievementId.FOUNDER }
-        assertEquals(5_000L, awarded.unlockedAt)
-        assertEquals(5_000L, awarded.celebratedAt)
+        assertTrue(plan(grantsPro = true, founderLifetime = true).insertUnlocks.none { it.achievementId == AchievementId.FOUNDER })
+        assertTrue(plan(grantsPro = false, founderLifetime = true).insertUnlocks.none { it.achievementId.isAccountStatus })
     }
 
     @Test
-    fun founderUnlockIsIdempotentAndSurvivesLosingTheGrant() {
-        val first = plan(grantsPro = true, founderLifetime = true)
+    fun founderIsNotStoredAndALegacyRowDoesNotOwnIt() {
         val stored = listOf(StoredUnlock(AchievementId.FOUNDER, celebratedAt = 5_000L))
         val again = AchievementReconciler.plan(
             request(grantsPro = true, founderLifetime = true, nowMillis = 9_000L),
@@ -93,8 +92,26 @@ class FounderAchievementTest {
             emptyList()
         )
         assertTrue(lost.revoke.isEmpty())
-        assertTrue(lost.insertUnlocks.none { it.achievementId == AchievementId.FOUNDER })
-        assertEquals(5_000L, first.insertUnlocks.single { it.achievementId == AchievementId.FOUNDER }.unlockedAt)
+        val legacy = AchievementBoardAssembler.assemble(
+            completedWorkoutCount = 0,
+            unlocks = listOf(UnlockSnapshot(AchievementId.FOUNDER, 5_000L, 5_000L, null)),
+            events = emptyList()
+        )
+        assertFalse(legacy.items.single { it.id == AchievementId.FOUNDER }.unlocked)
+        val grantedAt = Instant.parse("2024-03-01T00:00:00Z").toEpochMilli()
+        val earned = AchievementBoardAssembler.assemble(
+            completedWorkoutCount = 0,
+            unlocks = listOf(UnlockSnapshot(AchievementId.FOUNDER, 5_000L, 5_000L, null)),
+            events = emptyList(),
+            accountAuthority = AccountAchievementAuthority(
+                founderLifetime = true,
+                founderGrantedAtMillis = grantedAt
+            )
+        )
+        val founder = earned.items.single { it.id == AchievementId.FOUNDER }
+        assertTrue(founder.unlocked)
+        assertEquals(grantedAt, founder.unlockedAt)
+        assertTrue(earned.pending.none { it is PendingCelebration.ProUnlocked })
     }
 
     @Test
@@ -113,8 +130,9 @@ class FounderAchievementTest {
         assertTrue(BadgeWallPresenter.almostThere(board).none { it.achievementId == AchievementId.FOUNDER })
         val earned = AchievementBoardAssembler.assemble(
             completedWorkoutCount = 0,
-            unlocks = listOf(UnlockSnapshot(AchievementId.FOUNDER, 5_000L, 5_000L, null)),
-            events = emptyList()
+            unlocks = emptyList(),
+            events = emptyList(),
+            accountAuthority = AccountAchievementAuthority(founderLifetime = true, founderGrantedAtMillis = 5_000L)
         )
         assertEquals(BadgeVisualState.EARNED, earned.items.single { it.id == AchievementId.FOUNDER }.visualState())
         assertTrue(earned.pending.none { celebration ->

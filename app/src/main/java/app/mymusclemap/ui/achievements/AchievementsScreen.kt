@@ -657,6 +657,8 @@ internal fun achievementTitle(id: AchievementId): String {
     return when {
         id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_name)
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_name)
+        id == AchievementId.EARLY_ADOPTER -> stringResource(R.string.achievement_early_adopter_name)
+        id == AchievementId.DEVELOPER -> stringResource(R.string.achievement_developer_name)
         id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_name)
         id.badgeFamily == BadgeFamily.PR_HUNTER -> stringResource(R.string.achievement_pr_hunter_name)
         id.badgeFamily == BadgeFamily.EXERCISE_MASTERY -> stringResource(R.string.achievement_exercise_mastery_name)
@@ -675,6 +677,8 @@ internal fun achievementRequirement(id: AchievementId): String {
     return when {
         id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_requirement)
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_requirement)
+        id == AchievementId.EARLY_ADOPTER -> stringResource(R.string.achievement_early_adopter_requirement)
+        id == AchievementId.DEVELOPER -> stringResource(R.string.achievement_developer_requirement)
         id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_requirement)
         id.prHunterTarget != null -> stringResource(R.string.achievement_pr_hunter_requirement, id.prHunterTarget)
         id.masterySetTarget != null -> stringResource(

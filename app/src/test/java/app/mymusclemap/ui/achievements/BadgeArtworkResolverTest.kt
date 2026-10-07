@@ -26,8 +26,8 @@ class BadgeArtworkResolverTest {
         assertEquals(R.drawable.first_monthly_report_badge, drawable(AchievementId.FIRST_MONTHLY_REPORT))
         assertEquals(R.drawable.first_pr_badge, drawable(AchievementId.FIRST_PR))
         assertEquals(R.drawable.weight_pr_badge, drawable(AchievementId.WEIGHT_PR))
-        assertEquals(R.drawable.highest_rep_count_badge, drawable(AchievementId.REP_RECORD))
-        assertEquals(R.drawable.highest_total_volume_badge, drawable(AchievementId.VOLUME_RECORD))
+        assertEquals(R.drawable.rep_record_badge, drawable(AchievementId.REP_RECORD))
+        assertEquals(R.drawable.volume_record_badge, drawable(AchievementId.VOLUME_RECORD))
     }
 
     @Test
@@ -57,26 +57,23 @@ class BadgeArtworkResolverTest {
         assertEquals(R.drawable.volume_master_badge, drawable(AchievementId.VOLUME_MASTER))
         assertEquals(R.drawable.iron_discipline_badge, drawable(AchievementId.IRON_DISCIPLINE))
         assertEquals(R.drawable.founder_badge, drawable(AchievementId.FOUNDER))
-        val awaitingArtwork = setOf(
-            AchievementId.PR_HUNTER_10,
-            AchievementId.PR_HUNTER_25,
-            AchievementId.PR_HUNTER_50,
-            AchievementId.PR_HUNTER_100,
-            AchievementId.EXERCISE_MASTERY_100,
-            AchievementId.EXERCISE_MASTERY_250,
-            AchievementId.EXERCISE_MASTERY_500,
-            AchievementId.EXERCISE_MASTERY_1000,
-            AchievementId.WEEKLY_GOAL_STREAK_26,
-            AchievementId.WEEKLY_GOAL_STREAK_52
-        )
-        val mapped = AchievementId.entries.filter { it !in awaitingArtwork }.map { drawable(it) }
+        assertEquals(R.drawable.pr_hunter_10_badge, drawable(AchievementId.PR_HUNTER_10))
+        assertEquals(R.drawable.pr_hunter_25_badge, drawable(AchievementId.PR_HUNTER_25))
+        assertEquals(R.drawable.pr_hunter_50_badge, drawable(AchievementId.PR_HUNTER_50))
+        assertEquals(R.drawable.pr_hunter_100_badge, drawable(AchievementId.PR_HUNTER_100))
+        assertEquals(R.drawable.exercise_mastery_100_badge, drawable(AchievementId.EXERCISE_MASTERY_100))
+        assertEquals(R.drawable.exercise_mastery_250_badge, drawable(AchievementId.EXERCISE_MASTERY_250))
+        assertEquals(R.drawable.exercise_mastery_500_badge, drawable(AchievementId.EXERCISE_MASTERY_500))
+        assertEquals(R.drawable.exercise_mastery_1000_badge, drawable(AchievementId.EXERCISE_MASTERY_1000))
+        assertEquals(R.drawable.weekly_goal_streak_26_badge, drawable(AchievementId.WEEKLY_GOAL_STREAK_26))
+        assertEquals(R.drawable.weekly_goal_streak_52_badge, drawable(AchievementId.WEEKLY_GOAL_STREAK_52))
+        assertEquals(R.drawable.early_adopter_badge, drawable(AchievementId.EARLY_ADOPTER))
+        assertEquals(R.drawable.developer_badge, drawable(AchievementId.DEVELOPER))
+        val mapped = AchievementId.entries.map { drawable(it) }
         assertEquals(mapped.size, mapped.toSet().size)
-        AchievementId.entries.filter { it !in awaitingArtwork }.forEach { id ->
+        AchievementId.entries.forEach { id ->
             assertTrue(BadgeArtworkResolver.isProductionArtwork(id.badgeKey))
             assertNotEquals(R.drawable.ic_badge_placeholder, drawable(id))
-        }
-        awaitingArtwork.forEach { id ->
-            assertEquals(R.drawable.ic_badge_placeholder, drawable(id))
         }
         assertTrue(AchievementId.entries.none { it.name == "IRON_YEAR" })
         assertEquals(AchievementAccess.PRO, AchievementId.VOLUME_MASTER.access)

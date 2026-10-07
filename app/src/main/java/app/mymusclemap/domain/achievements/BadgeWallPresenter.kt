@@ -65,7 +65,7 @@ object BadgeWallPresenter {
         board: AchievementBoard,
         selectedFilter: AchievementAccess? = null
     ): BadgeWallPresentation {
-        val catalog = board.items
+        val catalog = board.items.filter { it.id.listed(it.unlocked) }
         val filters = listOf(AchievementAccess.FREE, AchievementAccess.PRO, AchievementAccess.SPECIAL)
             .filter { access -> catalog.any { it.access == access } }
         val active = selectedFilter?.takeIf { it in filters }
@@ -93,12 +93,13 @@ object BadgeWallPresenter {
      * Binary Journey awards are not candidates.
      */
     fun almostThere(board: AchievementBoard): List<AlmostThereEntry> {
+        val visible = board.items.filter { it.id.listed(it.unlocked) }
         val candidates = listOfNotNull(
-            nextCountMilestone(board.items) { it.workoutCountTarget },
-            nextCountMilestone(board.items) { it.streakWeeks },
-            nextCountMilestone(board.items) { it.prHunterTarget },
-            nextCountMilestone(board.items) { it.masterySetTarget },
-            nextVolumeMilestone(board.items),
+            nextCountMilestone(visible) { it.workoutCountTarget },
+            nextCountMilestone(visible) { it.streakWeeks },
+            nextCountMilestone(visible) { it.prHunterTarget },
+            nextCountMilestone(visible) { it.masterySetTarget },
+            nextVolumeMilestone(visible),
             targetWeightMilestone(board)
         )
         return candidates.sortedWith(almostThereOrder()).take(MAX_ALMOST_THERE)

@@ -1,5 +1,6 @@
 package eu.strictworkout.entitlement;
 
+import eu.strictworkout.account.AccountStatusGrantRepository;
 import eu.strictworkout.auth.StrictRequests;
 import eu.strictworkout.founder.FounderApplication;
 import eu.strictworkout.founder.FounderApplicationRepository;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -22,6 +25,7 @@ public class EntitlementController {
     private final FounderApplicationRepository applications;
     private final FounderWorkoutEventRepository events;
     private final EntitlementGrantRepository grants;
+    private final AccountStatusGrantRepository accountStatuses;
     private final FounderStateMachine machine;
     private final eu.strictworkout.founder.FounderRules rules;
     private final Clock clock;
@@ -30,6 +34,7 @@ public class EntitlementController {
             FounderApplicationRepository applications,
             FounderWorkoutEventRepository events,
             EntitlementGrantRepository grants,
+            AccountStatusGrantRepository accountStatuses,
             FounderStateMachine machine,
             eu.strictworkout.founder.FounderRules rules,
             Clock clock
@@ -37,6 +42,7 @@ public class EntitlementController {
         this.applications = applications;
         this.events = events;
         this.grants = grants;
+        this.accountStatuses = accountStatuses;
         this.machine = machine;
         this.rules = rules;
         this.clock = clock;
@@ -50,12 +56,19 @@ public class EntitlementController {
                 .flatMap(applications::findById)
                 .map(this::evaluatedStatus)
                 .orElse(null);
-        boolean lifetime = grants.existsByUser_IdAndSource(userId, EntitlementGrant.FOUNDER_LIFETIME);
+        var founder = grants.findByUser_IdAndSource(userId, EntitlementGrant.FOUNDER_LIFETIME);
+        boolean lifetime = founder.isPresent();
         EffectiveEntitlement entitlement = EffectiveEntitlement.resolve(status, lifetime);
+        List<SpecialAchievementResponse> specials = accountStatuses.findByUser_IdOrderByStatusAsc(userId)
+                .stream()
+                .map(grant -> new SpecialAchievementResponse(grant.getStatus().name(), grant.getGrantedAt()))
+                .toList();
         return new EntitlementResponse(
                 entitlement.access(),
                 entitlement.founderLifetime(),
-                entitlement.temporaryFounderPro()
+                entitlement.temporaryFounderPro(),
+                founder.map(EntitlementGrant::getGrantedAt).orElse(null),
+                specials
         );
     }
 
@@ -75,7 +88,15 @@ public class EntitlementController {
     public record EntitlementResponse(
             EntitlementAccess access,
             boolean founderLifetime,
-            boolean temporaryFounderPro
+            boolean temporaryFounderPro,
+            Instant founderGrantedAt,
+            List<SpecialAchievementResponse> specialAchievements
+    ) {
+    }
+
+    public record SpecialAchievementResponse(
+            String key,
+            Instant grantedAt
     ) {
     }
 }
