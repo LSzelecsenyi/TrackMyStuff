@@ -23,8 +23,14 @@ class BadgeWallPresenterTest {
     @Test
     fun emptyCategoriesAreNotFiltersOrAchievements() {
         val presentation = BadgeWallPresenter.present(board(completed = 0))
-        assertEquals(listOf(AchievementAccess.FREE, AchievementAccess.PRO), presentation.filters)
-        assertFalse(presentation.filters.any { it.name == "SPECIAL" })
+        assertEquals(
+            listOf(AchievementAccess.FREE, AchievementAccess.PRO, AchievementAccess.SPECIAL),
+            presentation.filters
+        )
+        assertEquals(
+            listOf(AchievementId.FOUNDER),
+            presentation.sections.single { it.category == AchievementCategory.SPECIAL }.items.map { it.id }
+        )
         assertEquals(
             AchievementCatalog.performance,
             presentation.sections.single { it.category == AchievementCategory.PERFORMANCE }.items.map { it.id }
@@ -34,6 +40,12 @@ class BadgeWallPresenterTest {
         assertFalse(AchievementId.entries.any { it.name.contains("EXERCISE_GOAL") })
         assertTrue(presentation.catalog.filter { it.category == AchievementCategory.PERFORMANCE }.all { it.countProgress == null })
         assertTrue(presentation.almostThere.none { it.achievementId.category == AchievementCategory.PERFORMANCE })
+        assertTrue(presentation.almostThere.none { it.achievementId == AchievementId.FOUNDER })
+        val founder = presentation.catalog.single { it.id == AchievementId.FOUNDER }
+        assertEquals(AchievementAccess.SPECIAL, founder.access)
+        assertEquals(null, founder.countProgress)
+        assertEquals(null, founder.volumeProgress)
+        assertFalse(founder.unlocked)
     }
 
     @Test
@@ -49,10 +61,15 @@ class BadgeWallPresenterTest {
         assertTrue(free.catalog.filter { it.access == AchievementAccess.PRO }.isNotEmpty())
         assertTrue(free.sections.all { section -> section.items.all { it.access == AchievementAccess.FREE } })
         assertEquals(AchievementAccess.FREE, free.selectedFilter)
+        val special = BadgeWallPresenter.present(source, AchievementAccess.SPECIAL)
         assertEquals(0, pro.earnedCount)
         assertEquals(AchievementCatalog.pro.size, pro.totalCount)
+        assertEquals(0, special.earnedCount)
+        assertEquals(AchievementCatalog.special.size, special.totalCount)
+        assertEquals(listOf(AchievementId.FOUNDER), special.sections.flatMap { it.items }.map { it.id })
+        assertTrue(special.almostThere.none { it.achievementId == AchievementId.FOUNDER })
         assertEquals(
-            listOf(AchievementId.IRON_YEAR, AchievementId.VOLUME_MASTER),
+            listOf(AchievementId.IRON_DISCIPLINE, AchievementId.VOLUME_MASTER),
             pro.sections.flatMap { it.items }.map { it.id }
         )
         assertTrue(pro.almostThere.none { it.achievementId == AchievementId.VOLUME_MASTER })
@@ -205,7 +222,7 @@ class BadgeWallPresenterTest {
             .single { it.category == AchievementCategory.CONSISTENCY }
             .items
             .map { it.id }
-        assertEquals(AchievementCatalog.workoutCounts + AchievementId.IRON_YEAR, consistency)
+        assertEquals(AchievementCatalog.workoutCounts + AchievementId.IRON_DISCIPLINE, consistency)
     }
 
     private fun board(

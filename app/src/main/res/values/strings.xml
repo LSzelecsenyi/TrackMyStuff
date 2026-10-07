@@ -1163,7 +1163,10 @@
     <string name="badge_wall_filter_all">All</string>
     <string name="badge_wall_filter_free">Free</string>
     <string name="badge_wall_filter_pro">PRO</string>
+    <string name="badge_wall_filter_special">Special</string>
     <string name="badge_wall_pro">PRO</string>
+    <string name="badge_wall_special">SPECIAL</string>
+    <string name="achievements_category_special">Special</string>
     <string name="badge_wall_requirement_complete">Requirement complete</string>
     <string name="badge_wall_unlock_with_pro">Unlock with PRO</string>
     <string name="badge_wall_volume_progress">%1$s / %2$s kg</string>
@@ -1196,8 +1199,10 @@
     <string name="achievement_volume_record_requirement">Set a new workout volume personal record</string>
     <string name="achievement_volume_master_name">Volume Master</string>
     <string name="achievement_volume_master_requirement">Reach 100,000 kg total workout volume</string>
-    <string name="achievement_iron_year_name">Iron Year</string>
-    <string name="achievement_iron_year_requirement">Complete 250 workouts</string>
+    <string name="achievement_iron_discipline_name">Iron Discipline</string>
+    <string name="achievement_iron_discipline_requirement">Complete 250 workouts</string>
+    <string name="achievement_founder_name">Founder</string>
+    <string name="achievement_founder_requirement">Founder member of Strict.</string>
     <string name="celebration_streak_body">You\'ve reached your weekly workout goal for %1$d consecutive weeks.</string>
     <string name="celebration_weight_halfway_title">Halfway there!</string>
     <string name="celebration_weight_halfway_body">You\'re halfway to your target weight.</string>

@@ -48,7 +48,8 @@ class AchievementRepository(
     private val database: WeightDatabase,
     private val clock: Clock,
     private val dateProvider: DateProvider,
-    private val grantsPro: () -> Boolean = { false }
+    private val grantsPro: () -> Boolean = { false },
+    private val founderLifetime: () -> Boolean = { false }
 ) {
     fun observeBoard(): Flow<AchievementBoard> {
         val awards = combine(
@@ -181,6 +182,7 @@ class AchievementRepository(
                     ),
                     performanceQualifications = PerformanceRecordEvaluator.qualifications(history),
                     grantsPro = grantsPro(),
+                    founderLifetime = founderLifetime(),
                     proQualifications = ProAchievementEvaluator.qualifications(history),
                     recordMonthlyReportMarker = recordMonthlyReport && monthlyMarkerAt == null
                 ),

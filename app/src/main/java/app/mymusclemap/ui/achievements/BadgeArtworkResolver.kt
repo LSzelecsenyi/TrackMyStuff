@@ -28,6 +28,9 @@ object BadgeArtworkResolver {
             AchievementId.WEIGHT_PR.name -> R.drawable.weight_pr_badge
             AchievementId.REP_RECORD.name -> R.drawable.highest_rep_count_badge
             AchievementId.VOLUME_RECORD.name -> R.drawable.highest_total_volume_badge
+            AchievementId.VOLUME_MASTER.name -> R.drawable.volume_master_badge
+            AchievementId.IRON_DISCIPLINE.name -> R.drawable.iron_discipline_badge
+            AchievementId.FOUNDER.name -> R.drawable.founder_badge
             else -> R.drawable.ic_badge_placeholder
         }
     }

@@ -57,7 +57,8 @@ object BadgeWallPresenter {
         AchievementCategory.CONSISTENCY,
         AchievementCategory.JOURNEY,
         AchievementCategory.GOALS,
-        AchievementCategory.PERFORMANCE
+        AchievementCategory.PERFORMANCE,
+        AchievementCategory.SPECIAL
     )
 
     fun present(
@@ -65,7 +66,7 @@ object BadgeWallPresenter {
         selectedFilter: AchievementAccess? = null
     ): BadgeWallPresentation {
         val catalog = board.items
-        val filters = listOf(AchievementAccess.FREE, AchievementAccess.PRO)
+        val filters = listOf(AchievementAccess.FREE, AchievementAccess.PRO, AchievementAccess.SPECIAL)
             .filter { access -> catalog.any { it.access == access } }
         val active = selectedFilter?.takeIf { it in filters }
         val visible = if (active == null) catalog else catalog.filter { it.access == active }

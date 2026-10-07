@@ -34,6 +34,11 @@ data class ReconcileRequest(
     val performanceQualifications: List<PerformanceQualification> = emptyList(),
     /** Canonical Pro grant at reconcile time. Not stored on the achievement row. */
     val grantsPro: Boolean = false,
+    /**
+     * Canonical Founder lifetime grant. Subscription Pro and temporary tester Pro do not set this.
+     * Not stored on the achievement row.
+     */
+    val founderLifetime: Boolean = false,
     val proQualifications: List<ProQualification> = emptyList(),
     /** Writes the monthly-report marker when this generation has not been recorded yet. */
     val recordMonthlyReportMarker: Boolean = false
@@ -235,8 +240,26 @@ object AchievementReconciler {
             null
         }
 
+        val founderInsert = if (
+            request.founderLifetime &&
+            AchievementId.FOUNDER !in storedIdsAfterRevoke
+        ) {
+            // No Founder-lifetime source carries an acquisition instant. The first insert uses
+            // reconcile time, then the stored row is left unchanged. Startup and entitlement
+            // refresh have no separate live-grant signal, so the award is stored already acknowledged.
+            UnlockInsert(
+                achievementId = AchievementId.FOUNDER,
+                unlockedAt = request.nowMillis,
+                celebratedAt = request.nowMillis,
+                triggerClientWorkoutId = null
+            )
+        } else {
+            null
+        }
+
         return ReconcilePlan(
-            insertUnlocks = insertUnlocks + streakInserts + journeyInserts + performanceInserts + proInserts,
+            insertUnlocks = insertUnlocks + streakInserts + journeyInserts + performanceInserts +
+                proInserts + listOfNotNull(founderInsert),
             revoke = revoke,
             insertEvents = weekInserts + listOfNotNull(historyInsert, markerInsert),
             deleteEventKeys = deleteEventKeys,
@@ -244,11 +267,11 @@ object AchievementReconciler {
         )
     }
 
-    /** Later completion wins. A tie prefers Volume Master over Iron Year. */
+    /** Later completion wins. A tie prefers Volume Master over Iron Discipline. */
     private fun proCelebrationRank(id: AchievementId): Int {
         return when (id) {
             AchievementId.VOLUME_MASTER -> 2
-            AchievementId.IRON_YEAR -> 1
+            AchievementId.IRON_DISCIPLINE -> 1
             else -> 0
         }
     }

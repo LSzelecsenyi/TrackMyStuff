@@ -317,9 +317,9 @@ private fun AlmostThereRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                if (item.access == AchievementAccess.PRO) {
+                if (item.access != AchievementAccess.FREE) {
                     Spacer(Modifier.width(6.dp))
-                    ProMark(item.id)
+                    AccessMark(item)
                 }
             }
             Text(
@@ -471,9 +471,9 @@ private fun BadgeCell(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        if (item.access == AchievementAccess.PRO) {
+        if (item.access != AchievementAccess.FREE) {
             Spacer(Modifier.height(4.dp))
-            ProMark(item.id)
+            AccessMark(item)
         }
         val progressLabel = when {
             showProgress && item.countProgress != null -> stringResource(
@@ -593,9 +593,9 @@ private fun BadgeDetailSheet(item: BadgeWallItem, onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (item.access == AchievementAccess.PRO) {
+            if (item.access != AchievementAccess.FREE) {
                 Spacer(Modifier.height(8.dp))
-                ProMark(item.id)
+                AccessMark(item)
             }
             item.badgeTier?.let { tier ->
                 Text(
@@ -654,7 +654,8 @@ internal fun achievementTitle(id: AchievementId): String {
     val workouts = id.workoutThreshold
     val weeks = id.streakWeeks
     return when {
-        id == AchievementId.IRON_YEAR -> stringResource(R.string.achievement_iron_year_name)
+        id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_name)
+        id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_name)
         id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_name)
         workouts != null -> stringResource(R.string.achievements_workouts_name, workouts)
         weeks != null -> stringResource(R.string.achievement_streak_name, weeks)
@@ -669,7 +670,8 @@ internal fun achievementRequirement(id: AchievementId): String {
     val workouts = id.workoutThreshold
     val weeks = id.streakWeeks
     return when {
-        id == AchievementId.IRON_YEAR -> stringResource(R.string.achievement_iron_year_requirement)
+        id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_requirement)
+        id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_requirement)
         id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_requirement)
         workouts != null -> stringResource(R.string.achievements_workouts_requirement, workouts)
         weeks != null -> stringResource(R.string.achievement_streak_requirement, weeks)
@@ -719,6 +721,7 @@ private fun AchievementAccess.labelRes(): Int {
     return when (this) {
         AchievementAccess.FREE -> R.string.badge_wall_filter_free
         AchievementAccess.PRO -> R.string.badge_wall_filter_pro
+        AchievementAccess.SPECIAL -> R.string.badge_wall_filter_special
     }
 }
 
@@ -732,16 +735,26 @@ private fun detailStateRes(state: BadgeVisualState): Int {
 }
 
 @Composable
-private fun ProMark(id: AchievementId) {
+private fun AccessMark(item: BadgeWallItem) {
+    val label = when (item.access) {
+        AchievementAccess.FREE -> return
+        AchievementAccess.PRO -> R.string.badge_wall_pro
+        AchievementAccess.SPECIAL -> R.string.badge_wall_special
+    }
+    val tag = when (item.access) {
+        AchievementAccess.PRO -> "badge-pro-${item.id.name}"
+        AchievementAccess.SPECIAL -> "badge-special-${item.id.name}"
+        AchievementAccess.FREE -> return
+    }
     Text(
-        text = stringResource(R.string.badge_wall_pro),
+        text = stringResource(label),
         style = MaterialTheme.typography.labelSmall,
         color = StrictBrand.onAction(),
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
             .background(StrictBrand.actionContainer())
             .padding(horizontal = 5.dp, vertical = 1.dp)
-            .testTag("badge-pro-${id.name}")
+            .testTag(tag)
     )
 }
 
@@ -792,6 +805,7 @@ private fun AchievementCategory.labelRes(): Int {
         AchievementCategory.PERFORMANCE -> R.string.achievements_category_performance
         AchievementCategory.JOURNEY -> R.string.achievements_category_journey
         AchievementCategory.GOALS -> R.string.achievements_category_goals
+        AchievementCategory.SPECIAL -> R.string.achievements_category_special
     }
 }
 

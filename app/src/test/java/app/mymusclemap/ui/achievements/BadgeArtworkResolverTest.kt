@@ -1,6 +1,7 @@
 package app.mymusclemap.ui.achievements
 
 import app.mymusclemap.R
+import app.mymusclemap.domain.achievements.AchievementAccess
 import app.mymusclemap.domain.achievements.AchievementId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -53,17 +54,20 @@ class BadgeArtworkResolverTest {
 
     @Test
     fun everyImplementedAchievementUsesItsOwnFinalizedArtwork() {
-        val awaitingArtwork = setOf(AchievementId.VOLUME_MASTER, AchievementId.IRON_YEAR)
-        val mapped = AchievementId.entries.filter { it !in awaitingArtwork }.map { drawable(it) }
+        assertEquals(R.drawable.volume_master_badge, drawable(AchievementId.VOLUME_MASTER))
+        assertEquals(R.drawable.iron_discipline_badge, drawable(AchievementId.IRON_DISCIPLINE))
+        assertEquals(R.drawable.founder_badge, drawable(AchievementId.FOUNDER))
+        val mapped = AchievementId.entries.map { drawable(it) }
         assertEquals(mapped.size, mapped.toSet().size)
-        AchievementId.entries.filter { it !in awaitingArtwork }.forEach { id ->
+        AchievementId.entries.forEach { id ->
             assertTrue(BadgeArtworkResolver.isProductionArtwork(id.badgeKey))
             assertNotEquals(R.drawable.ic_badge_placeholder, drawable(id))
-            assertNotEquals(R.drawable.founder_badge, drawable(id))
         }
-        awaitingArtwork.forEach { id ->
-            assertEquals(R.drawable.ic_badge_placeholder, drawable(id))
-        }
+        assertTrue(AchievementId.entries.none { it.name == "IRON_YEAR" })
+        assertEquals(AchievementAccess.PRO, AchievementId.VOLUME_MASTER.access)
+        assertEquals(AchievementAccess.PRO, AchievementId.IRON_DISCIPLINE.access)
+        assertEquals(100_000.0, AchievementId.VOLUME_MASTER.volumeThresholdKg)
+        assertEquals(250, AchievementId.IRON_DISCIPLINE.lifetimeWorkoutTarget)
     }
 
     @Test

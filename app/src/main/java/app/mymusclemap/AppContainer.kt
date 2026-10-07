@@ -86,6 +86,7 @@ class AppContainer(context: Context) {
     private val weightChanged = AtomicReference<suspend () -> Unit> { }
     private val plansChanged = AtomicReference<suspend () -> Unit> { }
     private val grantsPro = AtomicReference<() -> Boolean> { false }
+    private val founderLifetime = AtomicReference<() -> Boolean> { false }
     val exerciseRepository = ExerciseRepository(
         dao = database.exerciseDao(),
         clock = clock,
@@ -116,7 +117,8 @@ class AppContainer(context: Context) {
         database = database,
         clock = clock,
         dateProvider = dateProvider,
-        grantsPro = { grantsPro.get().invoke() }
+        grantsPro = { grantsPro.get().invoke() },
+        founderLifetime = { founderLifetime.get().invoke() }
     )
     val workoutSessionRepository = WorkoutSessionRepository(
         sessionDao = database.workoutSessionDao(),
@@ -197,6 +199,7 @@ class AppContainer(context: Context) {
             entitlementComposer.policy().customExercises(count).canCreate
         }
         grantsPro.set { entitlementComposer.resolve().grantsPro }
+        founderLifetime.set { entitlementComposer.resolve().founderLifetime }
         weightChanged.set { achievementRepository.reconcile() }
         plansChanged.set { achievementRepository.reconcile() }
         nativeWorkoutCompleted.set { clientWorkoutId ->

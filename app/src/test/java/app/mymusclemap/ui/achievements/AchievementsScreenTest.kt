@@ -33,6 +33,7 @@ import app.mymusclemap.ui.dashboard.NextAchievementLine
 import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -72,7 +73,7 @@ class AchievementsScreenTest {
         composeRule.onNodeWithText(testString(R.string.badge_wall_section_progress, 4, total)).assertIsDisplayed()
         composeRule.onNodeWithTag("badge-filter-FREE").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-filter-PRO").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("badge-filter-SPECIAL").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-filter-SPECIAL").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-section-PERFORMANCE").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.achievement_first_pr_name)).performScrollTo().assertIsDisplayed()
         AchievementId.entries.forEach { id ->
@@ -236,7 +237,7 @@ class AchievementsScreenTest {
         composeRule.onNodeWithTag("badge-filter-ALL").assertIsSelected()
         composeRule.onNodeWithTag("badge-filter-FREE").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-filter-PRO").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("badge-filter-SPECIAL").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-filter-SPECIAL").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-section-CONSISTENCY").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-filter-PRO").performClick()
         composeRule.onNodeWithTag("badge-filter-PRO").assertIsSelected()
@@ -247,7 +248,21 @@ class AchievementsScreenTest {
         composeRule.onNodeWithText(
             testString(R.string.badge_wall_section_progress, 0, AchievementCatalog.pro.size)
         ).assertIsDisplayed()
-        composeRule.onNodeWithTag("achievement-IRON_YEAR").assertIsDisplayed()
+        composeRule.onNodeWithTag("achievement-IRON_DISCIPLINE").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("achievement-FOUNDER").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-filter-SPECIAL").performClick()
+        composeRule.onNodeWithTag("badge-filter-SPECIAL").assertIsSelected()
+        composeRule.onNodeWithTag("achievement-FOUNDER").assertIsDisplayed()
+        composeRule.onNodeWithTag("badge-special-FOUNDER", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onAllNodesWithTag("badge-pro-FOUNDER", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onAllNodesWithTag("achievement-progress-FOUNDER").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("achievement-VOLUME_MASTER").assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.badge_wall_unlock_with_pro)).assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-summary-count").assertTextEquals(
+            testString(R.string.badge_wall_section_progress, 0, AchievementCatalog.special.size)
+        )
+        composeRule.onNodeWithTag("badge-filter-PRO").performClick()
+        composeRule.onNodeWithTag("achievement-IRON_DISCIPLINE").assertIsDisplayed()
         composeRule.onNodeWithTag("achievement-VOLUME_MASTER").assertIsDisplayed()
         composeRule.onNodeWithTag("badge-pro-VOLUME_MASTER", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onAllNodesWithTag("achievement-WORKOUTS_5").assertCountEquals(0)
@@ -258,6 +273,37 @@ class AchievementsScreenTest {
         composeRule.onNodeWithTag("badge-filter-ALL").assertIsSelected()
         composeRule.onNodeWithText(testString(R.string.badge_wall_section_progress, 0, total)).assertIsDisplayed()
         composeRule.onNodeWithTag("achievement-VOLUME_MASTER").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun founderDetailIsBinaryAndDoesNotOfferPro() {
+        var openedPro = false
+        val board = AchievementBoardAssembler.assemble(
+            completedWorkoutCount = 0,
+            unlocks = emptyList(),
+            events = emptyList()
+        )
+        composeRule.setContent {
+            WeightTrackerThemeForPreview(seeds = ThemeSeeds.DefaultLight, darkTheme = true) {
+                AchievementsScreen(
+                    presentation = BadgeWallPresenter.present(board),
+                    onBack = {},
+                    onOpenPro = { openedPro = true },
+                    selectedBadgeId = AchievementId.FOUNDER
+                )
+            }
+        }
+        composeRule.onNodeWithTag("badge-detail-requirement").assertTextEquals(
+            testString(R.string.achievement_founder_requirement)
+        )
+        composeRule.onNodeWithTag("badge-detail-state").assertTextEquals(testString(R.string.badge_wall_locked))
+        composeRule.onAllNodesWithTag("badge-detail-pro-lock").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-detail-progress").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-detail-earned-date").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-pro-teaser").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-pro-FOUNDER", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-special-FOUNDER", useUnmergedTree = true).assertCountEquals(2)
+        assertFalse(openedPro)
     }
 
     @Test

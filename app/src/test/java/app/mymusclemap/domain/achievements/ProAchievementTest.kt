@@ -26,17 +26,21 @@ class ProAchievementTest {
     @Test
     fun catalogMarksOnlyTheTwoNewAchievementsAsPro() {
         assertEquals(
-            listOf(AchievementId.IRON_YEAR, AchievementId.VOLUME_MASTER),
+            listOf(AchievementId.IRON_DISCIPLINE, AchievementId.VOLUME_MASTER),
             AchievementCatalog.pro
         )
         assertTrue(AchievementCatalog.free.none { it.access == AchievementAccess.PRO })
-        assertTrue(AchievementCatalog.workoutCounts.none { it == AchievementId.IRON_YEAR || it.workoutThreshold == 250 })
+        assertTrue(AchievementCatalog.workoutCounts.none { it == AchievementId.IRON_DISCIPLINE || it.workoutThreshold == 250 })
         assertEquals(100, AchievementId.WORKOUTS_100.workoutThreshold)
         assertEquals(200, AchievementId.WORKOUTS_200.workoutThreshold)
-        assertEquals(250, AchievementId.IRON_YEAR.lifetimeWorkoutTarget)
-        assertFalse(AchievementId.IRON_YEAR.revokesWhenWorkoutCountDrops)
+        assertEquals(250, AchievementId.IRON_DISCIPLINE.lifetimeWorkoutTarget)
+        assertFalse(AchievementId.IRON_DISCIPLINE.revokesWhenWorkoutCountDrops)
         assertFalse(AchievementId.VOLUME_MASTER.revokesWhenWorkoutCountDrops)
-        assertEquals(AchievementCatalog.free.size + AchievementCatalog.pro.size, AchievementId.entries.size)
+        assertEquals(
+            AchievementCatalog.free.size + AchievementCatalog.pro.size + AchievementCatalog.special.size,
+            AchievementId.entries.size
+        )
+        assertNull(AchievementId.fromStorage("IRON_YEAR"))
     }
 
     @Test
@@ -92,16 +96,16 @@ class ProAchievementTest {
     }
 
     @Test
-    fun ironYearUsesTheTwoHundredFiftiethCompletedWorkout() {
+    fun ironDisciplineUsesTheTwoHundredFiftiethCompletedWorkout() {
         val short = List(249) { index -> plainWorkout(id = index + 1L, finishedAt = index + 1L) }
-        assertNull(ProAchievementEvaluator.ironYear(short))
-        val full = short + plainWorkout(id = 400, finishedAt = 8_000, client = "year")
-        val qualification = ProAchievementEvaluator.ironYear(full.reversed())
+        assertNull(ProAchievementEvaluator.ironDiscipline(short))
+        val full = short + plainWorkout(id = 400, finishedAt = 8_000, client = "two-fifty")
+        val qualification = ProAchievementEvaluator.ironDiscipline(full.reversed())
         assertEquals(8_000L, qualification!!.unlockedAt)
-        assertEquals("year", qualification.clientWorkoutId)
+        assertEquals("two-fifty", qualification.clientWorkoutId)
         val tiedEarlier = plainWorkout(id = 1, finishedAt = 10, client = "first")
         val tiedLater = List(249) { index -> plainWorkout(id = index + 2L, finishedAt = 10, client = "rest-$index") }
-        val tied = ProAchievementEvaluator.ironYear(listOf(tiedLater.last()) + tiedLater.dropLast(1) + tiedEarlier)
+        val tied = ProAchievementEvaluator.ironDiscipline(listOf(tiedLater.last()) + tiedLater.dropLast(1) + tiedEarlier)
         assertEquals("rest-248", tied!!.clientWorkoutId)
     }
 
@@ -140,8 +144,8 @@ class ProAchievementTest {
         val pending = live.insertUnlocks.single { it.celebratedAt == null }
         assertEquals(AchievementId.VOLUME_MASTER, pending.achievementId)
         assertEquals(5_000L, pending.unlockedAt)
-        assertEquals(4_000L, live.insertUnlocks.single { it.achievementId == AchievementId.IRON_YEAR }.unlockedAt)
-        assertEquals(1_000L, live.insertUnlocks.single { it.achievementId == AchievementId.IRON_YEAR }.celebratedAt)
+        assertEquals(4_000L, live.insertUnlocks.single { it.achievementId == AchievementId.IRON_DISCIPLINE }.unlockedAt)
+        assertEquals(1_000L, live.insertUnlocks.single { it.achievementId == AchievementId.IRON_DISCIPLINE }.celebratedAt)
 
         val stored = alreadyEarned + live.insertUnlocks.map { StoredUnlock(it.achievementId, it.celebratedAt) }
         val downgrade = AchievementReconciler.plan(
@@ -170,7 +174,7 @@ class ProAchievementTest {
             lifetimeVolumeKg = 50_000.0
         )
         assertTrue(BadgeWallPresenter.almostThere(partial).any { it.achievementId == AchievementId.VOLUME_MASTER })
-        assertTrue(BadgeWallPresenter.almostThere(partial).any { it.achievementId == AchievementId.IRON_YEAR })
+        assertTrue(BadgeWallPresenter.almostThere(partial).any { it.achievementId == AchievementId.IRON_DISCIPLINE })
         val complete = AchievementBoardAssembler.assemble(
             completedWorkoutCount = 250,
             unlocks = AchievementCatalog.workoutCounts.map {
@@ -181,7 +185,7 @@ class ProAchievementTest {
         )
         assertTrue(
             BadgeWallPresenter.almostThere(complete).none {
-                it.achievementId == AchievementId.VOLUME_MASTER || it.achievementId == AchievementId.IRON_YEAR
+                it.achievementId == AchievementId.VOLUME_MASTER || it.achievementId == AchievementId.IRON_DISCIPLINE
             }
         )
         assertEquals(
@@ -192,7 +196,7 @@ class ProAchievementTest {
 
     private fun satisfied(): List<ProQualification> {
         return listOf(
-            ProQualification(AchievementId.IRON_YEAR, 4_000L, "year"),
+            ProQualification(AchievementId.IRON_DISCIPLINE, 4_000L, "discipline"),
             ProQualification(AchievementId.VOLUME_MASTER, 5_000L, "cross")
         )
     }

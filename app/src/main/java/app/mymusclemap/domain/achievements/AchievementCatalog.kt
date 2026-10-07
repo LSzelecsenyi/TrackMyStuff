@@ -8,7 +8,9 @@ enum class AchievementCategory {
     CONSISTENCY,
     PERFORMANCE,
     JOURNEY,
-    GOALS
+    GOALS,
+    /** Section bucket for [AchievementAccess.SPECIAL]. Access, not this category, is the filter. */
+    SPECIAL
 }
 
 /** Awards that are the same badge at different lengths. Later tiers can be added here. */
@@ -28,7 +30,8 @@ enum class BadgeTier {
  */
 enum class AchievementAccess {
     FREE,
-    PRO
+    PRO,
+    SPECIAL
 }
 
 /** Lifetime product milestones. These are not numeric progress awards. */
@@ -100,7 +103,7 @@ enum class AchievementId(
     WEIGHT_PR(AchievementCategory.PERFORMANCE),
     REP_RECORD(AchievementCategory.PERFORMANCE),
     VOLUME_RECORD(AchievementCategory.PERFORMANCE),
-    IRON_YEAR(
+    IRON_DISCIPLINE(
         AchievementCategory.CONSISTENCY,
         access = AchievementAccess.PRO,
         lifetimeWorkoutTarget = 250
@@ -109,6 +112,10 @@ enum class AchievementId(
         AchievementCategory.PERFORMANCE,
         access = AchievementAccess.PRO,
         volumeThresholdKg = 100_000.0
+    ),
+    FOUNDER(
+        AchievementCategory.SPECIAL,
+        access = AchievementAccess.SPECIAL
     );
 
     val badgeKey: String = name
@@ -148,6 +155,16 @@ enum class AchievementId(
             require(workoutThreshold == null)
             require(lifetimeWorkoutTarget == null)
         }
+        if (category == AchievementCategory.SPECIAL || access == AchievementAccess.SPECIAL) {
+            require(category == AchievementCategory.SPECIAL)
+            require(access == AchievementAccess.SPECIAL)
+            require(workoutThreshold == null)
+            require(lifetimeWorkoutTarget == null)
+            require(volumeThresholdKg == null)
+            require(streakWeeks == null)
+            require(journeyMilestone == null)
+            require(badgeFamily == null)
+        }
     }
 
     /** Completed-workout target used for progress, including the sticky Pro milestone. */
@@ -171,6 +188,8 @@ object AchievementCatalog {
         .filter { it.category == AchievementCategory.PERFORMANCE }
 
     val pro: List<AchievementId> = AchievementId.entries.filter { it.access == AchievementAccess.PRO }
+
+    val special: List<AchievementId> = AchievementId.entries.filter { it.access == AchievementAccess.SPECIAL }
 
     val free: List<AchievementId> = AchievementId.entries.filter { it.access == AchievementAccess.FREE }
 

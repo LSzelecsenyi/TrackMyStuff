@@ -18,10 +18,10 @@ data class ProQualification(
 
 object ProAchievementEvaluator {
     const val VOLUME_MASTER_KG = 100_000.0
-    const val IRON_YEAR_WORKOUTS = 250
+    const val IRON_DISCIPLINE_WORKOUTS = 250
 
     fun qualifications(history: List<WorkoutSessionAggregate>): List<ProQualification> {
-        return listOfNotNull(ironYear(history), volumeMaster(history))
+        return listOfNotNull(ironDiscipline(history), volumeMaster(history))
     }
 
     fun lifetimeVolumeKg(history: List<WorkoutSessionAggregate>): Double {
@@ -30,11 +30,11 @@ object ProAchievementEvaluator {
         }
     }
 
-    fun ironYear(history: List<WorkoutSessionAggregate>): ProQualification? {
+    fun ironDiscipline(history: List<WorkoutSessionAggregate>): ProQualification? {
         val ordered = completed(history)
-        if (ordered.size < IRON_YEAR_WORKOUTS) return null
-        val crossing = ordered[IRON_YEAR_WORKOUTS - 1]
-        return qualification(AchievementId.IRON_YEAR, crossing)
+        if (ordered.size < IRON_DISCIPLINE_WORKOUTS) return null
+        val crossing = ordered[IRON_DISCIPLINE_WORKOUTS - 1]
+        return qualification(AchievementId.IRON_DISCIPLINE, crossing)
     }
 
     /**
