@@ -71,7 +71,9 @@ class EntitlementDebugOverrideTest {
         assertFalse(sources.founderLifetime.active)
         val resolved = resolve(adjusted)
         assertEquals(EntitlementTier.Pro, resolved.tier)
-        assertTrue(resolved.founderLifetime)
+        assertFalse(resolved.founderLifetime)
+        assertTrue(resolved.founderRecognized)
+        assertTrue(resolved.founderProActive)
         assertFalse(resolved.temporaryTesterPro)
         assertFalse(resolved.subscriptionValid)
         assertEquals(
@@ -93,7 +95,9 @@ class EntitlementDebugOverrideTest {
             EntitlementDebugOverride.adjust(sources, EntitlementOverrideMode.Founder)
         )
         assertEquals(EntitlementTier.Pro, resolved.tier)
-        assertTrue(resolved.founderLifetime)
+        assertFalse(resolved.founderLifetime)
+        assertTrue(resolved.founderRecognized)
+        assertTrue(resolved.founderProActive)
         assertTrue(resolved.subscriptionValid)
         assertFalse(resolved.temporaryTesterPro)
     }
@@ -223,11 +227,28 @@ class EntitlementDebugOverrideTest {
         )
         val resolved = composer.resolve()
         assertEquals(EntitlementTier.Pro, resolved.tier)
-        assertTrue(resolved.founderLifetime)
+        assertFalse(resolved.founderLifetime)
+        assertTrue(resolved.founderRecognized)
+        assertTrue(resolved.founderProActive)
         assertFalse(resolved.temporaryTesterPro)
         assertEquals(FounderProgramStatus.NotEnrolled, composer.sources().founderProgram.status)
         assertEquals(program, FounderProgramState(status = FounderProgramStatus.NotEnrolled))
         assertEquals(null, program.enrolledOn)
+    }
+
+    @Test
+    fun nonFounderHidesPromotionalProAndAutoLeavesItAlone() {
+        val expiresAt = now.plusSeconds(120)
+        val sources = EntitlementSources(
+            promotionalPro = PromotionalProEntitlement(expiresAt = expiresAt)
+        )
+        assertSame(sources, EntitlementDebugOverride.adjust(sources, EntitlementOverrideMode.Auto))
+        val hidden = EntitlementDebugOverride.adjust(sources, EntitlementOverrideMode.NonFounder)
+        assertFalse(resolve(hidden).grantsPro)
+        assertFalse(hidden.promotionalPro.isActive(now))
+        val founder = EntitlementDebugOverride.adjust(sources, EntitlementOverrideMode.Founder)
+        assertEquals(expiresAt, founder.promotionalPro.expiresAt)
+        assertTrue(resolve(founder).founderProActive)
     }
 
     private fun resolve(sources: EntitlementSources): EffectiveEntitlement {

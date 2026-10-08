@@ -126,6 +126,62 @@ class FounderApiIT {
     }
 
     @Test
+    void enrollmentStopsAtCapacityAndStaysIdempotentWhenFullOrClosed() {
+        assertEquals(2000, jdbc.queryForObject(
+                "select capacity from founder_program_capacity where id = 1",
+                Integer.class
+        ));
+        String existing = login("capacity-existing");
+        ok(post("/api/v1/founder/enrollment", "{}", existing));
+        try {
+            jdbc.update("update founder_program_capacity set capacity = enrolled_count where id = 1");
+            String blocked = login("capacity-blocked");
+            ResponseEntity<String> full = post("/api/v1/founder/enrollment", "{}", blocked);
+            assertEquals(HttpStatus.CONFLICT, full.getStatusCode());
+            assertEquals("ENROLLMENT_FULL", parse(full).get("errorCode"));
+            assertEquals(0, countApplications(userId(blocked)));
+            Map<String, Object> again = parse(ok(post("/api/v1/founder/enrollment", "{}", existing)));
+            assertEquals("ACTIVE_FREE", again.get("status"));
+
+            jdbc.update("update founder_program_capacity set enrollment_open = false where id = 1");
+            String afterClose = login("capacity-closed");
+            ResponseEntity<String> closed = post("/api/v1/founder/enrollment", "{}", afterClose);
+            assertEquals(HttpStatus.CONFLICT, closed.getStatusCode());
+            assertEquals("ENROLLMENT_CLOSED", parse(closed).get("errorCode"));
+            assertEquals("ACTIVE_FREE", parse(ok(post("/api/v1/founder/enrollment", "{}", existing))).get("status"));
+        } finally {
+            jdbc.update("update founder_program_capacity set capacity = 2000, enrollment_open = true where id = 1");
+        }
+    }
+
+    @Test
+    void concurrentEnrollmentCannotExceedTheRemainingSlot() throws Exception {
+        jdbc.update("update founder_program_capacity set capacity = enrolled_count + 1 where id = 1");
+        try {
+            String first = login("capacity-race-a");
+            String second = login("capacity-race-b");
+            List<Integer> statuses = race(
+                    () -> post("/api/v1/founder/enrollment", "{}", first),
+                    () -> post("/api/v1/founder/enrollment", "{}", second)
+            );
+            assertEquals(List.of(200, 409), statuses.stream().sorted().toList());
+            Integer enrolled = jdbc.queryForObject(
+                    "select enrolled_count from founder_program_capacity where id = 1",
+                    Integer.class
+            );
+            Integer capacity = jdbc.queryForObject(
+                    "select capacity from founder_program_capacity where id = 1",
+                    Integer.class
+            );
+            assertEquals(capacity, enrolled);
+            int applications = countApplications(userId(first)) + countApplications(userId(second));
+            assertEquals(1, applications);
+        } finally {
+            jdbc.update("update founder_program_capacity set capacity = 2000 where id = 1");
+        }
+    }
+
+    @Test
     void usersCannotSeeOrAdvanceEachOther() {
         String first = login("user-a");
         String second = login("user-b");

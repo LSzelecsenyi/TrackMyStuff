@@ -138,7 +138,7 @@ class FounderReviewIT {
     }
 
     @Test
-    void approvalGrantsLifetimeAtomicallyAndSurvivesANewLogin() {
+    void approvalGrantsTwelveMonthsOfProAndSurvivesANewLogin() {
         String user = pendingUser("lifetime-user");
         String userId = userId(user);
         Map<String, Object> before = parse(ok(get("/api/v1/entitlements", user)));
@@ -169,9 +169,25 @@ class FounderReviewIT {
 
         Map<String, Object> entitlements = parse(ok(get("/api/v1/entitlements", user)));
         assertEquals("PRO", entitlements.get("access"));
-        assertFlag(true, entitlements.get("founderLifetime"));
+        assertFlag(false, entitlements.get("founderLifetime"));
+        assertFlag(true, entitlements.get("founderRecognized"));
         assertFlag(false, entitlements.get("temporaryFounderPro"));
         assertNotNull(entitlements.get("founderGrantedAt"));
+        assertNotNull(entitlements.get("founderProExpiresAt"));
+        assertEquals(0, jdbc.queryForObject(
+                "select count(*) from entitlement_grant where user_id = ?::uuid and source = 'FOUNDER_LIFETIME'",
+                Integer.class,
+                userId
+        ));
+        assertEquals(1, jdbc.queryForObject(
+                "select count(*) from entitlement_grant where user_id = ?::uuid and source = 'FOUNDER_PRO'",
+                Integer.class,
+                userId
+        ));
+        assertEquals(0, jdbc.queryForObject(
+                "select count(*) from information_schema.tables where table_schema = 'public' and table_name = 'subscription'",
+                Integer.class
+        ));
         assertTrue(specialKeys(entitlements).stream().noneMatch("FOUNDER"::equals));
         assertEquals(0, jdbc.queryForObject(
                 "select count(*) from account_status_grant where user_id = ? and status = 'FOUNDER'",
@@ -179,15 +195,93 @@ class FounderReviewIT {
                 UUID.fromString(userId)
         ));
 
+        Instant grantedAt = Instant.parse(String.valueOf(entitlements.get("founderGrantedAt")));
+        Instant expiresAt = Instant.parse(String.valueOf(entitlements.get("founderProExpiresAt")));
+        assertEquals(grantedAt.atZone(java.time.ZoneOffset.UTC).plusMonths(12).toInstant(), expiresAt);
+        String expiresAtText = String.valueOf(entitlements.get("founderProExpiresAt"));
+        assertEquals(expiresAtText, String.valueOf(parse(ok(get("/api/v1/entitlements", user))).get("founderProExpiresAt")));
+
+        clock.set(expiresAt.minusNanos(1));
+        Map<String, Object> justBefore = parse(ok(get("/api/v1/entitlements", user)));
+        assertEquals("PRO", justBefore.get("access"));
+        assertEquals("APPROVED", parse(ok(get("/api/v1/founder", user))).get("status"));
+
+        clock.set(expiresAt);
+        String atExpirySession = login("lifetime-user", "lifetime-user");
+        Map<String, Object> atExpiry = parse(ok(get("/api/v1/entitlements", atExpirySession)));
+        assertEquals("FREE", atExpiry.get("access"));
+        assertFlag(true, atExpiry.get("founderRecognized"));
+        assertFlag(false, atExpiry.get("founderLifetime"));
+        assertFlag(false, atExpiry.get("temporaryFounderPro"));
+        assertEquals(expiresAtText, String.valueOf(atExpiry.get("founderProExpiresAt")));
+        assertEquals("APPROVED", parse(ok(get("/api/v1/founder", atExpirySession))).get("status"));
+
+        clock.set(expiresAt.plusSeconds(60));
+        String afterSession = login("lifetime-user", "lifetime-user");
+        Map<String, Object> after = parse(ok(get("/api/v1/entitlements", afterSession)));
+        assertEquals("FREE", after.get("access"));
+        assertFlag(true, after.get("founderRecognized"));
+        assertEquals("APPROVED", parse(ok(get("/api/v1/founder", afterSession))).get("status"));
+
         String reinstalled = login("lifetime-user", "lifetime-user");
         assertEquals(userId, userId(reinstalled));
         assertNotEquals(user, reinstalled);
         Map<String, Object> restored = parse(ok(get("/api/v1/entitlements", reinstalled)));
-        assertFlag(true, restored.get("founderLifetime"));
+        assertEquals("FREE", restored.get("access"));
+        assertFlag(false, restored.get("founderLifetime"));
+        assertFlag(true, restored.get("founderRecognized"));
         entityManager.clear();
         FounderReviewDecision reloaded = decisions.findByApplication_Id(UUID.fromString(applicationId)).orElseThrow();
         assertEquals("APPROVED", reloaded.getDecision());
         assertEquals(decision.get("reviewedBy"), reloaded.getAdminId().toString());
+    }
+
+    @Test
+    void anExistingLifetimeGrantIsLeftPermanent() {
+        String user = pendingUser("legacy-lifetime");
+        String userId = userId(user);
+        String applicationId = applicationId(userId);
+        String admin = adminLogin();
+        ok(post("/api/v1/admin/founder/applications/" + applicationId + "/approval", "{}", admin));
+        jdbc.update(
+                "update entitlement_grant set source = 'FOUNDER_LIFETIME', expires_at = null where user_id = ?::uuid",
+                userId
+        );
+        Map<String, Object> entitlements = parse(ok(get("/api/v1/entitlements", user)));
+        assertEquals("PRO", entitlements.get("access"));
+        assertFlag(true, entitlements.get("founderLifetime"));
+        assertFlag(true, entitlements.get("founderRecognized"));
+        assertEquals("null", String.valueOf(entitlements.get("founderProExpiresAt")));
+        clock.set(Instant.parse("2099-01-01T00:00:00Z"));
+        String laterSession = login("legacy-lifetime", "legacy-lifetime");
+        Map<String, Object> later = parse(ok(get("/api/v1/entitlements", laterSession)));
+        assertEquals("PRO", later.get("access"));
+        assertFlag(true, later.get("founderLifetime"));
+        assertEquals("APPROVED", parse(ok(get("/api/v1/founder", laterSession))).get("status"));
+    }
+
+    @Test
+    void adminCanCloseEnrollmentWithoutRemovingAnExistingParticipant() {
+        String existing = login("already-enrolled", "already-enrolled");
+        ok(post("/api/v1/founder/enrollment", "{}", existing));
+        String admin = adminLogin();
+        try {
+            Map<String, Object> closed = parse(ok(put(
+                    "/api/v1/admin/founder/enrollment",
+                    "{\"open\":false}",
+                    admin
+            )));
+            assertFlag(false, closed.get("open"));
+            assertEquals(2000, ((Number) closed.get("capacity")).intValue());
+            String blocked = login("after-close", "after-close");
+            ResponseEntity<String> rejected = post("/api/v1/founder/enrollment", "{}", blocked);
+            assertEquals(HttpStatus.CONFLICT, rejected.getStatusCode());
+            assertEquals("ENROLLMENT_CLOSED", parse(rejected).get("errorCode"));
+            Map<String, Object> again = parse(ok(post("/api/v1/founder/enrollment", "{}", existing)));
+            assertEquals("ACTIVE_FREE", again.get("status"));
+        } finally {
+            jdbc.update("update founder_program_capacity set enrollment_open = true");
+        }
     }
 
     @Test

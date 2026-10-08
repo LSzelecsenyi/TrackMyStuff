@@ -137,7 +137,16 @@ class MainActivity : ComponentActivity() {
                                 founderAvailability = container.founderProgramAvailability,
                                 founderProgram = founderViewModel,
                                 currentEntitlement = container.entitlementComposer::resolve,
-                                entitlementChanges = container.featureEntitlements.changes()
+                                entitlementChanges = container.featureEntitlements.changes(),
+                                founderApprovalCelebration = container::pendingFounderApprovalCelebration,
+                                onAcknowledgeFounderApproval = container::acknowledgeFounderApprovalCelebration,
+                                proBenefitsStatus = container::proBenefitsStatus,
+                                proDiscovery = container::proDiscoverySnapshot,
+                                promotionNow = container::promotionNow,
+                                onActivateProDiscovery = container::activateProDiscovery,
+                                onDismissProDiscoveryOffer = container::dismissProDiscoveryOffer,
+                                onDismissProDiscoveryWarning = container::dismissProDiscoveryWarning,
+                                onPromotionClock = container::notePromotionClock
                             )
                         }
                     }
@@ -155,6 +164,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             container.refreshFounderProgramFromStore()
             container.refreshFounderAuthority()
+            container.refreshPromotionAvailability()
         }
     }
 

@@ -30,24 +30,40 @@ data class FounderProgramSnapshot(
     val status: FounderProgramStatus = FounderProgramStatus.NotEnrolled
 )
 
+/**
+ * Promotional Pro from the 60-day discovery trial.
+ * Active only while [now] is strictly before [expiresAt]. There is no renewal.
+ */
+data class PromotionalProEntitlement(
+    val expiresAt: Instant? = null
+) {
+    fun isActive(now: Instant): Boolean {
+        val until = expiresAt ?: return false
+        return now.isBefore(until)
+    }
+}
+
 data class EntitlementSources(
     val subscription: SubscriptionEntitlement = SubscriptionEntitlement(),
     val founderLifetime: FounderLifetimeEntitlement = FounderLifetimeEntitlement(),
     val founderProgram: FounderProgramSnapshot = FounderProgramSnapshot(),
-    val backendFounder: BackendFounderEntitlement = BackendFounderEntitlement()
+    val backendFounder: BackendFounderEntitlement = BackendFounderEntitlement(),
+    val promotionalPro: PromotionalProEntitlement = PromotionalProEntitlement()
 ) {
     companion object {
         fun of(
             subscription: SubscriptionEntitlement = SubscriptionEntitlement(),
             founderLifetime: FounderLifetimeEntitlement = FounderLifetimeEntitlement(),
             program: FounderProgramState = FounderProgramState(),
-            backendFounder: BackendFounderEntitlement = BackendFounderEntitlement()
+            backendFounder: BackendFounderEntitlement = BackendFounderEntitlement(),
+            promotionalPro: PromotionalProEntitlement = PromotionalProEntitlement()
         ): EntitlementSources {
             return EntitlementSources(
                 subscription = subscription,
                 founderLifetime = founderLifetime,
                 founderProgram = FounderProgramSnapshot(program.status),
-                backendFounder = backendFounder
+                backendFounder = backendFounder,
+                promotionalPro = promotionalPro
             )
         }
     }

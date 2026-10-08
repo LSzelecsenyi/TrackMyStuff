@@ -58,6 +58,32 @@ require(strictEntitlementOverride in allowedEntitlementOverrides) {
     "strict.entitlementOverride must be AUTO, FOUNDER, or NON_FOUNDER. " +
         "Found \"$strictEntitlementOverride\"."
 }
+val allowedProDiscoveryModes = setOf("REAL", "ELIGIBLE", "ACTIVE", "EXPIRED")
+val strictProDiscovery = optionalBuildValue(
+    "strict.debug.proDiscovery",
+    "STRICT_DEBUG_PRO_DISCOVERY"
+) ?: "REAL"
+require(strictProDiscovery in allowedProDiscoveryModes) {
+    "strict.debug.proDiscovery must be REAL, ELIGIBLE, ACTIVE, or EXPIRED. " +
+        "Found \"$strictProDiscovery\"."
+}
+
+fun optionalDebugSeconds(propertyName: String, envName: String): String {
+    val raw = optionalBuildValue(propertyName, envName) ?: return ""
+    require(raw.toLongOrNull()?.let { it >= 0 } == true) {
+        "$propertyName must be a non-negative integer. Found \"$raw\"."
+    }
+    return raw
+}
+
+val strictProDiscoveryExpiresInSeconds = optionalDebugSeconds(
+    "strict.debug.proDiscoveryExpiresInSeconds",
+    "STRICT_DEBUG_PRO_DISCOVERY_EXPIRES_IN_SECONDS"
+)
+val strictProDiscoveryWarningBeforeSeconds = optionalDebugSeconds(
+    "strict.debug.proDiscoveryWarningBeforeSeconds",
+    "STRICT_DEBUG_PRO_DISCOVERY_WARNING_BEFORE_SECONDS"
+)
 
 fun releaseSigningValue(propertyName: String, envName: String): String? {
     System.getenv(envName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -135,6 +161,17 @@ android {
                 "STRICT_ENTITLEMENT_OVERRIDE",
                 buildConfigString(strictEntitlementOverride)
             )
+            buildConfigField("String", "STRICT_PRO_DISCOVERY", buildConfigString(strictProDiscovery))
+            buildConfigField(
+                "String",
+                "STRICT_PRO_DISCOVERY_EXPIRES_IN_SECONDS",
+                buildConfigString(strictProDiscoveryExpiresInSeconds)
+            )
+            buildConfigField(
+                "String",
+                "STRICT_PRO_DISCOVERY_WARNING_BEFORE_SECONDS",
+                buildConfigString(strictProDiscoveryWarningBeforeSeconds)
+            )
         }
     }
 
@@ -186,6 +223,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
         filter {
             includeTestsMatching("app.mymusclemap.FounderProgramRuleSelectionTest")
             includeTestsMatching("app.mymusclemap.EntitlementOverrideSelectionReleaseTest")
+            includeTestsMatching("app.mymusclemap.ProDiscoveryDebugSelectionReleaseTest")
         }
     }
     systemProperty("demo.backup.write", (findProperty("demo.backup.write") ?: "false").toString())

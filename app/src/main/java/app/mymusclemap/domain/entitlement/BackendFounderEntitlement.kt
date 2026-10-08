@@ -18,7 +18,11 @@ data class BackendFounderEntitlement(
     val validUntil: Instant? = null,
     val userId: String? = null,
     val founderGrantedAt: Instant? = null,
-    val specialGrants: List<SpecialAchievementGrant> = emptyList()
+    val specialGrants: List<SpecialAchievementGrant> = emptyList(),
+    /** Approved Founding Member. Stays true after Founder Pro expires. */
+    val founderRecognized: Boolean = false,
+    /** End of the 12-month Founder Pro grant. Null when that grant is absent. */
+    val founderProExpiresAt: Instant? = null
 ) {
     fun trusted(now: Instant): BackendFounderEntitlement {
         val until = validUntil ?: return BackendFounderEntitlement()
@@ -26,6 +30,12 @@ data class BackendFounderEntitlement(
             return BackendFounderEntitlement()
         }
         return this
+    }
+
+    /** Founder Pro ends at [founderProExpiresAt] even when the cache itself is still trusted. */
+    fun founderProActive(now: Instant): Boolean {
+        val expiresAt = founderProExpiresAt ?: return false
+        return now.isBefore(expiresAt)
     }
 
     fun specialGrantedAtMillis(key: String): Long? {

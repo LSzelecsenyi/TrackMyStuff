@@ -82,6 +82,8 @@ sealed interface FounderEnrollmentCall {
     data object NoSession : FounderEnrollmentCall
     /** Bearer was rejected. The stored session has been cleared. */
     data object Unauthenticated : FounderEnrollmentCall
+    data object Closed : FounderEnrollmentCall
+    data object Full : FounderEnrollmentCall
     data object Rejected : FounderEnrollmentCall
     data object Unavailable : FounderEnrollmentCall
 }
@@ -107,7 +109,9 @@ sealed interface FounderEntitlementCall {
         val temporaryFounderPro: Boolean,
         val founderLifetime: Boolean,
         val founderGrantedAt: java.time.Instant? = null,
-        val specialAchievements: List<app.mymusclemap.domain.entitlement.SpecialAchievementGrant> = emptyList()
+        val specialAchievements: List<app.mymusclemap.domain.entitlement.SpecialAchievementGrant> = emptyList(),
+        val founderRecognized: Boolean = false,
+        val founderProExpiresAt: java.time.Instant? = null
     ) : FounderEntitlementCall
     data object NoSession : FounderEntitlementCall
     data object Unauthenticated : FounderEntitlementCall

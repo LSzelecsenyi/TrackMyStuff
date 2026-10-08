@@ -318,6 +318,65 @@ class AchievementsScreenTest {
     }
 
     @Test
+    fun completedProBadgeUsesTheOrdinaryLockedAppearanceUntilProReturns() {
+        val historical = 2_000L
+        val locked = proVolumeBoard(grantsPro = false, unlockedAt = historical)
+        val lockedItem = BadgeWallPresenter.present(locked).item(AchievementId.VOLUME_MASTER)!!
+        assertFalse(lockedItem.unlocked)
+        assertTrue(lockedItem.requirementMet)
+        assertEquals(historical, lockedItem.unlockedAt)
+        composeRule.setContent {
+            WeightTrackerThemeForPreview(seeds = ThemeSeeds.DefaultLight, darkTheme = true) {
+                AchievementsScreen(
+                    presentation = BadgeWallPresenter.present(locked),
+                    onBack = {},
+                    selectedBadgeId = AchievementId.VOLUME_MASTER
+                )
+            }
+        }
+        composeRule.onNodeWithTag("badge-detail-state").assertTextEquals(testString(R.string.badge_wall_locked))
+        composeRule.onAllNodesWithTag("achievement-badge-locked-VOLUME_MASTER").assertCountEquals(1)
+        composeRule.onAllNodesWithTag("achievement-badge-unlocked-VOLUME_MASTER").assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.badge_wall_requirement_complete)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.badge_wall_unlock_with_pro)).assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-detail-pro-lock").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-detail-earned-date").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-detail-progress").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("badge-pro-teaser").assertCountEquals(0)
+    }
+
+    @Test
+    fun completedProBadgeLooksEarnedAgainWhenProReturns() {
+        val historical = 2_000L
+        val restored = proVolumeBoard(grantsPro = true, unlockedAt = historical)
+        val restoredItem = BadgeWallPresenter.present(restored).item(AchievementId.VOLUME_MASTER)!!
+        assertTrue(restoredItem.unlocked)
+        assertEquals(historical, restoredItem.unlockedAt)
+        composeRule.setContent {
+            WeightTrackerThemeForPreview(seeds = ThemeSeeds.DefaultLight, darkTheme = true) {
+                AchievementsScreen(
+                    presentation = BadgeWallPresenter.present(restored),
+                    onBack = {},
+                    selectedBadgeId = AchievementId.VOLUME_MASTER
+                )
+            }
+        }
+        composeRule.onNodeWithTag("badge-detail-state").assertTextEquals(testString(R.string.badge_wall_earned))
+        composeRule.onAllNodesWithTag("achievement-badge-unlocked-VOLUME_MASTER").assertCountEquals(1)
+        composeRule.onAllNodesWithTag("achievement-badge-locked-VOLUME_MASTER").assertCountEquals(0)
+        composeRule.onNodeWithTag("badge-detail-earned-date").assertIsDisplayed()
+    }
+
+    private fun proVolumeBoard(grantsPro: Boolean, unlockedAt: Long) =
+        AchievementBoardAssembler.assemble(
+            completedWorkoutCount = 0,
+            unlocks = listOf(UnlockSnapshot(AchievementId.VOLUME_MASTER, unlockedAt, unlockedAt, null)),
+            events = emptyList(),
+            lifetimeVolumeKg = 100_000.0,
+            grantsPro = grantsPro
+        )
+
+    @Test
     fun realisticProgressKeepsEarnedAndLockedArtworkDistinctInLight() {
         realisticProgress(dark = false)
     }

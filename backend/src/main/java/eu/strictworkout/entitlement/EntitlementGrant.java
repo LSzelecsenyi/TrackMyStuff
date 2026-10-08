@@ -19,6 +19,7 @@ import java.util.UUID;
 public class EntitlementGrant {
 
     public static final String FOUNDER_LIFETIME = "FOUNDER_LIFETIME";
+    public static final String FOUNDER_PRO = "FOUNDER_PRO";
 
     @Id
     private UUID id;
@@ -42,16 +43,21 @@ public class EntitlementGrant {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
     protected EntitlementGrant() {
     }
 
     public EntitlementGrant(UUID id, eu.strictworkout.identity.AppUser user, FounderApplication application, Instant grantedAt) {
         this.id = id;
         this.user = user;
-        this.source = FOUNDER_LIFETIME;
+        this.source = FOUNDER_PRO;
         this.application = application;
         this.grantedAt = grantedAt;
         this.createdAt = grantedAt;
+        this.expiresAt = FounderProTerm.expiresAt(grantedAt);
     }
 
     public String getSource() {
@@ -60,5 +66,17 @@ public class EntitlementGrant {
 
     public Instant getGrantedAt() {
         return grantedAt;
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public boolean legacyLifetime() {
+        return FOUNDER_LIFETIME.equals(source);
+    }
+
+    public boolean founderProActive(Instant now) {
+        return FOUNDER_PRO.equals(source) && FounderProTerm.active(expiresAt, now);
     }
 }

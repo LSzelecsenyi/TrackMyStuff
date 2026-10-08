@@ -20,6 +20,7 @@ class WeightTrackerApplication : Application() {
         applicationScope.launch {
             container.refreshFounderProgramFromStore()
             container.restoreFounderEntitlementCache()
+            container.refreshPromotionAvailability()
             container.refreshFounderAuthority()
             container.appBackupRepository.recoverInterruptedPhotoRestore()
             container.achievementRepository.reconcile()

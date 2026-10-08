@@ -109,6 +109,11 @@ class OkHttpStrictBackendApi(
                     sessions.clear()
                     FounderEnrollmentCall.Unauthenticated
                 }
+                response.code == 409 -> when (errorCode(response)) {
+                    "ENROLLMENT_CLOSED" -> FounderEnrollmentCall.Closed
+                    "ENROLLMENT_FULL" -> FounderEnrollmentCall.Full
+                    else -> FounderEnrollmentCall.Rejected
+                }
                 !response.isSuccessful -> FounderEnrollmentCall.Rejected
                 else -> BackendFounderSnapshot.parse(response.body.string(), zone)
                     ?.let { FounderEnrollmentCall.Enrolled(it) }
@@ -299,8 +304,16 @@ internal fun parseEntitlementPayload(raw: String): FounderEntitlementCall? {
         return null
     }
     val founderLifetime = json.optBoolean("founderLifetime", false)
+    val founderRecognized = json.optBoolean("founderRecognized", false)
+    val founderProExpiresAt = if (!json.has("founderProExpiresAt") || json.isNull("founderProExpiresAt")) {
+        null
+    } else {
+        runCatching { Instant.parse(json.getString("founderProExpiresAt")) }.getOrNull()
+    }
     val founderGrantedAt = if (
-        !founderLifetime || !json.has("founderGrantedAt") || json.isNull("founderGrantedAt")
+        (!founderLifetime && !founderRecognized && founderProExpiresAt == null) ||
+        !json.has("founderGrantedAt") ||
+        json.isNull("founderGrantedAt")
     ) {
         null
     } else {
@@ -322,6 +335,8 @@ internal fun parseEntitlementPayload(raw: String): FounderEntitlementCall? {
         temporaryFounderPro = json.optBoolean("temporaryFounderPro", false),
         founderLifetime = founderLifetime,
         founderGrantedAt = founderGrantedAt,
-        specialAchievements = specials
+        specialAchievements = specials,
+        founderRecognized = founderRecognized,
+        founderProExpiresAt = founderProExpiresAt
     )
 }

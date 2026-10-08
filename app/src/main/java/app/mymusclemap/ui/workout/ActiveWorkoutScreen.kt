@@ -54,9 +54,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -254,12 +254,23 @@ fun ActiveWorkoutScreen(
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
     }
-    BackHandler(enabled = state.discarding) { }
-    LaunchedEffect(state.finished, state.completionSummary) {
-        val summary = state.completionSummary
-        if (state.finished && summary != null) {
-            onFinished(summary)
-        }
+    val completionSummary = state.completionSummary
+    val readyToOpenCompletion = state.finished &&
+        completionSummary != null &&
+        state.pendingFinishCount == null
+    var openedCompletion by remember { mutableStateOf(false) }
+    // The finish dialog is removed in the same turn the session becomes completed.
+    // Swallow back until that dialog is gone and this destination has been replaced,
+    // so its dismissal cannot pop the completion screen.
+    BackHandler(
+        enabled = state.discarding || (state.finished && completionSummary != null)
+    ) { }
+    LaunchedEffect(readyToOpenCompletion, completionSummary) {
+        if (!readyToOpenCompletion || completionSummary == null || openedCompletion) return@LaunchedEffect
+        withFrameNanos { }
+        withFrameNanos { }
+        openedCompletion = true
+        onFinished(completionSummary)
     }
     LaunchedEffect(state.abandoned) {
         if (state.abandoned) onAbandoned()

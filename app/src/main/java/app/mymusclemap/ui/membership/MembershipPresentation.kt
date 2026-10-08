@@ -38,7 +38,7 @@ fun membershipPresentation(
     entitlement: EffectiveEntitlement,
     founderStatus: FounderProgramStatus
 ): MembershipPresentation {
-    if (entitlement.founderLifetime) {
+    if (entitlement.founderRecognized && entitlement.grantsPro) {
         return MembershipPresentation(MembershipBadge.Founder, MembershipDetail.FoundingMember)
     }
     if (!entitlement.grantsPro) {

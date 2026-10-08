@@ -42,6 +42,7 @@ import app.mymusclemap.domain.workout.ActualSetLogic
 import app.mymusclemap.domain.workout.ExerciseHistorySelection
 import app.mymusclemap.domain.workout.ExerciseHistorySet
 import app.mymusclemap.domain.workout.InWorkoutExerciseHistory
+import app.mymusclemap.domain.workout.WorkoutCompletionSummary
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.SessionExercise
@@ -705,6 +706,7 @@ class ActiveWorkoutScreenLayoutTest {
         onComplete: (Long) -> Unit = {},
         onSkip: (Long) -> Unit = {},
         onReps: (Long, String) -> Unit = { _, _ -> },
+        onFinished: (WorkoutCompletionSummary) -> Unit = {},
         backDispatcher: AtomicReference<OnBackPressedDispatcher?>? = null
     ) {
         composeRule.setContent {
@@ -745,7 +747,7 @@ class ActiveWorkoutScreenLayoutTest {
                             onRequestAbandon = onRequestAbandon,
                             onDismissAbandon = {},
                             onConfirmAbandon = {},
-                            onFinished = { _ -> },
+                            onFinished = onFinished,
                             onAbandoned = {},
                             onMessageConsumed = {},
                             onFocusConsumed = {}
@@ -809,6 +811,41 @@ class ActiveWorkoutScreenLayoutTest {
                 }
             }
         )
+    }
+
+    @Test
+    fun finishDialogStaysUntilCompletionNavigationIsAllowed() {
+        val opened = AtomicInteger(0)
+        render(
+            state = completedState().copy(
+                finished = true,
+                finishing = true,
+                pendingFinishCount = 0,
+                completionSummary = WorkoutCompletionSummary(1, 1, 1_000L, "cw-1")
+            ),
+            width = 360.dp,
+            fontScale = 1f,
+            onFinished = { opened.incrementAndGet() }
+        )
+        assertEquals(0, opened.get())
+    }
+
+    @Test
+    fun completionOpensOnceAfterTheFinishDialogIsGone() {
+        val opened = AtomicInteger(0)
+        render(
+            state = completedState().copy(
+                finished = true,
+                finishing = true,
+                completionSummary = WorkoutCompletionSummary(1, 1, 1_000L, "cw-1")
+            ),
+            width = 360.dp,
+            fontScale = 1f,
+            onFinished = { opened.incrementAndGet() }
+        )
+        assertEquals(1, opened.get())
+        composeRule.waitForIdle()
+        assertEquals(1, opened.get())
     }
 
     private fun completedState(): ActiveWorkoutUiState {

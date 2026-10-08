@@ -52,13 +52,22 @@ public class EntitlementController {
     @Transactional(readOnly = true)
     public EntitlementResponse current() {
         UUID userId = StrictRequests.current().userId();
+        Instant now = clock.instant();
         FounderStatus status = applications.findIdByUserId(userId)
                 .flatMap(applications::findById)
                 .map(this::evaluatedStatus)
                 .orElse(null);
-        var founder = grants.findByUser_IdAndSource(userId, EntitlementGrant.FOUNDER_LIFETIME);
-        boolean lifetime = founder.isPresent();
-        EffectiveEntitlement entitlement = EffectiveEntitlement.resolve(status, lifetime);
+        List<EntitlementGrant> founderGrants = grants.findByUser_Id(userId);
+        EntitlementGrant legacy = founderGrants.stream().filter(EntitlementGrant::legacyLifetime).findFirst().orElse(null);
+        EntitlementGrant founderPro = founderGrants.stream()
+                .filter(grant -> EntitlementGrant.FOUNDER_PRO.equals(grant.getSource()))
+                .findFirst()
+                .orElse(null);
+        boolean lifetime = legacy != null;
+        boolean founderProActive = founderPro != null && founderPro.founderProActive(now);
+        EffectiveEntitlement entitlement = EffectiveEntitlement.resolve(status, lifetime, founderProActive, false);
+        EntitlementGrant recognition = founderPro != null ? founderPro : legacy;
+        boolean founderRecognized = status == FounderStatus.APPROVED || recognition != null;
         List<SpecialAchievementResponse> specials = accountStatuses.findByUser_IdOrderByStatusAsc(userId)
                 .stream()
                 .map(grant -> new SpecialAchievementResponse(grant.getStatus().name(), grant.getGrantedAt()))
@@ -67,8 +76,10 @@ public class EntitlementController {
                 entitlement.access(),
                 entitlement.founderLifetime(),
                 entitlement.temporaryFounderPro(),
-                founder.map(EntitlementGrant::getGrantedAt).orElse(null),
-                specials
+                recognition == null ? null : recognition.getGrantedAt(),
+                specials,
+                founderRecognized,
+                founderPro == null ? null : founderPro.getExpiresAt()
         );
     }
 
@@ -90,7 +101,9 @@ public class EntitlementController {
             boolean founderLifetime,
             boolean temporaryFounderPro,
             Instant founderGrantedAt,
-            List<SpecialAchievementResponse> specialAchievements
+            List<SpecialAchievementResponse> specialAchievements,
+            boolean founderRecognized,
+            Instant founderProExpiresAt
     ) {
     }
 

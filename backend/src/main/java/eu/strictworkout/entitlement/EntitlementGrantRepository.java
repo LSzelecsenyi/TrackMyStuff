@@ -2,6 +2,7 @@ package eu.strictworkout.entitlement;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -10,4 +11,6 @@ public interface EntitlementGrantRepository extends JpaRepository<EntitlementGra
     boolean existsByUser_IdAndSource(UUID userId, String source);
 
     Optional<EntitlementGrant> findByUser_IdAndSource(UUID userId, String source);
+
+    List<EntitlementGrant> findByUser_Id(UUID userId);
 }

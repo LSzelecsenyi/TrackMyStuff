@@ -162,6 +162,14 @@ abstract class WorkoutSessionDao {
 
     @Query(
         """
+        SELECT COALESCE(finishedAt, startedAt) FROM workout_sessions
+        WHERE status = 'COMPLETED' AND importFingerprint IS NULL
+        """
+    )
+    abstract suspend fun nativeCompletionEpochMillis(): List<Long>
+
+    @Query(
+        """
         SELECT e.* FROM workout_session_exercises e
         INNER JOIN workout_sessions s ON s.id = e.sessionId
         WHERE s.status = 'COMPLETED'

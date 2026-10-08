@@ -250,6 +250,22 @@ class WorkoutSessionRepository(
         )
     }
 
+    /** Completed session for a client workout id. In-progress and unknown ids return null. */
+    suspend fun completedAggregate(clientWorkoutId: String): WorkoutSessionAggregate? {
+        if (clientWorkoutId.isBlank()) return null
+        val session = sessionDao.getByClientWorkoutId(clientWorkoutId) ?: return null
+        if (session.status != SessionStatus.COMPLETED.name) return null
+        return getAggregate(session.id)
+    }
+
+    /** Completed history used to compare a finished workout with earlier performances. */
+    suspend fun completedAggregates(): List<WorkoutSessionAggregate> {
+        val sessions = sessionDao.getCompletedSessions()
+        val exercises = sessionDao.getCompletedExercises()
+        val sets = sessionDao.getCompletedSets()
+        return sessions.map { session -> toAggregate(session, exercises, sets, emptyList()) }
+    }
+
     /**
      * Read-only lookup of one previous occurrence for [exercise]. Actual recorded
      * values are used. Planned values and set drafts are not read.

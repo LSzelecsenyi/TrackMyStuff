@@ -29,7 +29,7 @@
       <strict-state kind="content">
         <p class="kicker">Founder application</p>
         <header class="surface header">
-          <p class="badge">Status: {{ statusLabel(review.application.status) }}</p>
+          <p class="badge" [attr.data-status]="review.application.status">Status: {{ statusLabel(review.application.status) }}</p>
           <h1>{{ emailLabel(review.tester.email) }}</h1>
           <dl class="facts">
             <div>
@@ -192,7 +192,7 @@
         <section class="surface decision" aria-labelledby="decision">
           <h2 id="decision">Decision</h2>
           @if (review.decision; as decision) {
-            <p class="badge">Decision: {{ decisionLabel(decision.decision) }}</p>
+            <p class="badge" [attr.data-status]="decision.decision">Decision: {{ decisionLabel(decision.decision) }}</p>
             <dl class="facts">
               <div>
                 <dt>Decided</dt>
@@ -234,7 +234,7 @@
               (keydown.escape)="cancelEditor($event)"
             >
               <h3 id="approve-title">Approve this Founding Tester?</h3>
-              <p>Approval grants this tester permanent Founder Lifetime access.</p>
+              <p>Approval grants 12 months of Pro. Founding Member status remains after that Pro ends.</p>
               @if (actionError(); as message) {
                 <p class="action-error" role="alert">{{ message }}</p>
               }
@@ -259,7 +259,7 @@
               (keydown.escape)="cancelEditor($event)"
             >
               <h3 id="reject-title">Reject this Founding Tester?</h3>
-              <p>Rejection keeps this application closed and does not grant Founder Lifetime.</p>
+              <p>Rejection keeps this application closed and does not grant Pro.</p>
               <label for="rejection-reason">Rejection reason</label>
               <textarea
                 id="rejection-reason"

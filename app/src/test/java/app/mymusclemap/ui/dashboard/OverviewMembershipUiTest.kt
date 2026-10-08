@@ -80,7 +80,7 @@ class OverviewMembershipUiTest {
         composeRule.onAllNodesWithText(testString(R.string.membership_badge_pro)).assertCountEquals(0)
         composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).assertDoesNotExist()
         composeRule.onNodeWithTag(OVERVIEW_MEMBERSHIP_BADGE).performClick()
-        composeRule.onNodeWithText(testString(R.string.founder_lifetime_pro)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_pro_active)).assertIsDisplayed()
     }
 
     @Test

@@ -103,6 +103,16 @@ class AppNavigationTest {
     }
 
     @Test
+    fun proBenefitsOpensWithoutDuplicatingAndHidesBottomBar() {
+        val fromOverview = AppNavigation.openProBenefits(AppRoutes.OVERVIEW)
+        assertEquals(AppRoutes.PRO_BENEFITS, fromOverview.targetRoute)
+        assertEquals(AppRoutes.OVERVIEW, fromOverview.backTarget)
+        assertTrue(fromOverview.shouldPush)
+        assertFalse(AppNavigation.openProBenefits(AppRoutes.PRO_BENEFITS).shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRO_BENEFITS))
+    }
+
+    @Test
     fun proInfoOpensWithoutDuplicatingAndHidesBottomBar() {
         val fromSettings = AppNavigation.openProInfo(AppRoutes.SETTINGS)
         assertEquals(AppRoutes.PRO_INFO, fromSettings.targetRoute)

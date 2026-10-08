@@ -135,6 +135,49 @@ class EntitlementResolverTest {
     }
 
     @Test
+    fun founderProEndsAtItsExpirationEvenWhileTheCacheIsStillTrusted() {
+        val expiresAt = now.plusSeconds(60)
+        val cached = BackendFounderEntitlement(
+            founderRecognized = true,
+            founderGrantedAt = now.minusSeconds(86_400),
+            founderProExpiresAt = expiresAt,
+            validUntil = now.plusSeconds(86_400)
+        )
+        val before = resolve(backend = cached.copy(), now = expiresAt.minusNanos(1))
+        assertEquals(EntitlementTier.Pro, before.tier)
+        assertTrue(before.founderProActive)
+        assertTrue(before.founderRecognized)
+        assertFalse(before.founderLifetime)
+        val atExpiry = EntitlementResolver.resolve(
+            EntitlementSources.of(backendFounder = cached),
+            expiresAt
+        )
+        assertEquals(EntitlementTier.Free, atExpiry.tier)
+        assertFalse(atExpiry.founderProActive)
+        assertTrue(atExpiry.founderRecognized)
+        val later = EntitlementResolver.resolve(
+            EntitlementSources.of(backendFounder = cached),
+            expiresAt.plusSeconds(1)
+        )
+        assertEquals(EntitlementTier.Free, later.tier)
+        assertTrue(later.founderRecognized)
+        assertFalse(later.temporaryTesterPro)
+    }
+
+    private fun resolve(
+        subscriptionUntil: Instant? = null,
+        founderLifetime: Boolean = false,
+        program: FounderProgramState = FounderProgramState(),
+        backend: BackendFounderEntitlement = BackendFounderEntitlement(),
+        now: Instant = this.now
+    ): EffectiveEntitlement {
+        return EntitlementResolver.resolve(
+            resolveSources(subscriptionUntil, founderLifetime, program, backend),
+            now
+        )
+    }
+
+    @Test
     fun backendLifetimeResolvesToProWithoutTemporaryPro() {
         val resolved = resolve(
             backend = BackendFounderEntitlement(
@@ -211,18 +254,6 @@ class EntitlementResolverTest {
             status = FounderProgramStatus.ActivePro,
             enrolledOn = LocalDate.of(2026, 1, 1),
             deadline = LocalDate.of(2026, 2, 15)
-        )
-    }
-
-    private fun resolve(
-        subscriptionUntil: Instant? = null,
-        founderLifetime: Boolean = false,
-        program: FounderProgramState = FounderProgramState(),
-        backend: BackendFounderEntitlement = BackendFounderEntitlement()
-    ): EffectiveEntitlement {
-        return EntitlementResolver.resolve(
-            resolveSources(subscriptionUntil, founderLifetime, program, backend),
-            now
         )
     }
 

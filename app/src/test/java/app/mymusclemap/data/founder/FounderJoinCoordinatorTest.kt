@@ -137,6 +137,26 @@ class FounderJoinCoordinatorTest {
     }
 
     @Test
+    fun closedAndFullEnrollmentStayDistinct() = runBlocking {
+        val google = CountingGoogle(GoogleIdTokenRequest.Issued(GoogleIdTokenValue("google-id-token")))
+        withJoin(google) { server, sessions, join, applied ->
+            sessions.write(stored("existing-bearer"))
+            server.enqueue(MockResponse().setBody("""{"id":"$userId"}"""))
+            server.enqueue(MockResponse().setResponseCode(409).setBody("""{"errorCode":"ENROLLMENT_CLOSED"}"""))
+            assertEquals(FounderJoinResult.Closed, join.join())
+            assertEquals(0, google.calls)
+            assertTrue(applied.isEmpty())
+        }
+        withJoin(google) { server, sessions, join, applied ->
+            sessions.write(stored("existing-bearer"))
+            server.enqueue(MockResponse().setBody("""{"id":"$userId"}"""))
+            server.enqueue(MockResponse().setResponseCode(409).setBody("""{"errorCode":"ENROLLMENT_FULL"}"""))
+            assertEquals(FounderJoinResult.Full, join.join())
+            assertTrue(applied.isEmpty())
+        }
+    }
+
+    @Test
     fun aRejectedBearerIsClearedAndGoogleCanReplaceIt() = runBlocking {
         val google = CountingGoogle(GoogleIdTokenRequest.Issued(GoogleIdTokenValue("google-id-token")))
         withJoin(google) { server, sessions, join, applied ->

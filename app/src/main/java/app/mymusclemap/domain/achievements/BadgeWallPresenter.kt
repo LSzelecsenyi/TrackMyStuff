@@ -39,7 +39,8 @@ enum class BadgeVisualState {
 fun BadgeWallItem.visualState(): BadgeVisualState {
     return when {
         unlocked -> BadgeVisualState.EARNED
-        access == AchievementAccess.PRO && requirementMet -> BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED
+        // A completed Pro requirement without active Pro uses the ordinary locked look.
+        access == AchievementAccess.PRO && requirementMet -> BadgeVisualState.LOCKED
         progressStarted() -> BadgeVisualState.LOCKED_PROGRESS
         else -> BadgeVisualState.LOCKED
     }

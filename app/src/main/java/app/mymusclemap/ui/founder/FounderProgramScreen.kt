@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -33,11 +35,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -75,7 +82,8 @@ fun FounderProgramScreen(
     onResumeSession: () -> Unit = {},
     onFeedbackChange: (String) -> Unit,
     onSubmitReport: () -> Unit,
-    onAcknowledgeMilestone: () -> Unit
+    onAcknowledgeMilestone: () -> Unit,
+    bottomContentInsets: WindowInsets = WindowInsets.ime.union(WindowInsets.navigationBars)
 ) {
     Scaffold(
         modifier = Modifier
@@ -113,7 +121,9 @@ fun FounderProgramScreen(
                 CircularProgressIndicator(modifier = Modifier.padding(AppDimens.screenPadding))
                 return@Column
             }
-            if (state.journey.milestone != null) {
+            if (state.journey.milestone != null &&
+                state.journey.milestone != FounderMilestone.FounderApproved
+            ) {
                 FounderMilestoneDialog(
                     state = state,
                     onAcknowledge = onAcknowledgeMilestone
@@ -122,9 +132,8 @@ fun FounderProgramScreen(
             Column(
                 modifier = Modifier
                     .weight(1f)
+                    .windowInsetsPadding(bottomContentInsets)
                     .verticalScroll(rememberScrollState())
-                    .navigationBarsPadding()
-                    .imePadding()
                     .padding(horizontal = AppDimens.screenPadding)
             ) {
                 if (state.journey.phase == FounderJourneyPhase.Welcome) {
@@ -295,6 +304,8 @@ private fun joinNoticeText(notice: FounderJoinNotice): String? {
         FounderJoinNotice.None -> return null
         FounderJoinNotice.GoogleFailed -> R.string.founder_join_google_failed
         FounderJoinNotice.Unavailable -> R.string.founder_join_unavailable
+        FounderJoinNotice.Closed -> R.string.founder_join_closed
+        FounderJoinNotice.Full -> R.string.founder_join_full
         FounderJoinNotice.Rejected -> R.string.founder_join_rejected
         FounderJoinNotice.NotConfigured -> R.string.founder_join_not_configured
     }
@@ -407,7 +418,9 @@ private fun PendingCopy() {
 private fun MemberCopy() {
     FounderBadge()
     Spacer(Modifier.height(AppDimens.itemGap))
-    Headline(stringResource(R.string.founder_lifetime_pro), tag = FOUNDER_STATUS)
+    Headline(stringResource(R.string.founder_member_title), tag = FOUNDER_STATUS)
+    Spacer(Modifier.height(AppDimens.itemGap))
+    BodyText(stringResource(R.string.founder_member_pro))
     Spacer(Modifier.height(AppDimens.itemGap))
     BodyText(stringResource(R.string.founder_milestone_member_helped))
 }
@@ -588,7 +601,12 @@ internal fun FounderTrainingCompleteDialog(
             }
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 BodyText(stringResource(R.string.founder_milestone_training_body))
                 Spacer(Modifier.height(AppDimens.itemGap))
                 BodyText(stringResource(R.string.founder_milestone_training_next))
@@ -723,6 +741,14 @@ private fun TesterReportSection(
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    var fieldFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(fieldFocused, imeBottom) {
+        if (fieldFocused && imeBottom > 0) {
+            bringIntoViewRequester.bringIntoView()
+        }
+    }
     Spacer(Modifier.height(AppDimens.sectionGap))
     CompactEditorSection(
         title = stringResource(R.string.founder_report_title),
@@ -735,13 +761,14 @@ private fun TesterReportSection(
             onValueChange = onFeedbackChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag(FOUNDER_FEEDBACK_FIELD)
                 .bringIntoViewRequester(bringIntoViewRequester)
                 .onFocusChanged { focus ->
+                    fieldFocused = focus.isFocused
                     if (focus.isFocused) {
                         scope.launch { bringIntoViewRequester.bringIntoView() }
                     }
-                },
+                }
+                .testTag(FOUNDER_FEEDBACK_FIELD),
             label = { Text(stringResource(R.string.founder_feedback_hint)) },
             isError = state.feedbackBlank || state.feedbackTooLong,
             supportingText = when {

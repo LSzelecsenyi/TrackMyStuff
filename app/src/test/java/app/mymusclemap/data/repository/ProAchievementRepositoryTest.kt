@@ -74,7 +74,7 @@ class ProAchievementRepositoryTest {
         val locked = repository.board().items.single { it.id == AchievementId.VOLUME_MASTER }
         assertFalse(locked.unlocked)
         assertTrue(locked.requirementMet)
-        assertEquals(BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED, locked.visualState())
+        assertEquals(BadgeVisualState.LOCKED, locked.visualState())
         assertEquals(100_000.0, locked.volumeProgress!!.currentKg, 0.0)
         assertTrue(repository.board().pending.none { it is PendingCelebration.ProUnlocked })
         assertNull(unlockOrNull(AchievementId.VOLUME_MASTER))
@@ -91,7 +91,8 @@ class ProAchievementRepositoryTest {
         val downgraded = repository.board().items.single { it.id == AchievementId.VOLUME_MASTER }
         assertFalse(downgraded.unlocked)
         assertTrue(downgraded.requirementMet)
-        assertEquals(BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED, downgraded.visualState())
+        assertEquals(BadgeVisualState.LOCKED, downgraded.visualState())
+        assertEquals(earnedAt, downgraded.unlockedAt)
         assertEquals(100_000.0, downgraded.volumeProgress!!.currentKg, 0.0)
         assertEquals(earnedAt, unlockAt(AchievementId.VOLUME_MASTER))
         assertTrue(repository.board().pending.none { it is PendingCelebration.ProUnlocked })

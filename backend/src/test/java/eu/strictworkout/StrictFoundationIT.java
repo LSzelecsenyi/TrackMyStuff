@@ -95,6 +95,7 @@ class StrictFoundationIT {
                 "external_identity",
                 "flyway_schema_history",
                 "founder_application",
+                "founder_program_capacity",
                 "founder_review_decision",
                 "founder_review_snapshot",
                 "founder_workout_event"

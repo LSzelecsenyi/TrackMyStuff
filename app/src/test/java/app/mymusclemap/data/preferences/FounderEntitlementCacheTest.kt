@@ -55,6 +55,36 @@ class FounderEntitlementCacheTest {
     }
 
     @Test
+    fun cachedFounderProCannotOutliveItsExpiration() = runBlocking {
+        val expiresAt = Instant.parse("2027-03-15T18:45:01Z")
+        cache.save(
+            temporaryFounderPro = false,
+            founderLifetime = false,
+            validUntil = expiresAt.plusSeconds(86_400),
+            userId = "account-a",
+            founderGrantedAt = Instant.parse("2026-03-15T18:45:01Z"),
+            founderRecognized = true,
+            founderProExpiresAt = expiresAt
+        )
+        val stored = cache.current()
+        assertTrue(stored.founderRecognized)
+        assertEquals(expiresAt, stored.founderProExpiresAt)
+        val before = app.mymusclemap.domain.entitlement.EntitlementResolver.resolve(
+            app.mymusclemap.domain.entitlement.EntitlementSources.of(backendFounder = stored),
+            expiresAt.minusNanos(1)
+        )
+        val atExpiry = app.mymusclemap.domain.entitlement.EntitlementResolver.resolve(
+            app.mymusclemap.domain.entitlement.EntitlementSources.of(backendFounder = stored),
+            expiresAt
+        )
+        assertTrue(before.grantsPro)
+        assertTrue(before.founderRecognized)
+        assertFalse(atExpiry.grantsPro)
+        assertTrue(atExpiry.founderRecognized)
+        assertFalse(atExpiry.founderLifetime)
+    }
+
+    @Test
     fun rejectedBearerDropsTheTrustedCache() = runBlocking {
         cache.save(
             temporaryFounderPro = false,

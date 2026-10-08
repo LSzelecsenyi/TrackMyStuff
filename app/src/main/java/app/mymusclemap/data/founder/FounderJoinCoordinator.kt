@@ -14,6 +14,8 @@ enum class FounderJoinResult {
     GoogleFailed,
     NotConfigured,
     Unavailable,
+    Closed,
+    Full,
     Rejected,
     InProgress
 }
@@ -60,6 +62,8 @@ class FounderJoinCoordinator(
                 }
                 FounderEnrollmentCall.Unauthenticated -> usedGoogle = usedGoogle
                 FounderEnrollmentCall.NoSession -> Unit
+                FounderEnrollmentCall.Closed -> return FounderJoinResult.Closed
+                FounderEnrollmentCall.Full -> return FounderJoinResult.Full
                 FounderEnrollmentCall.Rejected -> return FounderJoinResult.Rejected
                 FounderEnrollmentCall.Unavailable -> return FounderJoinResult.Unavailable
             }

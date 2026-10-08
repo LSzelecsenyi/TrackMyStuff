@@ -38,5 +38,26 @@ class EffectiveEntitlementTest {
         assertEquals(EntitlementAccess.PRO, subscription.access());
         assertFalse(subscription.founderLifetime());
         assertFalse(subscription.temporaryFounderPro());
+        assertFalse(subscription.founderProActive());
+    }
+
+    @Test
+    void founderProEndsAtExpirationAndDoesNotOutrankALegacyLifetimeGrant() {
+        EffectiveEntitlement active = EffectiveEntitlement.resolve(FounderStatus.APPROVED, false, true, false);
+        assertEquals(EntitlementAccess.PRO, active.access());
+        assertTrue(active.founderProActive());
+        assertFalse(active.founderLifetime());
+        assertFalse(active.temporaryFounderPro());
+
+        EffectiveEntitlement expired = EffectiveEntitlement.resolve(FounderStatus.APPROVED, false, false, false);
+        assertEquals(EntitlementAccess.FREE, expired.access());
+        assertFalse(expired.founderProActive());
+        assertFalse(expired.temporaryFounderPro());
+
+        EffectiveEntitlement legacy = EffectiveEntitlement.resolve(FounderStatus.APPROVED, true, true, false);
+        assertEquals(EntitlementAccess.PRO, legacy.access());
+        assertTrue(legacy.founderLifetime());
+        assertFalse(legacy.founderProActive());
+        assertFalse(legacy.temporaryFounderPro());
     }
 }

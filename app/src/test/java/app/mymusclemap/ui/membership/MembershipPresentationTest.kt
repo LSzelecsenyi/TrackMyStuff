@@ -3,6 +3,7 @@ package app.mymusclemap.ui.membership
 import app.mymusclemap.data.appbackup.AppBackupFormat
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
+import app.mymusclemap.domain.entitlement.BackendFounderEntitlement
 import app.mymusclemap.domain.entitlement.EntitlementResolver
 import app.mymusclemap.domain.entitlement.EntitlementSources
 import app.mymusclemap.domain.entitlement.FounderProgramAvailability
@@ -125,7 +126,11 @@ class MembershipPresentationTest {
     @Test
     fun badgeAndAcknowledgementDoNotGrantOrRemovePro() {
         val sources = EntitlementSources.of(
-            program = FounderProgramState(status = FounderProgramStatus.ActivePro)
+            program = FounderProgramState(status = FounderProgramStatus.ActivePro),
+            backendFounder = BackendFounderEntitlement(
+                temporaryFounderPro = true,
+                validUntil = later
+            )
         )
         val before = EntitlementResolver.resolve(sources, now)
         val acknowledged = FounderMilestoneAcknowledgements(temporaryProUnlocked = true)
@@ -162,14 +167,45 @@ class MembershipPresentationTest {
         assertEquals(null, journey.milestone)
     }
 
+    @Test
+    fun expiredFounderProDropsTheMembershipMark() {
+        val expired = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                backendFounder = BackendFounderEntitlement(
+                    founderRecognized = true,
+                    founderGrantedAt = earlier,
+                    founderProExpiresAt = now,
+                    validUntil = later
+                )
+            ),
+            now
+        )
+        assertTrue(expired.founderRecognized)
+        assertFalse(expired.grantsPro)
+        assertFalse(expired.founderLifetime)
+        assertEquals(
+            MembershipPresentation.None,
+            membershipPresentation(expired, FounderProgramStatus.Approved)
+        )
+    }
+
     private fun present(
         status: FounderProgramStatus,
         subscriptionUntil: Instant? = null
     ): MembershipPresentation {
+        val temporary = status == FounderProgramStatus.ActivePro || status == FounderProgramStatus.PendingApproval
+        val recognized = status == FounderProgramStatus.Approved
         val entitlement = EntitlementResolver.resolve(
             EntitlementSources.of(
                 subscription = SubscriptionEntitlement(paidUntilInclusive = subscriptionUntil),
-                program = FounderProgramState(status = status)
+                program = FounderProgramState(status = status),
+                backendFounder = BackendFounderEntitlement(
+                    temporaryFounderPro = temporary,
+                    founderRecognized = recognized,
+                    founderGrantedAt = if (recognized) now else null,
+                    founderProExpiresAt = if (recognized) later else null,
+                    validUntil = if (temporary || recognized) later else null
+                )
             ),
             now
         )

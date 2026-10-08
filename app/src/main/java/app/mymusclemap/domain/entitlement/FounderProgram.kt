@@ -11,7 +11,7 @@ enum class FounderProgramStatus {
     Expired,
     Rejected;
 
-    /** Temporary Tester Pro. Approved uses Founder Lifetime instead. */
+    /** Temporary Tester Pro during qualification and review. Approval uses the Founder Pro grant. */
     fun grantsTemporaryPro(): Boolean {
         return this == ActivePro || this == PendingApproval
     }

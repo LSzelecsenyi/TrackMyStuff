@@ -83,6 +83,10 @@ describe('Founder detail route', () => {
     expect(names).toEqual(['Later day', 'Untitled workout']);
     expect(text.indexOf('Later day')).toBeLessThan(text.indexOf('Untitled workout'));
     expect(text).toContain('1h 1m');
+    expect(text).toContain('Exercises');
+    expect(text).toContain('4');
+    expect(text).toContain('Completed sets');
+    expect(text).toContain('12');
     expect(text).toContain(formatLocalDate('2026-06-02'));
     expect(text).toContain('From a template');
     expect(text).toContain('External load used');

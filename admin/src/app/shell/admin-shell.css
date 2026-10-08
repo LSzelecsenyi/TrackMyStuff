@@ -22,8 +22,9 @@
   gap: var(--strict-space-item) var(--strict-space-section);
   min-height: var(--strict-nav);
   padding: var(--strict-space-item) var(--strict-space-screen);
-  background: var(--strict-surface);
-  border-bottom: 1px solid var(--strict-divider);
+  background: var(--strict-navy);
+  color: #f4f7fb;
+  border-bottom: 1px solid transparent;
 }
 
 .brand {
@@ -40,17 +41,16 @@
   flex-direction: column;
 }
 
-.wordmark {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.3px;
-  line-height: 26px;
+.brand-mark {
+  display: block;
+  height: 36px;
+  width: auto;
 }
 
 .admin-label {
-  color: var(--strict-text-secondary);
+  color: var(--strict-lime);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 1.4px;
   line-height: 16px;
   text-transform: uppercase;
@@ -68,13 +68,34 @@ nav a {
   min-height: var(--strict-control);
   padding: 0 12px;
   border-radius: var(--strict-radius-compact);
-  color: var(--strict-text-secondary);
+  color: #c5ced6;
   text-decoration: none;
 }
 
+nav a:hover {
+  color: #f4f7fb;
+  background: rgb(226 253 109 / 12%);
+}
+
 nav a.active {
-  color: var(--strict-primary);
-  box-shadow: inset 0 -2px 0 var(--strict-primary);
+  color: var(--strict-lime);
+  background: rgb(226 253 109 / 16%);
+  box-shadow: inset 0 -2px 0 var(--strict-lime);
+}
+
+.topbar .button {
+  background: transparent;
+  color: #f4f7fb;
+  border-color: rgb(244 247 251 / 28%);
+}
+
+.topbar .button:hover {
+  color: var(--strict-lime);
+  border-color: var(--strict-lime);
+}
+
+.topbar :focus-visible {
+  outline-color: var(--strict-lime);
 }
 
 .topbar-actions {

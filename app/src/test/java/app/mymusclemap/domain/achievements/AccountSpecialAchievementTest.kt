@@ -30,7 +30,7 @@ class AccountSpecialAchievementTest {
         val trusted = board(
             unlocks = emptyList(),
             authority = AccountAchievementAuthority(
-                founderLifetime = true,
+                founderRecognized = true,
                 founderGrantedAtMillis = grantedMillis,
                 earlyAdopterGrantedAtMillis = grantedMillis,
                 developerGrantedAtMillis = grantedMillis
@@ -55,7 +55,7 @@ class AccountSpecialAchievementTest {
     @Test
     fun switchingAccountDropsThePreviousSpecialBadges() {
         val accountA = AccountAchievementAuthority(
-            founderLifetime = true,
+            founderRecognized = true,
             founderGrantedAtMillis = grantedMillis,
             earlyAdopterGrantedAtMillis = grantedMillis,
             developerGrantedAtMillis = grantedMillis
@@ -134,7 +134,7 @@ class AccountSpecialAchievementTest {
             assertTrue(id.name, badge.requirementMet)
             assertFalse(id.name, badge.unlocked)
             assertEquals(id.name, historical, badge.unlockedAt)
-            assertEquals(BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED, badge.visualState())
+            assertEquals(BadgeVisualState.LOCKED, badge.visualState())
         }
         assertTrue(item(free, AchievementId.WORKOUTS_10).unlocked)
         assertTrue(free.pending.none { it is PendingCelebration.ProUnlocked })
@@ -163,6 +163,27 @@ class AccountSpecialAchievementTest {
         }
         assertTrue(item(pro, AchievementId.WORKOUTS_10).unlocked)
         assertTrue(pro.pending.none { it is PendingCelebration.ProUnlocked })
+
+        val founderStillEarned = board(
+            unlocks = emptyList(),
+            authority = AccountAchievementAuthority(
+                founderRecognized = true,
+                founderGrantedAtMillis = grantedMillis
+            ),
+            grantsPro = false,
+            workouts = 250,
+            volume = 100_000.0,
+            stored = unlocks
+        )
+        assertTrue(item(founderStillEarned, AchievementId.FOUNDER).unlocked)
+        assertEquals(grantedMillis, item(founderStillEarned, AchievementId.FOUNDER).unlockedAt)
+        assertEquals(BadgeVisualState.EARNED, item(founderStillEarned, AchievementId.FOUNDER).visualState())
+        assertFalse(item(founderStillEarned, AchievementId.VOLUME_MASTER).unlocked)
+        assertEquals(historical, item(founderStillEarned, AchievementId.VOLUME_MASTER).unlockedAt)
+        assertEquals(
+            BadgeVisualState.LOCKED,
+            item(founderStillEarned, AchievementId.VOLUME_MASTER).visualState()
+        )
         assertEquals(listOf(10, 25, 50, 100), AchievementCatalog.prHunter.map { it.prHunterTarget })
         assertEquals(listOf(100, 250, 500, 1000), AchievementCatalog.exerciseMastery.map { it.masterySetTarget })
         assertEquals(listOf(4, 8, 12, 26, 52), AchievementCatalog.weeklyStreaks.map { it.streakWeeks })

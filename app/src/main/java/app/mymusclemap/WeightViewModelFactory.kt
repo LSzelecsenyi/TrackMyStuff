@@ -51,6 +51,7 @@ import app.mymusclemap.ui.statistics.StatisticsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
 import app.mymusclemap.ui.templates.TemplateListViewModel
 import app.mymusclemap.ui.workout.ActiveWorkoutViewModel
+import app.mymusclemap.ui.workout.WorkoutCompletionViewModel
 import app.mymusclemap.ui.workout.WorkoutHubViewModel
 import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
 import kotlinx.coroutines.flow.Flow
@@ -228,6 +229,9 @@ class WeightViewModelFactory(
             }
             modelClass.isAssignableFrom(HealthConnectViewModel::class.java) -> {
                 HealthConnectViewModel(healthRepository, dateProvider)
+            }
+            modelClass.isAssignableFrom(WorkoutCompletionViewModel::class.java) -> {
+                WorkoutCompletionViewModel(workoutSessionRepository)
             }
             modelClass.isAssignableFrom(AchievementsViewModel::class.java) -> {
                 AchievementsViewModel(checkNotNull(achievementRepository))

@@ -3,7 +3,9 @@ package app.mymusclemap
 import app.mymusclemap.domain.entitlement.BackendFounderEntitlement
 import app.mymusclemap.domain.entitlement.EntitlementSources
 import app.mymusclemap.domain.entitlement.FounderLifetimeEntitlement
+import app.mymusclemap.domain.entitlement.PromotionalProEntitlement
 import app.mymusclemap.domain.entitlement.SubscriptionEntitlement
+import java.time.Instant
 
 /**
  * Debug composition only. Release uses a different source file whose [adjust] is identity.
@@ -21,12 +23,21 @@ object EntitlementDebugOverride {
         return when (mode) {
             EntitlementOverrideMode.Auto -> sources
             EntitlementOverrideMode.Founder -> sources.copy(
-                founderLifetime = FounderLifetimeEntitlement(active = true)
+                founderLifetime = FounderLifetimeEntitlement(),
+                backendFounder = sources.backendFounder.copy(
+                    temporaryFounderPro = false,
+                    founderLifetime = false,
+                    founderRecognized = true,
+                    founderGrantedAt = sources.backendFounder.founderGrantedAt ?: Instant.EPOCH,
+                    founderProExpiresAt = Instant.parse("9999-12-31T00:00:00Z"),
+                    validUntil = Instant.parse("9999-12-31T00:00:00Z")
+                )
             )
             EntitlementOverrideMode.NonFounder -> sources.copy(
                 subscription = SubscriptionEntitlement(),
                 founderLifetime = FounderLifetimeEntitlement(),
-                backendFounder = BackendFounderEntitlement()
+                backendFounder = BackendFounderEntitlement(),
+                promotionalPro = PromotionalProEntitlement()
             )
         }
     }

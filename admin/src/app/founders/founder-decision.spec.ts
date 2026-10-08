@@ -45,7 +45,7 @@ describe('Founder review decisions', () => {
     await open(pending());
     click('Approve');
     expect(text()).toContain('Approve this Founding Tester?');
-    expect(text()).toContain('permanent Founder Lifetime access');
+    expect(text()).toContain('12 months of Pro');
     expect(postCount()).toBe(0);
 
     click('Cancel');

@@ -278,6 +278,102 @@ class PerformanceRecordTest {
     }
 
     @Test
+    fun aSingleFirstPerformanceIsNotAHighlight() {
+        val baseline = weighted("bench", exerciseId = 1, finishedAt = 100, weight = 60.0, reps = 8)
+        assertTrue(PerformanceRecordEvaluator.highlightsFor(listOf(baseline), "bench").isEmpty())
+        assertTrue(PerformanceRecordEvaluator.events(listOf(baseline)).isEmpty())
+    }
+
+    @Test
+    fun aLaterSetInTheFirstWorkoutCanBeatThatWorkoutsOwnBaseline() {
+        val session = twoWeights(client = "bench", sessionId = 1, finishedAt = 100, first = 20.0, second = 25.0)
+        val highlights = PerformanceRecordEvaluator.highlightsFor(listOf(session), "bench")
+        val highlight = highlights.single()
+        assertEquals(PerformanceRecordKind.WEIGHT, highlight.kind)
+        assertEquals(20.0, highlight.previous, 0.0)
+        assertEquals(25.0, highlight.current, 0.0)
+        assertEquals(1, PerformanceRecordEvaluator.events(listOf(session)).size)
+    }
+
+    @Test
+    fun laterWeightRepAndVolumeRecordsReportPreviousAndNewValues() {
+        val first = weighted("first", exerciseId = 1, finishedAt = 100, weight = 20.0, reps = 8, kind = PlannedLoadKind.ADDED_WEIGHT)
+        val second = weighted(
+            "second",
+            exerciseId = 1,
+            finishedAt = 200,
+            weight = 25.0,
+            reps = 12,
+            sessionId = 2,
+            kind = PlannedLoadKind.ADDED_WEIGHT
+        )
+        val highlights = PerformanceRecordEvaluator.highlightsFor(listOf(first, second), "second")
+        val weight = highlights.single { it.kind == PerformanceRecordKind.WEIGHT }
+        val reps = highlights.single { it.kind == PerformanceRecordKind.REPS }
+        val volume = highlights.single { it.kind == PerformanceRecordKind.VOLUME }
+        assertEquals("Exercise 1", weight.exerciseName)
+        assertEquals(20.0, weight.previous, 0.0)
+        assertEquals(25.0, weight.current, 0.0)
+        assertEquals(HighlightMeasure.ADDED_KG, weight.measure)
+        assertEquals(8.0, reps.previous, 0.0)
+        assertEquals(12.0, reps.current, 0.0)
+        assertEquals(160.0, volume.previous, 0.0)
+        assertEquals(300.0, volume.current, 0.0)
+        assertEquals(3, highlights.size)
+    }
+
+    @Test
+    fun perSideWeightHighlightsUseTheDoubledComparableLoad() {
+        val first = weighted(
+            "side",
+            exerciseId = 1,
+            finishedAt = 100,
+            weight = 20.0,
+            reps = 5,
+            interpretation = WeightInterpretation.PER_SIDE
+        )
+        val second = weighted(
+            "side-2",
+            exerciseId = 1,
+            finishedAt = 200,
+            weight = 25.0,
+            reps = 5,
+            sessionId = 2,
+            interpretation = WeightInterpretation.PER_SIDE
+        )
+        val highlight = PerformanceRecordEvaluator.highlightsFor(listOf(first, second), "side-2")
+            .single { it.kind == PerformanceRecordKind.WEIGHT }
+        assertEquals(40.0, highlight.previous, 0.0)
+        assertEquals(50.0, highlight.current, 0.0)
+        assertEquals(HighlightMeasure.PER_SIDE_TOTAL_KG, highlight.measure)
+    }
+
+    @Test
+    fun aLaterRecordIsHighlightedAfterTheBadgeWasAlreadyEarned() {
+        val baseline = weighted("base", exerciseId = 1, finishedAt = 100, weight = 40.0, reps = 5)
+        val firstRecord = weighted("first-record", exerciseId = 1, finishedAt = 200, weight = 50.0, reps = 5, sessionId = 2)
+        val later = weighted("later", exerciseId = 1, finishedAt = 300, weight = 60.0, reps = 5, sessionId = 3)
+        val history = listOf(baseline, firstRecord, later)
+        val badge = PerformanceRecordEvaluator.qualifications(history).single { it.achievementId == AchievementId.WEIGHT_PR }
+        assertEquals(200L, badge.unlockedAt)
+        val highlight = PerformanceRecordEvaluator.highlightsFor(history, "later").single { it.kind == PerformanceRecordKind.WEIGHT }
+        assertEquals(50.0, highlight.previous, 0.0)
+        assertEquals(60.0, highlight.current, 0.0)
+        assertEquals(2, PerformanceRecordEvaluator.events(history).count { it.kind == PerformanceRecordKind.WEIGHT })
+    }
+
+    @Test
+    fun severalImprovementsInOneWorkoutCollapseToThePreviousBestAndTheNewBest() {
+        val baseline = weighted("base", exerciseId = 1, finishedAt = 100, weight = 20.0, reps = 5)
+        val climbing = twoWeights(client = "climb", sessionId = 2, finishedAt = 200, first = 22.0, second = 25.0)
+        val history = listOf(baseline, climbing)
+        assertEquals(2, PerformanceRecordEvaluator.events(history).count { it.kind == PerformanceRecordKind.WEIGHT })
+        val highlight = PerformanceRecordEvaluator.highlightsFor(history, "climb").single { it.kind == PerformanceRecordKind.WEIGHT }
+        assertEquals(20.0, highlight.previous, 0.0)
+        assertEquals(25.0, highlight.current, 0.0)
+    }
+
+    @Test
     fun anEarnedPerformanceAchievementIsNotRevokedWhenHistoryDisappears() {
         val stored = listOf(
             StoredUnlock(AchievementId.FIRST_PR, celebratedAt = 1L),
@@ -308,6 +404,26 @@ class PerformanceRecordTest {
             triggerClientWorkoutId = trigger,
             performanceQualifications = performance
         )
+    }
+
+    private fun twoWeights(
+        client: String,
+        sessionId: Long,
+        finishedAt: Long,
+        first: Double,
+        second: Double
+    ): WorkoutSessionAggregate {
+        val session = weighted(
+            client = client,
+            exerciseId = 1,
+            finishedAt = finishedAt,
+            weight = first,
+            reps = 5,
+            sessionId = sessionId
+        )
+        val opening = session.exercises[0].sets[0]
+        val followUp = opening.copy(id = opening.id + 1, position = 1, actualWeightKg = second, plannedWeightKg = second)
+        return session.copy(exercises = listOf(session.exercises[0].copy(sets = listOf(opening, followUp))))
     }
 
     private fun weighted(

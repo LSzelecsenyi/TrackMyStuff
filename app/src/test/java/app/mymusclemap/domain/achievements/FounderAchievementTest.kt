@@ -104,7 +104,7 @@ class FounderAchievementTest {
             unlocks = listOf(UnlockSnapshot(AchievementId.FOUNDER, 5_000L, 5_000L, null)),
             events = emptyList(),
             accountAuthority = AccountAchievementAuthority(
-                founderLifetime = true,
+                founderRecognized = true,
                 founderGrantedAtMillis = grantedAt
             )
         )
@@ -132,7 +132,7 @@ class FounderAchievementTest {
             completedWorkoutCount = 0,
             unlocks = emptyList(),
             events = emptyList(),
-            accountAuthority = AccountAchievementAuthority(founderLifetime = true, founderGrantedAtMillis = 5_000L)
+            accountAuthority = AccountAchievementAuthority(founderRecognized = true, founderGrantedAtMillis = 5_000L)
         )
         assertEquals(BadgeVisualState.EARNED, earned.items.single { it.id == AchievementId.FOUNDER }.visualState())
         assertTrue(earned.pending.none { celebration ->

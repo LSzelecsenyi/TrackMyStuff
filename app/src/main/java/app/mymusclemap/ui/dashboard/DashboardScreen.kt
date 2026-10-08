@@ -746,7 +746,7 @@ private fun MembershipInfoDialog(
     val body = when (detail) {
         MembershipDetail.TemporaryFounderPro -> stringResource(R.string.membership_temporary_pro_body)
         MembershipDetail.PendingFounderReview -> stringResource(R.string.membership_pending_pro_body)
-        MembershipDetail.FoundingMember -> stringResource(R.string.founder_lifetime_pro)
+        MembershipDetail.FoundingMember -> stringResource(R.string.founder_pro_active)
         MembershipDetail.Pro -> stringResource(R.string.membership_generic_pro_body)
     }
     AlertDialog(

@@ -81,7 +81,9 @@ class FounderEntitlementCache(
         validUntil: Instant,
         userId: String,
         founderGrantedAt: Instant? = null,
-        specialGrants: List<SpecialAchievementGrant> = emptyList()
+        specialGrants: List<SpecialAchievementGrant> = emptyList(),
+        founderRecognized: Boolean = false,
+        founderProExpiresAt: Instant? = null
     ) {
         if (userId.isBlank()) {
             return
@@ -92,7 +94,9 @@ class FounderEntitlementCache(
             validUntil = validUntil,
             userId = userId,
             founderGrantedAt = founderGrantedAt,
-            specialGrants = specialGrants.filter { it.key == "EARLY_ADOPTER" || it.key == "DEVELOPER" }
+            specialGrants = specialGrants.filter { it.key == "EARLY_ADOPTER" || it.key == "DEVELOPER" },
+            founderRecognized = founderRecognized,
+            founderProExpiresAt = founderProExpiresAt
         )
         mutex.withLock {
             generation.incrementAndGet()
@@ -106,6 +110,12 @@ class FounderEntitlementCache(
                     prefs.remove(KEY_FOUNDER_GRANTED_AT)
                 } else {
                     prefs[KEY_FOUNDER_GRANTED_AT] = founderGrantedAt.toEpochMilli()
+                }
+                prefs[KEY_RECOGNIZED] = founderRecognized
+                if (founderProExpiresAt == null) {
+                    prefs.remove(KEY_PRO_EXPIRES_AT)
+                } else {
+                    prefs[KEY_PRO_EXPIRES_AT] = founderProExpiresAt.toEpochMilli()
                 }
                 prefs[KEY_SPECIALS] = encodeSpecials(next.specialGrants)
             }
@@ -128,6 +138,8 @@ class FounderEntitlementCache(
                 prefs.remove(KEY_LIFETIME)
                 prefs.remove(KEY_VALID_UNTIL)
                 prefs.remove(KEY_FOUNDER_GRANTED_AT)
+                prefs.remove(KEY_RECOGNIZED)
+                prefs.remove(KEY_PRO_EXPIRES_AT)
                 prefs.remove(KEY_SPECIALS)
             }
         }
@@ -144,7 +156,9 @@ class FounderEntitlementCache(
             validUntil = Instant.ofEpochMilli(until),
             userId = userId,
             founderGrantedAt = founderGrantedAt,
-            specialGrants = decodeSpecials(prefs[KEY_SPECIALS])
+            specialGrants = decodeSpecials(prefs[KEY_SPECIALS]),
+            founderRecognized = prefs[KEY_RECOGNIZED] == true,
+            founderProExpiresAt = prefs[KEY_PRO_EXPIRES_AT]?.let(Instant::ofEpochMilli)
         )
     }
 
@@ -174,6 +188,8 @@ class FounderEntitlementCache(
         private val KEY_LIFETIME = booleanPreferencesKey("founder_lifetime")
         private val KEY_VALID_UNTIL = longPreferencesKey("valid_until_epoch_milli")
         private val KEY_FOUNDER_GRANTED_AT = longPreferencesKey("founder_granted_at_epoch_milli")
+        private val KEY_RECOGNIZED = booleanPreferencesKey("founder_recognized")
+        private val KEY_PRO_EXPIRES_AT = longPreferencesKey("founder_pro_expires_at_epoch_milli")
         private val KEY_SPECIALS = stringPreferencesKey("special_achievements")
     }
 }

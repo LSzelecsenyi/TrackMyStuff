@@ -25,7 +25,7 @@
         @for (application of applications(); track application.id) {
           <li>
             <a class="surface queue-card" [routerLink]="['/founders', application.id]">
-              <span class="badge">Status: {{ statusLabel(application.status) }}</span>
+              <span class="badge" [attr.data-status]="application.status">Status: {{ statusLabel(application.status) }}</span>
               <span class="who">{{ emailLabel(application.testerEmail) }}</span>
               <span class="meta">
                 <span>Waiting since <span class="tabular">{{ formatInstant(application.pendingAt) }}</span></span>

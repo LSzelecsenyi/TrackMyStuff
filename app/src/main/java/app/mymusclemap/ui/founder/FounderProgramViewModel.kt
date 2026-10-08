@@ -54,6 +54,8 @@ enum class FounderJoinNotice {
     None,
     GoogleFailed,
     Unavailable,
+    Closed,
+    Full,
     Rejected,
     NotConfigured
 }
@@ -65,6 +67,8 @@ fun FounderJoinResult.toNotice(): FounderJoinNotice {
         FounderJoinResult.InProgress -> FounderJoinNotice.None
         FounderJoinResult.GoogleFailed -> FounderJoinNotice.GoogleFailed
         FounderJoinResult.Unavailable -> FounderJoinNotice.Unavailable
+        FounderJoinResult.Closed -> FounderJoinNotice.Closed
+        FounderJoinResult.Full -> FounderJoinNotice.Full
         FounderJoinResult.Rejected -> FounderJoinNotice.Rejected
         FounderJoinResult.NotConfigured -> FounderJoinNotice.NotConfigured
     }

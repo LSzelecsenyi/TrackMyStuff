@@ -52,6 +52,9 @@ import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.EffectiveEntitlement
+import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
+import app.mymusclemap.domain.entitlement.StrictOneTimePrompt
+import app.mymusclemap.domain.entitlement.selectStrictOneTimePrompt
 import app.mymusclemap.domain.entitlement.EntitlementTier
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
 import app.mymusclemap.domain.entitlement.FounderProgramRules
@@ -63,6 +66,7 @@ import app.mymusclemap.ui.founder.FounderProgramViewModel
 import app.mymusclemap.ui.founder.founderJourney
 import app.mymusclemap.ui.founder.presentedChecklist
 import app.mymusclemap.ui.membership.membershipPresentation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import app.mymusclemap.domain.reports.ReportPeriod
@@ -73,6 +77,8 @@ import app.mymusclemap.domain.workout.WorkoutCompletionSummary
 import app.mymusclemap.ui.achievements.AchievementsScreen
 import app.mymusclemap.ui.achievements.AchievementsViewModel
 import app.mymusclemap.ui.achievements.CelebrationDialog
+import app.mymusclemap.ui.achievements.acknowledgeThenNavigate
+import app.mymusclemap.ui.achievements.globalCelebrationCandidates
 import app.mymusclemap.ui.dashboard.DashboardScreen
 import app.mymusclemap.ui.dashboard.DashboardViewModel
 import app.mymusclemap.ui.dashboard.BodyMeasurementDetailScreen
@@ -99,6 +105,9 @@ import app.mymusclemap.ui.onboarding.OnboardingWorkoutSpotlight
 import app.mymusclemap.ui.settings.HelpTipsScreen
 import app.mymusclemap.ui.settings.OpenSourceLicensesScreen
 import app.mymusclemap.ui.settings.PrivacyPolicyScreen
+import app.mymusclemap.ui.pro.ProBenefitsScreen
+import app.mymusclemap.ui.pro.ProDiscoveryOfferDialog
+import app.mymusclemap.ui.pro.ProDiscoveryWarningDialog
 import app.mymusclemap.ui.pro.ProInfoScreen
 import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.health.HealthSettingsAction
@@ -130,6 +139,7 @@ import app.mymusclemap.ui.workout.LockScreenDeliveryBlock
 import app.mymusclemap.ui.workout.ActiveWorkoutScreen
 import app.mymusclemap.ui.workout.ActiveWorkoutViewModel
 import app.mymusclemap.ui.workout.WorkoutCompletionScreen
+import app.mymusclemap.ui.workout.WorkoutCompletionViewModel
 import app.mymusclemap.ui.workout.WorkoutHubViewModel
 import app.mymusclemap.ui.workout.WorkoutPrimaryAction
 import app.mymusclemap.ui.workout.WorkoutStartPickerSheet
@@ -139,6 +149,8 @@ import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 
 private const val ARG_EXERCISE_ID = "exerciseId"
@@ -283,13 +295,25 @@ fun WeightTrackerNavHost(
             temporaryTesterPro = false
         )
     },
-    entitlementChanges: Flow<Int> = flowOf(0)
+    entitlementChanges: Flow<Int> = flowOf(0),
+    founderApprovalCelebration: () -> app.mymusclemap.domain.entitlement.FounderApprovalCelebration? = { null },
+    onAcknowledgeFounderApproval: () -> Unit = {},
+    proBenefitsStatus: () -> app.mymusclemap.domain.entitlement.ProBenefitsStatus = {
+        app.mymusclemap.domain.entitlement.ProBenefitsStatus()
+    },
+    proDiscovery: () -> ProDiscoverySnapshot = { ProDiscoverySnapshot() },
+    promotionNow: () -> Instant = { Instant.now() },
+    onActivateProDiscovery: () -> Unit = {},
+    onDismissProDiscoveryOffer: () -> Unit = {},
+    onDismissProDiscoveryWarning: () -> Unit = {},
+    onPromotionClock: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val achievementsViewModel: AchievementsViewModel = viewModel(factory = factory)
     val achievementBoard by achievementsViewModel.board.collectAsStateWithLifecycle()
+    val heldCelebrationKeys by achievementsViewModel.heldCelebrationKeys.collectAsStateWithLifecycle()
     val showBottomBar = AppNavigation.showsBottomBar(currentRoute)
     val workoutHubViewModel: WorkoutHubViewModel = viewModel(factory = factory)
     val hubState by workoutHubViewModel.uiState.collectAsStateWithLifecycle()
@@ -676,6 +700,16 @@ fun WeightTrackerNavHost(
             }
             composable(AppRoutes.PRO_INFO) {
                 ProInfoScreen(onBack = { navController.popBackStack() })
+            }
+            composable(AppRoutes.PRO_BENEFITS) {
+                val benefits = remember(entitlementRevision) { proBenefitsStatus() }
+                val discovery = remember(entitlementRevision) { proDiscovery() }
+                ProBenefitsScreen(
+                    status = benefits,
+                    onBack = { navController.popBackStack() },
+                    discovery = discovery,
+                    onActivateTrial = onActivateProDiscovery
+                )
             }
             navigation(
                 route = AppRoutes.STATISTICS_GRAPH,
@@ -1240,28 +1274,39 @@ fun WeightTrackerNavHost(
                 )
             ) { entry ->
                 val clientWorkoutId = entry.arguments?.getString(ARG_CLIENT_WORKOUT_ID).orEmpty()
-                val summary = WorkoutCompletionSummary(
-                    exerciseCount = entry.arguments?.getInt(ARG_EXERCISES) ?: 0,
-                    completedSetCount = entry.arguments?.getInt(ARG_COMPLETED_SETS) ?: 0,
-                    durationMillis = entry.arguments?.getLong(ARG_DURATION_MILLIS) ?: 0L,
-                    clientWorkoutId = clientWorkoutId.ifBlank { null }
-                )
+                val completionViewModel: WorkoutCompletionViewModel = viewModel(factory = factory)
+                val summaryState by completionViewModel.state.collectAsStateWithLifecycle()
+                LaunchedEffect(clientWorkoutId) {
+                    completionViewModel.load(clientWorkoutId)
+                }
                 val workoutCelebrations = if (clientWorkoutId.isBlank()) {
                     emptyList()
                 } else {
                     achievementBoard.pending.filter { it.triggerClientWorkoutId == clientWorkoutId }
                 }
-                val onboardingViewModel: OnboardingGuideViewModel = viewModel(factory = factory)
-                val onboarding by onboardingViewModel.guide.collectAsStateWithLifecycle()
-                WorkoutCompletionScreen(
-                    summary = summary,
-                    onBackToOverview = { navController.leaveWorkoutComplete() },
-                    showHeatmapCta = onboarding.showHeatmapCompletionCta,
-                    onSeeWhatYouTrained = { navController.leaveWorkoutComplete() },
-                    celebrations = workoutCelebrations,
-                    onAcknowledgeCelebrations = {
-                        achievementsViewModel.acknowledgeCelebrations(workoutCelebrations)
+                LaunchedEffect(workoutCelebrations) {
+                    achievementsViewModel.holdWorkoutCelebrations(workoutCelebrations)
+                }
+                var leavingCompletion by remember { mutableStateOf(false) }
+                val completionScope = rememberCoroutineScope()
+                val leaveCompletion = {
+                    if (!leavingCompletion) {
+                        leavingCompletion = true
+                        completionScope.launch {
+                            acknowledgeThenNavigate(
+                                celebrations = workoutCelebrations,
+                                acknowledge = { pending ->
+                                    achievementsViewModel.acknowledgeCelebrationsAndWait(pending)
+                                },
+                                navigate = { navController.leaveWorkoutComplete() }
+                            )
+                        }
                     }
+                }
+                WorkoutCompletionScreen(
+                    state = summaryState,
+                    onLeave = leaveCompletion,
+                    celebrations = workoutCelebrations
                 )
             }
             composable(
@@ -1374,12 +1419,70 @@ fun WeightTrackerNavHost(
             onDismiss = workoutHubViewModel::consumeLockedFeature
         )
     }
-    val completionVisible = AppNavigation.canonicalRoute(currentRoute) == AppRoutes.WORKOUT_COMPLETE
-    if (!completionVisible && achievementBoard.pending.isNotEmpty()) {
-        CelebrationDialog(
-            celebrations = achievementBoard.pending,
-            onDismiss = { achievementsViewModel.acknowledgeCelebrations(achievementBoard.pending) }
-        )
+    val canonicalRoute = AppNavigation.canonicalRoute(currentRoute)
+    val suppressGlobalCelebration = canonicalRoute == AppRoutes.ACTIVE_WORKOUT ||
+        canonicalRoute == AppRoutes.WORKOUT_COMPLETE
+    val globalCelebrations = globalCelebrationCandidates(
+        pending = achievementBoard.pending,
+        heldKeys = heldCelebrationKeys,
+        suppressForRoute = suppressGlobalCelebration
+    )
+    val founderApproval = remember(entitlementRevision, founder.status) {
+        founderApprovalCelebration()
+    }
+    val discovery = remember(entitlementRevision) { proDiscovery() }
+    LaunchedEffect(discovery.nextBoundary) {
+        val target = discovery.nextBoundary ?: return@LaunchedEffect
+        val wait = Duration.between(promotionNow(), target).toMillis()
+        if (wait > 0) {
+            delay(wait)
+        }
+        onPromotionClock()
+    }
+    val prompt = selectStrictOneTimePrompt(
+        founderApproval = founderApproval != null,
+        workoutCelebration = globalCelebrations.isNotEmpty(),
+        suppressForRoute = suppressGlobalCelebration,
+        discoveryOffer = discovery.showAutomaticOffer,
+        discoveryWarning = discovery.showAutomaticWarning
+    )
+    when (prompt) {
+        StrictOneTimePrompt.FounderApproval -> {
+            app.mymusclemap.ui.founder.FounderApprovalCelebrationDialog(
+                celebration = founderApproval!!,
+                onGetStarted = {
+                    onAcknowledgeFounderApproval()
+                    navController.navigateInternal(AppRoutes.PRO_BENEFITS)
+                },
+                onDismiss = onAcknowledgeFounderApproval
+            )
+        }
+        StrictOneTimePrompt.WorkoutCelebration -> {
+            CelebrationDialog(
+                celebrations = globalCelebrations,
+                onDismiss = { achievementsViewModel.acknowledgeCelebrations(globalCelebrations) }
+            )
+        }
+        StrictOneTimePrompt.ProDiscoveryOffer -> {
+            ProDiscoveryOfferDialog(
+                onActivate = onActivateProDiscovery,
+                onNotNow = onDismissProDiscoveryOffer
+            )
+        }
+        StrictOneTimePrompt.ProDiscoveryWarning -> {
+            val expiresAt = discovery.trialExpiresAt
+            if (expiresAt != null) {
+                ProDiscoveryWarningDialog(
+                    expiresAt = expiresAt,
+                    onViewPlans = {
+                        onDismissProDiscoveryWarning()
+                        navController.navigateInternal(AppRoutes.PRO_BENEFITS)
+                    },
+                    onMaybeLater = onDismissProDiscoveryWarning
+                )
+            }
+        }
+        null -> Unit
     }
 }
 

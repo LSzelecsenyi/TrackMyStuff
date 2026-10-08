@@ -12,6 +12,7 @@ object AppRoutes {
     const val PRIVACY = "privacy"
     const val OPEN_SOURCE_LICENSES = "open_source_licenses"
     const val PRO_INFO = "pro_info"
+    const val PRO_BENEFITS = "pro_benefits"
     const val STATISTICS_GRAPH = "statistics_graph"
     const val STATISTICS = "statistics"
     const val STATISTICS_MUSCLES = "statistics_muscles"
@@ -137,6 +138,14 @@ object AppNavigation {
             targetRoute = AppRoutes.PRIVACY,
             backTarget = AppRoutes.SETTINGS,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.PRIVACY)
+        )
+    }
+
+    fun openProBenefits(fromRoute: String, currentRoute: String? = fromRoute): InternalNavigation {
+        return InternalNavigation(
+            targetRoute = AppRoutes.PRO_BENEFITS,
+            backTarget = canonicalRoute(fromRoute) ?: AppRoutes.OVERVIEW,
+            shouldPush = shouldNavigate(currentRoute, AppRoutes.PRO_BENEFITS)
         )
     }
 

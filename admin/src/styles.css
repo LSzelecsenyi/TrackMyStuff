@@ -11,14 +11,19 @@
 :root[data-theme='light'],
 :root[data-theme='system'] {
   color-scheme: light;
+  --strict-navy: #0c121c;
+  --strict-blue: #1548c6;
+  --strict-lime: #e2fd6d;
+  --strict-lime-hover: #d4f04a;
   --strict-page: #f4f7fb;
   --strict-surface: #ebf0f8;
   --strict-surface-secondary: #dce7fa;
-  --strict-text: #000000;
+  --strict-text: #0c121c;
   --strict-text-secondary: #3a4556;
   --strict-divider: #d5deea;
-  --strict-primary: #2457c5;
-  --strict-on-primary: #ffffff;
+  --strict-primary: var(--strict-lime);
+  --strict-on-primary: var(--strict-navy);
+  --strict-focus: var(--strict-blue);
   --strict-tertiary: #e8754f;
   --strict-success: #2e7d32;
   --strict-warning: var(--strict-tertiary);
@@ -47,8 +52,9 @@
   --strict-text: #ffffff;
   --strict-text-secondary: #c5d0e0;
   --strict-divider: #2a384e;
-  --strict-primary: #7fa6ff;
-  --strict-on-primary: #0c121c;
+  --strict-primary: var(--strict-lime);
+  --strict-on-primary: var(--strict-navy);
+  --strict-focus: var(--strict-lime);
   --strict-tertiary: #ff9a78;
   --strict-success: #81c784;
   --strict-warning: var(--strict-tertiary);
@@ -66,8 +72,9 @@
     --strict-text: #ffffff;
     --strict-text-secondary: #c5d0e0;
     --strict-divider: #2a384e;
-    --strict-primary: #7fa6ff;
-    --strict-on-primary: #0c121c;
+    --strict-primary: var(--strict-lime);
+    --strict-on-primary: var(--strict-navy);
+    --strict-focus: var(--strict-lime);
     --strict-tertiary: #ff9a78;
     --strict-success: #81c784;
     --strict-warning: var(--strict-tertiary);
@@ -103,7 +110,7 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--strict-primary);
+  outline: 2px solid var(--strict-focus);
   outline-offset: 2px;
 }
 
@@ -168,10 +175,62 @@ h1,
   cursor: pointer;
 }
 
+.button:hover:not(.primary):not(.caution):not(.button-primary) {
+  border-color: var(--strict-blue);
+}
+
+.button.primary,
+.button-primary {
+  background: var(--strict-lime);
+  color: var(--strict-navy);
+}
+
+.button.primary:hover:not(:disabled),
+.button-primary:hover:not(:disabled),
+.button[aria-pressed='true']:hover,
+.button[aria-expanded='true']:hover {
+  background: var(--strict-lime-hover);
+}
+
+.button.primary:disabled,
+.button-primary:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.button.caution {
+  background: transparent;
+  color: var(--strict-danger);
+  border-color: var(--strict-danger);
+}
+
+.button.caution:hover:not(:disabled) {
+  background: var(--strict-danger-surface);
+}
+
 .button[aria-pressed='true'],
 .button[aria-expanded='true'] {
   background: var(--strict-primary);
   color: var(--strict-on-primary);
+}
+
+.badge[data-status='APPROVED'] {
+  background: var(--strict-lime);
+  color: var(--strict-navy);
+  border-color: transparent;
+}
+
+.badge[data-status='PENDING_APPROVAL'],
+.badge[data-status='ACTIVE_PRO'] {
+  background: var(--strict-surface-secondary);
+  color: var(--strict-text);
+  border-color: var(--strict-blue);
+}
+
+.badge[data-status='REJECTED'] {
+  background: var(--strict-danger-surface);
+  color: var(--strict-on-danger);
+  border-color: transparent;
 }
 
 .skeleton-line {

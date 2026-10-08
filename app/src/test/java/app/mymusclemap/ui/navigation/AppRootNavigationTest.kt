@@ -211,6 +211,22 @@ class AppRootNavigationTest {
     }
 
     @Test
+    fun givenProBenefitsWhenBackThenOriginRemains() {
+        val nav = host()
+        composeRule.runOnIdle {
+            nav.navigateInternal(AppRoutes.PRO_BENEFITS)
+            nav.navigateInternal(AppRoutes.PRO_BENEFITS)
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.PRO_BENEFITS, nav.currentDestination?.route)
+        composeRule.runOnIdle {
+            nav.popBackStack()
+        }
+        composeRule.waitForIdle()
+        assertEquals(AppRoutes.OVERVIEW, nav.currentDestination?.route)
+    }
+
+    @Test
     fun givenProInfoWhenBackThenOriginRemains() {
         val nav = host()
         composeRule.runOnIdle {
@@ -349,6 +365,7 @@ class AppRootNavigationTest {
                     composable(AppRoutes.HELP) { Text("help") }
                     composable(AppRoutes.PRIVACY) { Text("privacy") }
                     composable(AppRoutes.PRO_INFO) { Text("pro-info") }
+                    composable(AppRoutes.PRO_BENEFITS) { Text("pro-benefits") }
                     navigation(
                         route = AppRoutes.STATISTICS_GRAPH,
                         startDestination = AppRoutes.STATISTICS

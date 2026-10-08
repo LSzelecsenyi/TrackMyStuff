@@ -24,8 +24,20 @@ import app.mymusclemap.data.founder.FounderWorkoutSyncScheduler
 import app.mymusclemap.data.founder.FounderSetObservation
 import app.mymusclemap.data.founder.FounderWorkoutObservations
 import app.mymusclemap.data.founder.NativeFounderWorkout
+import app.mymusclemap.data.preferences.FounderApprovalCelebrationStore
+import app.mymusclemap.data.preferences.ProDiscoveryStore
+import app.mymusclemap.data.preferences.ProDiscoveryStoreKind
+import app.mymusclemap.data.preferences.PromotionAvailabilityStore
+import app.mymusclemap.data.promotion.ProDiscoveryCoordinator
+import app.mymusclemap.data.promotion.PromotionAvailabilityClient
+import app.mymusclemap.domain.entitlement.EntitlementResolver
+import app.mymusclemap.domain.entitlement.ProDiscoveryCoverage
+import app.mymusclemap.domain.entitlement.ProDiscoveryPolicy
+import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
+import app.mymusclemap.domain.entitlement.PromotionalProEntitlement
 import app.mymusclemap.data.preferences.FounderEntitlementCache
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
+import app.mymusclemap.data.preferences.FounderRecognitionStore
 import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
@@ -50,16 +62,19 @@ import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.SystemDateProvider
 import app.mymusclemap.domain.entitlement.EntitlementComposer
+import app.mymusclemap.domain.entitlement.FounderApprovalCelebration
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.InactiveFounderLifetimeProvider
 import app.mymusclemap.domain.entitlement.InactiveSubscriptionProvider
 import app.mymusclemap.domain.entitlement.PolicyBackedEntitlements
+import app.mymusclemap.domain.entitlement.ProBenefitsStatus
 import app.mymusclemap.ui.workout.ActiveWorkoutNotificationCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
@@ -180,6 +195,51 @@ class AppContainer(context: Context) {
             entitlementRevision.value = entitlementRevision.value + 1
         }
     )
+    val founderRecognition = FounderRecognitionStore(
+        context = appContext,
+        sessionUserId = { authenticatedUserId.get() },
+        onChanged = {
+            refreshAccountAuthority()
+            entitlementRevision.value = entitlementRevision.value + 1
+        }
+    )
+    val founderApprovalCelebrations = FounderApprovalCelebrationStore(
+        context = appContext,
+        onChanged = {
+            entitlementRevision.value = entitlementRevision.value + 1
+        }
+    )
+    private val proDiscoveryReal = ProDiscoveryStore(
+        context = appContext,
+        kind = ProDiscoveryStoreKind.REAL,
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+    )
+    private val proDiscoverySimulation = ProDiscoveryStore(
+        context = appContext,
+        kind = ProDiscoveryStoreKind.SIMULATION,
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+    )
+    private val promotionAvailability = PromotionAvailabilityStore(
+        context = appContext,
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+    )
+    private val promotionAvailabilityClient = PromotionAvailabilityClient(
+        baseUrl = BuildConfig.STRICT_API_BASE_URL,
+        http = strictOkHttpClient()
+    )
+    val proDiscovery = ProDiscoveryCoordinator(
+        real = proDiscoveryReal,
+        simulation = proDiscoverySimulation,
+        now = { clock.instant() },
+        zone = clock.zone,
+        completions = {
+            database.workoutSessionDao().nativeCompletionEpochMillis().map { Instant.ofEpochMilli(it) }
+        },
+        debugConfig = { ProDiscoveryDebugSelection.current() },
+        promotionsEnabled = { promotionAvailability.promotionsEnabled() },
+        onAvailability = { enabled -> promotionAvailability.setPromotionsEnabled(enabled) },
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+    )
     val subscriptionProvider = InactiveSubscriptionProvider
     val founderLifetimeProvider = InactiveFounderLifetimeProvider
     val founderProgram = FounderProgramCoordinator(
@@ -198,8 +258,22 @@ class AppContainer(context: Context) {
         clock = clock,
         founderProgram = founderProgram::currentState,
         backendFounder = founderEntitlementCache::current,
+        promotionalPro = { proDiscovery.currentGrant() },
         adjustSources = EntitlementOverrideSelection::adjust
     )
+    init {
+        proDiscovery.coverage = {
+            val withoutTrial = EntitlementOverrideSelection.adjust(
+                entitlementComposer.sources().copy(promotionalPro = PromotionalProEntitlement())
+            )
+            ProDiscoveryCoverage(
+                currentlyFree = !EntitlementResolver.resolve(withoutTrial, clock.instant()).grantsPro,
+                continuedBeyond = { expiresAt ->
+                    ProDiscoveryPolicy.continuedProBeyond(withoutTrial, expiresAt)
+                }
+            )
+        }
+    }
     val featureEntitlements: FeatureEntitlements = PolicyBackedEntitlements(
         policySource = { entitlementComposer.policy() },
         revisions = entitlementRevision
@@ -210,7 +284,7 @@ class AppContainer(context: Context) {
             entitlementComposer.policy().customExercises(count).canCreate
         }
         grantsPro.set { entitlementComposer.resolve().grantsPro }
-        founderLifetime.set { entitlementComposer.resolve().founderLifetime }
+        founderLifetime.set { entitlementComposer.resolve().founderRecognized }
         refreshAccountAuthority()
         weightChanged.set { achievementRepository.reconcile() }
         plansChanged.set { achievementRepository.reconcile() }
@@ -221,6 +295,7 @@ class AppContainer(context: Context) {
             } else {
                 founderProgram.onNativeWorkoutCompleted(clientWorkoutId)
             }
+            founderCacheScope.launch { proDiscovery.refreshHistory() }
         }
     }
 
@@ -231,6 +306,83 @@ class AppContainer(context: Context) {
     suspend fun restoreFounderEntitlementCache() {
         authenticatedUserId.set(strictAccount.sessions.read()?.userId)
         founderEntitlementCache.load()
+        founderRecognition.load()
+        founderApprovalCelebrations.load()
+        proDiscoveryReal.load()
+        proDiscoverySimulation.load()
+        promotionAvailability.load()
+        proDiscovery.prepare()
+        proDiscovery.refreshHistory()
+    }
+
+    fun promotionNow(): Instant = clock.instant()
+
+    fun proDiscoverySnapshot(): ProDiscoverySnapshot = proDiscovery.snapshot()
+
+    fun activateProDiscovery() {
+        founderCacheScope.launch { proDiscovery.activate() }
+    }
+
+    fun dismissProDiscoveryOffer() {
+        founderCacheScope.launch { proDiscovery.dismissOffer() }
+    }
+
+    fun dismissProDiscoveryWarning() {
+        founderCacheScope.launch { proDiscovery.dismissWarning() }
+    }
+
+    fun notePromotionClock() {
+        entitlementRevision.value = entitlementRevision.value + 1
+    }
+
+    suspend fun refreshPromotionAvailability() {
+        proDiscovery.refreshAvailability { promotionAvailabilityClient.promotionsEnabled() }
+    }
+
+    /**
+     * The celebration for the signed-in account, or null. Reads the backend program
+     * snapshot and the unadjusted entitlement cache. A debug Founder override is ignored.
+     */
+    fun pendingFounderApprovalCelebration(): FounderApprovalCelebration? {
+        if (!founderApprovalCelebrations.isLoaded()) {
+            return null
+        }
+        val userId = authenticatedUserId.get()
+        val program = founderProgram.currentState()
+        val trusted = founderEntitlementCache.current().trusted(clock.instant())
+        return app.mymusclemap.domain.entitlement.pendingFounderApprovalCelebration(
+            userId = userId,
+            backendOwned = program.backendOwned,
+            status = program.status,
+            founderLifetime = trusted.founderLifetime,
+            founderProExpiresAt = trusted.founderProExpiresAt,
+            now = clock.instant(),
+            acknowledged = userId != null && founderApprovalCelebrations.isAcknowledged(userId)
+        )
+    }
+
+    /**
+     * Access copy for the Pro Benefits screen. An expiration is included only when the
+     * trusted cache still has a Founder Pro instant. The screen does not calculate a date.
+     */
+    fun proBenefitsStatus(): ProBenefitsStatus {
+        val now = clock.instant()
+        val resolved = entitlementComposer.resolve()
+        val trusted = founderEntitlementCache.current().trusted(now)
+        return app.mymusclemap.domain.entitlement.proBenefitsStatus(
+            grantsPro = resolved.grantsPro,
+            founderProActive = resolved.founderProActive && trusted.founderProActive(now),
+            founderLifetime = trusted.founderLifetime,
+            founderProExpiresAt = trusted.founderProExpiresAt
+        )
+    }
+
+    /** Records that this account has seen the celebration. Does not change Pro or recognition. */
+    fun acknowledgeFounderApprovalCelebration() {
+        val userId = authenticatedUserId.get() ?: return
+        founderCacheScope.launch {
+            founderApprovalCelebrations.acknowledge(userId)
+        }
     }
 
     suspend fun refreshFounderAuthority() {
@@ -387,7 +539,9 @@ class AppContainer(context: Context) {
                     validUntil = clock.instant().plus(FounderEntitlementCache.TRUST),
                     userId = userId,
                     founderGrantedAt = trusted.founderGrantedAt,
-                    specialGrants = trusted.specialGrants
+                    specialGrants = trusted.specialGrants,
+                    founderRecognized = trusted.founderRecognized,
+                    founderProExpiresAt = trusted.founderProExpiresAt
                 )
             }
         }
@@ -396,26 +550,34 @@ class AppContainer(context: Context) {
     private suspend fun saveLoadedEntitlements(entitlements: FounderEntitlementCall.Loaded) {
         val userId = authenticatedUserId.get() ?: strictAccount.sessions.read()?.userId ?: return
         authenticatedUserId.set(userId)
+        if (entitlements.founderRecognized || entitlements.founderLifetime) {
+            founderRecognition.confirm(userId, entitlements.founderGrantedAt)
+        }
         founderEntitlementCache.save(
             temporaryFounderPro = entitlements.temporaryFounderPro,
             founderLifetime = entitlements.founderLifetime,
             validUntil = clock.instant().plus(FounderEntitlementCache.TRUST),
             userId = userId,
             founderGrantedAt = entitlements.founderGrantedAt,
-            specialGrants = entitlements.specialAchievements
+            specialGrants = entitlements.specialAchievements,
+            founderRecognized = entitlements.founderRecognized,
+            founderProExpiresAt = entitlements.founderProExpiresAt
         )
     }
 
     private fun refreshAccountAuthority() {
         val resolved = entitlementComposer.resolve()
         val trusted = founderEntitlementCache.current().trusted(clock.instant())
+        val recognition = founderRecognition.current()
+        val founderRecognized = recognition.recognized || resolved.founderRecognized
         accountAuthorityState.set(
             AccountAchievementAuthority(
-                founderLifetime = resolved.founderLifetime,
-                founderGrantedAtMillis = if (trusted.founderLifetime) {
-                    trusted.founderGrantedAt?.toEpochMilli()
-                } else {
-                    null
+                founderRecognized = founderRecognized,
+                founderGrantedAtMillis = when {
+                    recognition.recognized -> recognition.grantedAt?.toEpochMilli()
+                        ?: trusted.founderGrantedAt?.toEpochMilli()
+                    resolved.founderRecognized -> trusted.founderGrantedAt?.toEpochMilli()
+                    else -> null
                 },
                 earlyAdopterGrantedAtMillis = trusted.specialGrantedAtMillis("EARLY_ADOPTER"),
                 developerGrantedAtMillis = trusted.specialGrantedAtMillis("DEVELOPER")

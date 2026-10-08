@@ -47,7 +47,7 @@ class FounderAchievementRepositoryTest {
             database = database,
             clock = clock,
             dateProvider = FixedDateProvider(LocalDate.of(2026, 10, 7)),
-            grantsPro = { authority.founderLifetime },
+            grantsPro = { false },
             accountAuthority = { authority }
         )
     }
@@ -75,7 +75,7 @@ class FounderAchievementRepositoryTest {
 
         val grantedAt = Instant.parse("2024-03-01T00:00:00Z").toEpochMilli()
         authority = AccountAchievementAuthority(
-            founderLifetime = true,
+            founderRecognized = true,
             founderGrantedAtMillis = grantedAt
         )
         repository.notifyEntitlementChanged()

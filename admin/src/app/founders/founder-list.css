@@ -15,8 +15,9 @@
   text-decoration: none;
 }
 
-.queue-card:hover {
-  border-color: var(--strict-primary);
+.queue-card:hover,
+.queue-card:focus-visible {
+  border-color: var(--strict-blue);
 }
 
 .who {

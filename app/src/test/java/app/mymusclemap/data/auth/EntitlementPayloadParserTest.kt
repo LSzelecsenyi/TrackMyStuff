@@ -38,8 +38,30 @@ class EntitlementPayloadParserTest {
             """.trimIndent()
         ) as FounderEntitlementCall.Loaded
         assertEquals(Instant.parse("2024-03-01T00:00:00Z"), loaded.founderGrantedAt)
+        assertEquals(false, loaded.founderRecognized)
+        assertNull(loaded.founderProExpiresAt)
         assertEquals(listOf("EARLY_ADOPTER", "DEVELOPER"), loaded.specialAchievements.map { it.key })
         assertEquals(Instant.parse("2026-02-01T00:00:00Z"), loaded.specialAchievements[1].grantedAt)
+    }
+
+    @Test
+    fun founderProExpirationIsParsedWithoutTreatingItAsLifetime() {
+        val loaded = parseEntitlementPayload(
+            """
+            {
+              "access":"PRO",
+              "founderLifetime":false,
+              "temporaryFounderPro":false,
+              "founderRecognized":true,
+              "founderGrantedAt":"2026-03-15T18:45:01Z",
+              "founderProExpiresAt":"2027-03-15T18:45:01Z"
+            }
+            """.trimIndent()
+        ) as FounderEntitlementCall.Loaded
+        assertEquals(false, loaded.founderLifetime)
+        assertEquals(true, loaded.founderRecognized)
+        assertEquals(Instant.parse("2027-03-15T18:45:01Z"), loaded.founderProExpiresAt)
+        assertEquals(Instant.parse("2026-03-15T18:45:01Z"), loaded.founderGrantedAt)
     }
 
     @Test

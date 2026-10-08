@@ -91,6 +91,11 @@ sealed interface PendingCelebration {
     }
 }
 
+/** Stable key for holding or acknowledging one celebration. Empty when the celebration has no id. */
+fun PendingCelebration.deliveryKey(): String {
+    return acknowledgement.achievementId ?: acknowledgement.progressEventKey.orEmpty()
+}
+
 data class UnlockSnapshot(
     val achievementId: AchievementId,
     val unlockedAt: Long,
@@ -111,7 +116,8 @@ data class ProgressEventSnapshot(
  * Room unlock rows are not ownership for these three badges.
  */
 data class AccountAchievementAuthority(
-    val founderLifetime: Boolean = false,
+    /** Permanent Founding Member badge. Independent of whether Founder Pro is still active. */
+    val founderRecognized: Boolean = false,
     val founderGrantedAtMillis: Long? = null,
     val earlyAdopterGrantedAtMillis: Long? = null,
     val developerGrantedAtMillis: Long? = null
@@ -153,7 +159,7 @@ private fun BadgeWallItem.withCurrentOwnership(
 ): BadgeWallItem {
     return when (id) {
         AchievementId.FOUNDER -> {
-            val owned = account.founderLifetime
+            val owned = account.founderRecognized
             copy(
                 unlocked = owned,
                 unlockedAt = if (owned) account.founderGrantedAtMillis else null,

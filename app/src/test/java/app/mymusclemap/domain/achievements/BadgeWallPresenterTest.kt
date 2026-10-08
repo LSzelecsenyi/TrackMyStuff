@@ -210,7 +210,7 @@ class BadgeWallPresenterTest {
                 leadingExerciseSets = 1000,
                 grantsPro = true,
                 accountAuthority = AccountAchievementAuthority(
-                    founderLifetime = true,
+                    founderRecognized = true,
                     founderGrantedAtMillis = 10L,
                     earlyAdopterGrantedAtMillis = 10L,
                     developerGrantedAtMillis = 10L

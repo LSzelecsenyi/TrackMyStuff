@@ -124,7 +124,7 @@ class ProAchievementTest {
         val volume = board.items.single { it.id == AchievementId.VOLUME_MASTER }
         assertFalse(volume.unlocked)
         assertTrue(volume.requirementMet)
-        assertEquals(BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED, volume.visualState())
+        assertEquals(BadgeVisualState.LOCKED, volume.visualState())
         assertNull(volume.unlockedAt)
         assertTrue(board.pending.none { it is PendingCelebration.ProUnlocked })
         assertTrue(BadgeWallPresenter.almostThere(board).none { it.achievementId.access == AchievementAccess.PRO })
@@ -171,6 +171,10 @@ class ProAchievementTest {
             events = emptyList(),
             lifetimeVolumeKg = 50_000.0
         )
+        assertEquals(
+            BadgeVisualState.LOCKED_PROGRESS,
+            partial.items.single { it.id == AchievementId.VOLUME_MASTER }.visualState()
+        )
         assertTrue(BadgeWallPresenter.almostThere(partial).any { it.achievementId == AchievementId.VOLUME_MASTER })
         assertTrue(BadgeWallPresenter.almostThere(partial).any { it.achievementId == AchievementId.IRON_DISCIPLINE })
         val complete = AchievementBoardAssembler.assemble(
@@ -187,7 +191,7 @@ class ProAchievementTest {
             }
         )
         assertEquals(
-            BadgeVisualState.REQUIREMENT_MET_PRO_LOCKED,
+            BadgeVisualState.LOCKED,
             complete.items.single { it.id == AchievementId.VOLUME_MASTER }.visualState()
         )
     }

@@ -12,6 +12,7 @@ import app.mymusclemap.domain.achievements.BadgeWallPresenter
 import app.mymusclemap.domain.achievements.CelebrationAcknowledgement
 import app.mymusclemap.domain.achievements.NextWorkoutMilestone
 import app.mymusclemap.domain.achievements.PendingCelebration
+import app.mymusclemap.domain.achievements.deliveryKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,10 @@ class AchievementsViewModel(
 
     private val selectedFilter = MutableStateFlow<AchievementAccess?>(null)
     private val openedBadge = MutableStateFlow<AchievementId?>(null)
+    private val heldCelebrationKeysState = MutableStateFlow<Set<String>>(emptySet())
+
+    /** Workout celebrations already shown on the completion screen. Hidden from the global dialog. */
+    val heldCelebrationKeys: StateFlow<Set<String>> = heldCelebrationKeysState
 
     val presentation: StateFlow<BadgeWallPresentation> = combine(board, selectedFilter) { current, filter ->
         BadgeWallPresenter.present(current, filter)
@@ -65,6 +70,35 @@ class AchievementsViewModel(
     fun acknowledgeCelebrations(celebrations: List<PendingCelebration>) {
         acknowledge(celebrations.map { it.acknowledgement })
     }
+
+    fun holdWorkoutCelebrations(celebrations: List<PendingCelebration>) {
+        val keys = celebrations.map { it.deliveryKey() }.filter { it.isNotEmpty() }.toSet()
+        if (keys.isEmpty()) return
+        heldCelebrationKeysState.value = heldCelebrationKeysState.value + keys
+    }
+
+    suspend fun acknowledgeCelebrationsAndWait(celebrations: List<PendingCelebration>) {
+        holdWorkoutCelebrations(celebrations)
+        repository.acknowledge(celebrations.map { it.acknowledgement })
+    }
+}
+
+internal fun globalCelebrationCandidates(
+    pending: List<PendingCelebration>,
+    heldKeys: Set<String>,
+    suppressForRoute: Boolean
+): List<PendingCelebration> {
+    if (suppressForRoute) return emptyList()
+    return pending.filter { it.deliveryKey() !in heldKeys }
+}
+
+internal suspend fun acknowledgeThenNavigate(
+    celebrations: List<PendingCelebration>,
+    acknowledge: suspend (List<PendingCelebration>) -> Unit,
+    navigate: () -> Unit
+) {
+    acknowledge(celebrations)
+    navigate()
 }
 
 private val EmptyAchievementBoard = AchievementBoardAssembler.assemble(

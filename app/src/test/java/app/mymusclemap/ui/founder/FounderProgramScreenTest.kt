@@ -3,6 +3,7 @@ package app.mymusclemap.ui.founder
 import android.content.Context
 import androidx.annotation.PluralsRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -32,6 +34,7 @@ import app.mymusclemap.domain.entitlement.FounderQualification
 import app.mymusclemap.testString
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -267,13 +270,12 @@ class FounderProgramScreenTest {
                 acknowledgements = FounderMilestoneAcknowledgements(founderApproved = true)
             )
         })
-        composeRule.onNodeWithText(testString(R.string.founder_milestone_member_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.founder_milestone_member_pro)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.founder_milestone_member_thanks)).assertIsDisplayed()
-        composeRule.onNodeWithTag(FOUNDER_MILESTONE_CONTINUE).performClick()
-        composeRule.waitForIdle()
+        composeRule.onNodeWithText(testString(R.string.founder_approval_title)).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_milestone_member_title)).assertDoesNotExist()
-        composeRule.onNodeWithText(testString(R.string.founder_lifetime_pro)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_milestone_member_pro)).assertDoesNotExist()
+        composeRule.onNodeWithTag(FOUNDER_MILESTONE_CONTINUE).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_member_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_member_pro)).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.founder_badge)).assertCountEquals(2)
         composeRule.onNodeWithText("Approved").assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_feedback_save)).assertDoesNotExist()
@@ -312,6 +314,82 @@ class FounderProgramScreenTest {
         composeRule.onNodeWithText(testString(R.string.founder_rejected_body)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_rejected_reason, reason)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_milestone_member_title)).assertDoesNotExist()
+    }
+
+    @Test
+    fun trainingCompleteDialogPointsToSettingsAndContinuesOnce() {
+        var continued = 0
+        composeRule.setContent {
+            WeightTrackerThemeForPreview {
+                FounderTrainingCompleteDialog(onAcknowledge = { continued += 1 })
+            }
+        }
+        composeRule.onNodeWithText(testString(R.string.founder_milestone_training_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_milestone_training_body)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_milestone_training_next)).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Next, submit your Tester Report to complete your application."
+        ).assertDoesNotExist()
+        composeRule.onNodeWithTag(FOUNDER_MILESTONE_CONTINUE).performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, continued)
+    }
+
+    @Test
+    fun focusedFeedbackStaysAboveTheKeyboardAndTheReportStaysEditable() {
+        val keyboard = 240.dp
+        var state by mutableStateOf(
+            ui(
+                fastRules,
+                status = FounderProgramStatus.ActivePro,
+                workouts = 2,
+                days = 1,
+                acknowledgements = FounderMilestoneAcknowledgements(
+                    temporaryProUnlocked = true,
+                    trainingComplete = true
+                )
+            ).copy(feedbackDraft = "The rest timer was easy to find.")
+        )
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = density.density, fontScale = 1f)
+            ) {
+                WeightTrackerThemeForPreview {
+                    Box(
+                        modifier = Modifier
+                            .width(360.dp)
+                            .height(640.dp)
+                    ) {
+                        FounderProgramScreen(
+                            state = state,
+                            onBack = {},
+                            onEnroll = {},
+                            onFeedbackChange = { state = state.copy(feedbackDraft = it) },
+                            onSubmitReport = {},
+                            onAcknowledgeMilestone = {},
+                            bottomContentInsets = WindowInsets(
+                                bottom = with(density) { keyboard.roundToPx() }
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(FOUNDER_FEEDBACK_FIELD).performScrollTo().performClick()
+        composeRule.onNodeWithTag(FOUNDER_FEEDBACK_FIELD).performTextInput("\nSets stayed visible.")
+        composeRule.waitForIdle()
+        assertTrue(state.feedbackDraft.contains("The rest timer was easy to find."))
+        assertTrue(state.feedbackDraft.contains("Sets stayed visible."))
+        val keyboardPx = with(composeRule.density) { keyboard.toPx() }
+        val root = composeRule.onNodeWithTag(FOUNDER_ROOT).fetchSemanticsNode().boundsInRoot
+        val field = composeRule.onNodeWithTag(FOUNDER_FEEDBACK_FIELD).fetchSemanticsNode().boundsInRoot
+        assertTrue(field.bottom <= root.bottom - keyboardPx + 1f)
+        assertTrue(field.top < field.bottom)
+        composeRule.onNodeWithTag(FOUNDER_SUBMIT_REPORT).performScrollTo().assertIsDisplayed()
+        val submit = composeRule.onNodeWithTag(FOUNDER_SUBMIT_REPORT).fetchSemanticsNode().boundsInRoot
+        assertTrue(submit.bottom <= root.bottom - keyboardPx + 1f)
     }
 
     private fun render(

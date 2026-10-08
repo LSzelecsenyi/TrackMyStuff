@@ -120,14 +120,12 @@ dd {
   margin-top: 0;
 }
 
-.primary {
-  background: var(--strict-primary);
-  color: var(--strict-on-primary);
+.primary:hover:not(:disabled) {
+  background: var(--strict-lime-hover);
 }
 
-.caution {
-  background: transparent;
-  border-color: var(--strict-danger);
+.caution:hover:not(:disabled) {
+  background: var(--strict-danger-surface);
 }
 
 .dialog {

@@ -3,6 +3,7 @@ package app.mymusclemap.domain.achievements
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.statistics.WorkoutSetVolume
+import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
@@ -38,8 +39,32 @@ data class PerformanceRecordEvent(
     val sessionId: Long
 )
 
+/** How a highlight value should be shown. The stored numbers are the comparable values. */
+enum class HighlightMeasure {
+    ADDED_KG,
+    EXTERNAL_KG,
+    /** Effective load, which is the per-side weight doubled. */
+    PER_SIDE_TOTAL_KG,
+    REPS,
+    VOLUME_KG
+}
+
+/**
+ * One genuine record in a single completed workout.
+ * Previous is the best comparable value before the first improvement in that workout.
+ * Current is the best comparable value after the workout. The first performance is omitted.
+ */
+data class PerformanceHighlight(
+    val kind: PerformanceRecordKind,
+    val exerciseName: String?,
+    val previous: Double,
+    val current: Double,
+    val measure: HighlightMeasure
+)
+
 private data class OrderedSet(
     val exerciseId: Long,
+    val exerciseName: String,
     val measurement: MeasurementType,
     val interpretation: WeightInterpretation,
     val set: SessionSet
@@ -92,6 +117,107 @@ object PerformanceRecordEvaluator {
                     bestVolume = workoutVolume
                     found += PerformanceRecordEvent(PerformanceRecordKind.VOLUME, at, client, sessionId)
                 }
+            }
+        }
+        return found
+    }
+
+    /**
+     * Records achieved inside [clientWorkoutId], collapsed to one line per exercise and kind.
+     * Uses the same comparisons as [events]. Later records are included after a badge already exists.
+     * This does not create or count achievement unlocks.
+     */
+    fun highlightsFor(
+        history: List<WorkoutSessionAggregate>,
+        clientWorkoutId: String
+    ): List<PerformanceHighlight> {
+        if (clientWorkoutId.isBlank()) return emptyList()
+        val bestWeight = HashMap<Long, Double>()
+        val bestReps = HashMap<Long, Int>()
+        var bestVolume: Double? = null
+        val found = ArrayList<PerformanceHighlight>()
+        completedInOrder(history).forEach { aggregate ->
+            val client = aggregate.session.clientWorkoutId.takeIf { it.isNotBlank() }
+            val volumeBefore = bestVolume
+            val weightBeforeFirstBeat = HashMap<Long, Double>()
+            val repsBeforeFirstBeat = HashMap<Long, Int>()
+            val weightRecord = HashMap<Long, OrderedSet>()
+            val repsRecord = HashMap<Long, OrderedSet>()
+            setsInOrder(aggregate).forEach { item ->
+                comparableWeightKg(item)?.let { load ->
+                    val previous = bestWeight[item.exerciseId]
+                    if (previous == null) {
+                        bestWeight[item.exerciseId] = load
+                    } else if (load > previous) {
+                        if (client == clientWorkoutId && weightBeforeFirstBeat[item.exerciseId] == null) {
+                            weightBeforeFirstBeat[item.exerciseId] = previous
+                        }
+                        bestWeight[item.exerciseId] = load
+                        if (client == clientWorkoutId) {
+                            weightRecord[item.exerciseId] = item
+                        }
+                    }
+                }
+                comparableReps(item)?.let { count ->
+                    val previous = bestReps[item.exerciseId]
+                    if (previous == null) {
+                        bestReps[item.exerciseId] = count
+                    } else if (count > previous) {
+                        if (client == clientWorkoutId && repsBeforeFirstBeat[item.exerciseId] == null) {
+                            repsBeforeFirstBeat[item.exerciseId] = previous
+                        }
+                        bestReps[item.exerciseId] = count
+                        if (client == clientWorkoutId) {
+                            repsRecord[item.exerciseId] = item
+                        }
+                    }
+                }
+            }
+            val workoutVolume = workoutVolumeKg(aggregate)
+            if (workoutVolume != null) {
+                val previous = bestVolume
+                if (previous == null) {
+                    bestVolume = workoutVolume
+                } else if (workoutVolume > previous) {
+                    bestVolume = workoutVolume
+                }
+            }
+            if (client != clientWorkoutId) return@forEach
+            val seen = HashSet<Long>()
+            aggregate.exercises
+                .sortedWith(compareBy({ it.exercise.position }, { it.exercise.id }))
+                .forEach { item ->
+                    val exerciseId = item.exercise.exerciseId
+                    if (!seen.add(exerciseId)) return@forEach
+                    weightBeforeFirstBeat[exerciseId]?.let { previous ->
+                        val record = weightRecord[exerciseId] ?: return@let
+                        found += PerformanceHighlight(
+                            kind = PerformanceRecordKind.WEIGHT,
+                            exerciseName = record.exerciseName,
+                            previous = previous,
+                            current = bestWeight.getValue(exerciseId),
+                            measure = weightMeasure(record)
+                        )
+                    }
+                    repsBeforeFirstBeat[exerciseId]?.let { previous ->
+                        val record = repsRecord[exerciseId] ?: return@let
+                        found += PerformanceHighlight(
+                            kind = PerformanceRecordKind.REPS,
+                            exerciseName = record.exerciseName,
+                            previous = previous.toDouble(),
+                            current = bestReps.getValue(exerciseId).toDouble(),
+                            measure = HighlightMeasure.REPS
+                        )
+                    }
+                }
+            if (workoutVolume != null && volumeBefore != null && workoutVolume > volumeBefore) {
+                found += PerformanceHighlight(
+                    kind = PerformanceRecordKind.VOLUME,
+                    exerciseName = null,
+                    previous = volumeBefore,
+                    current = workoutVolume,
+                    measure = HighlightMeasure.VOLUME_KG
+                )
             }
         }
         return found
@@ -177,12 +303,25 @@ object PerformanceRecordEvaluator {
                     .map { set ->
                         OrderedSet(
                             exerciseId = item.exercise.exerciseId,
+                            exerciseName = item.exercise.name,
                             measurement = item.exercise.measurementType,
                             interpretation = item.exercise.weightInterpretation,
                             set = set
                         )
                     }
             }
+    }
+
+    private fun weightMeasure(item: OrderedSet): HighlightMeasure {
+        return when (item.set.actualLoadKind) {
+            PlannedLoadKind.ADDED_WEIGHT -> HighlightMeasure.ADDED_KG
+            PlannedLoadKind.EXTERNAL_WEIGHT -> if (item.interpretation == WeightInterpretation.PER_SIDE) {
+                HighlightMeasure.PER_SIDE_TOTAL_KG
+            } else {
+                HighlightMeasure.EXTERNAL_KG
+            }
+            else -> HighlightMeasure.EXTERNAL_KG
+        }
     }
 
     private fun PerformanceRecordEvent.toQualification(id: AchievementId): PerformanceQualification {
