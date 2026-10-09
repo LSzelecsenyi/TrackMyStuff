@@ -7,4 +7,5 @@ sealed interface ProDiscoveryActivation {
     data class AlreadyActive(val expiresAt: Instant) : ProDiscoveryActivation
     data object AlreadyUsed : ProDiscoveryActivation
     data object NotEligible : ProDiscoveryActivation
+    data object Unavailable : ProDiscoveryActivation
 }

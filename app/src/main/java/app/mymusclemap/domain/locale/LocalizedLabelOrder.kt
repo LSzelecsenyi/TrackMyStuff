@@ -4,7 +4,8 @@ import java.text.Collator
 import java.util.Locale
 
 object LocalizedLabelOrder {
-    val locale: Locale = AppLocale.UI
+    val locale: Locale
+        get() = AppLocale.UI
 
     fun collator(): Collator {
         return Collator.getInstance(locale).apply {

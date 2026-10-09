@@ -66,7 +66,10 @@ import app.mymusclemap.domain.entitlement.FounderApprovalCelebration
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.InactiveFounderLifetimeProvider
-import app.mymusclemap.domain.entitlement.InactiveSubscriptionProvider
+import app.mymusclemap.data.billing.BillingCoordinator
+import app.mymusclemap.data.billing.BillingVerificationClient
+import app.mymusclemap.data.billing.VerifiedSubscriptionStore
+import app.mymusclemap.domain.billing.VerifiedPaidSubscription
 import app.mymusclemap.domain.entitlement.PolicyBackedEntitlements
 import app.mymusclemap.domain.entitlement.ProBenefitsStatus
 import app.mymusclemap.ui.workout.ActiveWorkoutNotificationCoordinator
@@ -83,11 +86,14 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicReference
 
-class AppContainer(context: Context) {
+class AppContainer(context: Context, val accountUserId: String) {
     private val appContext = context.applicationContext
     private val clock: Clock = Clock.systemDefaultZone()
     val dateProvider: DateProvider = SystemDateProvider(clock)
-    private val database = WeightDatabase.create(appContext)
+    private val database = WeightDatabase.create(
+        appContext,
+        app.mymusclemap.domain.account.accountDatabaseName(accountUserId)
+    )
     val weightRepository = WeightRepository(
         dao = database.weightMeasurementDao(),
         clock = clock,
@@ -167,7 +173,7 @@ class AppContainer(context: Context) {
     )
     val themePreferences = ThemePreferences(appContext)
     val progressPhotoStore = ProgressPhotoStore(
-        File(appContext.filesDir, ProgressPhotoStore.DIRECTORY_NAME)
+        File(appContext.filesDir, app.mymusclemap.domain.account.accountPhotoDirectory(accountUserId))
     )
     val appBackupRepository = AppBackupRepository(
         database,
@@ -179,7 +185,7 @@ class AppContainer(context: Context) {
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     val founderProgramRules: FounderProgramRules = FounderProgramRuleSelection.rules
     val founderProgramAvailability = FounderProgramAvailabilitySelection.availability
-    val founderProgramStore = FounderProgramStore(appContext)
+    val founderProgramStore = FounderProgramStore(appContext, accountUserId)
     val founderMilestoneAcknowledgements = FounderMilestoneAcknowledgementStore(appContext)
     private val entitlementRevision = MutableStateFlow(0)
     val entitlementRevisions: kotlinx.coroutines.flow.StateFlow<Int> get() = entitlementRevision
@@ -212,7 +218,8 @@ class AppContainer(context: Context) {
     private val proDiscoveryReal = ProDiscoveryStore(
         context = appContext,
         kind = ProDiscoveryStoreKind.REAL,
-        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 },
+        userId = accountUserId
     )
     private val proDiscoverySimulation = ProDiscoveryStore(
         context = appContext,
@@ -238,9 +245,21 @@ class AppContainer(context: Context) {
         debugConfig = { ProDiscoveryDebugSelection.current() },
         promotionsEnabled = { promotionAvailability.promotionsEnabled() },
         onAvailability = { enabled -> promotionAvailability.setPromotionsEnabled(enabled) },
-        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 },
+        authorizeActivation = {
+            app.mymusclemap.data.promotion.ProDiscoveryTrialClient(
+                baseUrl = BuildConfig.STRICT_API_BASE_URL,
+                http = strictOkHttpClient(),
+                sessionToken = { strictAccount.sessions.read()?.accessToken?.value }
+            ).activate()
+        }
     )
-    val subscriptionProvider = InactiveSubscriptionProvider
+    val verifiedSubscriptions = VerifiedSubscriptionStore(
+        context = appContext,
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 },
+        userId = accountUserId
+    )
+    val subscriptionProvider = verifiedSubscriptions
     val founderLifetimeProvider = InactiveFounderLifetimeProvider
     val founderProgram = FounderProgramCoordinator(
         store = founderProgramStore,
@@ -301,6 +320,26 @@ class AppContainer(context: Context) {
 
     suspend fun refreshFounderProgramFromStore() {
         founderProgram.refresh()
+    }
+
+    suspend fun migrateLegacyTrial() {
+        val record = proDiscovery.persistedTrial()
+        val activatedAt = record.activatedAt ?: return
+        val expiresAt = record.expiresAt ?: return
+        val marker = java.io.File(appContext.noBackupFilesDir, "trial_migrated_$accountUserId")
+        if (marker.isFile) {
+            return
+        }
+        val result = app.mymusclemap.data.promotion.ProDiscoveryTrialClient(
+            baseUrl = BuildConfig.STRICT_API_BASE_URL,
+            http = strictOkHttpClient(),
+            sessionToken = { strictAccount.sessions.read()?.accessToken?.value }
+        ).migrate(activatedAt, expiresAt)
+        if (result is app.mymusclemap.data.promotion.TrialAuthorization.Granted ||
+            result is app.mymusclemap.data.promotion.TrialAuthorization.AlreadyUsed
+        ) {
+            marker.writeText("migrated")
+        }
     }
 
     suspend fun restoreFounderEntitlementCache() {
@@ -458,6 +497,23 @@ class AppContainer(context: Context) {
             )
         )
     }
+    private val billingVerifier = BillingVerificationClient(
+        baseUrl = BuildConfig.STRICT_API_BASE_URL,
+        http = strictOkHttpClient(),
+        sessionToken = { strictAccount.sessions.read()?.accessToken?.value }
+    )
+    private val billingGateway = BillingGatewaySelection.create(appContext)
+    val billing = BillingCoordinator(
+        gateway = billingGateway,
+        verifier = billingVerifier::verify,
+        store = verifiedSubscriptions
+    )
+
+    init {
+        billingGateway.setPurchaseListener { purchases, outcome ->
+            founderCacheScope.launch { billing.onUpdate(purchases, outcome) }
+        }
+    }
 
     private val founderZone = ZoneId.systemDefault()
     private val founderWorkoutOutbox = FounderWorkoutOutbox(appContext)
@@ -590,6 +646,25 @@ class AppContainer(context: Context) {
         get() = strictAccount.sessions
     val strictAuthRepository: StrictAuthRepository
         get() = strictAccount.repository
+
+    fun bindBilling(activity: android.app.Activity) {
+        billingGateway.bind(activity)
+    }
+
+    suspend fun refreshBilling() {
+        verifiedSubscriptions.load()
+        billing.refresh()
+    }
+
+    suspend fun launchBilling(activity: android.app.Activity) {
+        billing.launch(activity)
+    }
+
+    fun selectBillingOffer(offerToken: String) {
+        billing.selectOffer(offerToken)
+    }
+
+    fun paidSubscriptionSnapshot(): VerifiedPaidSubscription? = verifiedSubscriptions.snapshot()
 
     fun bindStrictSignIn(uiContext: Context) {
         strictAccount.google.bind(uiContext)

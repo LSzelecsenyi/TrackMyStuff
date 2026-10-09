@@ -3,9 +3,9 @@ package app.mymusclemap.domain.entitlement
 import java.time.Instant
 
 /**
- * Paid access cached from a store provider. Cancellation is [renewalCancelled];
- * Pro continues until [paidUntilInclusive]. Null means there is no paid period.
- * This type has no store, product id, or billing-client fields.
+ * Paid access cached from a store provider. Cancellation is [renewalCancelled].
+ * [paidUntilInclusive] is the Play expiry instant. Access is exclusive: Pro is
+ * off at that instant, not after it. Null means there is no paid period.
  */
 data class SubscriptionEntitlement(
     val paidUntilInclusive: Instant? = null,
@@ -13,7 +13,7 @@ data class SubscriptionEntitlement(
 ) {
     fun isValid(now: Instant): Boolean {
         val until = paidUntilInclusive ?: return false
-        return !now.isAfter(until)
+        return now.isBefore(until)
     }
 }
 

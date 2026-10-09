@@ -1,8 +1,8 @@
 package app.mymusclemap.data.auth
 
 /**
- * Account boundary for a later Founder sign-in. Ordinary Free startup does not call [signIn].
- * The Strict user id is taken only from the backend response.
+ * Every Strict user signs in before the main app. The Strict user id comes only
+ * from the backend response, never from a client-supplied email.
  */
 class StrictAuthRepository(
     private val google: GoogleIdentityProvider,
@@ -19,7 +19,11 @@ class StrictAuthRepository(
             is GoogleIdTokenRequest.Issued -> when (val exchanged = api.exchangeGoogleIdToken(googleResult.idToken)) {
                 is GoogleExchangeResult.Accepted -> {
                     sessions.write(exchanged.session)
-                    StrictSignInResult.SignedIn(exchanged.session.userId)
+                    StrictSignInResult.SignedIn(
+                        exchanged.session.userId,
+                        exchanged.email,
+                        exchanged.displayName
+                    )
                 }
                 GoogleExchangeResult.InvalidGoogleToken -> StrictSignInResult.InvalidGoogleToken
                 GoogleExchangeResult.Rejected -> StrictSignInResult.BackendRejected

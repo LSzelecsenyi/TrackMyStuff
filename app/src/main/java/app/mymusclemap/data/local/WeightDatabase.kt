@@ -43,11 +43,11 @@ abstract class WeightDatabase : RoomDatabase() {
     abstract fun targetWeightGoalDao(): TargetWeightGoalDao
 
     companion object {
-        fun create(context: Context): WeightDatabase {
+        fun create(context: Context, name: String = "weight_tracker.db"): WeightDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 WeightDatabase::class.java,
-                "weight_tracker.db"
+                name
             )
                 .addMigrations(
                     MIGRATION_1_2,

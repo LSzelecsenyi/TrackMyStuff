@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.workout
 
+import app.mymusclemap.ui.exercises.starterExerciseLabel
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -315,7 +317,7 @@ private fun HighlightCard(highlight: PerformanceHighlight) {
         )
         highlight.exerciseName?.let { name ->
             Text(
-                text = name,
+                text = starterExerciseLabel(name),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -396,7 +398,7 @@ private fun ExerciseBlock(exercise: WorkoutSummaryExercise) {
     val resources = LocalResources.current
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = exercise.name,
+            text = starterExerciseLabel(exercise.name),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface
         )

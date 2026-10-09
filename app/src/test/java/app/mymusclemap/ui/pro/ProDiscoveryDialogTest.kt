@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import app.mymusclemap.R
+import app.mymusclemap.domain.entitlement.formatTrialRemaining
 import app.mymusclemap.testString
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -50,17 +51,26 @@ class ProDiscoveryDialogTest {
     @Test
     fun activateIsExplicitAndViewPlansOnlyNavigates() {
         val expiresAt = Instant.parse("2026-08-22T15:00:00Z")
+        val now = expiresAt.minusSeconds(125)
         var plans = 0
         var later = 0
         composeRule.setContent {
             WeightTrackerThemeForPreview {
                 ProDiscoveryWarningDialog(
                     expiresAt = expiresAt,
+                    now = now,
                     onViewPlans = { plans += 1 },
                     onMaybeLater = { later += 1 }
                 )
             }
         }
+        composeRule.onNodeWithText(
+            testString(R.string.pro_discovery_warning_title, formatTrialRemaining(now, expiresAt))
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText("Your Pro trial ends in 2 days").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_discovery_view_plans))
+            .performScrollTo()
+            .assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.pro_discovery_warning_message))
             .performScrollTo()
             .assertIsDisplayed()

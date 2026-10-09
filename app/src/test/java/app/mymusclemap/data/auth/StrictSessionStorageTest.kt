@@ -65,7 +65,8 @@ class StrictSessionStorageTest {
     @Test
     fun applicationStartupDoesNotOpenAStrictSession() {
         val app = ApplicationProvider.getApplicationContext<WeightTrackerApplication>()
-        assertNull(app.container.strictAuthRepository.storedSession())
+        assertNull(app.signIn.auth.storedSession())
+        assertNull(app.container)
         val startup = File("src/main/java/app/mymusclemap/WeightTrackerApplication.kt").readText()
         val main = File("src/main/java/app/mymusclemap/MainActivity.kt").readText()
         assertFalse(startup.contains("signIn("))

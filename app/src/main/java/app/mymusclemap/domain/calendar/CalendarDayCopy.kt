@@ -7,7 +7,8 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 object CalendarDayCopy {
-    private val longDate = DateTimeFormatter.ofPattern("MMMM d, yyyy", AppLocale.UI)
+    private fun longDate(): DateTimeFormatter =
+        DateTimeFormatter.ofPattern("MMMM d, yyyy", AppLocale.UI)
 
     fun description(
         resources: Resources,
@@ -17,7 +18,7 @@ object CalendarDayCopy {
         isFuture: Boolean = false,
         plannedWorkoutCount: Int = 0
     ): String {
-        val parts = mutableListOf(date.format(longDate))
+        val parts = mutableListOf(date.format(longDate()))
         if (isToday) {
             parts += resources.getString(R.string.calendar_today_label)
         }

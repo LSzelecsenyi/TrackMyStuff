@@ -14,7 +14,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.round
 
-private val monthAbbrev: DateTimeFormatter =
+private fun monthAbbrev(): DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM", AppLocale.UI)
 
 internal fun ReportPeriod.displayTitle(): String {
@@ -23,8 +23,8 @@ internal fun ReportPeriod.displayTitle(): String {
         ReportKind.Yearly -> startInclusive.year.toString()
         ReportKind.Quarterly,
         ReportKind.HalfYear -> {
-            val start = YearMonth.from(startInclusive).format(monthAbbrev)
-            val end = YearMonth.from(endInclusive).format(monthAbbrev)
+            val start = YearMonth.from(startInclusive).format(monthAbbrev())
+            val end = YearMonth.from(endInclusive).format(monthAbbrev())
             "$start–$end ${startInclusive.year}"
         }
     }

@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.workoutimport
 
+import app.mymusclemap.ui.exercises.starterExerciseLabel
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -240,7 +242,7 @@ private fun MappingExerciseRow(exercise: Exercise, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp)
     ) {
-        Text(exercise.name, style = MaterialTheme.typography.titleSmall)
+        Text(starterExerciseLabel(exercise.name), style = MaterialTheme.typography.titleSmall)
         Text(
             text = listOf(
                 stringResource(exercise.measurementType.labelRes()),

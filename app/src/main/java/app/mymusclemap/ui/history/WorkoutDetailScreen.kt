@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.history
 
+import app.mymusclemap.ui.exercises.starterExerciseLabel
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -265,7 +267,7 @@ private fun ExerciseDetailSection(
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
-    Text(item.exercise.name, style = MaterialTheme.typography.titleLarge)
+    Text(starterExerciseLabel(item.exercise.name), style = MaterialTheme.typography.titleLarge)
     Text(
         text = stringResource(item.exercise.primaryMuscle.labelRes()),
         style = MaterialTheme.typography.bodyMedium

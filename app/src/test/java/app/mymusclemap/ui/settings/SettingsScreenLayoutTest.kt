@@ -460,9 +460,9 @@ class SettingsScreenLayoutTest {
             state = SettingsUiState(privacyPolicyUrl = null),
             onOpenPrivacyPolicy = { opens[0] += 1 }
         )
-        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsEnabled()
-        composeRule.onNodeWithText(testString(R.string.action_privacy_policy_in_app_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_privacy_policy_in_app_subtitle)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performClick()
         assertEquals(1, opens[0])
     }
@@ -474,9 +474,9 @@ class SettingsScreenLayoutTest {
             state = SettingsUiState(privacyPolicyUrl = "https://example.com/privacy"),
             onOpenPrivacyPolicy = { opens[0] += 1 }
         )
-        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).assertIsEnabled()
-        composeRule.onNodeWithText(testString(R.string.action_privacy_policy_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_privacy_policy_subtitle)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performClick()
         assertEquals(1, opens[0])
     }
@@ -602,6 +602,15 @@ class SettingsScreenLayoutTest {
         composeRule.waitForIdle()
     }
 
+    @Test
+    fun proPlanStaysAvailableWhenTheFounderEntryIsHidden() {
+        var opens = 0
+        render(showFounderProgram = false, onOpenProPlan = { opens += 1 })
+        composeRule.onNodeWithTag(SETTINGS_PRO_PLAN).performScrollTo().performClick()
+        org.junit.Assert.assertEquals(1, opens)
+        composeRule.onNodeWithText(testString(R.string.settings_pro_plan)).assertExists()
+    }
+
     private fun render(
         state: SettingsUiState = SettingsUiState(),
         width: Dp = 360.dp,
@@ -614,6 +623,7 @@ class SettingsScreenLayoutTest {
         onOpenPrivacyPolicy: () -> Unit = {},
         onOpenHelp: () -> Unit = {},
         onOpenFounderProgram: () -> Unit = {},
+        onOpenProPlan: () -> Unit = {},
         showFounderProgram: Boolean = true,
         showFounderBadge: Boolean = false,
         darkTheme: Boolean = false,
@@ -621,7 +631,10 @@ class SettingsScreenLayoutTest {
         onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
         lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
         onConfirmLockScreenEnable: () -> Unit = {},
-        onDismissLockScreenEnable: () -> Unit = {}
+        onDismissLockScreenEnable: () -> Unit = {},
+        accountName: String? = null,
+        accountEmail: String? = null,
+        onSignOut: () -> Unit = {}
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -659,6 +672,7 @@ class SettingsScreenLayoutTest {
                             onOpenPrivacyPolicy = onOpenPrivacyPolicy,
                             onOpenHelp = onOpenHelp,
                             onOpenFounderProgram = onOpenFounderProgram,
+                            onOpenProPlan = onOpenProPlan,
                             showFounderProgram = showFounderProgram,
                             showFounderBadge = showFounderBadge,
                             onMessageConsumed = {},
@@ -666,12 +680,28 @@ class SettingsScreenLayoutTest {
                             onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
                             lockScreenEnablePrompt = lockScreenEnablePrompt,
                             onConfirmLockScreenEnable = onConfirmLockScreenEnable,
-                            onDismissLockScreenEnable = onDismissLockScreenEnable
+                            onDismissLockScreenEnable = onDismissLockScreenEnable,
+                            accountName = accountName,
+                            accountEmail = accountEmail,
+                            onSignOut = onSignOut
                         )
                     }
                 }
             }
         }
         composeRule.waitForIdle()
+    }
+
+    @Test
+    fun accountSectionShowsTheSignedInGoogleAccountAndConfirmsSignOut() {
+        var signedOut = 0
+        render(accountName = "Ada", accountEmail = "ada@example.com", onSignOut = { signedOut += 1 })
+        composeRule.onNodeWithTag(SETTINGS_ACCOUNT).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Ada").assertIsDisplayed()
+        composeRule.onNodeWithText("ada@example.com").assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_SIGN_OUT).performScrollTo().performClick()
+        composeRule.onNodeWithText(testString(R.string.settings_sign_out_title)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.settings_sign_out))[1].performClick()
+        assertEquals(1, signedOut)
     }
 }

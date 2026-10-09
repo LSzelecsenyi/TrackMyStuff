@@ -41,8 +41,18 @@ class EntitlementResolverTest {
             ),
             now
         )
-        assertEquals(EntitlementTier.Pro, resolved.tier)
-        assertTrue(resolved.subscriptionValid)
+        assertEquals(EntitlementTier.Free, resolved.tier)
+        assertFalse(resolved.subscriptionValid)
+        val stillPaid = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                subscription = SubscriptionEntitlement(
+                    paidUntilInclusive = now.plusMillis(1),
+                    renewalCancelled = true
+                )
+            ),
+            now
+        )
+        assertEquals(EntitlementTier.Pro, stillPaid.tier)
     }
 
     @Test
@@ -247,6 +257,27 @@ class EntitlementResolverTest {
         )
         assertEquals(cached, EntitlementAuthority.afterPortableUserDataRestore(cached))
         assertEquals(EntitlementTier.Pro, EntitlementResolver.resolve(cached, now).tier)
+    }
+
+    @Test
+    fun paidProCanExpireWhilePromotionalProRemains() {
+        val stillPro = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                subscription = SubscriptionEntitlement(paidUntilInclusive = now.minusSeconds(1)),
+                promotionalPro = PromotionalProEntitlement(expiresAt = now.plusSeconds(60))
+            ),
+            now
+        )
+        assertFalse(stillPro.subscriptionValid)
+        assertTrue(stillPro.promotionalProActive)
+        assertEquals(EntitlementTier.Pro, stillPro.tier)
+        val ended = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                subscription = SubscriptionEntitlement(paidUntilInclusive = now.minusSeconds(1))
+            ),
+            now
+        )
+        assertEquals(EntitlementTier.Free, ended.tier)
     }
 
     private fun activePro(): FounderProgramState {

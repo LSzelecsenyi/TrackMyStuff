@@ -30,7 +30,11 @@ sealed interface GoogleIdTokenRequest {
 }
 
 sealed interface StrictSignInResult {
-    data class SignedIn(val userId: String) : StrictSignInResult
+    data class SignedIn(
+        val userId: String,
+        val email: String? = null,
+        val displayName: String? = null
+    ) : StrictSignInResult
     data object Cancelled : StrictSignInResult
     data object GoogleFailed : StrictSignInResult
     data object GoogleNotConfigured : StrictSignInResult
@@ -58,7 +62,11 @@ sealed interface StrictLogoutResult {
 }
 
 sealed interface GoogleExchangeResult {
-    data class Accepted(val session: StoredStrictSession) : GoogleExchangeResult
+    data class Accepted(
+        val session: StoredStrictSession,
+        val email: String? = null,
+        val displayName: String? = null
+    ) : GoogleExchangeResult
     data object InvalidGoogleToken : GoogleExchangeResult
     data object Rejected : GoogleExchangeResult
     data object Unavailable : GoogleExchangeResult

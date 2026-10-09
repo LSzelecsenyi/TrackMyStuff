@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.mymusclemap.R
+import app.mymusclemap.domain.entitlement.formatTrialRemaining
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.StrictBrand
 import java.time.Instant
@@ -126,7 +127,8 @@ fun ProDiscoveryOfferDialog(
 fun ProDiscoveryWarningDialog(
     expiresAt: Instant,
     onViewPlans: () -> Unit,
-    onMaybeLater: () -> Unit
+    onMaybeLater: () -> Unit,
+    now: Instant = Instant.now()
 ) {
     Dialog(
         onDismissRequest = onMaybeLater,
@@ -154,7 +156,10 @@ fun ProDiscoveryWarningDialog(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = stringResource(R.string.pro_discovery_warning_title),
+                        text = stringResource(
+                            R.string.pro_discovery_warning_title,
+                            formatTrialRemaining(now, expiresAt)
+                        ),
                         style = MaterialTheme.typography.titleLarge,
                         color = StrictBrand.lime,
                         textAlign = TextAlign.Center

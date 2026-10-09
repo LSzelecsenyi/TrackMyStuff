@@ -306,7 +306,20 @@ fun WeightTrackerNavHost(
     onActivateProDiscovery: () -> Unit = {},
     onDismissProDiscoveryOffer: () -> Unit = {},
     onDismissProDiscoveryWarning: () -> Unit = {},
-    onPromotionClock: () -> Unit = {}
+    onPromotionClock: () -> Unit = {},
+    billingScreen: app.mymusclemap.domain.billing.BillingScreenState =
+        app.mymusclemap.domain.billing.BillingScreenState(),
+    paidSubscription: () -> app.mymusclemap.domain.billing.VerifiedPaidSubscription? = { null },
+    onSelectBillingOffer: (String) -> Unit = {},
+    onSubscribe: () -> Unit = {},
+    onManageSubscription: (String) -> Unit = {},
+    accountName: String? = null,
+    accountEmail: String? = null,
+    onSignOut: () -> Unit = {},
+    showLanguageSetting: Boolean = false,
+    selectedLanguage: app.mymusclemap.domain.locale.AppLanguage =
+        app.mymusclemap.domain.locale.AppLanguage.EN,
+    onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {}
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -662,6 +675,15 @@ fun WeightTrackerNavHost(
                     onOpenFounderProgram = {
                         navController.navigateInternal(AppRoutes.FOUNDER_PROGRAM)
                     },
+                    onOpenProPlan = {
+                        navController.navigateInternal(AppRoutes.PRO_BENEFITS)
+                    },
+                    accountName = accountName,
+                    accountEmail = accountEmail,
+                    onSignOut = onSignOut,
+                    showLanguageSetting = showLanguageSetting,
+                    selectedLanguage = selectedLanguage,
+                    onLanguageSelected = onLanguageSelected,
                     onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) }
                 )
             }
@@ -704,11 +726,28 @@ fun WeightTrackerNavHost(
             composable(AppRoutes.PRO_BENEFITS) {
                 val benefits = remember(entitlementRevision) { proBenefitsStatus() }
                 val discovery = remember(entitlementRevision) { proDiscovery() }
+                val entitlement = remember(entitlementRevision) { currentEntitlement() }
+                val paid = remember(entitlementRevision) { paidSubscription() }
+                val now = promotionNow()
+                val plan = app.mymusclemap.domain.billing.proPlanPresentation(
+                    founderProActive = entitlement.founderProActive,
+                    founderLifetime = entitlement.founderLifetime,
+                    founderExpiresAt = benefits.expiresAt,
+                    trialExpiresAt = discovery.trialExpiresAt?.takeIf { discovery.trialActive },
+                    paid = paid,
+                    billing = billingScreen,
+                    now = now
+                )
                 ProBenefitsScreen(
                     status = benefits,
                     onBack = { navController.popBackStack() },
                     discovery = discovery,
-                    onActivateTrial = onActivateProDiscovery
+                    onActivateTrial = onActivateProDiscovery,
+                    now = now,
+                    plan = plan,
+                    onSelectOffer = onSelectBillingOffer,
+                    onSubscribe = onSubscribe,
+                    onManageSubscription = onManageSubscription
                 )
             }
             navigation(
@@ -1474,6 +1513,7 @@ fun WeightTrackerNavHost(
             if (expiresAt != null) {
                 ProDiscoveryWarningDialog(
                     expiresAt = expiresAt,
+                    now = promotionNow(),
                     onViewPlans = {
                         onDismissProDiscoveryWarning()
                         navController.navigateInternal(AppRoutes.PRO_BENEFITS)
@@ -1498,6 +1538,13 @@ private fun SettingsRoute(
     onOpenPrivacy: () -> Unit,
     onOpenOpenSourceLicenses: () -> Unit,
     onOpenFounderProgram: () -> Unit,
+    onOpenProPlan: () -> Unit,
+    accountName: String?,
+    accountEmail: String?,
+    onSignOut: () -> Unit,
+    showLanguageSetting: Boolean,
+    selectedLanguage: app.mymusclemap.domain.locale.AppLanguage,
+    onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit,
     showFounderProgram: Boolean,
     showFounderBadge: Boolean,
     onOpenHealthDetails: () -> Unit
@@ -1634,6 +1681,13 @@ private fun SettingsRoute(
         onOpenHelp = onOpenHelp,
         onOpenOpenSourceLicenses = onOpenOpenSourceLicenses,
         onOpenFounderProgram = onOpenFounderProgram,
+        onOpenProPlan = onOpenProPlan,
+        accountName = accountName,
+        accountEmail = accountEmail,
+        onSignOut = onSignOut,
+        showLanguageSetting = showLanguageSetting,
+        selectedLanguage = selectedLanguage,
+        onLanguageSelected = onLanguageSelected,
         showFounderProgram = showFounderProgram,
         showFounderBadge = showFounderBadge,
         onMessageConsumed = viewModel::consumeMessage,

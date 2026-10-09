@@ -2,7 +2,7 @@ package app.mymusclemap
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -12,7 +12,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import app.mymusclemap.data.account.VerifiedAccountProfile
+import app.mymusclemap.data.auth.StrictSignInResult
+import app.mymusclemap.ui.auth.WelcomeSignInScreen
+import app.mymusclemap.ui.theme.StrictBrand
+import app.mymusclemap.domain.billing.manageSubscriptionUrl
+import app.mymusclemap.domain.locale.AppLanguageApplicator
+import app.mymusclemap.domain.locale.AppLanguagePolicy
+import app.mymusclemap.domain.locale.SystemLanguage
+import app.mymusclemap.ui.widget.refreshHeatmapWidgets
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,7 +51,7 @@ import app.mymusclemap.ui.onboarding.OnboardingViewModel
 import app.mymusclemap.ui.pro.LocalFeatureEntitlements
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     @Volatile
     private var splashReady = false
     private val openPrivacyPolicy = mutableStateOf(false)
@@ -55,8 +69,14 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             acceptActiveWorkoutRequest(intent)
         }
-        val container = (application as WeightTrackerApplication).container
+        val app = application as WeightTrackerApplication
+        val container = app.container
         setContent {
+            if (container == null) {
+                SideEffect { splashReady = true }
+                WelcomeGate(app)
+                return@setContent
+            }
             val appearance by container.themePreferences.appearance.collectAsStateWithLifecycle(
                 initialValue = AppearanceSettings.Default
             )
@@ -124,6 +144,7 @@ class MainActivity : ComponentActivity() {
                         AppLaunchStage.App -> {
                             val founderViewModel: FounderProgramViewModel =
                                 viewModel(factory = container.viewModelFactory)
+                            val billingState by container.billing.screen.collectAsStateWithLifecycle()
                             WeightTrackerNavHost(
                                 factory = container.viewModelFactory,
                                 dateProvider = container.dateProvider,
@@ -146,7 +167,43 @@ class MainActivity : ComponentActivity() {
                                 onActivateProDiscovery = container::activateProDiscovery,
                                 onDismissProDiscoveryOffer = container::dismissProDiscoveryOffer,
                                 onDismissProDiscoveryWarning = container::dismissProDiscoveryWarning,
-                                onPromotionClock = container::notePromotionClock
+                                onPromotionClock = container::notePromotionClock,
+                                billingScreen = billingState,
+                                paidSubscription = container::paidSubscriptionSnapshot,
+                                onSelectBillingOffer = container::selectBillingOffer,
+                                onSubscribe = {
+                                    lifecycleScope.launch { container.launchBilling(this@MainActivity) }
+                                },
+                                onManageSubscription = { productId ->
+                                    val url = manageSubscriptionUrl(
+                                        packageName,
+                                        productId
+                                    )
+                                    startActivity(
+                                        Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                    )
+                                },
+                                accountName = app.accounts.profile()?.displayName,
+                                accountEmail = app.accounts.profile()?.email,
+                                showLanguageSetting = AppLanguagePolicy.systemAllowsChoice(
+                                    SystemLanguage.primary(this@MainActivity)
+                                ),
+                                selectedLanguage = app.resolvedLanguage,
+                                onLanguageSelected = { language ->
+                                    lifecycleScope.launch {
+                                        app.languages.write(language)
+                                        app.rememberLanguage(language)
+                                        AppLanguageApplicator.apply(language)
+                                        refreshHeatmapWidgets(this@MainActivity)
+                                    }
+                                },
+                                onSignOut = {
+                                    lifecycleScope.launch {
+                                        app.signIn.auth.logout()
+                                        app.accounts.clearActive()
+                                        app.restartProcess()
+                                    }
+                                }
                             )
                         }
                     }
@@ -158,18 +215,23 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        val container = (application as WeightTrackerApplication).container
+        val app = application as WeightTrackerApplication
+        app.signIn.bind(this)
+        val container = app.container ?: return
         container.bindStrictSignIn(this)
+        container.bindBilling(this)
         container.activeWorkoutNotifications.refresh()
         lifecycleScope.launch {
             container.refreshFounderProgramFromStore()
             container.refreshFounderAuthority()
             container.refreshPromotionAvailability()
+            container.refreshBilling()
         }
     }
 
     override fun onStop() {
-        (application as WeightTrackerApplication).container.unbindStrictSignIn(this)
+        (application as WeightTrackerApplication).signIn.unbind(this)
+        (application as WeightTrackerApplication).container?.unbindStrictSignIn(this)
         super.onStop()
     }
 
@@ -188,7 +250,7 @@ class MainActivity : ComponentActivity() {
         val sessionId = intent.getLongExtra(EXTRA_OPEN_ACTIVE_WORKOUT, -1L)
         intent.removeExtra(EXTRA_OPEN_ACTIVE_WORKOUT)
         if (sessionId <= 0L) return
-        val container = (application as WeightTrackerApplication).container
+        val container = (application as WeightTrackerApplication).container ?: return
         lifecycleScope.launch {
             val status = container.workoutSessionRepository.getAggregate(sessionId)?.session?.status
             activeWorkoutSessionId.value = if (status == SessionStatus.IN_PROGRESS) sessionId else null
@@ -207,3 +269,73 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_OPEN_ACTIVE_WORKOUT = "app.mymusclemap.OPEN_ACTIVE_WORKOUT"
     }
 }
+
+@Composable
+private fun WelcomeGate(app: WeightTrackerApplication) {
+    var busy by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val offline = app.startupDecision().offline
+    var message by remember { mutableStateOf<String?>(null) }
+    var claim by remember { androidx.compose.runtime.mutableStateOf<VerifiedAccountProfile?>(null) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(StrictBrand.dark)
+    ) {
+        WelcomeSignInScreen(
+            busy = busy,
+            message = message ?: if (offline) stringResource(R.string.welcome_offline_first) else null,
+            claimOpen = claim != null,
+            onContinue = {
+                if (busy) return@WelcomeSignInScreen
+                if (app.startupDecision().offline) {
+                    message = context.getString(R.string.welcome_offline_first)
+                    return@WelcomeSignInScreen
+                }
+                busy = true
+                message = null
+                scope.launch {
+                    when (val result = app.signIn.continueWithGoogle()) {
+                        is StrictSignInResult.SignedIn -> {
+                            val profile = VerifiedAccountProfile(
+                                userId = result.userId,
+                                email = result.email,
+                                displayName = result.displayName
+                            )
+                            if (app.accounts.legacyUnclaimed()) {
+                                claim = profile
+                            } else {
+                                app.accounts.activate(profile)
+                                app.restartProcess()
+                            }
+                        }
+                        StrictSignInResult.Cancelled ->
+                            message = context.getString(R.string.welcome_canceled)
+                        StrictSignInResult.Unavailable ->
+                            message = context.getString(R.string.welcome_unavailable)
+                        StrictSignInResult.InvalidGoogleToken ->
+                            message = context.getString(R.string.welcome_invalid)
+                        StrictSignInResult.GoogleNotConfigured ->
+                            message = context.getString(R.string.welcome_not_configured)
+                        StrictSignInResult.GoogleFailed,
+                        StrictSignInResult.BackendRejected ->
+                            message = context.getString(R.string.welcome_failed)
+                    }
+                    busy = false
+                }
+            },
+            onConfirmClaim = {
+                val profile = claim ?: return@WelcomeSignInScreen
+                app.accounts.claimLegacy(profile.userId)
+                app.accounts.activate(profile)
+                app.restartProcess()
+            },
+            onCancelClaim = {
+                claim = null
+                scope.launch { app.signIn.auth.logout() }
+            }
+        )
+    }
+}
+

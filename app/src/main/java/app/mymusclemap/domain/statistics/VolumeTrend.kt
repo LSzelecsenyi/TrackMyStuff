@@ -27,13 +27,13 @@ enum class VolumeTrendResolution {
 }
 
 object VolumeTrendAxis {
-    private val dayLabel: DateTimeFormatter =
+    private fun dayLabel(): DateTimeFormatter =
         DateTimeFormatter.ofPattern("MMM d", AppLocale.UI)
-    private val dayYearLabel: DateTimeFormatter =
+    private fun dayYearLabel(): DateTimeFormatter =
         DateTimeFormatter.ofPattern("MMM d, yy", AppLocale.UI)
-    private val monthLabel: DateTimeFormatter =
+    private fun monthLabel(): DateTimeFormatter =
         DateTimeFormatter.ofPattern("MMM", AppLocale.UI)
-    private val monthYearLabel: DateTimeFormatter =
+    private fun monthYearLabel(): DateTimeFormatter =
         DateTimeFormatter.ofPattern("MMM yyyy", AppLocale.UI)
 
     fun label(
@@ -46,9 +46,9 @@ object VolumeTrendAxis {
         return when (resolution) {
             VolumeTrendResolution.Daily,
             VolumeTrendResolution.Weekly ->
-                date.format(if (crossesYears) dayYearLabel else dayLabel)
+                date.format(if (crossesYears) dayYearLabel() else dayLabel())
             VolumeTrendResolution.Monthly ->
-                date.format(if (crossesYears) monthYearLabel else monthLabel)
+                date.format(if (crossesYears) monthYearLabel() else monthLabel())
         }
     }
 }

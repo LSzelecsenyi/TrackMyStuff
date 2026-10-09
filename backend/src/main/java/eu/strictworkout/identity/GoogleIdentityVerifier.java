@@ -46,7 +46,14 @@ final class GoogleIdentityVerifier implements ExternalIdentityVerifier {
             email = null;
             emailVerified = false;
         }
-        return new VerifiedExternalIdentity(IdentityProvider.GOOGLE, payload.getSubject(), email, email != null && emailVerified);
+        String name = payload.get("name") instanceof String value && !value.isBlank() ? value : null;
+        return new VerifiedExternalIdentity(
+                IdentityProvider.GOOGLE,
+                payload.getSubject(),
+                email,
+                email != null && emailVerified,
+                name
+        );
     }
 
     private static String text(String value) {

@@ -152,22 +152,22 @@ internal object ActiveWorkoutNotifications {
                 if (body.completable) {
                     val detail = currentSetLine(setLabel, valueLabel(context, body))
                     builder
-                        .setContentTitle(body.exerciseName)
+                        .setContentTitle(app.mymusclemap.domain.exercise.StarterExerciseNames.display(context.resources, body.exerciseName))
                         .setContentText(detail)
                         .setStyle(
                             NotificationCompat.BigTextStyle()
                                 .bigText(detail)
-                                .setBigContentTitle(body.exerciseName)
+                                .setBigContentTitle(app.mymusclemap.domain.exercise.StarterExerciseNames.display(context.resources, body.exerciseName))
                         )
                 } else {
                     val open = context.getString(R.string.notification_open_to_enter_set)
                     builder
-                        .setContentTitle(body.exerciseName)
+                        .setContentTitle(app.mymusclemap.domain.exercise.StarterExerciseNames.display(context.resources, body.exerciseName))
                         .setContentText(open)
                         .setStyle(
                             NotificationCompat.BigTextStyle()
                                 .bigText("$setLabel\n$open")
-                                .setBigContentTitle(body.exerciseName)
+                                .setBigContentTitle(app.mymusclemap.domain.exercise.StarterExerciseNames.display(context.resources, body.exerciseName))
                         )
                 }
             }

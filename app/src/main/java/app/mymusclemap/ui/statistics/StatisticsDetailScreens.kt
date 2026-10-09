@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.statistics
 
+import app.mymusclemap.ui.exercises.starterExerciseLabel
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -137,7 +139,7 @@ fun StatisticsExerciseListScreen(
         StatisticsCard {
             exercises.forEach { summary ->
                 DestinationRow(
-                    title = summary.name,
+                    title = starterExerciseLabel(summary.name),
                     subtitle = summary.recent?.let { bestLabel(it) },
                     onClick = { onOpenExercise(summary.exerciseId) },
                     testTag = "statistics-exercise-all-${summary.exerciseId}"
@@ -153,7 +155,7 @@ fun StatisticsExerciseDetailScreen(
     onBack: () -> Unit
 ) {
     StatisticsDetailScaffold(
-        title = summary?.name ?: stringResource(R.string.statistics_exercises_title),
+        title = summary?.name?.let { starterExerciseLabel(it) } ?: stringResource(R.string.statistics_exercises_title),
         testTag = STATISTICS_EXERCISE_DETAIL,
         onBack = onBack
     ) {
@@ -195,7 +197,7 @@ fun StatisticsExerciseDetailScreen(
                     points = summary.history.map { SeriesPoint(it.date, it.value) },
                     contentDescription = stringResource(
                         R.string.statistics_progress_chart_description,
-                        summary.name,
+                        starterExerciseLabel(summary.name),
                         summary.history.size
                     ),
                     subdued = true,

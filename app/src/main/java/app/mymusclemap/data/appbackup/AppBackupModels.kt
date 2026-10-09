@@ -20,6 +20,11 @@ import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
 import java.time.Instant
 
+/**
+ * ZIP backup of the open account database. The archive has no account id and no
+ * entitlement grants. Restore replaces that signed-in account only, after the
+ * existing destructive-replace warning. A legacy archive is accepted the same way.
+ */
 object AppBackupFormat {
     const val FORMAT = "my-muscle-map-backup"
     const val FORMAT_VERSION = 1

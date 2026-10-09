@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Email
@@ -130,6 +131,12 @@ internal const val SETTINGS_SEND_FEEDBACK = "settings-send-feedback"
 internal const val SETTINGS_PRIVACY_POLICY = "settings-privacy-policy"
 internal const val SETTINGS_OPEN_SOURCE_LICENSES = "settings-open-source-licenses"
 internal const val SETTINGS_APP_VERSION = "settings-app-version"
+internal const val SETTINGS_PRO_PLAN = "settings-pro-plan"
+internal const val SETTINGS_ACCOUNT = "settings-account"
+internal const val SETTINGS_LANGUAGE = "settings-language"
+internal const val SETTINGS_LANGUAGE_HU = "settings-language-hu"
+internal const val SETTINGS_LANGUAGE_EN = "settings-language-en"
+internal const val SETTINGS_SIGN_OUT = "settings-sign-out"
 internal const val SETTINGS_WEEKLY_GOAL = "settings-weekly-goal"
 internal const val SETTINGS_LOCK_SCREEN_SETS = "settings-lock-screen-sets"
 internal const val SETTINGS_LOCK_SCREEN_ENABLE = "settings-lock-screen-enable"
@@ -191,7 +198,15 @@ fun SettingsScreen(
     onOpenLockScreenAccessSettings: () -> Unit = {},
     lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
     onConfirmLockScreenEnable: () -> Unit = {},
-    onDismissLockScreenEnable: () -> Unit = {}
+    onDismissLockScreenEnable: () -> Unit = {},
+    onOpenProPlan: () -> Unit = {},
+    accountName: String? = null,
+    accountEmail: String? = null,
+    onSignOut: () -> Unit = {},
+    showLanguageSetting: Boolean = false,
+    selectedLanguage: app.mymusclemap.domain.locale.AppLanguage =
+        app.mymusclemap.domain.locale.AppLanguage.EN,
+    onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
@@ -250,6 +265,13 @@ fun SettingsScreen(
                         bottom = if (customEditorVisible) AppDimens.itemGap else AppDimens.scrollEndPadding
                     )
             ) {
+                if (showLanguageSetting) {
+                    LanguageSection(
+                        selected = selectedLanguage,
+                        onSelected = onLanguageSelected
+                    )
+                    CompactEditorDivider()
+                }
                 AppearanceSection(
                     state = state,
                     customEditorVisible = customEditorVisible,
@@ -261,6 +283,14 @@ fun SettingsScreen(
                     onDraftColorPicked = onDraftColorPicked,
                     onGenerateDark = onGenerateDark,
                     onResetCustomDraft = onResetCustomDraft
+                )
+                CompactEditorDivider()
+                ProPlanSection(onOpenProPlan = onOpenProPlan)
+                CompactEditorDivider()
+                AccountSection(
+                    name = accountName,
+                    email = accountEmail,
+                    onSignOut = onSignOut
                 )
                 if (showFounderProgram) {
                     CompactEditorDivider()
@@ -462,6 +492,36 @@ private fun SettingsSaveBar(
                     fontWeight = FontWeight.SemiBold
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun LanguageSection(
+    selected: app.mymusclemap.domain.locale.AppLanguage,
+    onSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit
+) {
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.settings_language))) {
+        Text(
+            text = stringResource(R.string.settings_language_body),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag(SETTINGS_LANGUAGE)
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        Column(modifier = Modifier.selectableGroup()) {
+            ChoiceRow(
+                label = stringResource(R.string.language_hungarian),
+                selected = selected == app.mymusclemap.domain.locale.AppLanguage.HU,
+                testTag = SETTINGS_LANGUAGE_HU,
+                onClick = { onSelected(app.mymusclemap.domain.locale.AppLanguage.HU) }
+            )
+            ChoiceRow(
+                label = stringResource(R.string.language_english),
+                selected = selected == app.mymusclemap.domain.locale.AppLanguage.EN,
+                testTag = SETTINGS_LANGUAGE_EN,
+                onClick = { onSelected(app.mymusclemap.domain.locale.AppLanguage.EN) }
+            )
         }
     }
 }
@@ -986,6 +1046,71 @@ private fun AppBackupSection(
             subtitle = stringResource(R.string.action_restore_app_backup_subtitle),
             testTag = SETTINGS_APP_BACKUP_RESTORE,
             onClick = onRestoreClick
+        )
+    }
+}
+
+@Composable
+private fun AccountSection(
+    name: String?,
+    email: String?,
+    onSignOut: () -> Unit
+) {
+    var confirm by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.settings_account))) {
+        Text(
+            text = name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.settings_account_signed_in),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.testTag(SETTINGS_ACCOUNT)
+        )
+        if (!email.isNullOrBlank()) {
+            Text(
+                text = email,
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(AppDimens.itemGap))
+        DataActionRow(
+            icon = Icons.Outlined.Email,
+            title = stringResource(R.string.settings_sign_out),
+            subtitle = stringResource(R.string.settings_sign_out_body),
+            testTag = SETTINGS_SIGN_OUT,
+            onClick = { confirm = true }
+        )
+    }
+    if (confirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(stringResource(R.string.settings_sign_out_title)) },
+            text = { Text(stringResource(R.string.settings_sign_out_body)) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirm = false
+                    onSignOut()
+                }) {
+                    Text(stringResource(R.string.settings_sign_out))
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ProPlanSection(onOpenProPlan: () -> Unit) {
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.settings_pro_plan))) {
+        DataActionRow(
+            icon = Icons.Filled.Star,
+            title = stringResource(R.string.settings_pro_plan),
+            subtitle = stringResource(R.string.settings_pro_plan_subtitle),
+            testTag = SETTINGS_PRO_PLAN,
+            onClick = onOpenProPlan
         )
     }
 }

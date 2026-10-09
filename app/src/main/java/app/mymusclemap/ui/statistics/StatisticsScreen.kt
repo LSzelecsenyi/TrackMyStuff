@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.statistics
 
+import app.mymusclemap.ui.exercises.starterExerciseLabel
+
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -395,7 +397,7 @@ private fun ExerciseSection(
             StatisticsCard {
                 TrainingStatisticsLogic.summaryExercises(exercises).forEach { summary ->
                     DestinationRow(
-                        title = summary.name,
+                        title = starterExerciseLabel(summary.name),
                         subtitle = latestSubtitle(summary),
                         onClick = { onOpenExercise(summary.exerciseId) },
                         testTag = "statistics-exercise-${summary.exerciseId}"

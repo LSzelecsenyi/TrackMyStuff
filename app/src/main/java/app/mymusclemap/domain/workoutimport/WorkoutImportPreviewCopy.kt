@@ -12,11 +12,11 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 object WorkoutImportPreviewCopy {
-    private val dateFormat: DateTimeFormatter =
+    private fun dateFormat(): DateTimeFormatter =
         DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.UI)
     private val timeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
-    fun dateLabel(date: LocalDate): String = date.format(dateFormat)
+    fun dateLabel(date: LocalDate): String = date.format(dateFormat())
 
     fun dateRange(range: ClosedRange<LocalDate>?): String {
         if (range == null) {

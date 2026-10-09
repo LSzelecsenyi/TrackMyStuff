@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.reports
 
+import app.mymusclemap.ui.exercises.starterExerciseLabel
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -478,7 +480,7 @@ private fun HighlightsSection(highlights: List<ReportExerciseHighlight>) {
                         Spacer(Modifier.height(AppDimens.itemGap))
                     }
                     Text(
-                        text = highlight.name,
+                        text = starterExerciseLabel(highlight.name),
                         style = AppTypeTokens.statValue,
                         color = MaterialTheme.colorScheme.onBackground
                     )

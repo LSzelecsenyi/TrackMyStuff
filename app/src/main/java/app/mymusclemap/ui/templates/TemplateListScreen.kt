@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.templates
 
+import app.mymusclemap.ui.exercises.joinedStarterNames
+
 import android.os.SystemClock
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -424,7 +426,7 @@ private fun TemplateRow(
             if (item.exerciseNames.isNotEmpty()) {
                 Spacer(Modifier.height(AppDimens.statSecondaryGap))
                 Text(
-                    text = item.exerciseNames.joinToString(" · "),
+                    text = joinedStarterNames(item.exerciseNames),
                     style = AppTypeTokens.statCaption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,

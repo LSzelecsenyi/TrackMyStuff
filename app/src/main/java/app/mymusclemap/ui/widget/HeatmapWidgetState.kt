@@ -15,6 +15,7 @@ internal object HeatmapWidgetState {
 
     suspend fun load(context: Context): MuscleHeatmapState {
         val container = (context.applicationContext as WeightTrackerApplication).container
+            ?: return from(emptyList(), LocalDate.now())
         val exercises = container.workoutSessionRepository.observeHeatmapExercises().first()
         return from(exercises, container.dateProvider.today())
     }

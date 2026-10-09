@@ -10,6 +10,7 @@ class ActiveWorkoutSetReceiver : BroadcastReceiver() {
         val ids = ActiveWorkoutNotifications.completionIds(intent) ?: return
         val app = context.applicationContext as? WeightTrackerApplication ?: return
         val pending = goAsync()
-        app.container.activeWorkoutNotifications.completeFromAction(ids.first, ids.second, pending)
+        val container = app.container ?: return
+        container.activeWorkoutNotifications.completeFromAction(ids.first, ids.second, pending)
     }
 }

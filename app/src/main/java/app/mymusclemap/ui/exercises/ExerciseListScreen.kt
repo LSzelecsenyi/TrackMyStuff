@@ -277,7 +277,7 @@ fun ExerciseListScreen(
             onDismissRequest = onDismissDelete,
             title = { Text(stringResource(R.string.exercise_delete_title)) },
             text = {
-                Text(stringResource(R.string.exercise_delete_message, exercise.name))
+                Text(stringResource(R.string.exercise_delete_message, starterExerciseLabel(exercise.name)))
             },
             confirmButton = {
                 TextButton(onClick = onConfirmDelete) {
@@ -448,6 +448,7 @@ private fun ExerciseRow(
             add(resources.getString(exercise.weightInterpretation.labelRes()))
         }
     }.joinToString(" · ")
+    val displayName = starterExerciseLabel(exercise.name)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -457,13 +458,13 @@ private fun ExerciseRow(
             .testTag(catalogRowTag(exercise.id))
             .semantics {
                 role = Role.Button
-                contentDescription = exercise.name
+                contentDescription = displayName
             },
         verticalAlignment = Alignment.Top
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = exercise.name,
+                text = displayName,
                 style = AppTypeTokens.sectionTitle,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -517,7 +518,7 @@ private fun ExerciseRow(
             ) {
                 Icon(
                     imageVector = Icons.Filled.MoreVert,
-                    contentDescription = stringResource(R.string.exercise_more_actions, exercise.name)
+                    contentDescription = stringResource(R.string.exercise_more_actions, starterExerciseLabel(exercise.name))
                 )
             }
             DropdownMenu(

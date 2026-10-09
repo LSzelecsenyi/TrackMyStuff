@@ -42,7 +42,9 @@ curl http://localhost:8082/api/v1/health
 
 ## Authentication
 
-Free use of Strict does not require an account. When a feature needs a durable server identity, the client sends a Google ID token:
+Every Strict user signs in with Google before the main app. Workouts stay on the device. Sign-in does not upload a cloud copy of the workout log.
+
+The client sends a Google ID token:
 
 ```shell
 curl -s -X POST http://localhost:8082/api/v1/auth/google \
@@ -73,6 +75,18 @@ Session lifetime, ISO-8601 or Spring duration, default `30d`:
 There is no refresh token. After expiry the client signs in with Google again. Logout does not affect the user's other sessions.
 
 The local profile starts without a Google client id and then rejects every Google token. Do not add a development backdoor. Automated tests stub verification instead of calling Google. Production must set `STRICT_GOOGLE_CLIENT_ID` with the `prod` profile.
+
+The Google subject (`sub`) is the external identity key. Email is not the account id. A normal Google account is never an admin. Admin access stays on the separate admin allowlist.
+
+Workout history stays in an account-scoped database on the phone. Sign-out does not delete it. Another Google account on the same phone opens a different database. ZIP restore replaces only the signed-in account's open database. Founder Pro, the Pro Discovery trial, and paid subscriptions are not restored from that ZIP.
+
+Pro Discovery activation is `POST /api/v1/promotions/pro-discovery/activate` with the session bearer. The server stores one 14-day trial per user. A legacy on-device trial can be imported once with `POST /api/v1/promotions/pro-discovery/migrate`. Those client timestamps are clamped to 14 days and are not proof of the workout history.
+
+Play purchase verification is `POST /api/v1/billing/subscriptions/verify` and requires the same bearer. The user id comes from the session. A purchase token already linked to another user is rejected. Real-time developer notifications stay on `POST /api/v1/billing/rtdn` and use Google push authentication, not a user session.
+
+A phone that already signed in can keep using its local workouts offline until the known Pro expiry. The first sign-in needs the network. Paid Pro is not extended because the device is offline.
+
+Debug builds can still simulate Founder, Pro Discovery, and billing with `strict.entitlementOverride`, `strict.debug.proDiscovery`, and `strict.debug.billing` in gitignored `local.properties`. Those modes stay on the device. They do not write Founder grants, promotional trials, or verified Play subscriptions, and they do not skip Google sign-in. Release builds ignore them. Sign-in, sign-out, offline return, account switch, trial restore, and a billing ownership mismatch are exercised with a real Google account and the existing debug billing modes. There is no production authentication bypass.
 
 ## Founder program
 

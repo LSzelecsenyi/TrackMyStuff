@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.templates
 
+import app.mymusclemap.ui.exercises.starterExerciseLabel
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -395,7 +397,7 @@ private fun PickerPane(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(exercise.name, style = MaterialTheme.typography.titleMedium)
+                    Text(starterExerciseLabel(exercise.name), style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = stringResource(
                             R.string.exercise_row_meta,
@@ -451,7 +453,7 @@ private fun ExerciseCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("${index + 1}. ${exercise.name}", style = MaterialTheme.typography.titleMedium)
+                    Text("${index + 1}. ${starterExerciseLabel(exercise.name)}", style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = buildString {
                             append(stringResource(exercise.measurementType.labelRes()))

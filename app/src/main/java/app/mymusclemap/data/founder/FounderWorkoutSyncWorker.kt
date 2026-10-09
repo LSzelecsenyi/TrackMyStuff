@@ -22,7 +22,8 @@ class FounderWorkoutSyncWorker(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext as? WeightTrackerApplication ?: return Result.failure()
-        return when (app.container.flushFounderWorkoutOutbox()) {
+        val container = app.container ?: return Result.retry()
+        return when (container.flushFounderWorkoutOutbox()) {
             FounderWorkoutFlush.Retry -> Result.retry()
             FounderWorkoutFlush.Done -> Result.success()
         }

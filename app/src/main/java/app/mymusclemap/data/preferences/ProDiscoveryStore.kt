@@ -42,11 +42,24 @@ enum class ProDiscoveryStoreKind {
 class ProDiscoveryStore(
     context: Context,
     kind: ProDiscoveryStoreKind,
-    private val onChanged: () -> Unit = {}
+    private val onChanged: () -> Unit = {},
+    userId: String? = null
 ) : ProDiscoveryStateStore {
-    private val dataStore = when (kind) {
-        ProDiscoveryStoreKind.REAL -> context.applicationContext.proDiscoveryStore
-        ProDiscoveryStoreKind.SIMULATION -> context.applicationContext.proDiscoverySimulationStore
+    private val dataStore = if (userId == null) {
+        when (kind) {
+            ProDiscoveryStoreKind.REAL -> context.applicationContext.proDiscoveryStore
+            ProDiscoveryStoreKind.SIMULATION -> context.applicationContext.proDiscoverySimulationStore
+        }
+    } else {
+        androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(
+            scope = kotlinx.coroutines.CoroutineScope(
+                kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+            ),
+            produceFile = {
+                val name = if (kind == ProDiscoveryStoreKind.REAL) "pro_discovery" else "pro_discovery_simulation"
+                java.io.File(context.applicationContext.filesDir, "datastore/${name}_$userId.preferences_pb")
+            }
+        )
     }
     private val mutex = Mutex()
     private var memory = ProDiscoveryRecord()

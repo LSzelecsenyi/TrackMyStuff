@@ -84,6 +84,26 @@ val strictProDiscoveryWarningBeforeSeconds = optionalDebugSeconds(
     "strict.debug.proDiscoveryWarningBeforeSeconds",
     "STRICT_DEBUG_PRO_DISCOVERY_WARNING_BEFORE_SECONDS"
 )
+val strictBillingProductIds = optionalBuildValue(
+    "strict.billing.productIds",
+    "STRICT_BILLING_PRODUCT_IDS"
+).orEmpty()
+val allowedDebugBilling = setOf(
+    "REAL",
+    "AVAILABLE",
+    "LOADING",
+    "UNAVAILABLE",
+    "CANCELED",
+    "PENDING",
+    "VERIFY_FAIL",
+    "ACTIVE",
+    "EXPIRED"
+)
+val strictDebugBilling = optionalBuildValue("strict.debug.billing", "STRICT_DEBUG_BILLING") ?: "REAL"
+// Debug entitlement, Pro Discovery, and billing values never bypass Google sign-in.
+require(strictDebugBilling in allowedDebugBilling) {
+    "strict.debug.billing must be one of ${allowedDebugBilling.joinToString(", ")}. Found \"$strictDebugBilling\"."
+}
 
 fun releaseSigningValue(propertyName: String, envName: String): String? {
     System.getenv(envName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -149,6 +169,7 @@ android {
             }
             buildConfigField("String", "STRICT_API_BASE_URL", buildConfigString(strictReleaseApiUrl))
             buildConfigField("String", "STRICT_GOOGLE_SERVER_CLIENT_ID", buildConfigString(strictGoogleServerClientId))
+            buildConfigField("String", "STRICT_BILLING_PRODUCT_IDS", buildConfigString(strictBillingProductIds))
         }
         debug {
             isMinifyEnabled = false
@@ -156,6 +177,8 @@ android {
             versionNameSuffix = "-debug"
             buildConfigField("String", "STRICT_API_BASE_URL", buildConfigString(strictDebugApiUrl))
             buildConfigField("String", "STRICT_GOOGLE_SERVER_CLIENT_ID", buildConfigString(strictGoogleServerClientId))
+            buildConfigField("String", "STRICT_BILLING_PRODUCT_IDS", buildConfigString(strictBillingProductIds))
+            buildConfigField("String", "STRICT_DEBUG_BILLING", buildConfigString(strictDebugBilling))
             buildConfigField(
                 "String",
                 "STRICT_ENTITLEMENT_OVERRIDE",
@@ -224,6 +247,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
             includeTestsMatching("app.mymusclemap.FounderProgramRuleSelectionTest")
             includeTestsMatching("app.mymusclemap.EntitlementOverrideSelectionReleaseTest")
             includeTestsMatching("app.mymusclemap.ProDiscoveryDebugSelectionReleaseTest")
+            includeTestsMatching("app.mymusclemap.BillingGatewaySelectionReleaseTest")
         }
     }
     systemProperty("demo.backup.write", (findProperty("demo.backup.write") ?: "false").toString())
@@ -242,6 +266,7 @@ room {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -268,6 +293,7 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.google.id)
     implementation(libs.okhttp)
+    implementation(libs.billing)
     implementation(libs.androidx.work.runtime)
 
     testImplementation(libs.okhttp.mockwebserver)

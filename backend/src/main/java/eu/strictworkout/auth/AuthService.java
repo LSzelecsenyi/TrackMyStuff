@@ -30,7 +30,12 @@ public class AuthService {
         VerifiedExternalIdentity verified = identities.verify(idToken);
         AppUser user = identityService.resolve(verified);
         AuthSessionService.IssuedSession issued = sessions.create(user.getId());
-        return new SessionIssued(issued.rawToken(), "Bearer", issued.expiresAt(), new UserRef(issued.userId()));
+        return new SessionIssued(
+                issued.rawToken(),
+                "Bearer",
+                issued.expiresAt(),
+                new UserRef(issued.userId(), verified.email(), verified.displayName())
+        );
     }
 
     public void logout(StrictPrincipal principal) {
@@ -40,6 +45,6 @@ public class AuthService {
     public record SessionIssued(String accessToken, String tokenType, Instant expiresAt, UserRef user) {
     }
 
-    public record UserRef(UUID id) {
+    public record UserRef(UUID id, String email, String displayName) {
     }
 }

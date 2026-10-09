@@ -12,6 +12,7 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
@@ -142,6 +143,13 @@ private fun BodyImage(
             .semantics { testTag = tag },
         contentScale = ContentScale.Fit
     )
+}
+
+suspend fun refreshHeatmapWidgets(context: Context) {
+    val widget = MuscleHeatmapWidget()
+    GlanceAppWidgetManager(context).getGlanceIds(MuscleHeatmapWidget::class.java).forEach { id ->
+        widget.update(context, id)
+    }
 }
 
 internal const val HEATMAP_WIDGET_TAG = "heatmap-widget"

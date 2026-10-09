@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="calendar_completed_workouts">
+        <item quantity="one">%d befejezett edzés</item>
+        <item quantity="other">%d befejezett edzés</item>
+    </plurals>
+    <plurals name="calendar_planned_workouts">
+        <item quantity="one">%d tervezett edzés</item>
+        <item quantity="other">%d tervezett edzés</item>
+    </plurals>
+    <plurals name="weekly_goal_streak">
+        <item quantity="one">%d hetes széria</item>
+        <item quantity="other">%d hetes széria</item>
+    </plurals>
+    <plurals name="weekly_overview_workouts">
+        <item quantity="one">%d edzés</item>
+        <item quantity="other">%d edzés</item>
+    </plurals>
+    <plurals name="weekly_overview_sets">
+        <item quantity="one">%d sorozat</item>
+        <item quantity="other">%d sorozat</item>
+    </plurals>
+    <plurals name="heatmap_days_ago">
+        <item quantity="one">%d napja</item>
+        <item quantity="other">%d napja</item>
+    </plurals>
+    <plurals name="finish_pending_body">
+        <item quantity="one">Még %d befejezetlen sorozat van.</item>
+        <item quantity="other">Még %d befejezetlen sorozat van.</item>
+    </plurals>
+    <plurals name="workout_import_occurrences">
+        <item quantity="one">%d előfordulás</item>
+        <item quantity="other">%d előfordulás</item>
+    </plurals>
+    <plurals name="statistics_workouts">
+        <item quantity="one">%d edzés</item>
+        <item quantity="other">%d edzés</item>
+    </plurals>
+    <plurals name="statistics_training_days">
+        <item quantity="one">%d nap</item>
+        <item quantity="other">%d nap</item>
+    </plurals>
+    <plurals name="statistics_muscle_sets">
+        <item quantity="one">%d sorozat</item>
+        <item quantity="other">%d sorozat</item>
+    </plurals>
+    <plurals name="statistics_completions">
+        <item quantity="one">%d alkalom</item>
+        <item quantity="other">%d alkalom</item>
+    </plurals>
+    <plurals name="statistics_rest_whole_days">
+        <item quantity="one">%d nap</item>
+        <item quantity="other">%d nap</item>
+    </plurals>
+    <plurals name="founder_challenge_workouts">
+        <item quantity="one">Teljesíts %d beszámítható Strict-edzést</item>
+        <item quantity="other">Teljesíts %d beszámítható Strict-edzést</item>
+    </plurals>
+    <plurals name="founder_challenge_days">
+        <item quantity="one">Edzz legalább %d különböző napon</item>
+        <item quantity="other">Edzz legalább %d különböző napon</item>
+    </plurals>
+    <plurals name="founder_challenge_window">
+        <item quantity="one">Teljesíts mindent %d napon belül</item>
+        <item quantity="other">Teljesíts mindent %d napon belül</item>
+    </plurals>
+    <plurals name="founder_temporary_pro_offer">
+        <item quantity="one">Teljesítsd az első beszámítható edzésedet, hogy feloldd az Ideiglenes Pro-t, amíg folytatod a programot.</item>
+        <item quantity="other">Teljesítsd az első %d beszámítható edzésedet, hogy feloldd az Ideiglenes Pro-t, amíg folytatod a programot.</item>
+    </plurals>
+    <plurals name="founder_unlock_temporary_pro">
+        <item quantity="one">Teljesíts %d beszámítható edzést az Ideiglenes Pro feloldásához.</item>
+        <item quantity="other">Teljesíts %d beszámítható edzést az Ideiglenes Pro feloldásához.</item>
+    </plurals>
+    <plurals name="founder_next_workouts">
+        <item quantity="one">Következő lépés: teljesíts még %d beszámítható edzést.</item>
+        <item quantity="other">Következő lépés: teljesíts még %d beszámítható edzést.</item>
+    </plurals>
+    <plurals name="founder_next_days">
+        <item quantity="one">Következő lépés: edzz még %d napon.</item>
+        <item quantity="other">Következő lépés: edzz még %d napon.</item>
+    </plurals>
+    <plurals name="founder_progress_workouts">
+        <item quantity="one">%1$d / %2$d beszámítható edzés</item>
+        <item quantity="other">%1$d / %2$d beszámítható edzés</item>
+    </plurals>
+    <plurals name="founder_progress_days">
+        <item quantity="one">%1$d / %2$d edzésnap</item>
+        <item quantity="other">%1$d / %2$d edzésnap</item>
+    </plurals>
+    <plurals name="founder_progress_temporary_pro">
+        <item quantity="one">%1$d / %2$d edzés az Ideiglenes Pro felé</item>
+        <item quantity="other">%1$d / %2$d edzés az Ideiglenes Pro felé</item>
+    </plurals>
+    <plurals name="celebration_history_body">
+        <item quantity="one">Az edzéselőzményeid %d jelvényt szereztek.</item>
+        <item quantity="other">Az edzéselőzményeid %d jelvényt szereztek.</item>
+    </plurals>
+</resources>

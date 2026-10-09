@@ -68,8 +68,7 @@ class OkHttpStrictBackendApi(
                     GoogleExchangeResult.InvalidGoogleToken
                 response.code == 401 || !response.isSuccessful ->
                     GoogleExchangeResult.Rejected
-                else -> parseSession(response.body.string())
-                    ?.let { GoogleExchangeResult.Accepted(it) }
+                else -> parseAccepted(response.body.string())
                     ?: GoogleExchangeResult.Rejected
             }
         } ?: GoogleExchangeResult.Unavailable
@@ -275,6 +274,17 @@ class OkHttpStrictBackendApi(
     private fun errorCode(response: okhttp3.Response): String? {
         val raw = response.body.string()
         return runCatching { JSONObject(raw).optString("errorCode").takeIf { it.isNotBlank() } }.getOrNull()
+    }
+
+    private fun parseAccepted(raw: String): GoogleExchangeResult.Accepted? {
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+        val session = parseSession(raw) ?: return null
+        val user = json.optJSONObject("user")
+        return GoogleExchangeResult.Accepted(
+            session,
+            user?.optString("email")?.ifBlank { null },
+            user?.optString("displayName")?.ifBlank { null }
+        )
     }
 
     private fun parseSession(raw: String): StoredStrictSession? {

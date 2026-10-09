@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.workout
 
+import app.mymusclemap.ui.exercises.starterExerciseLabel
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -549,7 +551,7 @@ fun ActiveWorkoutScreen(
     }
     if (historyOpen && historyExercise != null && historySet != null && historySelection != null) {
         ExerciseHistorySheet(
-            exerciseName = historyExercise.exercise.name,
+            exerciseName = starterExerciseLabel(historyExercise.exercise.name),
             selection = historySelection,
             comparisonPosition = historySet.position,
             onDismiss = { historyOpen = false }
@@ -788,7 +790,7 @@ private fun ExerciseBlock(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = item.exercise.name,
+                        text = starterExerciseLabel(item.exercise.name),
                         style = AppTypeTokens.sectionTitle,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
@@ -833,7 +835,7 @@ private fun ExerciseBlock(
             Spacer(Modifier.height(AppDimens.itemGap))
             item.sets.forEachIndexed { index, set ->
                 SetRow(
-                    exerciseName = item.exercise.name,
+                    exerciseName = starterExerciseLabel(item.exercise.name),
                     item = item,
                     set = set,
                     draft = state.drafts[set.id] ?: ActualSetLogic.draftFromSet(set),
@@ -1001,12 +1003,12 @@ private fun SetRow(
             }
             Text(
                 text = if (current) {
-                    item.exercise.name
+                    starterExerciseLabel(item.exercise.name)
                 } else {
                     stringResource(
                         R.string.field_set_label_with_exercise,
                         set.position + 1,
-                        item.exercise.name
+                        starterExerciseLabel(item.exercise.name)
                     )
                 },
                 style = AppTypeTokens.sectionTitle,

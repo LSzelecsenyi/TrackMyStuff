@@ -28,7 +28,8 @@ class ProDiscoveryCoordinator(
     private val onChanged: () -> Unit = {},
     var coverage: () -> ProDiscoveryCoverage = {
         ProDiscoveryCoverage(currentlyFree = true, continuedBeyond = { false })
-    }
+    },
+    private val authorizeActivation: suspend () -> TrialAuthorization = { TrialAuthorization.Local }
 ) {
     private var history: List<Instant> = emptyList()
 
@@ -108,6 +109,18 @@ class ProDiscoveryCoordinator(
         if (!snapshot().offerAvailable) {
             return ProDiscoveryActivation.NotEligible
         }
+        if (!config.usesSimulationStore) {
+            when (val authorized = authorizeActivation()) {
+                TrialAuthorization.Local -> Unit
+                is TrialAuthorization.Granted -> {
+                    store.activate(authorized.activatedAt, authorized.expiresAt)
+                    return ProDiscoveryActivation.Started(authorized.expiresAt)
+                }
+                TrialAuthorization.AlreadyUsed -> return ProDiscoveryActivation.AlreadyUsed
+                TrialAuthorization.Rejected -> return ProDiscoveryActivation.NotEligible
+                TrialAuthorization.Unavailable -> return ProDiscoveryActivation.Unavailable
+            }
+        }
         val expiresAt = start.plus(config.trialDuration())
         store.activate(start, expiresAt)
         return ProDiscoveryActivation.Started(store.current().expiresAt ?: expiresAt)
@@ -120,6 +133,8 @@ class ProDiscoveryCoordinator(
     suspend fun dismissWarning() {
         storeFor(debugConfig()).dismissWarning()
     }
+
+    fun persistedTrial(): app.mymusclemap.domain.entitlement.ProDiscoveryRecord = real.current()
 
     private fun facts(): ProDiscoveryFacts {
         val config = debugConfig()

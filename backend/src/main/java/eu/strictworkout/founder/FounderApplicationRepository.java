@@ -18,6 +18,9 @@ public interface FounderApplicationRepository extends JpaRepository<FounderAppli
     @Query("select application.id from FounderApplication application where application.user.id = :userId")
     Optional<UUID> findIdByUserId(@Param("userId") UUID userId);
 
+    @Query("select application.status from FounderApplication application where application.user.id = :userId")
+    Optional<FounderStatus> findStatusByUserId(@Param("userId") UUID userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select application from FounderApplication application where application.id = :id")
     Optional<FounderApplication> lockById(@Param("id") UUID id);

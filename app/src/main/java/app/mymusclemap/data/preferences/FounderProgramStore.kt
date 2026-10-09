@@ -25,8 +25,19 @@ private val Context.founderProgramDataStore: DataStore<Preferences> by preferenc
     name = FounderProgramStore.PREFERENCES_NAME
 )
 
-class FounderProgramStore(context: Context) {
-    private val dataStore = context.applicationContext.founderProgramDataStore
+class FounderProgramStore(context: Context, userId: String? = null) {
+    private val dataStore = if (userId == null) {
+        context.applicationContext.founderProgramDataStore
+    } else {
+        androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(
+            scope = kotlinx.coroutines.CoroutineScope(
+                kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+            ),
+            produceFile = {
+                java.io.File(context.applicationContext.filesDir, "datastore/founder_program_$userId.preferences_pb")
+            }
+        )
+    }
 
     suspend fun load(): FounderProgramState {
         val prefs = dataStore.data.first()
