@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <!-- Cleartext is limited to this debug source set so release stays HTTPS-only. -->
-    <base-config cleartextTrafficPermitted="true" />
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      This file is in the debug source set. Release builds do not merge it.
+      Debug talks to http://127.0.0.1:8082, and an emulator can use http://10.0.2.2:8082.
+      Network Security Config cannot name those IP literals in a domain-config,
+      so the debug base config allows cleartext. Release stays HTTPS-only.
+    -->
+    <base-config
+        cleartextTrafficPermitted="true"
+        tools:ignore="InsecureBaseConfiguration" />
 </network-security-config>

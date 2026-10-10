@@ -9,4 +9,9 @@ class PromotionConfiguration {
     PromotionalTrialService promotionalTrialService(JpaPromotionalTrialStore store) {
         return new PromotionalTrialService(store);
     }
+
+    @Bean
+    WelcomeBackService welcomeBackService(JpaWelcomeBackStore store) {
+        return new WelcomeBackService(store);
+    }
 }

@@ -13,6 +13,7 @@ class EntitlementComposer(
     private val founderProgram: () -> FounderProgramState = { FounderProgramState() },
     private val backendFounder: () -> BackendFounderEntitlement = { BackendFounderEntitlement() },
     private val promotionalPro: () -> PromotionalProEntitlement = { PromotionalProEntitlement() },
+    private val welcomeBack: () -> PromotionalProEntitlement = { PromotionalProEntitlement() },
     private val adjustSources: (EntitlementSources) -> EntitlementSources = { it }
 ) {
     fun sources(): EntitlementSources {
@@ -21,7 +22,8 @@ class EntitlementComposer(
             founderLifetime = founderLifetimeProvider.current(),
             program = founderProgram(),
             backendFounder = backendFounder(),
-            promotionalPro = promotionalPro()
+            promotionalPro = promotionalPro(),
+            welcomeBack = welcomeBack()
         )
     }
 

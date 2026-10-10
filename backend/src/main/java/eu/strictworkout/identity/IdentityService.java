@@ -16,11 +16,18 @@ public class IdentityService {
 
     private final ExternalIdentityRepository identities;
     private final IdentityCreation creation;
+    private final ReturningAccountPolicy returningAccounts;
     private final Clock clock;
 
-    public IdentityService(ExternalIdentityRepository identities, IdentityCreation creation, Clock clock) {
+    public IdentityService(
+            ExternalIdentityRepository identities,
+            IdentityCreation creation,
+            ReturningAccountPolicy returningAccounts,
+            Clock clock
+    ) {
         this.identities = identities;
         this.creation = creation;
+        this.returningAccounts = returningAccounts;
         this.clock = clock;
     }
 
@@ -42,8 +49,9 @@ public class IdentityService {
     }
 
     private AppUser insertOrLoad(VerifiedExternalIdentity verified) {
+        boolean skipEarlyAdopter = returningAccounts.skipEarlyAdopter(verified.subject());
         try {
-            return creation.insert(verified);
+            return creation.insert(verified, skipEarlyAdopter);
         } catch (DataIntegrityViolationException ex) {
             log.info("Concurrent first login resolved to the existing {} identity", verified.provider());
             return identities.findByProviderAndProviderSubject(verified.provider(), verified.subject())

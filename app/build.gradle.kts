@@ -84,6 +84,30 @@ val strictProDiscoveryWarningBeforeSeconds = optionalDebugSeconds(
     "strict.debug.proDiscoveryWarningBeforeSeconds",
     "STRICT_DEBUG_PRO_DISCOVERY_WARNING_BEFORE_SECONDS"
 )
+val strictWelcomeBack = optionalBuildValue(
+    "strict.debug.welcomeBack",
+    "STRICT_DEBUG_WELCOME_BACK"
+) ?: "REAL"
+require(strictWelcomeBack in allowedProDiscoveryModes) {
+    "strict.debug.welcomeBack must be REAL, ELIGIBLE, ACTIVE, or EXPIRED. " +
+        "Found \"$strictWelcomeBack\"."
+}
+val strictWelcomeBackGapDays = optionalDebugSeconds(
+    "strict.debug.welcomeBackGapDays",
+    "STRICT_DEBUG_WELCOME_BACK_GAP_DAYS"
+)
+val strictWelcomeBackExpiresInSeconds = optionalDebugSeconds(
+    "strict.debug.welcomeBackExpiresInSeconds",
+    "STRICT_DEBUG_WELCOME_BACK_EXPIRES_IN_SECONDS"
+)
+val strictWelcomeBackWarningBeforeSeconds = optionalDebugSeconds(
+    "strict.debug.welcomeBackWarningBeforeSeconds",
+    "STRICT_DEBUG_WELCOME_BACK_WARNING_BEFORE_SECONDS"
+)
+val strictWelcomeBackCooldownSeconds = optionalDebugSeconds(
+    "strict.debug.welcomeBackCooldownSeconds",
+    "STRICT_DEBUG_WELCOME_BACK_COOLDOWN_SECONDS"
+)
 val strictBillingProductIds = optionalBuildValue(
     "strict.billing.productIds",
     "STRICT_BILLING_PRODUCT_IDS"
@@ -105,28 +129,76 @@ require(strictDebugBilling in allowedDebugBilling) {
     "strict.debug.billing must be one of ${allowedDebugBilling.joinToString(", ")}. Found \"$strictDebugBilling\"."
 }
 
-fun releaseSigningValue(propertyName: String, envName: String): String? {
+fun releaseSigningValue(propertyNames: List<String>, envName: String): String? {
     System.getenv(envName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-    val localFile = rootProject.file("local.properties")
-    if (localFile.isFile) {
+    for (fileName in listOf("keystore.properties", "local.properties")) {
+        val secretFile = rootProject.file(fileName)
+        if (!secretFile.isFile) continue
         val props = Properties()
-        localFile.reader(Charsets.UTF_8).use { props.load(it) }
-        props.getProperty(propertyName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        secretFile.reader(Charsets.UTF_8).use { props.load(it) }
+        for (propertyName in propertyNames) {
+            props.getProperty(propertyName)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        }
     }
     return null
 }
 
-val releaseStoreFilePath = releaseSigningValue("mmm.release.storeFile", "MMM_RELEASE_STORE_FILE")
-val releaseStorePassword = releaseSigningValue("mmm.release.storePassword", "MMM_RELEASE_STORE_PASSWORD")
-val releaseKeyAlias = releaseSigningValue("mmm.release.keyAlias", "MMM_RELEASE_KEY_ALIAS")
-val releaseKeyPassword = releaseSigningValue("mmm.release.keyPassword", "MMM_RELEASE_KEY_PASSWORD")
-val releaseSigningValueCount = listOf(
-    releaseStoreFilePath,
-    releaseStorePassword,
-    releaseKeyAlias,
-    releaseKeyPassword
-).count { it != null }
-val hasCompleteReleaseSigning = releaseSigningValueCount == 4
+val releaseStoreFilePath = releaseSigningValue(
+    listOf("storeFile", "mmm.release.storeFile"),
+    "MMM_RELEASE_STORE_FILE"
+)
+val releaseStorePassword = releaseSigningValue(
+    listOf("storePassword", "mmm.release.storePassword"),
+    "MMM_RELEASE_STORE_PASSWORD"
+)
+val releaseKeyAlias = releaseSigningValue(
+    listOf("keyAlias", "mmm.release.keyAlias"),
+    "MMM_RELEASE_KEY_ALIAS"
+)
+val releaseKeyPassword = releaseSigningValue(
+    listOf("keyPassword", "mmm.release.keyPassword"),
+    "MMM_RELEASE_KEY_PASSWORD"
+)
+val releaseSigningMissing = buildList {
+    if (releaseStoreFilePath == null) {
+        add("store file (keystore.properties storeFile, local.properties mmm.release.storeFile, or MMM_RELEASE_STORE_FILE)")
+    }
+    if (releaseStorePassword == null) {
+        add("store password (storePassword, mmm.release.storePassword, or MMM_RELEASE_STORE_PASSWORD)")
+    }
+    if (releaseKeyAlias == null) {
+        add("key alias (keyAlias, mmm.release.keyAlias, or MMM_RELEASE_KEY_ALIAS)")
+    }
+    if (releaseKeyPassword == null) {
+        add("key password (keyPassword, mmm.release.keyPassword, or MMM_RELEASE_KEY_PASSWORD)")
+    }
+}
+val hasCompleteReleaseSigning = releaseSigningMissing.isEmpty()
+val releaseStoreFile = releaseStoreFilePath?.let { path ->
+    val configuredStore = file(path)
+    if (configuredStore.isAbsolute) configuredStore else rootProject.file(path)
+}
+
+fun releaseSigningFailure(): String? {
+    if (!hasCompleteReleaseSigning) {
+        return buildString {
+            appendLine("Release signing is required for a Play upload artifact and is not configured.")
+            appendLine("Missing:")
+            releaseSigningMissing.forEach { appendLine("- $it") }
+            appendLine("Put the values in gitignored keystore.properties, or export the MMM_RELEASE_* variables.")
+            appendLine("local.properties mmm.release.* is also accepted. Passwords are not printed.")
+            appendLine("The debug keystore is not used for release, and an unsigned AAB or APK is not a Play upload.")
+            append("See docs/android-release-signing.md. This build does not create a keystore.")
+        }
+    }
+    val store = releaseStoreFile
+    if (store == null || !store.isFile) {
+        return "Release keystore file was not found at ${store ?: "(no path)"}. " +
+            "The path is configured, but the file is not there. This build does not create a keystore. " +
+            "See docs/android-release-signing.md."
+    }
+    return null
+}
 
 android {
     namespace = "app.mymusclemap"
@@ -136,20 +208,16 @@ android {
         applicationId = "com.strictworkout.app"
         minSdk = 26
         targetSdk = 37
+        // First Play upload. versionCode must increase for every later upload. Do not lower it.
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
-        if (hasCompleteReleaseSigning) {
+        if (releaseSigningFailure() == null) {
             create("release") {
-                val configuredStore = file(releaseStoreFilePath!!)
-                storeFile = if (configuredStore.isAbsolute) {
-                    configuredStore
-                } else {
-                    rootProject.file(releaseStoreFilePath)
-                }
+                storeFile = releaseStoreFile
                 storePassword = releaseStorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
@@ -164,7 +232,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (hasCompleteReleaseSigning) {
+            if (signingConfigs.findByName("release") != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
             buildConfigField("String", "STRICT_API_BASE_URL", buildConfigString(strictReleaseApiUrl))
@@ -194,6 +262,27 @@ android {
                 "String",
                 "STRICT_PRO_DISCOVERY_WARNING_BEFORE_SECONDS",
                 buildConfigString(strictProDiscoveryWarningBeforeSeconds)
+            )
+            buildConfigField("String", "STRICT_WELCOME_BACK", buildConfigString(strictWelcomeBack))
+            buildConfigField(
+                "String",
+                "STRICT_WELCOME_BACK_GAP_DAYS",
+                buildConfigString(strictWelcomeBackGapDays)
+            )
+            buildConfigField(
+                "String",
+                "STRICT_WELCOME_BACK_EXPIRES_IN_SECONDS",
+                buildConfigString(strictWelcomeBackExpiresInSeconds)
+            )
+            buildConfigField(
+                "String",
+                "STRICT_WELCOME_BACK_WARNING_BEFORE_SECONDS",
+                buildConfigString(strictWelcomeBackWarningBeforeSeconds)
+            )
+            buildConfigField(
+                "String",
+                "STRICT_WELCOME_BACK_COOLDOWN_SECONDS",
+                buildConfigString(strictWelcomeBackCooldownSeconds)
             )
         }
     }
@@ -227,7 +316,9 @@ android {
     lint {
         abortOnError = true
         warningsAsErrors = false
-        checkReleaseBuilds = false
+        // Release packaging runs lint. Warnings stay warnings.
+        // Do not add a baseline that hides the existing warning set.
+        checkReleaseBuilds = true
     }
 }
 
@@ -247,6 +338,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
             includeTestsMatching("app.mymusclemap.FounderProgramRuleSelectionTest")
             includeTestsMatching("app.mymusclemap.EntitlementOverrideSelectionReleaseTest")
             includeTestsMatching("app.mymusclemap.ProDiscoveryDebugSelectionReleaseTest")
+            includeTestsMatching("app.mymusclemap.WelcomeBackDebugSelectionReleaseTest")
             includeTestsMatching("app.mymusclemap.BillingGatewaySelectionReleaseTest")
         }
     }
@@ -266,6 +358,7 @@ room {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
@@ -312,24 +405,42 @@ dependencies {
     testImplementation(libs.androidx.glance.appwidget.testing)
 }
 
-gradle.taskGraph.whenReady {
-    val touchesReleasePackaging = gradle.taskGraph.allTasks.any { task ->
-        val name = task.name
-        name.contains("Release") && (
-            name.startsWith("package") ||
-                name.startsWith("bundle") ||
-                name.startsWith("assemble") ||
-                name.startsWith("sign")
-            )
-    }
-    if (touchesReleasePackaging && releaseSigningValueCount in 1..3) {
-        error(
-            "Incomplete release signing configuration. Set all four values " +
-                "(mmm.release.storeFile, mmm.release.storePassword, mmm.release.keyAlias, " +
-                "mmm.release.keyPassword in gitignored local.properties, or MMM_RELEASE_STORE_FILE, " +
-                "MMM_RELEASE_STORE_PASSWORD, MMM_RELEASE_KEY_ALIAS, MMM_RELEASE_KEY_PASSWORD). " +
-                "Debug tasks do not require these values. If none are set, unsigned release " +
-                "artifacts can still be compiled."
+fun requestsSignedReleaseArtifact(name: String): Boolean {
+    return name == "assembleRelease" ||
+        name == "bundleRelease" ||
+        name == "packageRelease" ||
+        name == "packageReleaseBundle" ||
+        name == "signReleaseBundle" ||
+        (name.startsWith("sign") && name.contains("Release"))
+}
+
+tasks.register("checkReleaseSigning") {
+    group = "verification"
+    description = "Checks upload-key signing without printing secrets or creating a keystore."
+    doLast {
+        val failure = releaseSigningFailure()
+        if (failure != null) {
+            error(failure)
+        }
+        logger.lifecycle(
+            "Release signing is configured. The keystore file exists and the alias and passwords are set. " +
+                "Secret values are not printed."
         )
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val touchesSignedRelease = gradle.taskGraph.allTasks.any { requestsSignedReleaseArtifact(it.name) }
+    if (!touchesSignedRelease) return@whenReady
+    val problems = mutableListOf<String>()
+    releaseSigningFailure()?.let { problems += it }
+    if (strictGoogleServerClientId.isBlank()) {
+        problems += "Release packaging requires the Web OAuth client ID. Set " +
+            "strict.google.serverClientId in gitignored local.properties, or " +
+            "STRICT_GOOGLE_SERVER_CLIENT_ID. A release without it cannot sign anyone in. " +
+            "Debug builds still compile and fail closed at sign-in. The client ID is not printed."
+    }
+    if (problems.isNotEmpty()) {
+        error(problems.joinToString(separator = "\n\n"))
     }
 }

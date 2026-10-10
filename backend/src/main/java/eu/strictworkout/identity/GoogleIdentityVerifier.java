@@ -47,12 +47,16 @@ final class GoogleIdentityVerifier implements ExternalIdentityVerifier {
             emailVerified = false;
         }
         String name = payload.get("name") instanceof String value && !value.isBlank() ? value : null;
+        java.time.Instant issuedAt = payload.getIssuedAtTimeSeconds() == null
+                ? null
+                : java.time.Instant.ofEpochSecond(payload.getIssuedAtTimeSeconds());
         return new VerifiedExternalIdentity(
                 IdentityProvider.GOOGLE,
                 payload.getSubject(),
                 email,
                 email != null && emailVerified,
-                name
+                name,
+                issuedAt
         );
     }
 

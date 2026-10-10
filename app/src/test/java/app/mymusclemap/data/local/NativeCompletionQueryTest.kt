@@ -33,7 +33,37 @@ class NativeCompletionQueryTest {
         assertEquals(listOf(1_000L), database.workoutSessionDao().nativeCompletionEpochMillis())
     }
 
-    private suspend fun insert(status: SessionStatus, finishedAt: Long?, fingerprint: String?) {
+    @Test
+    fun welcomeBackHistoryIgnoresImportedAndAbandonedSessions() = runBlocking {
+        insert(
+            status = SessionStatus.COMPLETED,
+            finishedAt = 1_000L,
+            fingerprint = null,
+            clientWorkoutId = "native"
+        )
+        insert(
+            status = SessionStatus.COMPLETED,
+            finishedAt = 2_000L,
+            fingerprint = "imported",
+            clientWorkoutId = "imported"
+        )
+        insert(
+            status = SessionStatus.ABANDONED,
+            finishedAt = null,
+            fingerprint = null,
+            clientWorkoutId = "abandoned"
+        )
+        val rows = database.workoutSessionDao().nativeCompletionRows()
+        assertEquals(listOf("native"), rows.map { it.clientWorkoutId })
+        assertEquals(listOf(1_000L), rows.map { it.completedAt })
+    }
+
+    private suspend fun insert(
+        status: SessionStatus,
+        finishedAt: Long?,
+        fingerprint: String?,
+        clientWorkoutId: String = java.util.UUID.randomUUID().toString()
+    ) {
         database.workoutSessionDao().insertSession(
             WorkoutSessionEntity(
                 templateId = null,
@@ -50,7 +80,8 @@ class NativeCompletionQueryTest {
                 createdAt = 1L,
                 updatedAt = 1L,
                 activeLock = if (status == SessionStatus.IN_PROGRESS) 1 else null,
-                importFingerprint = fingerprint
+                importFingerprint = fingerprint,
+                clientWorkoutId = clientWorkoutId
             )
         )
     }

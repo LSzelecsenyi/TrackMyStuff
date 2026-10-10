@@ -311,7 +311,7 @@ private fun AlmostThereRow(
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = achievementTitle(item.id),
+                    text = achievementTitle(item.id, revealed = item.unlocked),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -324,7 +324,7 @@ private fun AlmostThereRow(
                 }
             }
             Text(
-                text = achievementRequirement(item.id),
+                text = achievementRequirement(item.id, revealed = item.unlocked),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -461,7 +461,7 @@ private fun BadgeCell(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            text = achievementTitle(item.id),
+            text = achievementTitle(item.id, revealed = item.unlocked),
             style = MaterialTheme.typography.labelMedium,
             color = if (item.unlocked) {
                 MaterialTheme.colorScheme.onBackground
@@ -510,29 +510,34 @@ private enum class BadgeArtworkEmphasis {
 @Composable
 private fun BadgeArtwork(item: BadgeWallItem, size: Dp, emphasis: BadgeArtworkEmphasis) {
     val earned = emphasis == BadgeArtworkEmphasis.Earned
+    val secretLocked = item.id.secret && !earned
     val modifier = Modifier
         .size(size)
         .alpha(
-            when (emphasis) {
-                BadgeArtworkEmphasis.Earned -> 1f
-                BadgeArtworkEmphasis.Next -> NextBadgeAlpha
-                BadgeArtworkEmphasis.Locked -> LockedBadgeAlpha
+            if (secretLocked) {
+                1f
+            } else {
+                when (emphasis) {
+                    BadgeArtworkEmphasis.Earned -> 1f
+                    BadgeArtworkEmphasis.Next -> NextBadgeAlpha
+                    BadgeArtworkEmphasis.Locked -> LockedBadgeAlpha
+                }
             }
         )
         .testTag(
             if (earned) "achievement-badge-unlocked-${item.id.name}"
             else "achievement-badge-locked-${item.id.name}"
         )
-    val painter = painterResource(BadgeArtworkResolver.drawableFor(item.badgeKey))
+    val painter = painterResource(BadgeArtworkResolver.drawableForWall(item.id, earned))
     val lockedFilter = remember {
         ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(LockedBadgeSaturation) })
     }
-    if (BadgeArtworkResolver.isProductionArtwork(item.badgeKey)) {
+    if (secretLocked || BadgeArtworkResolver.isProductionArtwork(item.badgeKey)) {
         Image(
             painter = painter,
             contentDescription = null,
             contentScale = ContentScale.Fit,
-            colorFilter = if (emphasis == BadgeArtworkEmphasis.Locked) lockedFilter else null,
+            colorFilter = if (!secretLocked && emphasis == BadgeArtworkEmphasis.Locked) lockedFilter else null,
             modifier = modifier
         )
     } else {
@@ -583,7 +588,7 @@ private fun BadgeDetailSheet(item: BadgeWallItem, onDismiss: () -> Unit) {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                text = achievementTitle(item.id),
+                text = achievementTitle(item.id, revealed = item.unlocked),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
@@ -608,7 +613,7 @@ private fun BadgeDetailSheet(item: BadgeWallItem, onDismiss: () -> Unit) {
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                text = achievementRequirement(item.id),
+                text = achievementRequirement(item.id, revealed = item.unlocked),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
@@ -651,10 +656,20 @@ private fun BadgeDetailSheet(item: BadgeWallItem, onDismiss: () -> Unit) {
 }
 
 @Composable
-internal fun achievementTitle(id: AchievementId): String {
+internal fun achievementTitle(id: AchievementId, revealed: Boolean = !id.secret): String {
+    if (id.secret && !revealed) {
+        return stringResource(R.string.achievement_secret_name)
+    }
     val workouts = id.workoutThreshold
     val weeks = id.streakWeeks
     return when {
+        id == AchievementId.SILENT_NIGHT -> stringResource(R.string.achievement_silent_night_name)
+        id == AchievementId.TRICK_OR_LIFT -> stringResource(R.string.achievement_trick_or_lift_name)
+        id == AchievementId.NEW_YEAR_SAME_ME -> stringResource(R.string.achievement_new_year_name)
+        id == AchievementId.LEAP_DAY_LIFTER -> stringResource(R.string.achievement_leap_day_name)
+        id == AchievementId.FRIDAY_THE_STRONGTEENTH -> stringResource(R.string.achievement_friday_thirteenth_name)
+        id == AchievementId.ONE_MORE_THING -> stringResource(R.string.achievement_one_more_thing_name)
+        id == AchievementId.TRIPLE_CROWN -> stringResource(R.string.achievement_triple_crown_name)
         id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_name)
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_name)
         id == AchievementId.EARLY_ADOPTER -> stringResource(R.string.achievement_early_adopter_name)
@@ -671,10 +686,21 @@ internal fun achievementTitle(id: AchievementId): String {
 }
 
 @Composable
-internal fun achievementRequirement(id: AchievementId): String {
+internal fun achievementRequirement(id: AchievementId, revealed: Boolean = !id.secret): String {
+    if (id.secret && !revealed) {
+        return stringResource(R.string.achievement_secret_requirement)
+    }
     val workouts = id.workoutThreshold
     val weeks = id.streakWeeks
     return when {
+        id == AchievementId.SILENT_NIGHT -> stringResource(R.string.achievement_silent_night_requirement)
+        id == AchievementId.TRICK_OR_LIFT -> stringResource(R.string.achievement_trick_or_lift_requirement)
+        id == AchievementId.NEW_YEAR_SAME_ME -> stringResource(R.string.achievement_new_year_requirement)
+        id == AchievementId.LEAP_DAY_LIFTER -> stringResource(R.string.achievement_leap_day_requirement)
+        id == AchievementId.FRIDAY_THE_STRONGTEENTH ->
+            stringResource(R.string.achievement_friday_thirteenth_requirement)
+        id == AchievementId.ONE_MORE_THING -> stringResource(R.string.achievement_one_more_thing_requirement)
+        id == AchievementId.TRIPLE_CROWN -> stringResource(R.string.achievement_triple_crown_requirement)
         id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_requirement)
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_requirement)
         id == AchievementId.EARLY_ADOPTER -> stringResource(R.string.achievement_early_adopter_requirement)
@@ -817,6 +843,7 @@ private fun AchievementCategory.labelRes(): Int {
         AchievementCategory.PERFORMANCE -> R.string.achievements_category_performance
         AchievementCategory.JOURNEY -> R.string.achievements_category_journey
         AchievementCategory.GOALS -> R.string.achievements_category_goals
+        AchievementCategory.HIDDEN_GEMS -> R.string.achievements_category_hidden_gems
         AchievementCategory.SPECIAL -> R.string.achievements_category_special
     }
 }

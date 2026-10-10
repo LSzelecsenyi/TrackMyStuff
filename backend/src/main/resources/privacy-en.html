@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Strict privacy policy</title>
+  <meta name="description" content="Privacy policy for the Strict workout app and Strict account service.">
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #0C121C; color: #F4F1EA; font: 16px/1.55 "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+    h1 { font-size: 1.7rem; line-height: 1.2; margin: 0.2rem 0 0.4rem; }
+    h2 { font-size: 1.15rem; margin: 1.6rem 0 0.4rem; }
+    a { color: #C6F24E; }
+    .mark { color: #C6F24E; font-weight: 700; letter-spacing: 0.14em; margin: 0; }
+    .langs { display: flex; gap: 1rem; margin: 0.8rem 0 0; }
+    .todo { background: #171E2B; border-left: 4px solid #C6F24E; padding: 0.8rem 1rem; margin: 0.8rem 0; }
+    ul { padding-left: 1.2rem; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="mark">STRICT</p>
+  <nav class="langs" aria-label="Language">
+    <a href="/privacy/en" aria-current="page">English</a>
+    <a href="/privacy/hu">Magyar</a>
+  </nav>
+  <h1>Privacy policy</h1>
+  <p>Effective date: 10 October 2026. This notice describes the Strict Android app and the Strict account service in this version. It is not a legal certification.</p>
+
+  <h2>Who is responsible</h2>
+  <div class="todo">
+    <p><strong>TODO, confirm before publication.</strong> The legal name, postal address, and any registration number of the controller are not in the app. The feedback draft uses laszlo.szelecsenyi@gmail.com. Confirm that this address is the privacy contact. Confirm whether a data protection officer is appointed. The app does not name one.</p>
+  </div>
+
+  <h2>Strict is local-first, and sign-in is required</h2>
+  <p>Workout history, plans, the exercise catalog, body weight, measurements, progress photos, goals, and achievements stay on the phone. Strict does not upload that log as a cloud copy. Google sign-in is mandatory, so Strict does process account information on its server.</p>
+
+  <h2>Data on your phone</h2>
+  <p>You enter training data in the app. A starter exercise list can be created on the phone at first launch. The app stores it in a local database, private photo files, and on-device preferences. Progress photos are not added to the public gallery. Theme, language, and lock-screen preferences are device settings.</p>
+  <p>Health Connect is optional. If you allow it, Strict reads recent steps, exercise sessions, resting heart rate, heart-rate variability, and sleep duration to show them. Those readings are not written into Strict’s database, are not sent to the Strict service, and are not included in a ZIP backup. Strict does not write them back to Health Connect.</p>
+
+  <h2>Google account and sessions</h2>
+  <ul>
+    <li>The app requests a Google ID token. It does not request Gmail, Drive, or contacts. The token is sent to the Strict service to open a session and is not stored as the session itself.</li>
+    <li>The server stores the Google subject as the account key, and the email address when Google says it is verified.</li>
+    <li>The display name is returned at sign-in and kept in the on-device profile. It is not written to a user-name column on the server.</li>
+    <li>The server assigns a Strict user id.</li>
+    <li>The phone stores an opaque session token in encrypted app storage that Android backup excludes. The server stores only a SHA-256 hash of that token. The default session lifetime in the current configuration is 30 days. There is no refresh token.</li>
+  </ul>
+  <p>Purpose: recognise the account and keep Founder access, promotional access, and a verified purchase with that person.</p>
+
+  <h2>Founder Program</h2>
+  <p>If you join, the server stores the application and, for qualifying workouts, limited metadata: completion time, local date, workout name, duration, exercise count, completed-set count, whether it came from a template, and whether it used external load. A tester report can include the text you write, the app version, and the platform. That upload does not include exercise names, individual sets, reps, weights, notes, body weight, photos, or Health Connect data.</p>
+
+  <h2>Promotional Pro access</h2>
+  <p>Pro Discovery stores one trial per account: activation time and expiry. Welcome Back stores the qualifying workout id you send, activation, expiry, and a cooldown. These records do not contain the workout log. If you delete the account after using a promotion, a marker records that the promotion was used so the same Google account cannot take it again. The marker is a SHA-256 hash of the Google subject plus those flags. It does not store the subject, email, name, or workout content.</p>
+
+  <h2>Google Play subscriptions</h2>
+  <p>Paid checkout is not offered until Play products are configured and a real purchase has been tested. When a purchase is verified, the server stores the purchase token, a hash of the token, package name, product id, subscription state, expiry, and order id. Google Play also processes the payment.</p>
+  <p>Deleting a Strict account does not cancel a Google Play subscription. Billing stays with Google until you cancel it in Google Play. The purchase row is unlinked from the user and marked so another Strict account cannot claim that token. The token is kept so Play notifications can still update that row.</p>
+  <div class="todo">
+    <p><strong>TODO, confirm before publication.</strong> No retention period has been chosen for the purchase token and order id. Do not treat this notice as stating a tax, accounting, or legal hold.</p>
+  </div>
+
+  <h2>Feedback, backups, and logs</h2>
+  <p>Send feedback opens your email app with a draft to laszlo.szelecsenyi@gmail.com. The draft includes the app version, Android version, and device manufacturer and model. Strict does not send the email. Your email provider handles it if you send it.</p>
+  <p>A ZIP backup contains the structured training data and progress photos you export. You choose the file location. Strict does not delete that file later. Health Connect readings and the session token are not in the ZIP. Android Auto Backup and device-to-device transfer of app data are turned off.</p>
+  <p>Application logs record error codes and rejection reasons. The sign-in diagnosis does not record the ID token, Google subject, email, or name. Purchase tokens are not written to those application logs.</p>
+  <div class="todo">
+    <p><strong>TODO, confirm before publication.</strong> Confirm whether the production host, reverse proxy, or database provider stores IP addresses, and for how long logs are kept. The app repository does not define that.</p>
+  </div>
+
+  <h2>Who else receives data</h2>
+  <ul>
+    <li>Google, for sign-in and, if you subscribe, for Play Billing.</li>
+    <li>Health Connect on your device, only if you grant access. Strict does not send those readings to its own service.</li>
+    <li>Your email app and the file location you pick for a backup.</li>
+  </ul>
+  <p>The app’s dependency list does not include an analytics, advertising, or crash-reporting SDK. It does include Play services libraries used for sign-in and billing.</p>
+  <div class="todo">
+    <p><strong>TODO, confirm before publication.</strong> Confirm Play services library telemetry with Google’s SDK guidance. Confirm where the server and database are hosted, and whether any transfer outside your country needs a transfer tool. This notice does not claim standard contractual clauses or an adequacy decision.</p>
+  </div>
+
+  <h2>Legal bases</h2>
+  <div class="todo">
+    <p><strong>TODO, confirm before publication.</strong> The product does not record a GDPR legal basis. Do not read this notice as choosing contract, legitimate interests, consent, or a legal obligation. Sign-in is required to use Strict. That is not, by itself, a consent checkbox, and this app does not ask you to tick one.</p>
+  </div>
+
+  <h2>How long data is kept</h2>
+  <ul>
+    <li>Training data on the phone remains until you delete it, delete the account, or uninstall the app.</li>
+    <li>The server account, sessions, Founder records, and promotional grant rows are deleted when the account deletion succeeds.</li>
+    <li>The deletion marker and the unlinked purchase record are kept. No end date is defined. See the TODOs above.</li>
+    <li>An exported ZIP remains wherever you saved it.</li>
+  </ul>
+
+  <h2>Account deletion</h2>
+  <p>In the app, open Settings and choose Delete account. The button stays disabled until you confirm. Strict asks Google for a fresh sign-in. Local data for that account is removed only after the server confirms deletion. The same Google account can sign in later as a new empty account. Founder recognition, a used promotion, the old workouts, and the old purchase link are not restored.</p>
+  <p>If you no longer have the app, use <a href="/account/delete">Delete your Strict account</a> on this site. That page is part of this server build. It is not a claim that the public production address is already online.</p>
+  <p>Sign-out and uninstall do not delete the server account.</p>
+
+  <h2>Your requests</h2>
+  <p>You can delete individual measurements, photos, and workouts in the app, export a ZIP of local training data, and delete the account as described above. There is no separate self-serve download of the server profile.</p>
+  <div class="todo">
+    <p><strong>TODO, confirm before publication.</strong> Confirm how people can ask for access, correction, restriction, objection, or a portable copy of server-side data, and how those requests are answered. Sending email to the feedback address is the only contact path implemented in the app.</p>
+  </div>
+
+  <h2>Security</h2>
+  <p>The release app is configured to call the API over HTTPS. The session token on the phone is encrypted, and the server stores a hash of it. The local database is in app-private storage. This notice does not claim a separate encryption layer for that database, and it does not claim a security certification.</p>
+
+  <h2>Children</h2>
+  <div class="todo">
+    <p><strong>TODO, confirm before publication.</strong> The app has no child mode and requires a Google account. Confirm the age group before the Play listing.</p>
+  </div>
+
+  <h2>Changes</h2>
+  <p>The effective date above is the date of this text. A later version should change that date.</p>
+  <div class="todo">
+    <p><strong>TODO, confirm before publication.</strong> Confirm how people are told about material changes. The app does not yet push a policy-update notice.</p>
+  </div>
+</main>
+</body>
+</html>

@@ -262,6 +262,61 @@ class BadgeWallPresenterTest {
     }
 
     @Test
+    fun hiddenGemsAreAFreeSectionImmediatelyBeforeSpecial() {
+        val earnedAt = 80L
+        val presentation = BadgeWallPresenter.present(
+            AchievementBoardAssembler.assemble(
+                completedWorkoutCount = 1,
+                unlocks = listOf(
+                    UnlockSnapshot(
+                        AchievementId.SILENT_NIGHT,
+                        unlockedAt = earnedAt,
+                        celebratedAt = earnedAt,
+                        triggerClientWorkoutId = null
+                    )
+                ),
+                events = emptyList()
+            )
+        )
+        assertEquals(
+            listOf(
+                AchievementCategory.CONSISTENCY,
+                AchievementCategory.JOURNEY,
+                AchievementCategory.GOALS,
+                AchievementCategory.PERFORMANCE,
+                AchievementCategory.HIDDEN_GEMS,
+                AchievementCategory.SPECIAL
+            ),
+            presentation.sections.map { it.category }
+        )
+        val gems = presentation.sections.single { it.category == AchievementCategory.HIDDEN_GEMS }.items
+        assertEquals(AchievementCatalog.secrets, gems.map { it.id })
+        assertTrue(gems.all { it.access == AchievementAccess.FREE && it.id.secret })
+        assertEquals(AchievementCatalog.secrets.size, gems.size)
+        val earned = gems.single { it.id == AchievementId.SILENT_NIGHT }
+        assertTrue(earned.unlocked)
+        assertEquals(earnedAt, earned.unlockedAt)
+        assertTrue(gems.filter { it.id != AchievementId.SILENT_NIGHT }.none { it.unlocked })
+        assertTrue(
+            presentation.sections.single { it.category == AchievementCategory.CONSISTENCY }
+                .items.none { it.id.secret }
+        )
+        assertTrue(
+            presentation.sections.single { it.category == AchievementCategory.PERFORMANCE }
+                .items.none { it.id.secret }
+        )
+        assertEquals(listedAchievementCount(), presentation.totalCount)
+        assertEquals(presentation.catalog.map { it.id }.size, presentation.catalog.map { it.id }.toSet().size)
+        val free = BadgeWallPresenter.present(board(completed = 1), AchievementAccess.FREE)
+        assertTrue(free.sections.single { it.category == AchievementCategory.HIDDEN_GEMS }.items.isNotEmpty())
+        val pro = BadgeWallPresenter.present(board(completed = 1), AchievementAccess.PRO)
+        val special = BadgeWallPresenter.present(board(completed = 1), AchievementAccess.SPECIAL)
+        assertTrue(pro.sections.none { it.category == AchievementCategory.HIDDEN_GEMS })
+        assertTrue(special.sections.none { it.category == AchievementCategory.HIDDEN_GEMS })
+        assertTrue(presentation.almostThere.none { it.achievementId.secret })
+    }
+
+    @Test
     fun catalogOrderInsideASectionStaysAscending() {
         val goals = BadgeWallPresenter.present(board(completed = 0))
             .sections
@@ -284,7 +339,7 @@ class BadgeWallPresenterTest {
             .single { it.category == AchievementCategory.CONSISTENCY }
             .items
             .map { it.id }
-        assertEquals(AchievementCatalog.workoutCounts + AchievementId.IRON_DISCIPLINE, consistency)
+        assertEquals(AchievementCatalog.byCategory(AchievementCategory.CONSISTENCY), consistency)
     }
 
     private fun listedAchievementCount(): Int {

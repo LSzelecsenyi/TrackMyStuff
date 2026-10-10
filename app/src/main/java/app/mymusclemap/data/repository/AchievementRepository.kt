@@ -33,6 +33,7 @@ import app.mymusclemap.domain.achievements.PerformanceRecordEvaluator
 import app.mymusclemap.domain.achievements.ExerciseMasteryEvaluator
 import app.mymusclemap.domain.achievements.PrHunterEvaluator
 import app.mymusclemap.domain.achievements.ProAchievementEvaluator
+import app.mymusclemap.domain.achievements.SecretAchievementEvaluator
 import app.mymusclemap.domain.achievements.WeeklyGoalCompletionEvaluator
 import app.mymusclemap.domain.achievements.WeeklyGoalStreakEvaluator
 import app.mymusclemap.domain.achievements.WeightMilestonePlan
@@ -208,7 +209,8 @@ class AchievementRepository(
                         PrHunterEvaluator.qualifications(recordEvents) +
                         ExerciseMasteryEvaluator.qualifications(history),
                     triggerWorkoutDate = triggerDate,
-                    recordMonthlyReportMarker = recordMonthlyReport && monthlyMarkerAt == null
+                    recordMonthlyReportMarker = recordMonthlyReport && monthlyMarkerAt == null,
+                    secretQualifications = SecretAchievementEvaluator.qualifications(history)
                 ),
                 unlocks = storedUnlocks,
                 events = storedEvents

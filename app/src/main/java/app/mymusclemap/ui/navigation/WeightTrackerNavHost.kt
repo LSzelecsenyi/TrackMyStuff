@@ -307,6 +307,12 @@ fun WeightTrackerNavHost(
     onDismissProDiscoveryOffer: () -> Unit = {},
     onDismissProDiscoveryWarning: () -> Unit = {},
     onPromotionClock: () -> Unit = {},
+    welcomeBack: () -> app.mymusclemap.domain.entitlement.WelcomeBackSnapshot = {
+        app.mymusclemap.domain.entitlement.WelcomeBackSnapshot()
+    },
+    onActivateWelcomeBack: () -> Unit = {},
+    onDismissWelcomeBackOffer: () -> Unit = {},
+    onDismissWelcomeBackWarning: () -> Unit = {},
     billingScreen: app.mymusclemap.domain.billing.BillingScreenState =
         app.mymusclemap.domain.billing.BillingScreenState(),
     paidSubscription: () -> app.mymusclemap.domain.billing.VerifiedPaidSubscription? = { null },
@@ -316,6 +322,10 @@ fun WeightTrackerNavHost(
     accountName: String? = null,
     accountEmail: String? = null,
     onSignOut: () -> Unit = {},
+    onDeleteAccount: suspend () -> app.mymusclemap.ui.settings.DeleteAccountResult = {
+        app.mymusclemap.ui.settings.DeleteAccountResult.Failed
+    },
+    onAccountDeletionFinished: () -> Unit = {},
     showLanguageSetting: Boolean = false,
     selectedLanguage: app.mymusclemap.domain.locale.AppLanguage =
         app.mymusclemap.domain.locale.AppLanguage.EN,
@@ -681,10 +691,23 @@ fun WeightTrackerNavHost(
                     accountName = accountName,
                     accountEmail = accountEmail,
                     onSignOut = onSignOut,
+                    onOpenDeleteAccount = { navController.navigateInternal(AppRoutes.DELETE_ACCOUNT) },
                     showLanguageSetting = showLanguageSetting,
                     selectedLanguage = selectedLanguage,
                     onLanguageSelected = onLanguageSelected,
                     onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) }
+                )
+            }
+            composable(AppRoutes.DELETE_ACCOUNT) {
+                val subscription = paidSubscription()
+                app.mymusclemap.ui.settings.DeleteAccountScreen(
+                    paidSubscriptionKnown = subscription != null &&
+                        (subscription.entitled || subscription.autoRenewing),
+                    onManageSubscription = { onManageSubscription(subscription?.productId.orEmpty()) },
+                    onDelete = onDeleteAccount,
+                    onFinished = onAccountDeletionFinished,
+                    onBack = { navController.popBackStack() },
+                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) }
                 )
             }
             composable(AppRoutes.FOUNDER_PROGRAM) {
@@ -726,6 +749,7 @@ fun WeightTrackerNavHost(
             composable(AppRoutes.PRO_BENEFITS) {
                 val benefits = remember(entitlementRevision) { proBenefitsStatus() }
                 val discovery = remember(entitlementRevision) { proDiscovery() }
+                val welcome = remember(entitlementRevision) { welcomeBack() }
                 val entitlement = remember(entitlementRevision) { currentEntitlement() }
                 val paid = remember(entitlementRevision) { paidSubscription() }
                 val now = promotionNow()
@@ -743,11 +767,14 @@ fun WeightTrackerNavHost(
                     onBack = { navController.popBackStack() },
                     discovery = discovery,
                     onActivateTrial = onActivateProDiscovery,
+                    welcomeBack = welcome,
+                    onActivateWelcomeBack = onActivateWelcomeBack,
                     now = now,
                     plan = plan,
                     onSelectOffer = onSelectBillingOffer,
                     onSubscribe = onSubscribe,
-                    onManageSubscription = onManageSubscription
+                    onManageSubscription = onManageSubscription,
+                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) }
                 )
             }
             navigation(
@@ -1470,8 +1497,10 @@ fun WeightTrackerNavHost(
         founderApprovalCelebration()
     }
     val discovery = remember(entitlementRevision) { proDiscovery() }
-    LaunchedEffect(discovery.nextBoundary) {
-        val target = discovery.nextBoundary ?: return@LaunchedEffect
+    val welcome = remember(entitlementRevision) { welcomeBack() }
+    LaunchedEffect(discovery.nextBoundary, welcome.nextBoundary) {
+        val target = listOfNotNull(discovery.nextBoundary, welcome.nextBoundary).minOrNull()
+            ?: return@LaunchedEffect
         val wait = Duration.between(promotionNow(), target).toMillis()
         if (wait > 0) {
             delay(wait)
@@ -1483,7 +1512,9 @@ fun WeightTrackerNavHost(
         workoutCelebration = globalCelebrations.isNotEmpty(),
         suppressForRoute = suppressGlobalCelebration,
         discoveryOffer = discovery.showAutomaticOffer,
-        discoveryWarning = discovery.showAutomaticWarning
+        discoveryWarning = discovery.showAutomaticWarning,
+        welcomeOffer = welcome.showAutomaticOffer,
+        welcomeWarning = welcome.showAutomaticWarning
     )
     when (prompt) {
         StrictOneTimePrompt.FounderApproval -> {
@@ -1522,6 +1553,26 @@ fun WeightTrackerNavHost(
                 )
             }
         }
+        StrictOneTimePrompt.WelcomeBackOffer -> {
+            app.mymusclemap.ui.pro.WelcomeBackOfferDialog(
+                onActivate = onActivateWelcomeBack,
+                onNotNow = onDismissWelcomeBackOffer
+            )
+        }
+        StrictOneTimePrompt.WelcomeBackWarning -> {
+            val expiresAt = welcome.trialExpiresAt
+            if (expiresAt != null) {
+                app.mymusclemap.ui.pro.WelcomeBackWarningDialog(
+                    expiresAt = expiresAt,
+                    now = promotionNow(),
+                    onViewPlans = {
+                        onDismissWelcomeBackWarning()
+                        navController.navigateInternal(AppRoutes.PRO_BENEFITS)
+                    },
+                    onMaybeLater = onDismissWelcomeBackWarning
+                )
+            }
+        }
         null -> Unit
     }
 }
@@ -1542,6 +1593,7 @@ private fun SettingsRoute(
     accountName: String?,
     accountEmail: String?,
     onSignOut: () -> Unit,
+    onOpenDeleteAccount: () -> Unit,
     showLanguageSetting: Boolean,
     selectedLanguage: app.mymusclemap.domain.locale.AppLanguage,
     onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit,
@@ -1685,6 +1737,7 @@ private fun SettingsRoute(
         accountName = accountName,
         accountEmail = accountEmail,
         onSignOut = onSignOut,
+        onOpenDeleteAccount = onOpenDeleteAccount,
         showLanguageSetting = showLanguageSetting,
         selectedLanguage = selectedLanguage,
         onLanguageSelected = onLanguageSelected,
@@ -1738,7 +1791,9 @@ private fun SettingsRoute(
                 LockScreenEnablePrompt.RequestPermission -> {
                     requestedPermissionLocally = true
                     viewModel.markLockScreenPermissionRequested()
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
                 }
                 LockScreenEnablePrompt.OpenSettings -> {
                     awaitingSettingsGrant = true

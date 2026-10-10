@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delete your Strict account</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      background: #0C121C;
+      color: #F4F1EA;
+      font: 16px/1.5 "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 40rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    h1 { font-size: 1.6rem; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.25rem; }
+    .mark { color: #C6F24E; font-weight: 700; letter-spacing: 0.14em; }
+    h2 { font-size: 1.15rem; margin: 1.5rem 0 0.5rem; }
+    a { color: #C6F24E; }
+    .panel { background: #171E2B; border-radius: 12px; padding: 1rem 1.1rem; margin-top: 1rem; }
+    button.delete {
+      appearance: none;
+      border: 0;
+      background: #8C1D18;
+      color: #fff;
+      border-radius: 999px;
+      padding: 0.85rem 1.2rem;
+      font: inherit;
+      font-weight: 650;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    button.delete:disabled { opacity: 0.45; }
+    label.confirm { display: flex; gap: 0.75rem; align-items: flex-start; margin-top: 1rem; }
+    .warn { color: #F3C7C3; }
+    .ok { color: #C6F24E; }
+    #status { min-height: 1.5rem; margin-top: 1rem; }
+    noscript { color: #F3C7C3; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="mark">STRICT</p>
+  <h1>Delete account</h1>
+  <p>Use this page if you no longer have the Strict app installed. It deletes the Strict account for the Google account you verify here. An email address on its own is not enough.</p>
+  <h2>What deletion does</h2>
+  <ul>
+    <li>Deletes the Strict account on the server, including Founder records and promotional grants tied to it.</li>
+    <li>Does not cancel a Google Play subscription. Billing stays with Google until you cancel it there.</li>
+    <li>Does not restore a purchase onto a new Strict account.</li>
+    <li>Does not delete a ZIP backup you already exported. That file is on your device or wherever you saved it.</li>
+    <li>Does not normally undo. Signing in again creates a new empty account.</li>
+  </ul>
+  <p><a href="https://play.google.com/store/account/subscriptions">Manage Google Play subscriptions</a></p>
+  <div id="unavailable" class="panel" hidden>
+    <p>This server is not configured to verify a Google account, so deletion cannot be started here.</p>
+  </div>
+  <div id="start">
+    <div id="g_id_onload" data-auto_prompt="false" data-callback="strictOnGoogle"></div>
+    <div class="g_id_signin" data-type="standard" data-theme="filled_black" data-text="continue_with" data-shape="pill"></div>
+  </div>
+  <div id="confirm" class="panel" hidden>
+    <p id="known" hidden class="warn">A paid Google Play subscription is known for this account. Deleting Strict does not cancel it.</p>
+    <p id="unknown-sub">If you pay for Strict through Google Play, cancel that subscription in Google Play. This page cannot cancel it.</p>
+    <label class="confirm">
+      <input id="agree" type="checkbox">
+      <span>I understand this permanently deletes my Strict account.</span>
+    </label>
+    <button id="delete" class="delete" type="button" disabled>Delete my Strict account</button>
+  </div>
+  <p id="status" role="status"></p>
+  <noscript>JavaScript and Google sign-in are required to verify the account and start deletion.</noscript>
+</main>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  const clientId = "{{CLIENT_ID}}";
+  const configured = "{{CONFIGURED}}" === "true";
+  let idToken = "";
+  const status = document.getElementById("status");
+  if (!configured) {
+    document.getElementById("unavailable").hidden = false;
+    document.getElementById("start").hidden = true;
+  } else {
+    document.getElementById("g_id_onload").setAttribute("data-client_id", clientId);
+  }
+  window.strictOnGoogle = async function (response) {
+    idToken = response && response.credential ? response.credential : "";
+    status.textContent = "";
+    if (!idToken) {
+      status.textContent = "Google did not return a sign-in. Nothing was deleted.";
+      return;
+    }
+    document.getElementById("confirm").hidden = false;
+    const preview = await fetch("/api/v1/account/deletion-preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: idToken, confirmed: false })
+    });
+    if (preview.status === 401) {
+      status.textContent = "Sign in with Google again. Nothing was deleted.";
+      return;
+    }
+    if (!preview.ok) {
+      status.textContent = "The account could not be checked. Nothing was deleted.";
+      return;
+    }
+    const body = await preview.json();
+    document.getElementById("known").hidden = !body.paidSubscriptionKnown;
+  };
+  document.getElementById("agree").addEventListener("change", function (event) {
+    document.getElementById("delete").disabled = !event.target.checked;
+  });
+  document.getElementById("delete").addEventListener("click", async function () {
+    const button = document.getElementById("delete");
+    button.disabled = true;
+    status.textContent = "Deleting the account…";
+    const result = await fetch("/api/v1/account/deletion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: idToken, confirmed: true })
+    });
+    if (result.status === 204) {
+      status.textContent = "The Strict account is deleted. A Google Play subscription, if you have one, is still managed by Google.";
+      status.className = "ok";
+      document.getElementById("confirm").hidden = true;
+      document.getElementById("start").hidden = true;
+      return;
+    }
+    button.disabled = !document.getElementById("agree").checked;
+    if (result.status === 401) {
+      status.textContent = "Sign in with Google again. Nothing was deleted.";
+    } else if (result.status === 404) {
+      status.textContent = "No Strict account was found for that Google sign-in.";
+    } else {
+      status.textContent = "Deletion did not finish. Nothing was confirmed deleted. You can try again.";
+    }
+  });
+</script>
+</body>
+</html>

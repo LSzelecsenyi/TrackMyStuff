@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import eu.strictworkout.account.DeletedAccountPolicy;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -26,6 +28,7 @@ public class FounderService {
     private final FounderEnrollment enrollment;
     private final FounderStateMachine machine;
     private final FounderRulesBinding rulesBinding;
+    private final DeletedAccountPolicy deletedAccounts;
     private final Clock clock;
 
     public FounderService(
@@ -35,6 +38,7 @@ public class FounderService {
             FounderEnrollment enrollment,
             FounderStateMachine machine,
             FounderRulesBinding rulesBinding,
+            DeletedAccountPolicy deletedAccounts,
             Clock clock
     ) {
         this.applications = applications;
@@ -43,6 +47,7 @@ public class FounderService {
         this.enrollment = enrollment;
         this.machine = machine;
         this.rulesBinding = rulesBinding;
+        this.deletedAccounts = deletedAccounts;
         this.clock = clock;
     }
 
@@ -52,6 +57,13 @@ public class FounderService {
 
     @Transactional
     public FounderView enroll(UUID userId) {
+        if (deletedAccounts.founderUsed(userId)) {
+            throw new FounderCommandException(
+                    HttpStatus.CONFLICT,
+                    "FOUNDER_ALREADY_USED",
+                    "Founder enrollment was already used by a deleted account for this Google sign-in."
+            );
+        }
         if (applications.findIdByUserId(userId).isEmpty()) {
             try {
                 enrollment.insert(userId);

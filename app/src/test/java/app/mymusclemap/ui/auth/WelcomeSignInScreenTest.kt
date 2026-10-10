@@ -40,6 +40,24 @@ class WelcomeSignInScreenTest {
     }
 
     @Test
+    fun privacyPolicyOpensWithoutSigningIn() {
+        var opened = 0
+        composeRule.setContent {
+            WelcomeSignInScreen(
+                busy = false,
+                message = null,
+                claimOpen = false,
+                onContinue = {},
+                onConfirmClaim = {},
+                onCancelClaim = {},
+                onOpenPrivacy = { opened += 1 }
+            )
+        }
+        composeRule.onNodeWithTag(WELCOME_PRIVACY).assertIsDisplayed().performClick()
+        assertEquals(1, opened)
+    }
+
+    @Test
     fun claimConfirmationIsExplicit() {
         var confirmed = 0
         var canceled = 0

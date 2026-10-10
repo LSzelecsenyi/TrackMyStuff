@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Strict adatvédelmi tájékoztató</title>
+  <meta name="description" content="A Strict edzésnapló és a Strict-fiókszolgáltatás adatvédelmi tájékoztatója.">
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #0C121C; color: #F4F1EA; font: 16px/1.55 "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+    h1 { font-size: 1.7rem; line-height: 1.2; margin: 0.2rem 0 0.4rem; }
+    h2 { font-size: 1.15rem; margin: 1.6rem 0 0.4rem; }
+    a { color: #C6F24E; }
+    .mark { color: #C6F24E; font-weight: 700; letter-spacing: 0.14em; margin: 0; }
+    .langs { display: flex; gap: 1rem; margin: 0.8rem 0 0; }
+    .todo { background: #171E2B; border-left: 4px solid #C6F24E; padding: 0.8rem 1rem; margin: 0.8rem 0; }
+    ul { padding-left: 1.2rem; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="mark">STRICT</p>
+  <nav class="langs" aria-label="Nyelv">
+    <a href="/privacy/en">English</a>
+    <a href="/privacy/hu" aria-current="page">Magyar</a>
+  </nav>
+  <h1>Adatvédelmi tájékoztató</h1>
+  <p>Hatályos: 2026. október 10. Ez a szöveg a Strict Android-alkalmazás és a Strict-fiókszolgáltatás jelen verzióját írja le. Nem jogi tanúsítvány.</p>
+
+  <h2>Ki a felelős</h2>
+  <div class="todo">
+    <p><strong>TODO, közzététel előtt meg kell erősíteni.</strong> Az adatkezelő jogi neve, postacíme és esetleges nyilvántartási száma nincs az alkalmazásban. A visszajelző piszkozat címzettje: laszlo.szelecsenyi@gmail.com. Meg kell erősíteni, hogy ez az adatvédelmi kapcsolattartó. Meg kell erősíteni, hogy van-e adatvédelmi tisztviselő. Az alkalmazás nem nevez meg ilyet.</p>
+  </div>
+
+  <h2>A Strict helyben tárol, a bejelentkezés kötelező</h2>
+  <p>Az edzésnapló, a tervek, a gyakorlattár, a testsúly, a testméretek, a fejlődésfotók, a célok és az eredmények a telefonon maradnak. A Strict ezt a naplót nem tölti fel felhőmásolatként. A Google-bejelentkezés kötelező, ezért a Strict a fiókadatokat a szerverén is kezeli.</p>
+
+  <h2>Adatok a telefonon</h2>
+  <p>Az edzésadatokat te viseled be. Az első indításkor helyben létrejöhet egy kezdő gyakorlattár. Az alkalmazás helyi adatbázisban, privát fotófájlokban és helyi beállításokban tárolja őket. A fejlődésfotók nem kerülnek a nyilvános galériába. A téma, a nyelv és a zárképernyő beállítása az eszköz beállítása.</p>
+  <p>A Health Connect nem kötelező. Ha engedélyezed, a Strict a közelmúlt lépéseit, edzésmunkameneteit, nyugalmi pulzusát, HRV-jét és alvásidejét olvassa, hogy megjelenítse. Ezek nem kerülnek a Strict adatbázisába, nem mennek a Strict szolgáltatásához, és nincsenek a ZIP-mentésben. A Strict nem írja vissza őket a Health Connectbe.</p>
+
+  <h2>Google-fiók és munkamenet</h2>
+  <ul>
+    <li>Az alkalmazás Google-azonosító tokent kér. Nem kér hozzáférést a Gmailhez, a Drive-hoz vagy a névjegyekhez. A tokent a Strict szolgáltatásának küldi munkamenet nyitásához, és nem ezt a tokent tárolja munkamenetként.</li>
+    <li>A szerver a Google-alanyazonosítót tárolja a fiók kulcsaként, és az e-mail-címet, ha a Google megerősítettnek jelzi.</li>
+    <li>A megjelenített név a bejelentkezéskor érkezik, és az eszközön lévő profilban marad. A szerveren nincs külön névoszlop a felhasználónak.</li>
+    <li>A szerver Strict-felhasználói azonosítót ad.</li>
+    <li>A telefon egy átlátszatlan munkamenet-tokent tárol titkosított, Android-mentésből kizárt tárhelyen. A szerver csak a token SHA-256 lenyomatát tárolja. A jelenlegi beállítás szerinti élettartam 30 nap. Frissítő token nincs.</li>
+  </ul>
+  <p>Cél: a fiók felismerése, és hogy a Founder-hozzáférés, a promóciós hozzáférés és az ellenőrzött vásárlás ennél a személynél maradjon.</p>
+
+  <h2>Founder program</h2>
+  <p>Ha csatlakozol, a szerver tárolja a jelentkezést, a beszámítható edzésekről pedig korlátozott metaadatot: befejezés ideje, helyi dátum, az edzés neve, időtartam, gyakorlatok száma, befejezett sorozatok száma, sablonból származott-e, és használt-e külső terhelést. A tesztelői jelentés tartalmazhatja az általad írt szöveget, az alkalmazás verzióját és a platformot. Ez a feltöltés nem tartalmazza a gyakorlatok nevét, az egyes sorozatokat, az ismétléseket, a súlyokat, a jegyzeteket, a testsúlyt, a fotókat vagy a Health Connect adatait.</p>
+
+  <h2>Promóciós Pro-hozzáférés</h2>
+  <p>A Pro Discovery fiókonként egy próbaidőt tárol: aktiválás és lejárat. A Welcome Back a megadott edzésazonosítót, az aktiválást, a lejáratot és a türelmi időt tárolja. Ezek nem tartalmazzák az edzésnaplót. Ha egy már felhasznált promóció után törlöd a fiókot, egy jelölő rögzíti, hogy a promóció el volt használva, így ugyanaz a Google-fiók nem kaphatja meg újra. A jelölő a Google-alanyazonosító SHA-256 lenyomata és ezek a jelzők. Nem tárolja magát az alanyazonosítót, az e-mailt, a nevet vagy az edzés tartalmát.</p>
+
+  <h2>Google Play-előfizetés</h2>
+  <p>Fizetős vásárlás addig nem elérhető, amíg a Play-termékek nincsenek beállítva, és egy valódi vásárlás nincs letesztelve. Ha egy vásárlás ellenőrzött, a szerver tárolja a vásárlási tokent, annak lenyomatát, a csomagnevet, a termékazonosítót, az előfizetés állapotát, a lejáratot és a rendelésazonosítót. A fizetést a Google Play is kezeli.</p>
+  <p>A Strict-fiók törlése nem mondja le a Google Play-előfizetést. A számlázás a Google-nál marad, amíg a Google Playen le nem mondod. A vásárlási sor lekapcsolódik a felhasználóról, és úgy van jelölve, hogy másik Strict-fiók ne köthesse magához a tokent. A token megmarad, hogy a Play-értesítések frissíthessék a sort.</p>
+  <div class="todo">
+    <p><strong>TODO, közzététel előtt meg kell erősíteni.</strong> A vásárlási token és a rendelésazonosító megőrzési ideje nincs meghatározva. Ez a tájékoztató nem állít adóügyi, számviteli vagy jogi megőrzési kötelezettséget.</p>
+  </div>
+
+  <h2>Visszajelzés, mentés és naplók</h2>
+  <p>A Visszajelzés küldése megnyitja az e-mail-alkalmazásodat egy laszlo.szelecsenyi@gmail.com címre szóló piszkozattal. A piszkozat tartalmazza az alkalmazás verzióját, az Android verzióját, valamint az eszköz gyártóját és típusát. A Strict nem küldi el az e-mailt. Ha elküldöd, az e-mail-szolgáltatód kezeli.</p>
+  <p>A ZIP-mentés a strukturált edzésadatokat és a fejlődésfotókat tartalmazza, amelyeket exportálsz. Te választod a fájl helyét. A Strict később nem törli ezt a fájlt. A Health Connect adatai és a munkamenet-token nincsenek a ZIP-ben. Az Android automatikus mentése és az eszközök közötti adatátvitel ki van kapcsolva.</p>
+  <p>Az alkalmazásnaplók hibakódokat és elutasítási okokat rögzítenek. A bejelentkezés diagnosztikája nem rögzíti az azonosító tokent, a Google-alanyazonosítót, az e-mailt vagy a nevet. A vásárlási tokenek nem kerülnek ezekbe az alkalmazásnaplókba.</p>
+  <div class="todo">
+    <p><strong>TODO, közzététel előtt meg kell erősíteni.</strong> Meg kell erősíteni, hogy az éles kiszolgáló, a reverse proxy vagy az adatbázis-szolgáltató tárol-e IP-címet, és meddig őrzi a naplókat. Az alkalmazás tárolója ezt nem határozza meg.</p>
+  </div>
+
+  <h2>Ki kap még adatot</h2>
+  <ul>
+    <li>A Google, a bejelentkezéshez, és előfizetés esetén a Play-számlázáshoz.</li>
+    <li>A Health Connect az eszközödön, csak ha hozzáférést adsz. A Strict ezeket az adatokat nem küldi a saját szolgáltatásának.</li>
+    <li>Az e-mail-alkalmazásod, és a mentéshez választott fájlhely.</li>
+  </ul>
+  <p>Az alkalmazás függőségei között nincs elemző, hirdetési vagy összeomlásjelentő SDK. Vannak Play-szolgáltatás-könyvtárak a bejelentkezéshez és a számlázáshoz.</p>
+  <div class="todo">
+    <p><strong>TODO, közzététel előtt meg kell erősíteni.</strong> A Play-szolgáltatás könyvtárainak telemetriáját a Google SDK-útmutatója szerint kell megerősíteni. Meg kell erősíteni, hol fut a szerver és az adatbázis, és kell-e adattovábbítási eszköz az országon kívüli továbbításhoz. Ez a tájékoztató nem hivatkozik általános szerződési záradékokra vagy megfelelőségi határozatra.</p>
+  </div>
+
+  <h2>Jogalapok</h2>
+  <div class="todo">
+    <p><strong>TODO, közzététel előtt meg kell erősíteni.</strong> A termék nem rögzít GDPR-jogalapot. Ebből a szövegből nem következik szerződés, jogos érdek, hozzájárulás vagy jogi kötelezettség. A bejelentkezés a Strict használatához kell. Ez önmagában nem hozzájáruló jelölőnégyzet, és az alkalmazás nem kér ilyet.</p>
+  </div>
+
+  <h2>Meddig őrizzük az adatokat</h2>
+  <ul>
+    <li>A telefonon lévő edzésadatok addig maradnak, amíg törlöd őket, törlöd a fiókot, vagy eltávolítod az alkalmazást.</li>
+    <li>A szerverfiók, a munkamenetek, a Founder-bejegyzések és a promóciós sorok a sikeres fióktörléskor törlődnek.</li>
+    <li>A törlési jelölő és a lekapcsolt vásárlási bejegyzés megmarad. Záró dátum nincs. Lásd a fenti TODO-kat.</li>
+    <li>Az exportált ZIP ott marad, ahová mentetted.</li>
+  </ul>
+
+  <h2>Fiók törlése</h2>
+  <p>Az alkalmazásban nyisd meg a Beállításokat, és válaszd a Fiók törlése lehetőséget. A gomb addig nem működik, amíg meg nem erősíted. A Strict friss Google-bejelentkezést kér. Az adott fiók helyi adatai csak a szerver visszaigazolása után törlődnek. Ugyanazzal a Google-fiókkal később új, üres fiókként lehet belépni. A Founder-elismerés, a felhasznált promóció, a régi edzések és a régi vásárlási kapcsolat nem áll vissza.</p>
+  <p>Ha az alkalmazás már nincs meg, ezen az oldalon a <a href="/account/delete">Strict-fiók törlése</a> használható. Ez az oldal ennek a szerververziónak a része. Ez nem azt állítja, hogy a nyilvános éles cím már elérhető.</p>
+  <p>A kijelentkezés és az eltávolítás nem törli a szerverfiókot.</p>
+
+  <h2>Kérelmek</h2>
+  <p>Az alkalmazásban törölhetsz egyes méréseket, fotókat és edzéseket, exportálhatsz egy ZIP-et a helyi edzésadatokról, és a fentiek szerint törölheted a fiókot. A szerverprofil külön letöltése nincs megvalósítva.</p>
+  <div class="todo">
+    <p><strong>TODO, közzététel előtt meg kell erősíteni.</strong> Meg kell erősíteni, hogyan lehet hozzáférést, helyesbítést, korlátozást, tiltakozást vagy a szerveroldali adatok hordozható másolatát kérni, és hogyan válaszolják meg ezeket. Az alkalmazásban megvalósított egyetlen kapcsolati út a visszajelző e-mail-cím.</p>
+  </div>
+
+  <h2>Biztonság</h2>
+  <p>A kiadásra szánt alkalmazás HTTPS-en hívja az API-t. A telefonon lévő munkamenet-token titkosított, a szerver a lenyomatát tárolja. A helyi adatbázis az alkalmazás privát tárhelyén van. Ez a tájékoztató nem állít külön titkosítási réteget erre az adatbázisra, és nem állít biztonsági tanúsítványt.</p>
+
+  <h2>Gyermekek</h2>
+  <div class="todo">
+    <p><strong>TODO, közzététel előtt meg kell erősíteni.</strong> Az alkalmazásnak nincs gyermekmódja, és Google-fiók kell hozzá. A korcsoportot a Play-listázás előtt meg kell erősíteni.</p>
+  </div>
+
+  <h2>Változások</h2>
+  <p>A fenti hatálybalépés ennek a szövegnek a dátuma. Későbbi változatnak ezt a dátumot kell módosítania.</p>
+  <div class="todo">
+    <p><strong>TODO, közzététel előtt meg kell erősíteni.</strong> Meg kell erősíteni, hogyan értesülnek az emberek a lényeges változásokról. Az alkalmazás még nem küld tájékoztató-frissítési értesítést.</p>
+  </div>
+</main>
+</body>
+</html>

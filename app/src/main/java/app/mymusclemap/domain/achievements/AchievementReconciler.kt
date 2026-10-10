@@ -44,6 +44,7 @@ data class ReconcileRequest(
      */
     val founderLifetime: Boolean = false,
     val proQualifications: List<ProQualification> = emptyList(),
+    val secretQualifications: List<SecretQualification> = emptyList(),
     /** Local date of the workout that triggered this reconcile, when there is one. */
     val triggerWorkoutDate: LocalDate? = null,
     /** Writes the monthly-report marker when this generation has not been recorded yet. */
@@ -206,6 +207,20 @@ object AchievementReconciler {
                 triggerClientWorkoutId = if (show) request.triggerClientWorkoutId else null
             )
         }
+        val missingSecrets = request.secretQualifications
+            .filter { it.achievementId.secret && it.achievementId !in storedIdsAfterRevoke }
+            .distinctBy { it.achievementId }
+        val secretInserts = missingSecrets.map { qualification ->
+            val live = !silentAwards &&
+                request.triggerClientWorkoutId != null &&
+                qualification.clientWorkoutId == request.triggerClientWorkoutId
+            UnlockInsert(
+                achievementId = qualification.achievementId,
+                unlockedAt = qualification.unlockedAt,
+                celebratedAt = if (live) null else request.nowMillis,
+                triggerClientWorkoutId = if (live) request.triggerClientWorkoutId else null
+            )
+        }
         val silenceWeeks = silentAwards || newWeeks.size > 1 ||
             missingFreeStreaks.isNotEmpty() || missingProStreaks.isNotEmpty()
         val weekInserts = newWeeks.map { week ->
@@ -255,7 +270,7 @@ object AchievementReconciler {
 
         return ReconcilePlan(
             insertUnlocks = insertUnlocks + streakInserts + journeyInserts + performanceInserts +
-                proInserts,
+                proInserts + secretInserts,
             revoke = revoke,
             insertEvents = weekInserts + listOfNotNull(historyInsert, markerInsert),
             deleteEventKeys = deleteEventKeys,

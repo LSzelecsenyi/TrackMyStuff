@@ -47,6 +47,24 @@ class FounderRecognitionStore(
         onChanged()
     }
 
+    suspend fun forget(userId: String) {
+        if (userId.isBlank()) {
+            return
+        }
+        mutex.withLock {
+            val loaded = memory.ifEmpty { read() }
+            if (!loaded.containsKey(userId)) {
+                memory = loaded
+                return
+            }
+            memory = loaded - userId
+            dataStore.edit { prefs ->
+                prefs[KEY_RECORDS] = encode(memory)
+            }
+        }
+        onChanged()
+    }
+
     /** Test isolation. Sign-out does not call this; it only hides the signed-in account. */
     suspend fun clear() {
         mutex.withLock {

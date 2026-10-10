@@ -48,7 +48,9 @@ data class EntitlementSources(
     val founderLifetime: FounderLifetimeEntitlement = FounderLifetimeEntitlement(),
     val founderProgram: FounderProgramSnapshot = FounderProgramSnapshot(),
     val backendFounder: BackendFounderEntitlement = BackendFounderEntitlement(),
-    val promotionalPro: PromotionalProEntitlement = PromotionalProEntitlement()
+    val promotionalPro: PromotionalProEntitlement = PromotionalProEntitlement(),
+    /** Welcome Back Pro. Independent of the 60-day discovery trial. */
+    val welcomeBack: PromotionalProEntitlement = PromotionalProEntitlement()
 ) {
     companion object {
         fun of(
@@ -56,14 +58,16 @@ data class EntitlementSources(
             founderLifetime: FounderLifetimeEntitlement = FounderLifetimeEntitlement(),
             program: FounderProgramState = FounderProgramState(),
             backendFounder: BackendFounderEntitlement = BackendFounderEntitlement(),
-            promotionalPro: PromotionalProEntitlement = PromotionalProEntitlement()
+            promotionalPro: PromotionalProEntitlement = PromotionalProEntitlement(),
+            welcomeBack: PromotionalProEntitlement = PromotionalProEntitlement()
         ): EntitlementSources {
             return EntitlementSources(
                 subscription = subscription,
                 founderLifetime = founderLifetime,
                 founderProgram = FounderProgramSnapshot(program.status),
                 backendFounder = backendFounder,
-                promotionalPro = promotionalPro
+                promotionalPro = promotionalPro,
+                welcomeBack = welcomeBack
             )
         }
     }

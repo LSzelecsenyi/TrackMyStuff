@@ -6,6 +6,7 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import java.util.concurrent.atomic.AtomicReference
@@ -53,6 +54,8 @@ class CredentialManagerGoogleIdentityProvider(
             }
         } catch (_: GetCredentialCancellationException) {
             GoogleIdTokenRequest.Cancelled
+        } catch (_: NoCredentialException) {
+            GoogleIdTokenRequest.Failed
         } catch (_: GetCredentialException) {
             GoogleIdTokenRequest.Failed
         }

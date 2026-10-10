@@ -101,7 +101,8 @@ class StrictFoundationIT {
                 "founder_workout_event",
                 "play_rtdn_message",
                 "play_subscription",
-                "promotional_trial"
+                "promotional_trial",
+                "welcome_back_grant"
         ), tables);
         Integer founderMigration = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success = true AND version = '3'",

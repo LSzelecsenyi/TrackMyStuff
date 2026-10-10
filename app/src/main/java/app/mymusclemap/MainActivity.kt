@@ -16,11 +16,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import app.mymusclemap.data.account.AccountDeletionOutcome
 import app.mymusclemap.data.account.VerifiedAccountProfile
 import app.mymusclemap.data.auth.StrictSignInResult
 import app.mymusclemap.ui.auth.WelcomeSignInScreen
+import app.mymusclemap.ui.settings.DeleteAccountResult
+import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.theme.StrictBrand
 import app.mymusclemap.domain.billing.manageSubscriptionUrl
 import app.mymusclemap.domain.locale.AppLanguageApplicator
@@ -71,7 +73,14 @@ class MainActivity : AppCompatActivity() {
         }
         val app = application as WeightTrackerApplication
         val container = app.container
+        // AppCompat 1.7 replaces ComponentActivity.setContentView and only installs the
+        // older view-tree owners. navigation-compose reads NavigationEventDispatcherOwner
+        // the first time NavHost is composed, which is the onboarding handoff to the
+        // first workout plan. Re-install on each composition in case setContentView
+        // replaced the decor view after the earlier call.
+        initializeViewTreeOwners()
         setContent {
+            initializeViewTreeOwners()
             if (container == null) {
                 SideEffect { splashReady = true }
                 WelcomeGate(app)
@@ -168,6 +177,10 @@ class MainActivity : AppCompatActivity() {
                                 onDismissProDiscoveryOffer = container::dismissProDiscoveryOffer,
                                 onDismissProDiscoveryWarning = container::dismissProDiscoveryWarning,
                                 onPromotionClock = container::notePromotionClock,
+                                welcomeBack = container::welcomeBackSnapshot,
+                                onActivateWelcomeBack = container::activateWelcomeBack,
+                                onDismissWelcomeBackOffer = container::dismissWelcomeBackOffer,
+                                onDismissWelcomeBackWarning = container::dismissWelcomeBackWarning,
                                 billingScreen = billingState,
                                 paidSubscription = container::paidSubscriptionSnapshot,
                                 onSelectBillingOffer = container::selectBillingOffer,
@@ -175,10 +188,11 @@ class MainActivity : AppCompatActivity() {
                                     lifecycleScope.launch { container.launchBilling(this@MainActivity) }
                                 },
                                 onManageSubscription = { productId ->
-                                    val url = manageSubscriptionUrl(
-                                        packageName,
-                                        productId
-                                    )
+                                    val url = if (productId.isBlank()) {
+                                        "https://play.google.com/store/account/subscriptions"
+                                    } else {
+                                        manageSubscriptionUrl(packageName, productId)
+                                    }
                                     startActivity(
                                         Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
                                     )
@@ -203,7 +217,23 @@ class MainActivity : AppCompatActivity() {
                                         app.accounts.clearActive()
                                         app.restartProcess()
                                     }
-                                }
+                                },
+                                onDeleteAccount = {
+                                    when (app.deleteCurrentAccount()) {
+                                        AccountDeletionOutcome.Deleted -> DeleteAccountResult.Deleted
+                                        AccountDeletionOutcome.NeedsNetwork -> DeleteAccountResult.NeedsNetwork
+                                        AccountDeletionOutcome.Cancelled -> DeleteAccountResult.Cancelled
+                                        AccountDeletionOutcome.ReauthenticationRequired ->
+                                            DeleteAccountResult.ReauthenticationRequired
+                                        is AccountDeletionOutcome.LocalCleanupFailed ->
+                                            DeleteAccountResult.LocalCleanupIncomplete
+                                        AccountDeletionOutcome.GoogleUnavailable,
+                                        AccountDeletionOutcome.NotFound,
+                                        AccountDeletionOutcome.Failed,
+                                        AccountDeletionOutcome.NoAccount -> DeleteAccountResult.Failed
+                                    }
+                                },
+                                onAccountDeletionFinished = { app.restartProcess() }
                             )
                         }
                     }
@@ -276,8 +306,21 @@ private fun WelcomeGate(app: WeightTrackerApplication) {
     val offline = app.startupDecision().offline
     var message by remember { mutableStateOf<String?>(null) }
     var claim by remember { androidx.compose.runtime.mutableStateOf<VerifiedAccountProfile?>(null) }
+    var localCleanup by remember { mutableStateOf(app.pendingLocalDeletion()) }
+    var showPrivacy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val offlineFirstMessage = stringResource(R.string.welcome_offline_first)
+    val canceledMessage = stringResource(R.string.welcome_canceled)
+    val unavailableMessage = stringResource(R.string.welcome_unavailable)
+    val invalidMessage = stringResource(R.string.welcome_invalid)
+    val notConfiguredMessage = stringResource(R.string.welcome_not_configured)
+    val failedMessage = stringResource(R.string.welcome_failed)
+    if (showPrivacy) {
+        WeightTrackerTheme {
+            PrivacyPolicyScreen(onBack = { showPrivacy = false })
+        }
+        return
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -287,10 +330,11 @@ private fun WelcomeGate(app: WeightTrackerApplication) {
             busy = busy,
             message = message ?: if (offline) stringResource(R.string.welcome_offline_first) else null,
             claimOpen = claim != null,
+            localCleanupMessage = if (localCleanup) stringResource(R.string.welcome_local_cleanup) else null,
             onContinue = {
                 if (busy) return@WelcomeSignInScreen
                 if (app.startupDecision().offline) {
-                    message = context.getString(R.string.welcome_offline_first)
+                    message = offlineFirstMessage
                     return@WelcomeSignInScreen
                 }
                 busy = true
@@ -310,17 +354,12 @@ private fun WelcomeGate(app: WeightTrackerApplication) {
                                 app.restartProcess()
                             }
                         }
-                        StrictSignInResult.Cancelled ->
-                            message = context.getString(R.string.welcome_canceled)
-                        StrictSignInResult.Unavailable ->
-                            message = context.getString(R.string.welcome_unavailable)
-                        StrictSignInResult.InvalidGoogleToken ->
-                            message = context.getString(R.string.welcome_invalid)
-                        StrictSignInResult.GoogleNotConfigured ->
-                            message = context.getString(R.string.welcome_not_configured)
+                        StrictSignInResult.Cancelled -> message = canceledMessage
+                        StrictSignInResult.Unavailable -> message = unavailableMessage
+                        StrictSignInResult.InvalidGoogleToken -> message = invalidMessage
+                        StrictSignInResult.GoogleNotConfigured -> message = notConfiguredMessage
                         StrictSignInResult.GoogleFailed,
-                        StrictSignInResult.BackendRejected ->
-                            message = context.getString(R.string.welcome_failed)
+                        StrictSignInResult.BackendRejected -> message = failedMessage
                     }
                     busy = false
                 }
@@ -334,7 +373,11 @@ private fun WelcomeGate(app: WeightTrackerApplication) {
             onCancelClaim = {
                 claim = null
                 scope.launch { app.signIn.auth.logout() }
-            }
+            },
+            onRetryLocalCleanup = {
+                localCleanup = !app.retryPendingLocalDeletion()
+            },
+            onOpenPrivacy = { showPrivacy = true }
         )
     }
 }

@@ -14,8 +14,15 @@ class SignInCoordinator(context: Context) {
         sessions = sessions
     )
     val auth = StrictAuthRepository(google, api, sessions)
+    val googleIdentity: GoogleIdentityProvider get() = google
 
     suspend fun continueWithGoogle() = auth.signIn()
+
+    suspend fun deleteAuthenticated(idToken: GoogleIdTokenValue) = api.deleteAccount(idToken)
+
+    suspend fun deletePublic(idToken: GoogleIdTokenValue) = api.deleteAccountPublic(idToken)
+
+    fun clearLocalSession() = sessions.clear()
 
     fun bind(activity: Activity) {
         google.bind(activity)

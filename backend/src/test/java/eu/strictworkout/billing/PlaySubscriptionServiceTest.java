@@ -149,10 +149,32 @@ class PlaySubscriptionServiceTest {
         repository.rows.put(stored.tokenHash(), new StoredPlaySubscription(
                 stored.tokenHash(), stored.purchaseToken(), stored.packageName(), stored.productId(), stored.basePlanId(),
                 stored.state(), stored.expiry(), stored.autoRenewing(), stored.entitled(), stored.linkedUserId(),
-                stored.orderId(), NOW.minusSeconds(7 * 3600)
+                stored.orderId(), NOW.minusSeconds(7 * 3600), stored.claimBlocked()
         ));
         assertEquals(1, service.reconcile(NOW.plusSeconds(1)));
         assertFalse(repository.rows.values().iterator().next().entitled());
+    }
+
+    @Test
+    void aBlockedTokenCannotBeClaimedAndNotificationsLeaveItUnlinked() {
+        service.verify(TOKEN, PRODUCT, null);
+        StoredPlaySubscription stored = repository.rows.values().iterator().next();
+        repository.rows.put(stored.tokenHash(), new StoredPlaySubscription(
+                stored.tokenHash(), stored.purchaseToken(), stored.packageName(), stored.productId(), stored.basePlanId(),
+                stored.state(), stored.expiry(), stored.autoRenewing(), stored.entitled(), null,
+                stored.orderId(), stored.updatedAt(), true
+        ));
+        UUID user = UUID.randomUUID();
+        assertEquals(PlaySubscriptionService.Status.CONFLICT, service.verify(TOKEN, PRODUCT, user).status());
+        play.purchase = active(NOW.plusSeconds(1_000), true);
+        assertEquals(
+                PlaySubscriptionService.Status.VERIFIED,
+                service.onNotification("blocked", NOW, "com.strictworkout.app", TOKEN, 2).status()
+        );
+        StoredPlaySubscription after = repository.rows.values().iterator().next();
+        assertTrue(after.claimBlocked());
+        assertNull(after.linkedUserId());
+        assertEquals(NOW.plusSeconds(1_000), after.expiry());
     }
 
     @Test

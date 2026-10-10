@@ -18,7 +18,9 @@ data class EffectiveEntitlement(
     /** True only while a Founder Pro grant is still before its expiration. */
     val founderProActive: Boolean = false,
     /** True only while a promotional Pro trial is still before its expiration. */
-    val promotionalProActive: Boolean = false
+    val promotionalProActive: Boolean = false,
+    /** True only while Welcome Back Pro is still before its expiration. */
+    val welcomeBackActive: Boolean = false
 ) {
     val grantsPro: Boolean
         get() = tier == EntitlementTier.Pro

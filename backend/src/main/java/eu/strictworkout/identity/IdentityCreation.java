@@ -29,7 +29,7 @@ class IdentityCreation {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public AppUser insert(VerifiedExternalIdentity verified) {
+    public AppUser insert(VerifiedExternalIdentity verified, boolean skipEarlyAdopter) {
         Instant now = clock.instant();
         AppUser user = users.saveAndFlush(new AppUser(UUID.randomUUID(), now, now));
         identities.saveAndFlush(new ExternalIdentity(
@@ -41,7 +41,9 @@ class IdentityCreation {
                 verifiedEmail(verified) != null,
                 now
         ));
-        earlyAdopters.assignNewUser(user);
+        if (!skipEarlyAdopter) {
+            earlyAdopters.assignNewUser(user);
+        }
         return user;
     }
 

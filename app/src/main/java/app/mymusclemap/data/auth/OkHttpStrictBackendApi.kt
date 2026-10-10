@@ -27,6 +27,8 @@ interface StrictBackendApi {
     suspend fun exchangeGoogleIdToken(idToken: GoogleIdTokenValue): GoogleExchangeResult
     suspend fun currentUser(): CurrentUserCall
     suspend fun revokeSession(): RevokeCall
+    suspend fun deleteAccount(idToken: GoogleIdTokenValue): AccountDeletionCall
+    suspend fun deleteAccountPublic(idToken: GoogleIdTokenValue): AccountDeletionCall
     suspend fun enrollFounder(zone: ZoneId): FounderEnrollmentCall
     suspend fun currentFounder(zone: ZoneId): FounderSnapshotCall
     suspend fun submitFounderWorkout(
@@ -253,6 +255,54 @@ class OkHttpStrictBackendApi(
                 else -> RevokeCall.Failed
             }
         } ?: RevokeCall.Failed
+    }
+
+    override suspend fun deleteAccount(idToken: GoogleIdTokenValue): AccountDeletionCall {
+        if (!isCredentialSafe(idToken.value)) {
+            return AccountDeletionCall.Rejected
+        }
+        val session = sessions.read() ?: return AccountDeletionCall.Unauthenticated
+        val body = JSONObject()
+            .put("idToken", idToken.value)
+            .put("confirmed", true)
+            .toString()
+        val request = Request.Builder()
+            .url("$root/api/v1/account")
+            .header("Authorization", "Bearer ${session.accessToken.value}")
+            .delete(body.toRequestBody(json))
+            .build()
+        return interpretDeletion(request)
+    }
+
+    override suspend fun deleteAccountPublic(idToken: GoogleIdTokenValue): AccountDeletionCall {
+        if (!isCredentialSafe(idToken.value)) {
+            return AccountDeletionCall.Rejected
+        }
+        val body = JSONObject()
+            .put("idToken", idToken.value)
+            .put("confirmed", true)
+            .toString()
+        val request = Request.Builder()
+            .url("$root/api/v1/account/deletion")
+            .post(body.toRequestBody(json))
+            .build()
+        return interpretDeletion(request)
+    }
+
+    private suspend fun interpretDeletion(request: Request): AccountDeletionCall {
+        return call(request) { response ->
+            when (response.code) {
+                204 -> AccountDeletionCall.Deleted
+                401 -> if (errorCode(response) == "REAUTHENTICATION_REQUIRED") {
+                    AccountDeletionCall.ReauthenticationRequired
+                } else {
+                    AccountDeletionCall.Unauthenticated
+                }
+                404 -> AccountDeletionCall.NotFound
+                in 500..599 -> AccountDeletionCall.Failed
+                else -> AccountDeletionCall.Rejected
+            }
+        } ?: AccountDeletionCall.Unavailable
     }
 
     /**

@@ -112,6 +112,16 @@ sealed interface FounderReportSubmission {
     data object Unavailable : FounderReportSubmission
 }
 
+sealed interface AccountDeletionCall {
+    data object Deleted : AccountDeletionCall
+    data object ReauthenticationRequired : AccountDeletionCall
+    data object Unauthenticated : AccountDeletionCall
+    data object NotFound : AccountDeletionCall
+    data object Rejected : AccountDeletionCall
+    data object Failed : AccountDeletionCall
+    data object Unavailable : AccountDeletionCall
+}
+
 sealed interface FounderEntitlementCall {
     data class Loaded(
         val temporaryFounderPro: Boolean,

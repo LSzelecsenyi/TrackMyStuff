@@ -49,6 +49,9 @@ class PlaySubscriptionEntity {
     @Column(name = "latest_order_id")
     private String latestOrderId;
 
+    @Column(name = "claim_blocked", nullable = false)
+    private boolean claimBlocked;
+
     @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
@@ -74,6 +77,7 @@ class PlaySubscriptionEntity {
         entitled = subscription.entitled();
         linkedUserId = subscription.linkedUserId();
         latestOrderId = subscription.orderId();
+        claimBlocked = subscription.claimBlocked();
         updatedAt = subscription.updatedAt();
     }
 
@@ -90,7 +94,8 @@ class PlaySubscriptionEntity {
                 entitled,
                 linkedUserId,
                 latestOrderId,
-                updatedAt
+                updatedAt,
+                claimBlocked
         );
     }
 }

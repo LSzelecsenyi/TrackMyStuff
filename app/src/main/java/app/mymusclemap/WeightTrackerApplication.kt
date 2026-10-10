@@ -47,6 +47,7 @@ class WeightTrackerApplication : Application() {
         applyLanguagePolicy()
         accounts = AccountDirectory(this)
         signIn = SignInCoordinator(this)
+        resumePendingLocalDeletion()
         if (startupDecision().state == AppAuthState.AUTHENTICATED) {
             openSignedInContainer()
         }
@@ -99,6 +100,55 @@ class WeightTrackerApplication : Application() {
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         startActivity(launch)
         exitProcess(0)
+    }
+
+    suspend fun deleteCurrentAccount(): app.mymusclemap.data.account.AccountDeletionOutcome {
+        val userId = accounts.activeUserId()
+            ?: return app.mymusclemap.data.account.AccountDeletionOutcome.NoAccount
+        val coordinator = app.mymusclemap.data.account.AccountDeletionCoordinator(
+            requestIdToken = { signIn.googleIdentity.requestIdToken() },
+            deleteAuthenticated = { signIn.deleteAuthenticated(it) },
+            deletePublic = { signIn.deletePublic(it) },
+            online = { online() },
+            afterServerDeletion = { id -> finishLocalDeletion(id) }
+        )
+        return coordinator.delete(userId)
+    }
+
+    fun retryPendingLocalDeletion(): Boolean {
+        val eraser = app.mymusclemap.data.account.AccountLocalDataEraser(this)
+        val pending = eraser.pendingUserId() ?: return true
+        val erased = eraser.erase(pending)
+        if (erased) {
+            eraser.clearPending()
+        }
+        return erased
+    }
+
+    fun pendingLocalDeletion(): Boolean {
+        return app.mymusclemap.data.account.AccountLocalDataEraser(this).pendingUserId() != null
+    }
+
+    private fun resumePendingLocalDeletion() {
+        val eraser = app.mymusclemap.data.account.AccountLocalDataEraser(this)
+        val pending = eraser.pendingUserId() ?: return
+        signIn.clearLocalSession()
+        accounts.detach(pending)
+        if (eraser.erase(pending)) {
+            eraser.clearPending()
+        }
+    }
+
+    private suspend fun finishLocalDeletion(userId: String): Boolean {
+        val eraser = app.mymusclemap.data.account.AccountLocalDataEraser(this)
+        if (!eraser.markPending(userId)) {
+            return false
+        }
+        container?.founderRecognition?.forget(userId)
+        container?.founderApprovalCelebrations?.forget(userId)
+        signIn.clearLocalSession()
+        accounts.detach(userId)
+        return eraser.erase(userId)
     }
 
     private fun session(): StoredStrictSession? = signIn.auth.storedSession()

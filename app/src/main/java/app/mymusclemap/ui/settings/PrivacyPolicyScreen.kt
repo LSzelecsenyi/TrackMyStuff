@@ -51,6 +51,12 @@ private val privacyPolicySections = listOf(
         R.string.privacy_policy_transmission_title,
         R.string.privacy_policy_transmission_body
     ),
+    PrivacyPolicySection(R.string.privacy_policy_founder_title, R.string.privacy_policy_founder_body),
+    PrivacyPolicySection(
+        R.string.privacy_policy_promotions_title,
+        R.string.privacy_policy_promotions_body
+    ),
+    PrivacyPolicySection(R.string.privacy_policy_billing_title, R.string.privacy_policy_billing_body),
     PrivacyPolicySection(R.string.privacy_policy_export_title, R.string.privacy_policy_export_body),
     PrivacyPolicySection(
         R.string.privacy_policy_feedback_title,
@@ -62,6 +68,12 @@ private val privacyPolicySections = listOf(
         R.string.privacy_policy_third_parties_title,
         R.string.privacy_policy_third_parties_body
     ),
+    PrivacyPolicySection(R.string.privacy_policy_bases_title, R.string.privacy_policy_bases_body),
+    PrivacyPolicySection(R.string.privacy_policy_retention_title, R.string.privacy_policy_retention_body),
+    PrivacyPolicySection(R.string.privacy_policy_rights_title, R.string.privacy_policy_rights_body),
+    PrivacyPolicySection(R.string.privacy_policy_security_title, R.string.privacy_policy_security_body),
+    PrivacyPolicySection(R.string.privacy_policy_children_title, R.string.privacy_policy_children_body),
+    PrivacyPolicySection(R.string.privacy_policy_changes_title, R.string.privacy_policy_changes_body),
     PrivacyPolicySection(
         R.string.privacy_policy_contact_title,
         R.string.privacy_policy_contact_body,

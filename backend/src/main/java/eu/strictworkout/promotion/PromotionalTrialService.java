@@ -35,6 +35,11 @@ public final class PromotionalTrialService {
         this.store = store;
     }
 
+    public boolean activeNow(UUID userId, Instant now) {
+        Trial trial = store.find(userId);
+        return trial != null && now.isBefore(trial.expiresAt());
+    }
+
     public Result activate(UUID userId, Instant now, boolean promotionsOpen, boolean incompatiblePro) {
         Trial existing = store.find(userId);
         if (existing != null) {

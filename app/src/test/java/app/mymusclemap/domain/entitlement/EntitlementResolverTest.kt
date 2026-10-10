@@ -280,6 +280,33 @@ class EntitlementResolverTest {
         assertEquals(EntitlementTier.Free, ended.tier)
     }
 
+    @Test
+    fun welcomeBackIsActiveOnlyBeforeItsExpirationAndDoesNotReplaceOtherPro() {
+        val expiresAt = now.plusSeconds(60)
+        val before = EntitlementResolver.resolve(
+            EntitlementSources.of(welcomeBack = PromotionalProEntitlement(expiresAt = expiresAt)),
+            expiresAt.minusMillis(1)
+        )
+        assertTrue(before.welcomeBackActive)
+        assertEquals(EntitlementTier.Pro, before.tier)
+        val atExpiry = EntitlementResolver.resolve(
+            EntitlementSources.of(welcomeBack = PromotionalProEntitlement(expiresAt = expiresAt)),
+            expiresAt
+        )
+        assertFalse(atExpiry.welcomeBackActive)
+        assertEquals(EntitlementTier.Free, atExpiry.tier)
+        val paidCovers = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                subscription = SubscriptionEntitlement(paidUntilInclusive = expiresAt.plusSeconds(3600)),
+                welcomeBack = PromotionalProEntitlement(expiresAt = expiresAt)
+            ),
+            expiresAt
+        )
+        assertTrue(paidCovers.subscriptionValid)
+        assertFalse(paidCovers.welcomeBackActive)
+        assertEquals(EntitlementTier.Pro, paidCovers.tier)
+    }
+
     private fun activePro(): FounderProgramState {
         return FounderProgramState(
             status = FounderProgramStatus.ActivePro,

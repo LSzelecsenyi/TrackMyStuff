@@ -5,6 +5,7 @@ public record VerifiedExternalIdentity(
         String subject,
         String email,
         boolean emailVerified,
-        String displayName
+        String displayName,
+        java.time.Instant issuedAt
 ) {
 }

@@ -110,14 +110,15 @@ public final class PlaySubscriptionService {
         }
         String hash = sha256(purchaseToken);
         Optional<StoredPlaySubscription> existing = subscriptions.find(hash);
-        if (existing.isPresent()
-                && existing.get().linkedUserId() != null
-                && userId != null
-                && !existing.get().linkedUserId().equals(userId)) {
+        boolean claimBlocked = existing.map(StoredPlaySubscription::claimBlocked).orElse(false);
+        UUID linked = existing.map(StoredPlaySubscription::linkedUserId).orElse(null);
+        if (linked != null && userId != null && !linked.equals(userId)) {
             return new Outcome(Status.CONFLICT, existing.get());
         }
-        UUID linked = existing.map(StoredPlaySubscription::linkedUserId).orElse(null);
-        if (linked == null) {
+        if (claimBlocked && userId != null && (linked == null || !linked.equals(userId))) {
+            return new Outcome(Status.CONFLICT, existing.orElse(null));
+        }
+        if (linked == null && !claimBlocked) {
             linked = userId;
         }
         Instant now = clock.instant();
@@ -134,7 +135,8 @@ public final class PlaySubscriptionService {
                 entitled,
                 linked,
                 purchase.orderId(),
-                now
+                now,
+                claimBlocked
         ));
         if (entitled && "ACKNOWLEDGEMENT_STATE_PENDING".equals(purchase.acknowledgementState())) {
             play.acknowledge(expectedPackage, line.productId(), purchaseToken);

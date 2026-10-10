@@ -25,6 +25,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,8 @@ import app.mymusclemap.domain.billing.SubscriptionOffer
 import app.mymusclemap.domain.entitlement.FeatureAccessPolicy
 import app.mymusclemap.domain.entitlement.ProBenefitsStatus
 import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
+import app.mymusclemap.domain.entitlement.WelcomeBackNotice
+import app.mymusclemap.domain.entitlement.WelcomeBackSnapshot
 import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.entitlement.formatTrialRemaining
 import app.mymusclemap.ui.theme.AppShapeTokens
@@ -62,6 +65,7 @@ internal const val PRO_BENEFITS_SUBSCRIPTION = "pro-benefits-subscription"
 internal const val PRO_BENEFITS_TABLE = "pro-benefits-table"
 internal const val PRO_BENEFITS_SUBSCRIBE = "pro-benefits-subscribe"
 internal const val PRO_BENEFITS_MANAGE = "pro-benefits-manage"
+internal const val PRO_BENEFITS_PRIVACY = "pro-benefits-privacy"
 
 /**
  * Free and Pro differences from the current feature policy.
@@ -73,11 +77,14 @@ fun ProBenefitsScreen(
     onBack: () -> Unit,
     discovery: ProDiscoverySnapshot = ProDiscoverySnapshot(),
     onActivateTrial: () -> Unit = {},
+    welcomeBack: WelcomeBackSnapshot = WelcomeBackSnapshot(),
+    onActivateWelcomeBack: () -> Unit = {},
     now: Instant = Instant.now(),
     plan: ProPlanPresentation = ProPlanPresentation.NotConfigured,
     onSelectOffer: (String) -> Unit = {},
     onSubscribe: () -> Unit = {},
-    onManageSubscription: (String) -> Unit = {}
+    onManageSubscription: (String) -> Unit = {},
+    onOpenPrivacy: () -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier
@@ -134,6 +141,11 @@ fun ProBenefitsScreen(
                     onActivateTrial = onActivateTrial,
                     now = now
                 )
+                WelcomeBackSection(
+                    welcomeBack = welcomeBack,
+                    proActive = status.proActive,
+                    onActivate = onActivateWelcomeBack
+                )
                 Spacer(Modifier.height(AppDimens.sectionGap))
                 ComparisonTable()
                 Spacer(Modifier.height(AppDimens.sectionGap))
@@ -143,6 +155,18 @@ fun ProBenefitsScreen(
                     onSubscribe = onSubscribe,
                     onManageSubscription = onManageSubscription
                 )
+                Spacer(Modifier.height(AppDimens.sectionGap))
+                Text(
+                    text = stringResource(R.string.pro_plan_privacy_note),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = StrictBrand.light
+                )
+                TextButton(
+                    onClick = onOpenPrivacy,
+                    modifier = Modifier.testTag(PRO_BENEFITS_PRIVACY)
+                ) {
+                    Text(stringResource(R.string.action_privacy_policy), color = StrictBrand.lime)
+                }
             }
         }
     }
@@ -252,6 +276,93 @@ private fun DiscoverySection(
         }
     }
 }
+
+@Composable
+private fun WelcomeBackSection(
+    welcomeBack: WelcomeBackSnapshot,
+    proActive: Boolean,
+    onActivate: () -> Unit
+) {
+    val expiresAt = welcomeBack.trialExpiresAt
+    if (welcomeBack.trialActive && expiresAt != null) {
+        Text(
+            text = stringResource(
+                R.string.welcome_back_active,
+                proDiscoveryDateTime(expiresAt)
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            color = StrictBrand.light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.headerStackGap)
+                .testTag(WELCOME_BACK_STATUS)
+        )
+    }
+    if (welcomeBack.trialExpired && !proActive) {
+        Text(
+            text = stringResource(R.string.welcome_back_expired),
+            style = MaterialTheme.typography.bodyLarge,
+            color = StrictBrand.light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.headerStackGap)
+                .testTag(WELCOME_BACK_STATUS)
+        )
+    }
+    if (welcomeBack.notice != WelcomeBackNotice.None) {
+        Text(
+            text = stringResource(R.string.welcome_back_unavailable),
+            style = MaterialTheme.typography.bodyMedium,
+            color = StrictBrand.light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.headerStackGap)
+                .testTag(WELCOME_BACK_NOTICE)
+        )
+    }
+    if (welcomeBack.offerAvailable && !proActive) {
+        Text(
+            text = stringResource(R.string.welcome_back_offer_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = StrictBrand.lime,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.sectionGap)
+                .testTag(WELCOME_BACK_BENEFITS)
+        )
+        Text(
+            text = stringResource(R.string.welcome_back_offer_message),
+            style = MaterialTheme.typography.bodyLarge,
+            color = StrictBrand.light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.headerStackGap)
+        )
+        Text(
+            text = stringResource(R.string.welcome_back_offer_note),
+            style = MaterialTheme.typography.bodyMedium,
+            color = StrictBrand.light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.headerStackGap)
+        )
+        Spacer(Modifier.height(AppDimens.headerStackGap))
+        Button(
+            onClick = onActivate,
+            shape = AppShapeTokens.button,
+            colors = StrictBrand.actionButtonColors(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(WELCOME_BACK_ACTIVATE)
+        ) {
+            Text(stringResource(R.string.welcome_back_activate))
+        }
+    }
+}
+
+internal const val WELCOME_BACK_STATUS = "welcome-back-status"
+internal const val WELCOME_BACK_NOTICE = "welcome-back-notice"
+internal const val WELCOME_BACK_BENEFITS = "welcome-back-benefits"
 
 @Composable
 private fun ComparisonTable() {

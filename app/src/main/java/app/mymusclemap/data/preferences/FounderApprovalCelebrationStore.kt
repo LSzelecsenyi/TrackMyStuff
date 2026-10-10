@@ -59,6 +59,26 @@ class FounderApprovalCelebrationStore(
         onChanged()
     }
 
+    suspend fun forget(userId: String) {
+        if (userId.isBlank()) {
+            return
+        }
+        mutex.withLock {
+            val current = if (loaded) memory else read()
+            if (!current.contains(userId)) {
+                memory = current
+                loaded = true
+                return
+            }
+            memory = current - userId
+            loaded = true
+            dataStore.edit { prefs ->
+                prefs[KEY_ACCOUNTS] = encode(memory)
+            }
+        }
+        onChanged()
+    }
+
     /** Test isolation. Sign-out does not call this. */
     suspend fun clear() {
         mutex.withLock {

@@ -28,13 +28,21 @@ import app.mymusclemap.data.preferences.FounderApprovalCelebrationStore
 import app.mymusclemap.data.preferences.ProDiscoveryStore
 import app.mymusclemap.data.preferences.ProDiscoveryStoreKind
 import app.mymusclemap.data.preferences.PromotionAvailabilityStore
+import app.mymusclemap.data.preferences.WelcomeBackStore
+import app.mymusclemap.data.preferences.WelcomeBackStoreKind
 import app.mymusclemap.data.promotion.ProDiscoveryCoordinator
 import app.mymusclemap.data.promotion.PromotionAvailabilityClient
+import app.mymusclemap.data.promotion.WelcomeBackClient
+import app.mymusclemap.data.promotion.WelcomeBackCoordinator
+import app.mymusclemap.data.promotion.WelcomeBackCoverage
 import app.mymusclemap.domain.entitlement.EntitlementResolver
 import app.mymusclemap.domain.entitlement.ProDiscoveryCoverage
 import app.mymusclemap.domain.entitlement.ProDiscoveryPolicy
 import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
 import app.mymusclemap.domain.entitlement.PromotionalProEntitlement
+import app.mymusclemap.domain.entitlement.WelcomeBackCompletion
+import app.mymusclemap.domain.entitlement.WelcomeBackPolicy
+import app.mymusclemap.domain.entitlement.WelcomeBackSnapshot
 import app.mymusclemap.data.preferences.FounderEntitlementCache
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderRecognitionStore
@@ -254,6 +262,45 @@ class AppContainer(context: Context, val accountUserId: String) {
             ).activate()
         }
     )
+    private val welcomeBackReal = WelcomeBackStore(
+        context = appContext,
+        kind = WelcomeBackStoreKind.REAL,
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 },
+        userId = accountUserId
+    )
+    private val welcomeBackSimulation = WelcomeBackStore(
+        context = appContext,
+        kind = WelcomeBackStoreKind.SIMULATION,
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 }
+    )
+    val welcomeBack = WelcomeBackCoordinator(
+        real = welcomeBackReal,
+        simulation = welcomeBackSimulation,
+        now = { clock.instant() },
+        zone = clock.zone,
+        completions = {
+            database.workoutSessionDao().nativeCompletionRows().map { row ->
+                WelcomeBackCompletion(row.clientWorkoutId, java.time.Instant.ofEpochMilli(row.completedAt))
+            }
+        },
+        debugConfig = { WelcomeBackDebugSelection.current() },
+        promotionsEnabled = { promotionAvailability.promotionsEnabled() },
+        onChanged = { entitlementRevision.value = entitlementRevision.value + 1 },
+        authorizeActivation = { workoutId ->
+            WelcomeBackClient(
+                baseUrl = BuildConfig.STRICT_API_BASE_URL,
+                http = strictOkHttpClient(),
+                sessionToken = { strictAccount.sessions.read()?.accessToken?.value }
+            ).activate(workoutId)
+        },
+        fetchGrant = {
+            WelcomeBackClient(
+                baseUrl = BuildConfig.STRICT_API_BASE_URL,
+                http = strictOkHttpClient(),
+                sessionToken = { strictAccount.sessions.read()?.accessToken?.value }
+            ).current()
+        }
+    )
     val verifiedSubscriptions = VerifiedSubscriptionStore(
         context = appContext,
         onChanged = { entitlementRevision.value = entitlementRevision.value + 1 },
@@ -278,6 +325,7 @@ class AppContainer(context: Context, val accountUserId: String) {
         founderProgram = founderProgram::currentState,
         backendFounder = founderEntitlementCache::current,
         promotionalPro = { proDiscovery.currentGrant() },
+        welcomeBack = { welcomeBack.currentGrant() },
         adjustSources = EntitlementOverrideSelection::adjust
     )
     init {
@@ -289,6 +337,17 @@ class AppContainer(context: Context, val accountUserId: String) {
                 currentlyFree = !EntitlementResolver.resolve(withoutTrial, clock.instant()).grantsPro,
                 continuedBeyond = { expiresAt ->
                     ProDiscoveryPolicy.continuedProBeyond(withoutTrial, expiresAt)
+                }
+            )
+        }
+        welcomeBack.coverage = {
+            val withoutGrant = EntitlementOverrideSelection.adjust(
+                entitlementComposer.sources().copy(welcomeBack = PromotionalProEntitlement())
+            )
+            WelcomeBackCoverage(
+                currentlyFree = !EntitlementResolver.resolve(withoutGrant, clock.instant()).grantsPro,
+                continuedBeyond = { expiresAt ->
+                    WelcomeBackPolicy.continuedProBeyond(withoutGrant, expiresAt)
                 }
             )
         }
@@ -314,7 +373,10 @@ class AppContainer(context: Context, val accountUserId: String) {
             } else {
                 founderProgram.onNativeWorkoutCompleted(clientWorkoutId)
             }
-            founderCacheScope.launch { proDiscovery.refreshHistory() }
+            founderCacheScope.launch {
+                proDiscovery.refreshHistory()
+                welcomeBack.noteCompletion(clientWorkoutId)
+            }
         }
     }
 
@@ -350,8 +412,13 @@ class AppContainer(context: Context, val accountUserId: String) {
         proDiscoveryReal.load()
         proDiscoverySimulation.load()
         promotionAvailability.load()
+        welcomeBackReal.load()
+        welcomeBackSimulation.load()
         proDiscovery.prepare()
         proDiscovery.refreshHistory()
+        welcomeBack.prepare()
+        welcomeBack.refreshHistory()
+        welcomeBack.refreshRemote()
     }
 
     fun promotionNow(): Instant = clock.instant()
@@ -368,6 +435,20 @@ class AppContainer(context: Context, val accountUserId: String) {
 
     fun dismissProDiscoveryWarning() {
         founderCacheScope.launch { proDiscovery.dismissWarning() }
+    }
+
+    fun welcomeBackSnapshot(): WelcomeBackSnapshot = welcomeBack.snapshot()
+
+    fun activateWelcomeBack() {
+        founderCacheScope.launch { welcomeBack.activate() }
+    }
+
+    fun dismissWelcomeBackOffer() {
+        founderCacheScope.launch { welcomeBack.dismissOffer() }
+    }
+
+    fun dismissWelcomeBackWarning() {
+        founderCacheScope.launch { welcomeBack.dismissWarning() }
     }
 
     fun notePromotionClock() {

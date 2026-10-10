@@ -37,7 +37,8 @@ object EntitlementDebugOverride {
                 subscription = SubscriptionEntitlement(),
                 founderLifetime = FounderLifetimeEntitlement(),
                 backendFounder = BackendFounderEntitlement(),
-                promotionalPro = PromotionalProEntitlement()
+                promotionalPro = PromotionalProEntitlement(),
+                welcomeBack = PromotionalProEntitlement()
             )
         }
     }

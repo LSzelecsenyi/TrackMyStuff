@@ -17,7 +17,8 @@ record StoredPlaySubscription(
         boolean entitled,
         UUID linkedUserId,
         String orderId,
-        Instant updatedAt
+        Instant updatedAt,
+        boolean claimBlocked
 ) {
 }
 

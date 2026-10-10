@@ -17,6 +17,12 @@ data class NativeCompletedStamp(
     val startedAt: Long
 )
 
+/** Native completion used for Welcome Back. finishedAt is already coalesced with startedAt. */
+data class NativeCompletionRow(
+    val clientWorkoutId: String,
+    val completedAt: Long
+)
+
 data class PreviousExerciseOccurrenceRow(
     val sessionId: Long,
     val templateId: Long?,

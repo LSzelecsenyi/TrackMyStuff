@@ -11,8 +11,9 @@ object EntitlementResolver {
         val founderRecognized = trustedFounder.founderRecognized || founderLifetime
         val temporaryTesterPro = trustedFounder.temporaryFounderPro && !founderLifetime && !founderProActive
         val promotionalProActive = sources.promotionalPro.isActive(now)
+        val welcomeBackActive = sources.welcomeBack.isActive(now)
         val pro = subscriptionValid || founderLifetime || founderProActive ||
-            temporaryTesterPro || promotionalProActive
+            temporaryTesterPro || promotionalProActive || welcomeBackActive
         return EffectiveEntitlement(
             tier = if (pro) EntitlementTier.Pro else EntitlementTier.Free,
             subscriptionValid = subscriptionValid,
@@ -20,7 +21,8 @@ object EntitlementResolver {
             temporaryTesterPro = temporaryTesterPro,
             founderRecognized = founderRecognized,
             founderProActive = founderProActive,
-            promotionalProActive = promotionalProActive
+            promotionalProActive = promotionalProActive,
+            welcomeBackActive = welcomeBackActive
         )
     }
 }

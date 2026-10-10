@@ -115,7 +115,9 @@ enum class StrictOneTimePrompt {
     FounderApproval,
     WorkoutCelebration,
     ProDiscoveryOffer,
-    ProDiscoveryWarning
+    WelcomeBackOffer,
+    ProDiscoveryWarning,
+    WelcomeBackWarning
 }
 
 /**
@@ -128,7 +130,9 @@ fun selectStrictOneTimePrompt(
     workoutCelebration: Boolean,
     suppressForRoute: Boolean,
     discoveryOffer: Boolean,
-    discoveryWarning: Boolean
+    discoveryWarning: Boolean,
+    welcomeOffer: Boolean = false,
+    welcomeWarning: Boolean = false
 ): StrictOneTimePrompt? {
     if (founderApproval) {
         return StrictOneTimePrompt.FounderApproval
@@ -142,8 +146,14 @@ fun selectStrictOneTimePrompt(
     if (discoveryOffer) {
         return StrictOneTimePrompt.ProDiscoveryOffer
     }
+    if (welcomeOffer) {
+        return StrictOneTimePrompt.WelcomeBackOffer
+    }
     if (discoveryWarning) {
         return StrictOneTimePrompt.ProDiscoveryWarning
+    }
+    if (welcomeWarning) {
+        return StrictOneTimePrompt.WelcomeBackWarning
     }
     return null
 }
@@ -200,6 +210,9 @@ object ProDiscoveryPolicy {
             return true
         }
         if (sources.founderLifetime.active) {
+            return true
+        }
+        if (sources.welcomeBack.isActive(trialExpiresAt)) {
             return true
         }
         val trusted = sources.backendFounder.trusted(trialExpiresAt)

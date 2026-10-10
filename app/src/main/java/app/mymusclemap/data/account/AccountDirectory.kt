@@ -58,6 +58,16 @@ class AccountDirectory(context: Context) {
         File(root, ACTIVE).delete()
     }
 
+    /** Drops the active pointer and profile when they belong to [userId]. The legacy-claim file stays. */
+    fun detach(userId: String) {
+        if (activeUserId() == userId) {
+            File(root, ACTIVE).delete()
+        }
+        if (profile()?.userId == userId) {
+            File(root, PROFILE).delete()
+        }
+    }
+
     fun legacyUnclaimed(): Boolean {
         return legacyDatabase().isFile && read(CLAIM) == null
     }

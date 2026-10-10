@@ -50,7 +50,6 @@ internal object ActiveWorkoutNotifications {
     }
 
     fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         val channel = NotificationChannel(
             CHANNEL_ID,
@@ -71,6 +70,17 @@ internal object ActiveWorkoutNotifications {
     ) {
         val manager = NotificationManagerCompat.from(context)
         if (model == null || !canDeliver(context)) {
+            manager.cancel(notificationId)
+            return
+        }
+        // The check is repeated here because lint does not follow canDeliver().
+        // API 26–32 have no POST_NOTIFICATIONS permission.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             manager.cancel(notificationId)
             return
         }
@@ -105,18 +115,13 @@ internal object ActiveWorkoutNotifications {
     }
 
     fun channelSettingsIntent(context: Context): Intent {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                putExtra(Settings.EXTRA_CHANNEL_ID, CHANNEL_ID)
-            }
-        } else {
-            appNotificationSettingsIntent(context)
+        return Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            putExtra(Settings.EXTRA_CHANNEL_ID, CHANNEL_ID)
         }
     }
 
     private fun channelBlocked(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
         val channel = context.getSystemService(NotificationManager::class.java)
             ?.getNotificationChannel(CHANNEL_ID)
             ?: return false

@@ -59,6 +59,7 @@ object BadgeWallPresenter {
         AchievementCategory.JOURNEY,
         AchievementCategory.GOALS,
         AchievementCategory.PERFORMANCE,
+        AchievementCategory.HIDDEN_GEMS,
         AchievementCategory.SPECIAL
     )
 
@@ -94,7 +95,7 @@ object BadgeWallPresenter {
      * Binary Journey awards are not candidates.
      */
     fun almostThere(board: AchievementBoard): List<AlmostThereEntry> {
-        val visible = board.items.filter { it.id.listed(it.unlocked) }
+        val visible = board.items.filter { it.id.listed(it.unlocked) && !it.id.secret }
         val candidates = listOfNotNull(
             nextCountMilestone(visible) { it.workoutCountTarget },
             nextCountMilestone(visible) { it.streakWeeks },

@@ -82,6 +82,12 @@ sealed interface PendingCelebration {
         override val acknowledgement: CelebrationAcknowledgement
     ) : PendingCelebration
 
+    data class SecretUnlocked(
+        val achievementId: AchievementId,
+        override val triggerClientWorkoutId: String?,
+        override val acknowledgement: CelebrationAcknowledgement
+    ) : PendingCelebration
+
     data class TargetWeightMilestone(
         val milestone: WeightMilestone,
         val includesLifetimeUnlock: Boolean,
@@ -203,6 +209,7 @@ private fun PendingCelebration.referencedAchievement(): AchievementId? {
         is PendingCelebration.JourneyUnlocked -> achievementId
         is PendingCelebration.PerformanceUnlocked -> achievementId
         is PendingCelebration.ProUnlocked -> achievementId
+        is PendingCelebration.SecretUnlocked -> achievementId
         is PendingCelebration.HistoryRecognized,
         is PendingCelebration.WeeklyGoalCompleted,
         is PendingCelebration.TargetWeightMilestone -> null
@@ -372,11 +379,21 @@ object AchievementBoardAssembler {
             .filter {
                 it.celebratedAt == null &&
                     it.achievementId.category == AchievementCategory.PERFORMANCE &&
-                    it.achievementId.access != AchievementAccess.PRO
+                    it.achievementId.access != AchievementAccess.PRO &&
+                    !it.achievementId.secret
             }
             .sortedByDescending { performanceCelebrationRank(it.achievementId) }
             .map { unlock ->
                 PendingCelebration.PerformanceUnlocked(
+                    achievementId = unlock.achievementId,
+                    triggerClientWorkoutId = unlock.triggerClientWorkoutId,
+                    acknowledgement = CelebrationAcknowledgement(achievementId = unlock.achievementId.name)
+                )
+            }
+        val secrets = unlocks
+            .filter { it.celebratedAt == null && it.achievementId.secret }
+            .map { unlock ->
+                PendingCelebration.SecretUnlocked(
                     achievementId = unlock.achievementId,
                     triggerClientWorkoutId = unlock.triggerClientWorkoutId,
                     acknowledgement = CelebrationAcknowledgement(achievementId = unlock.achievementId.name)
@@ -392,7 +409,7 @@ object AchievementBoardAssembler {
                     acknowledgement = CelebrationAcknowledgement(achievementId = unlock.achievementId.name)
                 )
             }
-        return history + journeys + performance + proAwards + streaks + weeks + awards + weight
+        return history + journeys + performance + secrets + proAwards + streaks + weeks + awards + weight
     }
 
     private fun performanceCelebrationRank(id: AchievementId): Int {

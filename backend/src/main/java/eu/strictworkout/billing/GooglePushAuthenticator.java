@@ -17,8 +17,12 @@ final class GooglePushAuthenticator {
         this.expectedEmail = expectedEmail == null ? "" : expectedEmail.trim();
     }
 
+    /**
+     * Both the push audience and the Pub/Sub service-account email are required.
+     * An audience alone would accept any Google-signed token for that audience.
+     */
     boolean configured() {
-        return !audience.isEmpty();
+        return !audience.isEmpty() && !expectedEmail.isEmpty();
     }
 
     boolean verify(String authorization) {
@@ -37,9 +41,6 @@ final class GooglePushAuthenticator {
             GoogleIdToken token = verifier.verify(jwt);
             if (token == null) {
                 return false;
-            }
-            if (expectedEmail.isEmpty()) {
-                return true;
             }
             return expectedEmail.equals(token.getPayload().getEmail());
         } catch (Exception error) {

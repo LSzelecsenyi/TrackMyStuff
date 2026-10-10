@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
@@ -137,6 +138,7 @@ internal const val SETTINGS_LANGUAGE = "settings-language"
 internal const val SETTINGS_LANGUAGE_HU = "settings-language-hu"
 internal const val SETTINGS_LANGUAGE_EN = "settings-language-en"
 internal const val SETTINGS_SIGN_OUT = "settings-sign-out"
+internal const val SETTINGS_DELETE_ACCOUNT = "settings-delete-account"
 internal const val SETTINGS_WEEKLY_GOAL = "settings-weekly-goal"
 internal const val SETTINGS_LOCK_SCREEN_SETS = "settings-lock-screen-sets"
 internal const val SETTINGS_LOCK_SCREEN_ENABLE = "settings-lock-screen-enable"
@@ -203,6 +205,7 @@ fun SettingsScreen(
     accountName: String? = null,
     accountEmail: String? = null,
     onSignOut: () -> Unit = {},
+    onOpenDeleteAccount: () -> Unit = {},
     showLanguageSetting: Boolean = false,
     selectedLanguage: app.mymusclemap.domain.locale.AppLanguage =
         app.mymusclemap.domain.locale.AppLanguage.EN,
@@ -290,7 +293,8 @@ fun SettingsScreen(
                 AccountSection(
                     name = accountName,
                     email = accountEmail,
-                    onSignOut = onSignOut
+                    onSignOut = onSignOut,
+                    onOpenDeleteAccount = onOpenDeleteAccount
                 )
                 if (showFounderProgram) {
                     CompactEditorDivider()
@@ -1054,7 +1058,8 @@ private fun AppBackupSection(
 private fun AccountSection(
     name: String?,
     email: String?,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onOpenDeleteAccount: () -> Unit
 ) {
     var confirm by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     CompactEditorSection(title = settingsKicker(stringResource(R.string.settings_account))) {
@@ -1078,6 +1083,13 @@ private fun AccountSection(
             subtitle = stringResource(R.string.settings_sign_out_body),
             testTag = SETTINGS_SIGN_OUT,
             onClick = { confirm = true }
+        )
+        DataActionRow(
+            icon = Icons.Outlined.Delete,
+            title = stringResource(R.string.settings_delete_account),
+            subtitle = stringResource(R.string.settings_delete_account_subtitle),
+            testTag = SETTINGS_DELETE_ACCOUNT,
+            onClick = onOpenDeleteAccount
         )
     }
     if (confirm) {

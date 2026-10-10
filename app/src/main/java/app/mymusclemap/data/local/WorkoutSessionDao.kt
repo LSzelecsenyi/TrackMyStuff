@@ -170,6 +170,16 @@ abstract class WorkoutSessionDao {
 
     @Query(
         """
+        SELECT clientWorkoutId, COALESCE(finishedAt, startedAt) AS completedAt
+        FROM workout_sessions
+        WHERE status = 'COMPLETED' AND importFingerprint IS NULL
+        ORDER BY COALESCE(finishedAt, startedAt) ASC, id ASC
+        """
+    )
+    abstract suspend fun nativeCompletionRows(): List<NativeCompletionRow>
+
+    @Query(
+        """
         SELECT e.* FROM workout_session_exercises e
         INNER JOIN workout_sessions s ON s.id = e.sessionId
         WHERE s.status = 'COMPLETED'

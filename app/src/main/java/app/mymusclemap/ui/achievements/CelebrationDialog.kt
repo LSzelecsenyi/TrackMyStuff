@@ -51,6 +51,7 @@ internal fun PendingCelebration.artworkAchievementId(): AchievementId? {
         is PendingCelebration.JourneyUnlocked -> achievementId
         is PendingCelebration.PerformanceUnlocked -> achievementId
         is PendingCelebration.ProUnlocked -> achievementId
+        is PendingCelebration.SecretUnlocked -> achievementId
         is PendingCelebration.TargetWeightMilestone ->
             if (includesLifetimeUnlock) AchievementId.TARGET_WEIGHT_REACHED else null
         is PendingCelebration.HistoryRecognized,
@@ -195,7 +196,7 @@ internal fun CelebrationArtwork(id: AchievementId, badgeSize: androidx.compose.u
 internal fun celebrationName(celebration: PendingCelebration): String {
     val artworkId = celebration.artworkAchievementId()
     return if (artworkId != null && celebration !is PendingCelebration.TargetWeightMilestone) {
-        achievementTitle(artworkId)
+        achievementTitle(artworkId, revealed = true)
     } else {
         celebrationTitle(celebration)
     }
@@ -205,7 +206,7 @@ internal fun celebrationName(celebration: PendingCelebration): String {
 internal fun celebrationDetail(celebration: PendingCelebration): String {
     val artworkId = celebration.artworkAchievementId()
     return if (artworkId != null && celebration !is PendingCelebration.TargetWeightMilestone) {
-        achievementRequirement(artworkId)
+        achievementRequirement(artworkId, revealed = true)
     } else {
         celebrationBody(celebration)
     }
@@ -222,6 +223,7 @@ fun celebrationTitle(celebration: PendingCelebration): String {
         is PendingCelebration.JourneyUnlocked -> achievementTitle(celebration.achievementId)
         is PendingCelebration.PerformanceUnlocked -> achievementTitle(celebration.achievementId)
         is PendingCelebration.ProUnlocked -> achievementTitle(celebration.achievementId)
+        is PendingCelebration.SecretUnlocked -> achievementTitle(celebration.achievementId, revealed = true)
         is PendingCelebration.TargetWeightMilestone -> when {
             celebration.includesLifetimeUnlock -> stringResource(R.string.achievement_on_target_name)
             celebration.milestone == WeightMilestone.HALFWAY ->
@@ -260,6 +262,7 @@ fun celebrationBody(celebration: PendingCelebration): String {
         is PendingCelebration.JourneyUnlocked -> achievementRequirement(celebration.achievementId)
         is PendingCelebration.PerformanceUnlocked -> achievementRequirement(celebration.achievementId)
         is PendingCelebration.ProUnlocked -> achievementRequirement(celebration.achievementId)
+        is PendingCelebration.SecretUnlocked -> achievementRequirement(celebration.achievementId, revealed = true)
         is PendingCelebration.TargetWeightMilestone -> when (celebration.milestone) {
             WeightMilestone.HALFWAY ->
                 stringResource(R.string.celebration_weight_halfway_body)

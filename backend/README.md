@@ -82,11 +82,13 @@ Workout history stays in an account-scoped database on the phone. Sign-out does 
 
 Pro Discovery activation is `POST /api/v1/promotions/pro-discovery/activate` with the session bearer. The server stores one 14-day trial per user. A legacy on-device trial can be imported once with `POST /api/v1/promotions/pro-discovery/migrate`. Those client timestamps are clamped to 14 days and are not proof of the workout history.
 
+Welcome Back is a separate 7-day grant: `GET /api/v1/promotions/welcome-back` and `POST /api/v1/promotions/welcome-back/activate`. The session user is the only identity. The body may contain a qualifying workout id, which blocks replay of that same workout. It does not prove the 40-day gap. The phone detects that gap from local native completions. The server sets activation, a 7×24-hour expiry, and a 180-day cooldown, and it rejects a new grant while Founder enrollment is open or another Pro source is active. Dismissing the offer does not call this endpoint. Apply Flyway `V11__welcome_back_grant.sql` with the usual backend migration.
+
 Play purchase verification is `POST /api/v1/billing/subscriptions/verify` and requires the same bearer. The user id comes from the session. A purchase token already linked to another user is rejected. Real-time developer notifications stay on `POST /api/v1/billing/rtdn` and use Google push authentication, not a user session.
 
 A phone that already signed in can keep using its local workouts offline until the known Pro expiry. The first sign-in needs the network. Paid Pro is not extended because the device is offline.
 
-Debug builds can still simulate Founder, Pro Discovery, and billing with `strict.entitlementOverride`, `strict.debug.proDiscovery`, and `strict.debug.billing` in gitignored `local.properties`. Those modes stay on the device. They do not write Founder grants, promotional trials, or verified Play subscriptions, and they do not skip Google sign-in. Release builds ignore them. Sign-in, sign-out, offline return, account switch, trial restore, and a billing ownership mismatch are exercised with a real Google account and the existing debug billing modes. There is no production authentication bypass.
+Debug builds can still simulate Founder, Pro Discovery, Welcome Back, and billing with `strict.entitlementOverride`, `strict.debug.proDiscovery`, `strict.debug.welcomeBack`, and `strict.debug.billing` in gitignored `local.properties`. Those modes stay on the device. They do not write Founder grants, promotional trials, Welcome Back grants, or verified Play subscriptions, and they do not skip Google sign-in. Release builds ignore them. Sign-in, sign-out, offline return, account switch, trial restore, and a billing ownership mismatch are exercised with a real Google account and the existing debug billing modes. There is no production authentication bypass.
 
 ## Founder program
 

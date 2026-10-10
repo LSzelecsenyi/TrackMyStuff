@@ -9,6 +9,20 @@ import app.mymusclemap.domain.achievements.AchievementId
  * Unknown keys, and awards that do not have artwork yet, keep the placeholder.
  */
 object BadgeArtworkResolver {
+    /**
+     * Locked secret badges always use the same placeholder, even after real artwork exists.
+     * Unlocked secrets use [drawableFor] and stay on the placeholder until that artwork is mapped.
+     */
+    /** Shared locked-secret artwork. This is not a catalog achievement. */
+    fun lockedSecretDrawable(): Int = R.drawable.hidden_gem_placeholder
+
+    fun drawableForWall(id: AchievementId, unlocked: Boolean): Int {
+        if (id.secret && !unlocked) {
+            return lockedSecretDrawable()
+        }
+        return drawableFor(id.badgeKey)
+    }
+
     fun drawableFor(badgeKey: String): Int {
         return when (badgeKey) {
             AchievementId.WORKOUTS_5.name -> R.drawable.consistency_badge_bronze
@@ -43,6 +57,13 @@ object BadgeArtworkResolver {
             AchievementId.FOUNDER.name -> R.drawable.founder_badge
             AchievementId.EARLY_ADOPTER.name -> R.drawable.early_adopter_badge
             AchievementId.DEVELOPER.name -> R.drawable.developer_badge
+            AchievementId.SILENT_NIGHT.name -> R.drawable.silent_night_heavy_weights_badge
+            AchievementId.TRICK_OR_LIFT.name -> R.drawable.trick_or_lift_badge
+            AchievementId.NEW_YEAR_SAME_ME.name -> R.drawable.new_year_same_me_badge
+            AchievementId.LEAP_DAY_LIFTER.name -> R.drawable.leap_day_lifter_badge
+            AchievementId.FRIDAY_THE_STRONGTEENTH.name -> R.drawable.friday_the_strongteenth_badge
+            AchievementId.ONE_MORE_THING.name -> R.drawable.one_more_thing_badge
+            AchievementId.TRIPLE_CROWN.name -> R.drawable.triple_crown_badge
             else -> R.drawable.ic_badge_placeholder
         }
     }

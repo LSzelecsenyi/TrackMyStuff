@@ -16,6 +16,7 @@
 *.keystore
 *.jks
 keystore.properties
+signing.properties
 .DS_Store
 /app/release/
 /app/debug/

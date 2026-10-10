@@ -9,6 +9,8 @@ enum class AchievementCategory {
     PERFORMANCE,
     JOURNEY,
     GOALS,
+    /** Secret awards. This is a section, not an access type. */
+    HIDDEN_GEMS,
     /** Section bucket for [AchievementAccess.SPECIAL]. Access, not this category, is the filter. */
     SPECIAL
 }
@@ -80,7 +82,12 @@ enum class AchievementId(
     val prHunterTarget: Int? = null,
     /** Completed sets of one exercise required by an Exercise Mastery tier. */
     val masterySetTarget: Int? = null,
-    val visibility: AchievementVisibility = AchievementVisibility.ALWAYS
+    val visibility: AchievementVisibility = AchievementVisibility.ALWAYS,
+    /**
+     * Shown on the Badge Wall before it is earned, but only as a masked placeholder.
+     * The real name and requirement stay hidden until the stored unlock exists.
+     */
+    val secret: Boolean = false
 ) {
     WORKOUTS_5(AchievementCategory.CONSISTENCY, workoutThreshold = 5),
     WORKOUTS_10(AchievementCategory.CONSISTENCY, workoutThreshold = 10),
@@ -203,6 +210,13 @@ enum class AchievementId(
         badgeTier = BadgeTier.GOLD,
         masterySetTarget = 1000
     ),
+    SILENT_NIGHT(AchievementCategory.HIDDEN_GEMS, secret = true),
+    TRICK_OR_LIFT(AchievementCategory.HIDDEN_GEMS, secret = true),
+    NEW_YEAR_SAME_ME(AchievementCategory.HIDDEN_GEMS, secret = true),
+    LEAP_DAY_LIFTER(AchievementCategory.HIDDEN_GEMS, secret = true),
+    FRIDAY_THE_STRONGTEENTH(AchievementCategory.HIDDEN_GEMS, secret = true),
+    ONE_MORE_THING(AchievementCategory.HIDDEN_GEMS, secret = true),
+    TRIPLE_CROWN(AchievementCategory.HIDDEN_GEMS, secret = true),
     FOUNDER(
         AchievementCategory.SPECIAL,
         access = AchievementAccess.SPECIAL
@@ -286,6 +300,19 @@ enum class AchievementId(
             require(workoutThreshold == null)
             require(lifetimeWorkoutTarget == null)
         }
+        if (secret) {
+            require(category == AchievementCategory.HIDDEN_GEMS)
+            require(access == AchievementAccess.FREE)
+            require(visibility == AchievementVisibility.ALWAYS)
+            require(workoutThreshold == null)
+            require(lifetimeWorkoutTarget == null)
+            require(volumeThresholdKg == null)
+            require(streakWeeks == null)
+            require(prHunterTarget == null)
+            require(masterySetTarget == null)
+            require(journeyMilestone == null)
+            require(badgeFamily == null)
+        }
         if (category == AchievementCategory.SPECIAL || access == AchievementAccess.SPECIAL) {
             require(category == AchievementCategory.SPECIAL)
             require(access == AchievementAccess.SPECIAL)
@@ -329,6 +356,8 @@ object AchievementCatalog {
     val pro: List<AchievementId> = AchievementId.entries.filter { it.access == AchievementAccess.PRO }
 
     val special: List<AchievementId> = AchievementId.entries.filter { it.access == AchievementAccess.SPECIAL }
+
+    val secrets: List<AchievementId> = AchievementId.entries.filter { it.secret }
 
     val free: List<AchievementId> = AchievementId.entries.filter { it.access == AchievementAccess.FREE }
 

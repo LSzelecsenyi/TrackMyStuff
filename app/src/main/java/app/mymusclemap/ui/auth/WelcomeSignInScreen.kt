@@ -27,6 +27,7 @@ import app.mymusclemap.ui.theme.StrictBrand
 
 internal const val WELCOME_ROOT = "welcome-root"
 internal const val WELCOME_CONTINUE = "welcome-continue"
+internal const val WELCOME_PRIVACY = "welcome-privacy"
 internal const val WELCOME_CLAIM = "welcome-claim"
 
 @Composable
@@ -34,9 +35,12 @@ fun WelcomeSignInScreen(
     busy: Boolean,
     message: String?,
     claimOpen: Boolean,
+    localCleanupMessage: String? = null,
     onContinue: () -> Unit,
     onConfirmClaim: () -> Unit,
-    onCancelClaim: () -> Unit
+    onCancelClaim: () -> Unit,
+    onRetryLocalCleanup: () -> Unit = {},
+    onOpenPrivacy: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -68,6 +72,13 @@ fun WelcomeSignInScreen(
             Spacer(Modifier.height(16.dp))
             Text(text = message, color = StrictBrand.lime, textAlign = TextAlign.Center)
         }
+        if (!localCleanupMessage.isNullOrBlank()) {
+            Spacer(Modifier.height(16.dp))
+            Text(text = localCleanupMessage, color = StrictBrand.lime, textAlign = TextAlign.Center)
+            TextButton(onClick = onRetryLocalCleanup) {
+                Text(stringResource(R.string.welcome_local_cleanup_retry))
+            }
+        }
         Spacer(Modifier.height(28.dp))
         if (busy) {
             CircularProgressIndicator(color = StrictBrand.lime)
@@ -81,6 +92,12 @@ fun WelcomeSignInScreen(
                     .testTag(WELCOME_CONTINUE)
             ) {
                 Text(stringResource(R.string.welcome_continue))
+            }
+            TextButton(
+                onClick = onOpenPrivacy,
+                modifier = Modifier.testTag(WELCOME_PRIVACY)
+            ) {
+                Text(stringResource(R.string.action_privacy_policy), color = StrictBrand.lime)
             }
         }
         Spacer(Modifier.weight(1f))
