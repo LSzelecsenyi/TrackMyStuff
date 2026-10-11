@@ -72,24 +72,52 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "set -euo pipefail; cd /opt/strict/dev; test -f strict-backend.jar.next; if [ -f strict-backend.jar ]; then cp -a strict-backend.jar strict-backend.jar.prev; fi; mv strict-backend.jar.next strict-backend.jar; sudo systemctl restart strict-backend-dev; sudo systemctl status strict-backend-dev --no-pager -l"
-
-      - name: Health check
-        run: |
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" '
-            set -euo pipefail
-            echo "Waiting for Strict DEV backend on 127.0.0.1:8083/api/v1/health"
-            for i in $(seq 1 60); do
-              code=$(curl -sS -o /tmp/strict-dev-health.json -w "%{http_code}" http://127.0.0.1:8083/api/v1/health || true)
-              if [ "$code" = "200" ] && grep -q "\"UP\"" /tmp/strict-dev-health.json; then
-                echo "Strict DEV backend is UP"
-                exit 0
-              fi
-              sleep 2
-            done
-            echo "Strict DEV backend did not become healthy" >&2
+            "bash -s" <<'EOF'
+          set -euo pipefail
+          cd /opt/strict/dev
+          test -f strict-backend.jar.next
+          if [ -f strict-backend.jar ]; then
+            cp -a strict-backend.jar strict-backend.jar.prev
+          fi
+          mv strict-backend.jar.next strict-backend.jar
+          if ! sudo systemctl restart strict-backend-dev; then
+            echo "strict-backend-dev did not restart" >&2
+            if [ -f strict-backend.jar.prev ]; then
+              cp -a strict-backend.jar.prev strict-backend.jar
+              sudo systemctl restart strict-backend-dev || true
+              echo "Restored the previous DEV jar. Applied database migrations are not reverted." >&2
+            fi
             sudo systemctl status strict-backend-dev --no-pager -l || true
             sudo journalctl -u strict-backend-dev -n 200 --no-pager || true
             exit 1
-          '
+          fi
+          EOF
+
+      - name: Health check
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "bash -s" <<'EOF'
+          set -euo pipefail
+          echo "Waiting for Strict DEV backend on 127.0.0.1:8083/api/v1/health"
+          for i in $(seq 1 60); do
+            code=$(curl -sS -o /tmp/strict-dev-health.json -w "%{http_code}" http://127.0.0.1:8083/api/v1/health || true)
+            if [ "$code" = "200" ] && grep -q '"UP"' /tmp/strict-dev-health.json; then
+              echo "Strict DEV backend is UP"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Strict DEV backend did not become healthy" >&2
+          if [ -f /opt/strict/dev/strict-backend.jar.prev ]; then
+            cp -a /opt/strict/dev/strict-backend.jar.prev /opt/strict/dev/strict-backend.jar
+            sudo systemctl restart strict-backend-dev || true
+            echo "Restored the previous DEV jar. Applied database migrations are not reverted." >&2
+          else
+            echo "No previous DEV jar to restore." >&2
+          fi
+          sudo systemctl status strict-backend-dev --no-pager -l || true
+          sudo journalctl -u strict-backend-dev -n 200 --no-pager || true
+          exit 1
+          EOF
