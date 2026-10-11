@@ -72,24 +72,54 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "set -euo pipefail; cd /opt/strict/prod; test -f strict-backend.jar.next; if [ -f strict-backend.jar ]; then cp -a strict-backend.jar strict-backend.jar.prev; fi; mv strict-backend.jar.next strict-backend.jar; sudo systemctl restart strict-backend-prod; sudo systemctl status strict-backend-prod --no-pager -l"
-
-      - name: Health check
-        run: |
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" '
-            set -euo pipefail
-            echo "Waiting for Strict PROD backend on 127.0.0.1:8082/api/v1/health"
-            for i in $(seq 1 60); do
-              code=$(curl -sS -o /tmp/strict-prod-health.json -w "%{http_code}" http://127.0.0.1:8082/api/v1/health || true)
-              if [ "$code" = "200" ] && grep -q "\"UP\"" /tmp/strict-prod-health.json; then
-                echo "Strict PROD backend is UP"
-                exit 0
-              fi
-              sleep 2
-            done
-            echo "Strict PROD backend did not become healthy" >&2
+            "bash -s" <<'EOF'
+          set -euo pipefail
+          cd /opt/strict/prod
+          test -f strict-backend.jar.next
+          if [ -f strict-backend.jar ]; then
+            cp -a strict-backend.jar strict-backend.jar.prev
+          fi
+          mv strict-backend.jar.next strict-backend.jar
+          if ! sudo systemctl restart strict-backend-prod; then
+            echo "strict-backend-prod did not restart" >&2
+            if [ -f strict-backend.jar.prev ]; then
+              cp -a strict-backend.jar.prev strict-backend.jar
+              sudo systemctl restart strict-backend-prod || true
+              echo "Restored the previous PROD jar. Applied database migrations are not reverted." >&2
+            else
+              echo "No previous PROD jar to restore. Rollback is unavailable." >&2
+            fi
             sudo systemctl status strict-backend-prod --no-pager -l || true
             sudo journalctl -u strict-backend-prod -n 200 --no-pager || true
             exit 1
-          '
+          fi
+          EOF
+
+      - name: Health check
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "bash -s" <<'EOF'
+          set -euo pipefail
+          echo "Waiting for Strict PROD backend on 127.0.0.1:8082/api/v1/health"
+          for i in $(seq 1 60); do
+            code=$(curl -sS -o /tmp/strict-prod-health.json -w "%{http_code}" http://127.0.0.1:8082/api/v1/health || true)
+            if [ "$code" = "200" ] && grep -q '"UP"' /tmp/strict-prod-health.json; then
+              echo "Strict PROD backend is UP"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Strict PROD backend did not become healthy" >&2
+          if [ -f /opt/strict/prod/strict-backend.jar.prev ]; then
+            cp -a /opt/strict/prod/strict-backend.jar.prev /opt/strict/prod/strict-backend.jar
+            sudo systemctl restart strict-backend-prod || true
+            echo "Restored the previous PROD jar. Applied database migrations are not reverted." >&2
+          else
+            echo "No previous PROD jar to restore. Rollback is unavailable." >&2
+          fi
+          sudo systemctl status strict-backend-prod --no-pager -l || true
+          sudo journalctl -u strict-backend-prod -n 200 --no-pager || true
+          exit 1
+          EOF
