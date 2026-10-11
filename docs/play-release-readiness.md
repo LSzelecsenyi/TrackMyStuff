@@ -154,7 +154,7 @@ The onboarding crash is the missing `NavigationEventDispatcherOwner` after `Main
 | Billing product IDs in the release artifact | Empty |
 | Cleartext in the release manifest | Not set. Debug cleartext stays in the debug source set |
 | Deep links | No browsable intent filter. The launcher activity is the only app entry |
-| Android backup | `allowBackup=false`, with cloud, device-transfer, and cross-platform domains excluded |
+| Android backup | `allowBackup=true`, include-only rules for `files/strict_user_data` plus appearance/language preferences. Photo files, sessions, entitlements, Founder state, queues, and WorkManager stay out. Cross-platform transfer is disabled. Cloud backup is skipped when the device cannot encrypt it. Transport restore is not yet verified on a device. |
 | Signing | Not configured |
 | `lintDebug` | Original audit failed: 9 errors, 239 warnings. The later lint pass is in the Lint section |
 
@@ -236,9 +236,9 @@ No analytics, crash, or advertising SDK is declared in the app’s Gradle depend
 | Google subject (`sub`) | Server `external_identity` until deletion | Stored. This is the account key | Already held by Google | No | Deleted with the account. A SHA-256 marker of `google:` plus the subject remains. The subject itself is not kept |
 | Verified email | Server, and a local profile copy | Stored when Google says the email is verified | Already held by Google | Local copy excluded with app data | Deleted with the account and removed from the local profile |
 | Display name | Login response and local profile only | Returned at login, not written to a user column | Already held by Google | Local copy excluded | Removed from the local profile when that account is deleted |
-| Workouts, plans, exercises, sets, notes | Account Room database | No, except the Founder rows below | No | Excluded | Deleted on this phone after the server deletion succeeds. Another account’s database is left in place |
-| Body weight and measurements | Local database | No | No | Excluded | Same as workouts |
-| Progress photos | App-private files for that account | No | No | Excluded | Deleted on this phone with the account. An exported ZIP is not deleted |
+| Workouts, plans, exercises, sets, notes | Account Room database under `files/strict_user_data` | No, except the Founder rows below | No | Included when Android backup runs. The latest changes may not be in the current snapshot. | Deleted on this phone after the server deletion succeeds. Another account’s database is left in place. An older Android snapshot or exported ZIP can still hold a copy |
+| Body weight and measurements | Same account database | No | No | Included with that database | Same as workouts |
+| Progress photos | App-private files for that account. The database may also store a gallery URI and a SHA-256 of the original bytes | No | No | Photo files excluded. The row, URI, and fingerprint travel with the account database | Deleted on this phone with the account. An exported ZIP is not deleted. A gallery reference can recover a photo only when it still opens and the bytes match |
 | Health Connect readings | Read from Health Connect, not saved in Strict’s database | No | Health Connect / Google Health, under the user’s Health Connect choice | Not copied by Strict | Revoking Health Connect access does not delete Strict workouts |
 | Founder enrollment, workouts, feedback, and review | Server | Yes, including feedback text | No | No | Deleted with the account. Founder capacity counters are not reduced |
 | Pro Discovery trial | Server | Yes. One trial record per user | No | No | Deleted. The marker records that it was used |
@@ -247,7 +247,7 @@ No analytics, crash, or advertising SDK is declared in the app’s Gradle depend
 | Feedback email | User’s email app | No. The app only opens a draft | The email provider, if the user sends it | No | The user controls the draft |
 | Diagnostics | No Strict crash or analytics SDK | Request logs record error codes, not tokens or feedback bodies | See the Play services note above | No | Not applicable |
 
-Android Auto Backup and device-to-device transfer are excluded in `backup_rules.xml` and `data_extraction_rules.xml`. A ZIP backup the user exports is outside the app once they save or share it. That ZIP does not include the session token, Founder grants, promotional trials, or Play subscriptions.
+Android Auto Backup includes only `files/strict_user_data` and the appearance/settings and language preference files (`backup_rules.xml`, `data_extraction_rules.xml`). Photo files, the encrypted session, account pointers, entitlement and Founder files, upload queues, WorkManager, and the unclaimed `weight_tracker.db` stay out. Android 12 and newer skip cloud backup when the device cannot use client-side encryption. Android 9–11 skip the included files unless the transport has client-side encryption. Android 8 cannot require that encryption. Device transfer uses the same allowlist and is not blocked by the cloud encryption flag. Cross-platform transfer is disabled. Backup still depends on the phone’s settings and schedule, so the newest edits may be absent. A ZIP the user exports remains the copy that includes photo files. That ZIP does not include the session token, Founder grants, promotional trials, or Play subscriptions, and it is outside the app once they save or share it.
 
 Items the developer must confirm before submitting Data safety:
 
@@ -313,13 +313,11 @@ The same Google account can sign in later. That creates a new Strict user id. It
 
 ### Local data
 
-The phone deletes local data only after the server returns `204`. It deletes that account’s Room database, its progress-photo directory, and DataStore files whose names contain that user id. It removes that user id from the on-device Founder recognition and approval-celebration records. It clears the session and the active profile. Theme, language, and lock-screen preferences stay. Another account’s database and photos stay.
+The phone deletes local data only after the server returns `204`. It deletes that account’s Room database in both the old location and `files/strict_user_data`, its progress-photo directory, and DataStore files whose names contain that user id. It removes that user id from the on-device Founder recognition and approval-celebration records, and it removes only that user’s Founder upload events. It clears the session and the active profile. Theme, language, and lock-screen preferences stay. Another account’s database, photos, and queued Founder events stay.
 
-The founder workout outbox is not split by account, so it is deleted. Otherwise the next account could upload the deleted account’s queued events.
+Android backup can already have copied that account’s database. Deletion does not remove a ZIP the user exported, and it does not promise that Google will delete an older cloud snapshot. A later restore can put the old database file back on the phone. The app opens only `account_<signed-in user id>.db` after Strict sign-in, so that restored file is not attached to a newly created user.
 
-Android Auto Backup and device transfer are already off (`allowBackup=false`, `backup_rules.xml`, `data_extraction_rules.xml`). Deletion does not remove a ZIP the user exported, and it does not delete files outside the app.
-
-If the server deletion succeeds and local deletion fails, the app records the user id in `noBackupFilesDir/pending_account_erasure.txt`, leaves the signed-in app, and the welcome screen explains that local data remains and can be retried. The next launch tries that cleanup again. It does not attach those files to a new account: databases are named `account_<user id>.db`.
+If the server deletion succeeds and local deletion fails, the app records the user id in `noBackupFilesDir/pending_account_erasure.txt`, leaves the signed-in app, and the welcome screen explains that local data remains and can be retried. The next launch tries that cleanup again. It does not attach those files to a new account.
 
 Offline, the app says a connection is required and does not delete local data.
 

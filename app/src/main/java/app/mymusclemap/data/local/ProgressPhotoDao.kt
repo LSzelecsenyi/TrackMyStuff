@@ -20,6 +20,15 @@ interface ProgressPhotoDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(entity: ProgressPhotoEntity): Long
 
+    @Query(
+        """
+        UPDATE progress_photos
+        SET sourceUri = :sourceUri, sourceFingerprint = :sourceFingerprint, updatedAt = :updatedAt
+        WHERE id = :id
+        """
+    )
+    suspend fun updateSource(id: Long, sourceUri: String?, sourceFingerprint: String?, updatedAt: Long)
+
     @Query("DELETE FROM progress_photos WHERE id = :id")
     suspend fun deleteById(id: Long)
 }

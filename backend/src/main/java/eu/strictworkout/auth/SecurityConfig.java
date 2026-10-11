@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 class SecurityConfig {
@@ -22,10 +23,12 @@ class SecurityConfig {
     SecurityFilterChain adminSecurityFilterChain(
             HttpSecurity http,
             AdminSessionService adminSessions,
-            AdminSessionCookies cookies
+            AdminSessionCookies cookies,
+            CorsConfigurationSource corsConfigurationSource
     ) throws Exception {
         http
                 .securityMatcher("/api/v1/admin/**")
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(AdminCsrfSupport.repository(cookies.secure()))
                         .csrfTokenRequestHandler(AdminCsrfSupport.requestHandler())
@@ -53,8 +56,13 @@ class SecurityConfig {
 
     @Bean
     @Order(2)
-    SecurityFilterChain memberSecurityFilterChain(HttpSecurity http, AuthSessionService sessions) throws Exception {
+    SecurityFilterChain memberSecurityFilterChain(
+            HttpSecurity http,
+            AuthSessionService sessions,
+            CorsConfigurationSource corsConfigurationSource
+    ) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)

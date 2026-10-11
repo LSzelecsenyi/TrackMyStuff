@@ -190,6 +190,7 @@ fun ProgressPhotosScreen(
     state: ProgressPhotosUiState,
     onBack: () -> Unit,
     onAdd: () -> Unit,
+    onRelink: (Long) -> Unit = {},
     onConsumeLaunchPicker: () -> Unit,
     onPicked: (Uri?) -> Unit,
     onOpenPhoto: (Long) -> Unit,
@@ -271,7 +272,15 @@ fun ProgressPhotosScreen(
                             .fillMaxWidth()
                             .testTag(PROGRESS_PHOTO_ADD)
                     ) {
-                        Text(stringResource(R.string.progress_photos_add))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(stringResource(R.string.progress_photos_add))
+                            if (!state.canAdd) {
+                                ProBadge()
+                            }
+                        }
                     }
                     if (state.photos.size >= 2) {
                         Spacer(Modifier.height(8.dp))
@@ -313,10 +322,12 @@ fun ProgressPhotosScreen(
                 ProgressPhotoCell(
                     photo = photo,
                     selected = photo.id in state.selectedIds,
+                    showRelink = photo.missing && !state.selectingCompare,
                     decode = decode,
                     onClick = {
                         if (state.selectingCompare) onToggleCompare(photo.id) else onOpenPhoto(photo.id)
-                    }
+                    },
+                    onRelink = { onRelink(photo.id) }
                 )
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -325,7 +336,11 @@ fun ProgressPhotosScreen(
         }
     }
     state.lockedFeature?.let { feature ->
-        ProInfoSheet(feature = feature, onDismiss = onDismissLocked)
+        ProInfoSheet(
+            feature = feature,
+            onDismiss = onDismissLocked,
+            dismissTextRes = R.string.onboarding_got_it
+        )
     }
 }
 
@@ -333,8 +348,10 @@ fun ProgressPhotosScreen(
 private fun ProgressPhotoCell(
     photo: ProgressPhotoListItem,
     selected: Boolean,
+    showRelink: Boolean,
     decode: suspend (String, Int) -> Bitmap?,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onRelink: () -> Unit
 ) {
     val date = UiFormatters.compactDate(photo.date)
     var bitmap by remember(photo.fileName, photo.missing) { mutableStateOf<Bitmap?>(null) }
@@ -380,6 +397,17 @@ private fun ProgressPhotoCell(
                         modifier = Modifier.padding(8.dp)
                     )
                 }
+            }
+            if (showRelink) {
+                TextButton(onClick = onRelink, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.progress_photos_relink))
+                }
+                Text(
+                    text = stringResource(R.string.progress_photos_relink_note),
+                    style = AppTypeTokens.statCaption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 6.dp)
+                )
             }
             Text(
                 text = date,

@@ -3,7 +3,7 @@ export const environment = {
   apiBaseUrl: '/api',
   /**
    * Public Google web client id. Must match the backend STRICT_GOOGLE_CLIENT_ID audience.
-   * Supply it at build time. Do not commit a deployment-specific value or any client secret.
+   * CI writes it with admin/scripts/write-google-client-id.mjs. Leave this empty in git.
    */
   googleClientId: '',
 };

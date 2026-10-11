@@ -106,11 +106,11 @@
     <string name="hero_weekly_average">Heti átlag: %1$s</string>
     <string name="change_from_previous_week_value">A múlt heti átlaghoz képest: %1$s</string>
     <string name="calendar_title">Naptár</string>
-    <string name="calendar_week_heading">Ez a hét · %1$s</string>
     <string name="calendar_show_month">Hónap megjelenítése</string>
     <string name="calendar_show_week">Hét megjelenítése</string>
     <string name="calendar_return_today">Ma</string>
     <string name="training_title">Edzés</string>
+    <string name="weekly_goal_header">Heti cél</string>
     <string name="weekly_goal_title">Heti edzéscél</string>
     <string name="weekly_goal_not_set">Nincs beállítva</string>
     <string name="weekly_goal_summary">Heti %1$d edzés</string>
@@ -220,7 +220,7 @@
     <string name="help_calendar_title">Naptár és edzéselőzmények</string>
     <string name="help_calendar_body">Az Áttekintés naptára jelöli a testsúllyal, edzésekkel és tervezett edzésekkel rendelkező napokat. Koppints egy napra a részletekért. A befejezett edzések és a testsúlybejegyzések a Naplóban is megjelennek.</string>
     <string name="help_backup_title">Biztonsági mentés és visszaállítás</string>
-    <string name="help_backup_body">A Beállításokban exportálhatsz egy biztonsági mentést a strukturált edzésadatokról és a fejlődésfotókról. A Health Connect adatai nem szerepelnek benne. A visszaállítás a jelenlegi adatokat a fájl tartalmára cseréli. A régebbi JSON-mentések a strukturált adatokat állítják vissza, és a már az eszközön lévő fejlődésfotókat a helyükön hagyják. A fájlban lévő adatok esetében ez nem vonható vissza.</string>
+    <string name="help_backup_body">Az Android mentheti az edzéseket, az edzésterveket, a testadatokat, valamint a megjelenés és a nyelv beállításait. Ez a mentés az Android beállításaitól és ütemezésétől függ, és a legutóbbi módosítások még nem biztos, hogy benne vannak. A felhőmentés elmaradhat, ha a telefon nem tudja titkosítani. A fotófájlok nem kerülnek bele. Egy elmentett galériahivatkozás később visszaállíthat egy fotót; különben a fotó nem érhető el, amíg újra nem csatolod, vagy egy teljes ZIP-et nem állítasz vissza. A Beállításokban a teljes ZIP-mentés tartalmazza a fejlődésfotókat. A visszaállítása lecseréli a jelenlegi adatokat. A régebbi JSON-mentések a strukturált adatokat állítják vissza, és a már az eszközön lévő fejlődésfotókat a helyükön hagyják. A visszaállított adatok kijelentkezve maradnak, amíg be nem jelentkezel a Strictbe. A Pro és a különleges státusz újra ellenőrzésre kerül a szerveren. Egy eszközmentés több, azon a telefonon használt Strict-fiók adatait is tartalmazhatja. Az alkalmazásban minden fiók külön marad.</string>
     <string name="help_health_title">Health Connect</string>
     <string name="help_health_body">A Health Connect nem kötelező. A Beállításokban engedélyezheted, hogy az alkalmazás beolvassa a közelmúltbeli aktivitást (lépések és edzésmunkamenetek) és a regenerációs trendeket (nyugalmi pulzus, HRV és alvásidő). Az alkalmazás nem írja vissza ezeket az adatokat, nem tölti fel őket, nem menti az adatbázisába, és nem szerepelteti őket a biztonsági mentésben vagy az exportban. Csak a közelmúlt napjai jelennek meg. A hozzáférés kikapcsolása nem törli az alkalmazásban tárolt edzéseket vagy testadatokat. Az alkalmazás többi része Health Connect nélkül is működik.</string>
     <string name="action_send_feedback">Visszajelzés küldése</string>
@@ -245,7 +245,7 @@
     <string name="privacy_policy_billing_title">Google Play-előfizetés</string>
     <string name="privacy_policy_billing_body">Fizetős vásárlás addig nem elérhető, amíg a Play-termékek nincsenek beállítva, és egy valódi vásárlás nincs letesztelve. Ha egy vásárlás ellenőrzött, a szerver tárolja a vásárlási tokent, annak lenyomatát, a csomagnevet, a termékazonosítót, az előfizetés állapotát, a lejáratot és a rendelésazonosítót. A Strict-fiók törlése nem mondja le a Google Play-előfizetést. A vásárlási sor lekapcsolódik, és úgy van jelölve, hogy másik Strict-fiók ne köthesse magához a tokent. TODO: a token és a rendelésazonosító megőrzési ideje nincs meghatározva.</string>
     <string name="privacy_policy_export_title">Biztonsági mentés és visszaállítás</string>
-    <string name="privacy_policy_export_body">Exportálhatsz egy biztonsági mentést a strukturált adatokról és a fejlődésfotókról, és visszaállíthatsz egy általad választott mentést. A Health Connect adatai és a munkamenet-token nincsenek benne. Te választod ki a cél- vagy forrásfájlt. Ha a fájlt felhőtárhelyre mented vagy megosztod, az a másolat az alkalmazáson kívül van, és a Strict később nem törli. A visszaállítás a jelenlegi adatokat a kiválasztott mentésre cseréli. A régebbi JSON-mentések a már az eszközön lévő fejlődésfotókat a helyükön hagyják. Az Android felhőalapú mentése és az eszközök közötti adatátvitel ki van kapcsolva.</string>
+    <string name="privacy_policy_export_body">Exportálhatsz egy ZIP-mentést a strukturált adatokról és a fejlődésfotókról, és visszaállíthatsz egy általad választott mentést. A Health Connect adatai és a munkamenet-token nincsenek benne. Te választod ki a cél- vagy forrásfájlt. Ha a fájlt felhőtárhelyre mented vagy megosztod, az a másolat az alkalmazáson kívül van, és a Strict később nem törli. A visszaállítás a jelenlegi adatokat a kiválasztott mentésre cseréli. A régebbi JSON-mentések a már az eszközön lévő fejlődésfotókat a helyükön hagyják. Az Android az edzéseket, a testadatokat, valamint a megjelenés és a nyelv beállításait is mentheti, ha a telefon mentési beállításai és ütemezése ezt lehetővé teszik. A legutóbbi módosítások még nem biztos, hogy mentve vannak. A fotófájlok, a bejelentkezési munkamenetek, valamint a Pro és a különleges státusz nincsenek benne. Egy elmentett galériahivatkozás később lehetővé teheti a fotó visszaállítását. A visszaállított adatokhoz Strict-bejelentkezés kell, és ezeket a jogosultságokat külön ellenőrzi a rendszer. Egy eszközmentés több, azon a telefonon használt Strict-fiók adatait is tartalmazhatja, és az alkalmazásban minden fiók külön marad. Az Android nem ígéri, hogy egy fiók törlése után eltávolítja a korábbi felhőmásolatot.</string>
     <string name="privacy_policy_feedback_title">Visszajelző e-mail</string>
     <string name="privacy_policy_feedback_body">A Visszajelzés küldése megnyitja az e-mail-alkalmazásodat egy %1$s címre szóló piszkozattal. A piszkozat tartalmazza az alkalmazás verzióját, az Android verzióját, valamint az eszköz gyártóját és típusát. Az alkalmazás maga nem küldi el az e-mailt. Te döntöd el, elküldöd-e. Amit elküldesz, azt ezután az e-mail-szolgáltatód kezeli.</string>
     <string name="privacy_policy_deletion_title">Az adataid törlése</string>
@@ -275,7 +275,7 @@
     <string name="message_updated">A meglévő mérés frissült.</string>
     <string name="message_deleted">Mérés törölve.</string>
     <string name="app_backup_title">Biztonsági mentés</string>
-    <string name="app_backup_body">Mentsd a Strict adatait és a fejlődésfotókat egy fájlba.</string>
+    <string name="app_backup_body">Exportálj egy teljes ZIP-et a Strict adatairól és a fejlődésfotókról. Az Android-mentés, amikor a telefon lefuttatja, nem tartalmazza a fotófájlokat.</string>
     <string name="action_export_app_backup">Biztonsági mentés exportálása</string>
     <string name="action_export_app_backup_subtitle">Adatok mentése fájlba</string>
     <string name="action_restore_app_backup">Biztonsági mentés visszaállítása</string>
@@ -771,6 +771,16 @@
     <string name="progress_photos_adding">Fotó hozzáadása…</string>
     <string name="progress_photos_open">Fejlődésfotók megnyitása</string>
     <string name="progress_photos_missing">A fotó nem érhető el</string>
+    <string name="progress_photos_relink">Fotó újracsatolása</string>
+    <string name="progress_photos_relink_note">Válassz egy másik képet a galériából. Ez nem ellenőrzi, hogy az eredeti fotó-e.</string>
+    <string name="database_open_title">A fiók adatai nem nyithatók meg</string>
+    <string name="database_open_migration_failed">Az eredeti adatok még a telefonon vannak. Nem lettek üres fiókra cserélve.</string>
+    <string name="database_open_newer_schema">Ezeket az adatokat a Strict egy újabb verziója írta. Frissítsd az alkalmazást. A fájl nem lett törölve.</string>
+    <string name="database_open_unreadable">A fiók adatbázisa nem olvasható. Nem lett üres adatbázisra cserélve.</string>
+    <string name="database_migration_other_title">Néhány fiókadat nem került át</string>
+    <string name="database_migration_other_body">Egy másik Strict-fiók adatai ezen a telefonon nem készültek el a mentéshez. Az eredeti fájlok megmaradtak.</string>
+    <string name="database_migration_retry">Próbáld újra</string>
+    <string name="database_migration_dismiss">Most nem</string>
     <string name="progress_photos_unreadable">Ez a fotó nem olvasható.</string>
     <string name="progress_photos_compare">Összehasonlítás</string>
     <string name="progress_photos_compare_hint">Válassz két fotót</string>
@@ -1048,7 +1058,7 @@
     <string name="delete_account_title">Fiók törlése</string>
     <string name="delete_account_intro">Ez törli a Strict-fiókot a szerveren.</string>
     <string name="delete_account_founder">A Founder állapot és a promóciós jogosultságok elvesznek.</string>
-    <string name="delete_account_local">Az ehhez a fiókhoz tartozó edzésnapló, mérések, célok és eredmények törlődnek erről a telefonról.</string>
+    <string name="delete_account_local">Az ehhez a fiókhoz tartozó edzésnapló, mérések, célok és eredmények törlődnek erről a telefonról. Egy régebbi Android-mentés vagy egy már exportált ZIP még tartalmazhat másolatot. A Strict ezeket a másolatokat nem tudja törölni.</string>
     <string name="delete_account_photos">Az ehhez a fiókhoz tartozó haladásfotók törlődnek erről a telefonról. A korábban exportált ZIP mentés ott marad, ahová elmentetted. A Strict azt nem tudja távolról törölni.</string>
     <string name="delete_account_subscription">A Google Play-előfizetés a fiók törlésével nem szűnik meg. A számlázást a Google Play kezeli. A vásárlás nem kerül át egy új fiókra.</string>
     <string name="delete_account_subscription_known">Ehhez a fiókhoz ismert fizetős előfizetés tartozik. A fiók törlése nem mondja le.</string>
@@ -1113,7 +1123,7 @@
     <string name="pro_info_external_workouts_import">Külső edzésimport a Pro-ban</string>
     <string name="pro_info_external_workouts_existing">A már importált edzések az előzményekben maradnak</string>
     <string name="pro_info_progress_photos_title">Fejlődésfotók</string>
-    <string name="pro_info_progress_photos_body">Tarts privát fotókat ezen az eszközön, és hasonlíts össze kettőt egymás mellett. A fotókat nem elemezzük, nem pontozzuk, és nem töltjük fel.</string>
+    <string name="pro_info_progress_photos_body">Új fejlődésfotó hozzáadása Pro-t igényel. A már mentett fotókat meg lehet nézni, és a hiányzó fotót újra lehet kapcsolni. A fotók ezen az eszközön maradnak; nem elemezzük, nem pontozzuk, és nem töltjük fel őket.</string>
     <string name="pro_info_progress_photos_compare">Két választott fotó összehasonlítása</string>
     <string name="pro_info_progress_photos_private">A fotók ezen az eszközön maradnak</string>
     <string name="pro_info_progress_photos_existing_stay">A már mentett fotók elérhetők maradnak</string>

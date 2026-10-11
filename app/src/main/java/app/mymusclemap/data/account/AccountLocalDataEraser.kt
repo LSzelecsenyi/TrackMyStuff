@@ -1,6 +1,7 @@
 package app.mymusclemap.data.account
 
 import android.content.Context
+import app.mymusclemap.data.local.AccountDatabaseLocation
 import app.mymusclemap.domain.account.accountDatabaseName
 import app.mymusclemap.domain.account.accountPhotoDirectory
 import java.io.File
@@ -11,8 +12,8 @@ import java.util.UUID
  *
  * Exported ZIP backups, Android shared storage, and another account's database
  * are outside this eraser. Theme, language, and lock-screen preferences stay.
- * The founder workout queue is not keyed by account, so it is cleared: leaving
- * it would let the next sign-in upload the deleted account's queued events.
+ * Founder upload events are removed for this user only. Another account's queued
+ * events stay in the outbox, which is outside Auto Backup.
  */
 class AccountLocalDataEraser(context: Context) {
     private val appContext = context.applicationContext
@@ -51,11 +52,27 @@ class AccountLocalDataEraser(context: Context) {
     }
 
     private fun deleteDatabase(name: String, failures: MutableList<File>) {
-        val database = appContext.getDatabasePath(name)
-        listOf(database, File(database.path + "-wal"), File(database.path + "-shm")).forEach { file ->
-            if (file.exists() && !file.delete()) {
-                failures += file
+        val locations = buildList {
+            add(appContext.getDatabasePath(name))
+            if (AccountDatabaseLocation.isAccountDatabase(name)) {
+                add(AccountDatabaseLocation.accountFile(appContext, name))
+                add(File(appContext.getDatabasePath(name).parentFile, "$name.partial"))
             }
+        }
+        locations.forEach { database ->
+            listOf(
+                database,
+                File(database.path + "-wal"),
+                File(database.path + "-shm"),
+                File(database.path + "-journal")
+            ).forEach { file ->
+                if (file.exists() && !file.delete()) {
+                    failures += file
+                }
+            }
+        }
+        if (AccountDatabaseLocation.isAccountDatabase(name)) {
+            File(appContext.noBackupFilesDir, "migrated_$name").delete()
         }
     }
 
@@ -76,7 +93,6 @@ class AccountLocalDataEraser(context: Context) {
     private companion object {
         const val PENDING = "pending_account_erasure.txt"
         val DEVICE_SCOPED_FOUNDER_FILES = setOf(
-            "founder_workout_outbox.preferences_pb",
             "founder_milestone_acknowledgements.preferences_pb",
             "founder_entitlement_cache.preferences_pb"
         )

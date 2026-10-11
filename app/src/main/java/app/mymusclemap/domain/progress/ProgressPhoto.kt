@@ -7,7 +7,9 @@ data class ProgressPhoto(
     val date: LocalDate,
     val fileName: String,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val sourceUri: String? = null,
+    val sourceFingerprint: String? = null
 )
 
 sealed class ProgressPhotoImportResult {

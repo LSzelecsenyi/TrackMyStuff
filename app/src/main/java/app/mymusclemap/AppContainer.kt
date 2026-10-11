@@ -19,6 +19,7 @@ import app.mymusclemap.data.founder.FounderJoinCoordinator
 import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.founder.FounderWorkoutFlush
 import app.mymusclemap.data.founder.FounderWorkoutOutbox
+import app.mymusclemap.data.founder.FounderWorkoutSubmission
 import app.mymusclemap.data.founder.FounderWorkoutSync
 import app.mymusclemap.data.founder.FounderWorkoutSyncScheduler
 import app.mymusclemap.data.founder.FounderSetObservation
@@ -525,7 +526,7 @@ class AppContainer(context: Context, val accountUserId: String) {
             FounderEntitlementCall.Unauthenticated -> founderEntitlementCache.drop()
             else -> Unit
         }
-        if (founderWorkoutOutbox.pending().isNotEmpty()) {
+        if (founderWorkoutOutbox.pendingFor(accountUserId).isNotEmpty()) {
             FounderWorkoutSyncScheduler.enqueue(appContext)
         }
     }
@@ -537,7 +538,16 @@ class AppContainer(context: Context, val accountUserId: String) {
         dao = database.progressPhotoDao(),
         store = progressPhotoStore,
         clock = clock,
-        dateProvider = dateProvider
+        dateProvider = dateProvider,
+        openOriginal = { raw ->
+            try {
+                appContext.contentResolver.openInputStream(android.net.Uri.parse(raw))
+            } catch (_: SecurityException) {
+                null
+            } catch (_: java.io.FileNotFoundException) {
+                null
+            }
+        }
     )
     val healthRepository = HealthRepository(
         source = HealthConnectGateway(appContext),
@@ -631,7 +641,10 @@ class AppContainer(context: Context, val accountUserId: String) {
                 }
             },
             submit = { event ->
-                strictAccount.api.submitFounderWorkout(
+                val sessionUser = strictAccount.sessions.read()?.userId
+                if (sessionUser == null || sessionUser != accountUserId || event.ownerUserId != accountUserId) {
+                    FounderWorkoutSubmission.NoSession
+                } else strictAccount.api.submitFounderWorkout(
                     clientWorkoutId = event.clientWorkoutId,
                     completedAt = Instant.ofEpochMilli(event.completedAtEpochMilli),
                     localDate = LocalDate.parse(event.localDate),
@@ -641,6 +654,8 @@ class AppContainer(context: Context, val accountUserId: String) {
             },
             onAccepted = { snapshot -> publishFounderSnapshot(snapshot) },
             onUnauthenticated = { founderEntitlementCache.drop() },
+            ownerUserId = { accountUserId },
+            sessionUserId = { strictAccount.sessions.read()?.userId },
             schedule = { FounderWorkoutSyncScheduler.enqueue(appContext) }
         )
     }

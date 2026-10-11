@@ -1,6 +1,7 @@
 package app.mymusclemap.data.account
 
 import androidx.test.core.app.ApplicationProvider
+import app.mymusclemap.data.local.AccountDatabaseLocation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -40,7 +41,9 @@ class AccountLocalDataEraserTest {
         assertFalse(deletedDatabase.exists())
         assertFalse(deletedPhotos.exists())
         assertFalse(deletedPrefs.exists())
-        assertFalse(outbox.exists())
+        assertTrue(outbox.exists())
+        assertFalse(context.getDatabasePath("account_$deleted.db").exists())
+        assertTrue(context.getDatabasePath("account_$kept.db").exists())
         assertTrue(keptDatabase.exists())
         assertTrue(keptPhotos.exists())
         assertTrue(keptPrefs.exists())
@@ -62,10 +65,13 @@ class AccountLocalDataEraserTest {
     }
 
     private fun writeDatabase(userId: String): File {
-        val file = context.getDatabasePath("account_$userId.db")
+        val file = AccountDatabaseLocation.accountFile(context, "account_$userId.db")
         file.parentFile?.mkdirs()
         file.writeText("db")
         File(file.path + "-wal").writeText("wal")
+        val legacy = context.getDatabasePath("account_$userId.db")
+        legacy.parentFile?.mkdirs()
+        legacy.writeText("legacy")
         return file
     }
 

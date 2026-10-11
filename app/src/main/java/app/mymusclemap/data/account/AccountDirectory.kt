@@ -2,6 +2,7 @@ package app.mymusclemap.data.account
 
 import android.content.Context
 import app.mymusclemap.domain.account.LegacyClaim
+import app.mymusclemap.data.local.AccountDatabaseLocation
 import app.mymusclemap.domain.account.accountDatabaseName
 import app.mymusclemap.domain.account.accountPhotoDirectory
 import app.mymusclemap.domain.account.legacyClaim
@@ -39,7 +40,7 @@ class AccountDirectory(context: Context) {
     }
 
     fun activate(profile: VerifiedAccountProfile) {
-        val target = appContext.getDatabasePath(accountDatabaseName(profile.userId))
+        val target = accountDatabase(profile.userId)
         if (read(CLAIM) == null && !legacyDatabase().isFile && target.isFile) {
             write(CLAIM, profile.userId)
         }
@@ -78,7 +79,7 @@ class AccountDirectory(context: Context) {
         if (decision == LegacyClaim.ALREADY_MINE || decision == LegacyClaim.OWNED_BY_OTHER) {
             return decision
         }
-        val target = appContext.getDatabasePath(accountDatabaseName(userId))
+        val target = accountDatabase(userId)
         if (!legacyExists) {
             if (target.isFile) {
                 finishClaim(userId)
@@ -86,7 +87,7 @@ class AccountDirectory(context: Context) {
             }
             return LegacyClaim.NOTHING_TO_CLAIM
         }
-        if (target.isFile || !moveDatabase(userId)) {
+        if (target.isFile || legacyAccountDatabase(userId).isFile || !moveDatabase(userId)) {
             return LegacyClaim.OWNED_BY_OTHER
         }
         finishClaim(userId)
@@ -101,10 +102,18 @@ class AccountDirectory(context: Context) {
         write(CLAIM, userId)
     }
 
+    private fun accountDatabase(userId: String): File {
+        return AccountDatabaseLocation.accountFile(appContext, accountDatabaseName(userId))
+    }
+
+    private fun legacyAccountDatabase(userId: String): File {
+        return AccountDatabaseLocation.legacyAccountFile(appContext, accountDatabaseName(userId))
+    }
+
     private fun moveDatabase(userId: String): Boolean {
         val legacy = legacyDatabase()
-        val target = appContext.getDatabasePath(accountDatabaseName(userId))
-        if (target.isFile) {
+        val target = accountDatabase(userId)
+        if (target.isFile || legacyAccountDatabase(userId).isFile) {
             return false
         }
         target.parentFile?.mkdirs()
@@ -139,7 +148,7 @@ class AccountDirectory(context: Context) {
         source.copyTo(target, overwrite = false)
     }
 
-    private fun legacyDatabase(): File = appContext.getDatabasePath("weight_tracker.db")
+    private fun legacyDatabase(): File = AccountDatabaseLocation.legacyUnclaimedFile(appContext)
 
     private fun read(name: String): String? {
         val file = File(root, name)

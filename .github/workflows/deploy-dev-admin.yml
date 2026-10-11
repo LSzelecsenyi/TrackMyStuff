@@ -1,0 +1,93 @@
+name: Deploy admin (DEV) to OCI
+
+on:
+  push:
+    branches: ["develop"]
+  workflow_dispatch:
+
+concurrency:
+  group: strict-admin-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://admin-dev.strictworkout.eu
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Test and build admin (DEV)
+        env:
+          STRICT_ADMIN_GOOGLE_CLIENT_ID: ${{ vars.STRICT_ADMIN_GOOGLE_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          cd admin
+          npm ci
+          npm test
+          node scripts/write-google-client-id.mjs
+          npx ng build --configuration=production
+          test -f dist/admin/browser/index.html
+          test -n "$(find dist/admin/browser -maxdepth 1 -name 'main-*.js' -print -quit)"
+
+      - name: Prepare SSH
+        run: |
+          set -euo pipefail
+          test -n "${{ secrets.DEPLOY_SSH_KEY }}" || (echo "DEPLOY_SSH_KEY is empty" && exit 1)
+          test -n "${{ secrets.DEPLOY_HOST }}" || (echo "DEPLOY_HOST is empty" && exit 1)
+          test -n "${{ secrets.DEPLOY_USER }}" || (echo "DEPLOY_USER is empty" && exit 1)
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload admin dist (DEV)
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "mkdir -p /opt/strict/dev/admin-ui"
+          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes" \
+            admin/dist/admin/browser/ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/strict/dev/admin-ui/"
+
+      - name: Reload nginx
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: Smoke check (DEV admin)
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" '
+            set -euo pipefail
+            code=$(curl -sS -o /dev/null -w "%{http_code}" -H "Host: admin-dev.strictworkout.eu" http://127.0.0.1/ || true)
+            echo "DEV admin responded with HTTP $code"
+            test "$code" = "200"
+            js_file=$(find /opt/strict/dev/admin-ui -maxdepth 1 -name "main-*.js" | head -n 1)
+            test -n "$js_file"
+            js_name=$(basename "$js_file")
+            ctype=$(curl -sS -o /dev/null -w "%{content_type}" -H "Host: admin-dev.strictworkout.eu" "http://127.0.0.1/$js_name" || true)
+            echo "DEV admin asset $js_name Content-Type: ${ctype:-missing}"
+            case "$ctype" in
+              application/javascript*|text/javascript*|application/x-javascript*) ;;
+              *)
+                echo "Expected a JavaScript Content-Type for /$js_name" >&2
+                exit 1
+                ;;
+            esac
+          '

@@ -1,8 +1,8 @@
 package app.mymusclemap.data.repository
 
 import android.content.Context
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import app.mymusclemap.data.local.AccountDatabaseLocation
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.domain.FixedDateProvider
 import app.mymusclemap.domain.account.accountDatabaseName
@@ -117,13 +117,11 @@ class FreshAccountFirstWorkoutTest {
     }
 
     private fun open(userId: String): WeightDatabase {
-        val database = Room.databaseBuilder(
+        val database = WeightDatabase.create(
             context,
-            WeightDatabase::class.java,
-            accountDatabaseName(userId)
+            accountDatabaseName(userId),
+            allowMainThreadQueries = true
         )
-            .allowMainThreadQueries()
-            .build()
         openDatabases += database
         return database
     }
@@ -136,10 +134,14 @@ class FreshAccountFirstWorkoutTest {
     }
 
     private fun deleteAccount(userId: String) {
-        val path = context.getDatabasePath(accountDatabaseName(userId))
-        path.delete()
-        File("${path.path}-wal").delete()
-        File("${path.path}-shm").delete()
+        listOf(
+            context.getDatabasePath(accountDatabaseName(userId)),
+            AccountDatabaseLocation.accountFile(context, accountDatabaseName(userId))
+        ).forEach { path ->
+            path.delete()
+            File("${path.path}-wal").delete()
+            File("${path.path}-shm").delete()
+        }
     }
 
     private fun stack(database: WeightDatabase): AccountStack {

@@ -306,6 +306,12 @@ object AppBackupJson {
                                 .put("fileName", row.fileName)
                                 .put("createdAt", row.createdAt)
                                 .put("updatedAt", row.updatedAt)
+                                .apply {
+                                    if (snapshot.schemaVersion >= AppBackupFormat.ARCHIVE_PHOTO_SOURCE_SCHEMA_VERSION) {
+                                        row.sourceUri?.let { put("sourceUri", it) }
+                                        row.sourceFingerprint?.let { put("sourceFingerprint", it) }
+                                    }
+                                }
                         )
                     }
                 }
@@ -961,7 +967,9 @@ object AppBackupJson {
             date = date,
             fileName = fileName,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            sourceUri = obj.optionalNullableString("sourceUri", errors),
+            sourceFingerprint = obj.optionalNullableString("sourceFingerprint", errors)
         )
     }
 

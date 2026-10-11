@@ -16,6 +16,23 @@ class AccountSpecialAchievementTest {
     private val grantedMillis = grantedAt.toEpochMilli()
 
     @Test
+    fun restoredOrdinaryUnlocksStayVisibleWithoutSpecialAuthority() {
+        val restored = board(
+            unlocks = listOf(
+                AchievementId.FIRST_WORKOUT,
+                AchievementId.FOUNDER,
+                AchievementId.EARLY_ADOPTER,
+                AchievementId.DEVELOPER
+            ),
+            authority = AccountAchievementAuthority()
+        )
+        assertTrue(item(restored, AchievementId.FIRST_WORKOUT).unlocked)
+        assertFalse(item(restored, AchievementId.FOUNDER).unlocked)
+        assertFalse(item(restored, AchievementId.EARLY_ADOPTER).unlocked)
+        assertFalse(item(restored, AchievementId.DEVELOPER).unlocked)
+    }
+
+    @Test
     fun founderEarlyAdopterAndDeveloperFollowTrustedAccountAuthority() {
         val legacy = board(
             unlocks = listOf(AchievementId.FOUNDER, AchievementId.EARLY_ADOPTER, AchievementId.DEVELOPER),

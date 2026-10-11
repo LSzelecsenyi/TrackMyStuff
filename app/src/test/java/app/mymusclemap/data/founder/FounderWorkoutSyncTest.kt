@@ -243,7 +243,9 @@ class FounderWorkoutSyncTest {
                 FounderWorkoutSubmission.Unavailable
             },
             onAccepted = {},
-            onUnauthenticated = {}
+            onUnauthenticated = {},
+            ownerUserId = { "user-a" },
+            sessionUserId = { "user-a" }
         )
         sync.onNativeWorkoutCompleted(workoutId.toString())
         sync.onNativeWorkoutCompleted(workoutId.toString())
@@ -293,6 +295,79 @@ class FounderWorkoutSyncTest {
     }
 
     @Test
+    fun accountAIsNotSubmittedAsAccountBAndASwitchDuringFlushStopsSubmission() = runBlocking {
+        val userA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        val userB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        val other = UUID.randomUUID().toString()
+        val submitted = mutableListOf<String>()
+        outbox.enqueue(
+            PendingFounderWorkout(workoutId.toString(), 1_700_000_000_000L, "2026-10-04", ownerUserId = userA)
+        )
+        outbox.enqueue(
+            PendingFounderWorkout(other, 1_700_000_000_000L, "2026-10-04", ownerUserId = userB)
+        )
+        val asB = sync(
+            accepting = true,
+            submit = {
+                submitted += it.ownerUserId.orEmpty()
+                FounderWorkoutSubmission.Unavailable
+            },
+            ownerUserId = { userB },
+            sessionUserId = { userB }
+        )
+        assertEquals(FounderWorkoutFlush.Retry, asB.flush())
+        assertEquals(listOf(userB), submitted)
+        assertEquals(userA, outbox.pendingFor(userA).single().ownerUserId)
+
+        submitted.clear()
+        var checks = 0
+        val switching = sync(
+            accepting = true,
+            submit = {
+                submitted += "submitted"
+                FounderWorkoutSubmission.Accepted(snapshot(1))
+            },
+            ownerUserId = { userA },
+            sessionUserId = {
+                checks += 1
+                if (checks >= 2) userB else userA
+            }
+        )
+        assertEquals(FounderWorkoutFlush.Done, switching.flush())
+        assertTrue(submitted.isEmpty())
+        assertEquals(userA, outbox.pendingFor(userA).single().ownerUserId)
+    }
+
+    @Test
+    fun unownedLegacyEventsAreQuarantinedInsteadOfAssignedToTheSignedInUser() = runBlocking {
+        val submitted = mutableListOf<String>()
+        outbox.enqueue(PendingFounderWorkout(workoutId.toString(), 1_700_000_000_000L, "2026-10-04"))
+        val sync = sync(
+            accepting = true,
+            submit = {
+                submitted += it.clientWorkoutId
+                FounderWorkoutSubmission.Accepted(snapshot(1))
+            }
+        )
+        assertEquals(FounderWorkoutFlush.Done, sync.flush())
+        assertTrue(submitted.isEmpty())
+        assertTrue(outbox.pending().isEmpty())
+        assertEquals(workoutId.toString(), outbox.quarantined().single().clientWorkoutId)
+        assertNull(outbox.quarantined().single().ownerUserId)
+    }
+
+    @Test
+    fun removingOneAccountLeavesTheOtherAccountsQueuedWork() = runBlocking {
+        val userA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        val userB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        outbox.enqueue(PendingFounderWorkout(workoutId.toString(), 1L, "2026-10-04", ownerUserId = userA))
+        outbox.enqueue(PendingFounderWorkout(UUID.randomUUID().toString(), 1L, "2026-10-04", ownerUserId = userB))
+        outbox.removeForUser(userA)
+        assertTrue(outbox.pendingFor(userA).isEmpty())
+        assertEquals(userB, outbox.pending().single().ownerUserId)
+    }
+
+    @Test
     fun onlyActiveBackendEnrollmentAcceptsWorkouts() {
         assertTrue(FounderWorkoutSync.accepts(FounderProgramStatus.ActiveFree, backendOwned = true))
         assertTrue(FounderWorkoutSync.accepts(FounderProgramStatus.ActivePro, backendOwned = true))
@@ -307,7 +382,9 @@ class FounderWorkoutSyncTest {
         submit: suspend (PendingFounderWorkout) -> FounderWorkoutSubmission,
         schedule: () -> Unit = {},
         onAccepted: suspend (BackendFounderSnapshot) -> Unit = {},
-        onUnauthenticated: suspend () -> Unit = {}
+        onUnauthenticated: suspend () -> Unit = {},
+        ownerUserId: () -> String = { "user-a" },
+        sessionUserId: () -> String? = { ownerUserId() }
     ): FounderWorkoutSync {
         return FounderWorkoutSync(
             outbox = outbox,
@@ -323,6 +400,8 @@ class FounderWorkoutSyncTest {
             submit = submit,
             onAccepted = onAccepted,
             onUnauthenticated = onUnauthenticated,
+            ownerUserId = ownerUserId,
+            sessionUserId = sessionUserId,
             schedule = schedule
         )
     }
@@ -345,6 +424,7 @@ class FounderWorkoutSyncTest {
 
     private suspend fun clearOutbox() {
         outbox.pending().forEach { outbox.remove(it.clientWorkoutId) }
+        outbox.quarantined().forEach { outbox.removeQuarantined(it.clientWorkoutId) }
     }
 
     private class MemorySession : StrictSessionStore {

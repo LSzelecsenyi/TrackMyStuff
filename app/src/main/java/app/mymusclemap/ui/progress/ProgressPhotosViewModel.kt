@@ -61,6 +61,8 @@ class ProgressPhotosViewModel(
     private val selectingCompare = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<List<Long>>(emptyList())
     private val loaded = MutableStateFlow(false)
+    private val relinkId = MutableStateFlow<Long?>(null)
+    private val recoveryAttempted = mutableSetOf<Long>()
 
     val uiState: StateFlow<ProgressPhotosUiState> = combine(
         combine(photos, recentThumbnails, launchPicker, importing, loaded) { items, thumbnails, picker, busy, ready ->
@@ -99,6 +101,13 @@ class ProgressPhotosViewModel(
         viewModelScope.launch {
             repository.sweepOrphans()
             repository.observeAll().collect { stored ->
+                withContext(Dispatchers.IO) {
+                    stored.forEach { photo ->
+                        if (!repository.isAvailable(photo.fileName) && recoveryAttempted.add(photo.id)) {
+                            repository.recoverOriginal(photo.id)
+                        }
+                    }
+                }
                 val items = stored.map { photo ->
                     ProgressPhotoListItem(
                         id = photo.id,
@@ -121,6 +130,7 @@ class ProgressPhotosViewModel(
 
     fun requestAdd() {
         message.value = null
+        relinkId.value = null
         if (!ProgressPhotoAccess.canAdd(entitlements::hasAccess)) {
             lockedFeature.value = AppFeature.ProgressPhotos
             return
@@ -128,13 +138,40 @@ class ProgressPhotosViewModel(
         launchPicker.value = true
     }
 
+    fun requestRelink(id: Long) {
+        message.value = null
+        relinkId.value = id
+        launchPicker.value = true
+    }
+
     fun consumeLaunchPicker() {
         launchPicker.value = false
     }
 
-    fun onPickerCancelled() = Unit
+    fun onPickerCancelled() {
+        relinkId.value = null
+    }
 
-    fun import(source: InputStream) {
+    fun import(source: InputStream, sourceUri: String? = null) {
+        val relinking = relinkId.value
+        relinkId.value = null
+        if (relinking != null) {
+            viewModelScope.launch {
+                importing.value = true
+                try {
+                    source.use { stream ->
+                        when (repository.relink(relinking, stream, sourceUri)) {
+                            is ProgressPhotoImportResult.Saved -> Unit
+                            ProgressPhotoImportResult.Unreadable,
+                            ProgressPhotoImportResult.FutureDate -> message.value = ProgressPhotoMessage.Unreadable
+                        }
+                    }
+                } finally {
+                    importing.value = false
+                }
+            }
+            return
+        }
         if (!ProgressPhotoAccess.canAdd(entitlements::hasAccess)) {
             source.close()
             lockedFeature.value = AppFeature.ProgressPhotos
@@ -144,7 +181,7 @@ class ProgressPhotosViewModel(
             importing.value = true
             try {
                 source.use { stream ->
-                    when (repository.import(stream)) {
+                    when (repository.import(stream, sourceUri = sourceUri)) {
                         is ProgressPhotoImportResult.Saved -> Unit
                         ProgressPhotoImportResult.Unreadable,
                         ProgressPhotoImportResult.FutureDate -> message.value = ProgressPhotoMessage.Unreadable

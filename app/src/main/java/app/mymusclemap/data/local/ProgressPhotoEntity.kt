@@ -16,5 +16,7 @@ data class ProgressPhotoEntity(
     val date: String,
     val fileName: String,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val sourceUri: String? = null,
+    val sourceFingerprint: String? = null
 )

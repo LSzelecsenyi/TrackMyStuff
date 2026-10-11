@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +50,7 @@ import app.mymusclemap.domain.workout.WeekProgress
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.domain.workout.WeeklyGoalRevision
 import app.mymusclemap.domain.workout.WeeklyGoalStatus
+import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
@@ -122,6 +124,7 @@ fun OverviewCalendar(
                 weekStart = weekStart,
                 isCurrentWeek = weekOffset == 0,
                 progress = weeklyGoal.progressOn(weekStart),
+                activeStreak = weeklyGoal.current.streak,
                 onExpand = {
                     if (!WeekCalendar.fitsInMonth(displayedMonth, weekStart)) {
                         onDisplayedMonthChange(WeekCalendar.primaryMonth(weekStart))
@@ -163,15 +166,16 @@ private fun WeekCalendarHeader(
     weekStart: LocalDate,
     isCurrentWeek: Boolean,
     progress: WeekProgress,
+    activeStreak: Int,
     onExpand: () -> Unit,
     onReturnToToday: () -> Unit
 ) {
     val trophy = weekTrophyTreatment(progress, isCurrentWeek)
     val range = UiFormatters.inclusiveDateRange(weekStart, WeekCalendar.end(weekStart))
-    val heading = if (isCurrentWeek) {
-        stringResource(R.string.calendar_week_heading, range)
+    val heading = if (activeStreak > 0) {
+        pluralStringResource(R.plurals.weekly_goal_header_streak, activeStreak, activeStreak)
     } else {
-        range
+        stringResource(R.string.weekly_goal_header)
     }
     val expandLabel = stringResource(R.string.calendar_show_month)
     Row(
@@ -188,42 +192,57 @@ private fun WeekCalendarHeader(
                     .testTag("overview-weekly-streak")
             )
         }
-        Row(
+        Column(
             modifier = Modifier
                 .weight(1f)
-                .defaultMinSize(minHeight = 32.dp)
                 .clickable(onClick = onExpand)
                 .semantics { contentDescription = expandLabel }
-                .testTag("overview-calendar-expand"),
-            verticalAlignment = Alignment.CenterVertically
+                .testTag("overview-calendar-expand")
         ) {
-        Text(
-            text = heading,
-            style = AppTypeTokens.sectionTitle,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .weight(1f)
-                .testTag("overview-calendar-heading")
-        )
-        if (!isCurrentWeek) {
-            Text(
-                text = stringResource(R.string.calendar_return_today),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+            Row(
                 modifier = Modifier
-                    .clickable(onClick = onReturnToToday)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .testTag("overview-calendar-today")
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 32.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = heading,
+                    style = AppTypeTokens.sectionTitle,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("overview-calendar-heading")
+                )
+                if (!isCurrentWeek) {
+                    Text(
+                        text = stringResource(R.string.calendar_return_today),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable(onClick = onReturnToToday)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .testTag("overview-calendar-today")
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Text(
+                text = range,
+                style = AppTypeTokens.sectionSubtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(top = AppDimens.statSecondaryGap)
+                    .testTag("overview-calendar-range")
             )
-        }
-        Icon(
-            imageVector = Icons.Filled.ExpandMore,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp)
-        )
         }
     }
 }

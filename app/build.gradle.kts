@@ -42,6 +42,9 @@ fun requireDebugStrictApiUrl(url: String) {
 
 val strictReleaseApiUrl = "https://api.strictworkout.eu"
 requireReleaseStrictApiUrl(strictReleaseApiUrl)
+// Keep in sync with StrictBackendUrls.DEVELOPMENT. This is the side-by-side DEV app, not the debug loopback.
+val strictDevApiUrl = "https://api-dev.strictworkout.eu"
+requireReleaseStrictApiUrl(strictDevApiUrl)
 val strictDebugApiUrl = (optionalBuildValue("strict.api.baseUrl", "STRICT_API_BASE_URL")
     ?: "http://127.0.0.1:8082").trim().trimEnd('/')
 requireDebugStrictApiUrl(strictDebugApiUrl)
@@ -49,6 +52,10 @@ val strictGoogleServerClientId = optionalBuildValue(
     "strict.google.serverClientId",
     "STRICT_GOOGLE_SERVER_CLIENT_ID"
 ).orEmpty()
+val strictDevGoogleServerClientId = optionalBuildValue(
+    "strict.google.serverClientId.dev",
+    "STRICT_GOOGLE_SERVER_CLIENT_ID_DEV"
+) ?: strictGoogleServerClientId
 val allowedEntitlementOverrides = setOf("AUTO", "FOUNDER", "NON_FOUNDER")
 val strictEntitlementOverride = optionalBuildValue(
     "strict.entitlementOverride",
@@ -285,6 +292,21 @@ android {
                 buildConfigString(strictWelcomeBackCooldownSeconds)
             )
         }
+        // Side-by-side DEV app. A product flavor would rename assembleRelease/bundleRelease
+        // and the Play upload path, so this stays a release-like build type.
+        // src/dev does not contain the debug entitlement or Founder overrides.
+        create("dev") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            if (signingConfigs.findByName("release") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            buildConfigField("String", "STRICT_API_BASE_URL", buildConfigString(strictDevApiUrl))
+            buildConfigField("String", "STRICT_GOOGLE_SERVER_CLIENT_ID", buildConfigString(strictDevGoogleServerClientId))
+            buildConfigField("String", "STRICT_BILLING_PRODUCT_IDS", buildConfigString(strictBillingProductIds))
+        }
     }
 
     compileOptions {
@@ -311,6 +333,12 @@ android {
         getByName("test") {
             assets.srcDir("$projectDir/schemas")
         }
+        // The dev build type is not the release build type, so it does not compile src/release on its own.
+        // Those classes are the production Founder, entitlement, and billing selections.
+        getByName("dev") {
+            java.directories.add("src/release/java")
+            kotlin.directories.add("src/release/java")
+        }
     }
 
     lint {
@@ -325,6 +353,9 @@ android {
 androidComponents {
     beforeVariants(selector().withBuildType("release")) { variant ->
         (variant as com.android.build.api.variant.HasUnitTestBuilder).enableUnitTest = true
+    }
+    beforeVariants(selector().withBuildType("dev")) { variant ->
+        (variant as com.android.build.api.variant.HasUnitTestBuilder).enableUnitTest = false
     }
 }
 
@@ -405,13 +436,17 @@ dependencies {
     testImplementation(libs.androidx.glance.appwidget.testing)
 }
 
-fun requestsSignedReleaseArtifact(name: String): Boolean {
+fun requestsProdReleaseArtifact(name: String): Boolean {
     return name == "assembleRelease" ||
         name == "bundleRelease" ||
         name == "packageRelease" ||
         name == "packageReleaseBundle" ||
         name == "signReleaseBundle" ||
         (name.startsWith("sign") && name.contains("Release"))
+}
+
+fun requestsDevArtifact(name: String): Boolean {
+    return name == "assembleDev" || name == "packageDev"
 }
 
 tasks.register("checkReleaseSigning") {
@@ -430,15 +465,22 @@ tasks.register("checkReleaseSigning") {
 }
 
 gradle.taskGraph.whenReady {
-    val touchesSignedRelease = gradle.taskGraph.allTasks.any { requestsSignedReleaseArtifact(it.name) }
-    if (!touchesSignedRelease) return@whenReady
+    val touchesProdRelease = gradle.taskGraph.allTasks.any { requestsProdReleaseArtifact(it.name) }
+    val touchesDev = gradle.taskGraph.allTasks.any { requestsDevArtifact(it.name) }
+    if (!touchesProdRelease && !touchesDev) return@whenReady
     val problems = mutableListOf<String>()
     releaseSigningFailure()?.let { problems += it }
-    if (strictGoogleServerClientId.isBlank()) {
+    if (touchesProdRelease && strictGoogleServerClientId.isBlank()) {
         problems += "Release packaging requires the Web OAuth client ID. Set " +
             "strict.google.serverClientId in gitignored local.properties, or " +
             "STRICT_GOOGLE_SERVER_CLIENT_ID. A release without it cannot sign anyone in. " +
             "Debug builds still compile and fail closed at sign-in. The client ID is not printed."
+    }
+    if (touchesDev && strictDevGoogleServerClientId.isBlank()) {
+        problems += "The DEV application requires a Web OAuth client ID. Set " +
+            "strict.google.serverClientId, or strict.google.serverClientId.dev when the DEV " +
+            "backend uses a different audience. STRICT_GOOGLE_SERVER_CLIENT_ID_DEV is the " +
+            "environment override. The client ID is not printed."
     }
     if (problems.isNotEmpty()) {
         error(problems.joinToString(separator = "\n\n"))

@@ -61,6 +61,7 @@ fun ProInfoContent(
     modifier: Modifier = Modifier,
     feature: AppFeature? = null,
     onDismiss: (() -> Unit)? = null,
+    dismissTextRes: Int = R.string.action_ok,
     showHeading: Boolean = true
 ) {
     val copy = feature.proInfoCopy()
@@ -126,7 +127,7 @@ fun ProInfoContent(
                     .defaultMinSize(minHeight = AppDimens.minTouch)
                     .testTag(PRO_INFO_DISMISS)
             ) {
-                Text(stringResource(R.string.action_ok))
+                Text(stringResource(dismissTextRes))
             }
         }
     }
@@ -173,7 +174,8 @@ fun ProInfoScreen(
 @Composable
 fun ProInfoSheet(
     onDismiss: () -> Unit,
-    feature: AppFeature? = null
+    feature: AppFeature? = null,
+    dismissTextRes: Int = R.string.action_ok
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -184,6 +186,7 @@ fun ProInfoSheet(
         ProInfoContent(
             feature = feature,
             onDismiss = onDismiss,
+            dismissTextRes = dismissTextRes,
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp)

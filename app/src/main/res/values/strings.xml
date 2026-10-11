@@ -106,11 +106,11 @@
     <string name="hero_weekly_average">Weekly average: %1$s</string>
     <string name="change_from_previous_week_value">Compared with last week\'s average: %1$s</string>
     <string name="calendar_title">Calendar</string>
-    <string name="calendar_week_heading">This week · %1$s</string>
     <string name="calendar_show_month">Show month</string>
     <string name="calendar_show_week">Show week</string>
     <string name="calendar_return_today">Today</string>
     <string name="training_title">Training</string>
+    <string name="weekly_goal_header">Weekly Goal</string>
     <string name="weekly_goal_title">Weekly workout goal</string>
     <string name="weekly_goal_not_set">Not set</string>
     <string name="weekly_goal_summary">%1$d workouts per week</string>
@@ -220,7 +220,7 @@
     <string name="help_calendar_title">Calendar and training history</string>
     <string name="help_calendar_body">The Overview calendar marks days with body weight, workouts, and planned workouts. Tap a day to see the details. Completed workouts and weight entries also appear in Journal.</string>
     <string name="help_backup_title">Backup &amp; restore</string>
-    <string name="help_backup_body">In Settings, export a backup of structured training data and progress photos. Health Connect readings are not included. Restore replaces the current data with the file. Older JSON backups restore structured data and leave progress photos already on this device in place. This cannot be undone for the data in the file.</string>
+    <string name="help_backup_body">Android can back up workouts, plans, body data, and appearance and language settings. That backup depends on Android system settings and scheduling, and the latest changes may not be included yet. Cloud backup may not run when the phone cannot encrypt it. Photo files are not included. A saved gallery reference may restore a photo later; otherwise it stays unavailable until you relink it or restore a full ZIP. In Settings, a full ZIP backup includes progress photos. Restoring it replaces the current data. Older JSON backups restore structured data and leave progress photos already on this device in place. Restored data stays signed out until you sign in to Strict. Pro and special status are checked again with the server. A device backup can contain data for more than one Strict account used on that phone. Each account stays separate in the app.</string>
     <string name="help_health_title">Health Connect</string>
     <string name="help_health_body">Health Connect is optional. In Settings, you can allow the app to read recent activity (steps and exercise sessions) and recovery trends (resting heart rate, HRV, and sleep duration). The app does not write those readings, does not upload them, does not save them in its database, and does not include them in backup or export. Only recent days are shown. Turning that access off does not delete workouts or body data stored in the app. The rest of the app works without Health Connect.</string>
     <string name="action_send_feedback">Send feedback</string>
@@ -245,7 +245,7 @@
     <string name="privacy_policy_billing_title">Google Play subscriptions</string>
     <string name="privacy_policy_billing_body">Paid checkout is not offered until Play products are configured and a real purchase has been tested. When a purchase is verified, the server stores the purchase token, a hash of the token, package name, product id, subscription state, expiry, and order id. Deleting a Strict account does not cancel the Google Play subscription. The purchase row is unlinked and marked so another Strict account cannot claim that token. TODO: no retention period has been chosen for the token and order id.</string>
     <string name="privacy_policy_export_title">Backup and restore</string>
-    <string name="privacy_policy_export_body">You can export a backup of structured data and progress photos, and restore a backup you choose. Health Connect readings and the session token are not included. You pick the destination or source file. If you save a file to cloud storage or share it, that copy is outside this app, and Strict does not delete it later. Restore replaces the current data with the backup you select. Older JSON backups leave progress photos already on this device in place. Android cloud backup and device-to-device transfer of this app\'s data are off.</string>
+    <string name="privacy_policy_export_body">You can export a ZIP backup of structured data and progress photos, and restore a backup you choose. Health Connect readings and the session token are not included. You pick the destination or source file. If you save a file to cloud storage or share it, that copy is outside this app, and Strict does not delete it later. Restore replaces the current data with the backup you select. Older JSON backups leave progress photos already on this device in place. Android can also back up workouts, body data, and appearance and language settings when the phone\'s backup settings and schedule allow it. The latest changes may not be backed up yet. Photo files, sign-in sessions, and Pro or special status are not included. A saved gallery reference may allow a photo to be recovered later. Restored data requires Strict sign-in, and those rights are verified separately. A device backup may include data for more than one Strict account used on that phone, and each stays separate in the app. Android does not promise to remove an older cloud copy after you delete an account.</string>
     <string name="privacy_policy_feedback_title">Feedback email</string>
     <string name="privacy_policy_feedback_body">Send feedback opens your email app with a draft addressed to %1$s. The draft includes app version, Android version, and device manufacturer/model. The app does not send the email itself. You decide whether to send it. Anything you send is then handled by your email provider.</string>
     <string name="privacy_policy_deletion_title">Deleting your data</string>
@@ -275,7 +275,7 @@
     <string name="message_updated">Existing measurement updated.</string>
     <string name="message_deleted">Measurement deleted.</string>
     <string name="app_backup_title">Backup</string>
-    <string name="app_backup_body">Back up your Strict data and progress photos to a file.</string>
+    <string name="app_backup_body">Export a full ZIP of your Strict data and progress photos. Android backup, when your phone runs it, does not include photo files.</string>
     <string name="action_export_app_backup">Export backup</string>
     <string name="action_export_app_backup_subtitle">Save your data to a file</string>
     <string name="action_restore_app_backup">Restore backup</string>
@@ -771,6 +771,16 @@
     <string name="progress_photos_adding">Adding photo…</string>
     <string name="progress_photos_open">Open progress photos</string>
     <string name="progress_photos_missing">Photo unavailable</string>
+    <string name="progress_photos_relink">Relink photo</string>
+    <string name="progress_photos_relink_note">Choose a replacement from your gallery. This does not check that it is the original photo.</string>
+    <string name="database_open_title">Account data could not be opened</string>
+    <string name="database_open_migration_failed">The original data is still on this phone. It was not replaced with an empty account.</string>
+    <string name="database_open_newer_schema">This data was written by a newer version of Strict. Update the app. The file was not deleted.</string>
+    <string name="database_open_unreadable">The account database could not be read. It was not replaced with an empty one.</string>
+    <string name="database_migration_other_title">Some account data was not moved</string>
+    <string name="database_migration_other_body">Data for another Strict account on this phone could not be prepared for backup. The original files were kept.</string>
+    <string name="database_migration_retry">Try again</string>
+    <string name="database_migration_dismiss">Not now</string>
     <string name="progress_photos_unreadable">That photo could not be read.</string>
     <string name="progress_photos_compare">Compare</string>
     <string name="progress_photos_compare_hint">Select two photos</string>
@@ -1048,7 +1058,7 @@
     <string name="delete_account_title">Delete account</string>
     <string name="delete_account_intro">This deletes the Strict account on the server.</string>
     <string name="delete_account_founder">Founder status and promotional grants for this account will be lost.</string>
-    <string name="delete_account_local">Workout history, measurements, goals, and achievements stored for this account on this phone will be removed.</string>
+    <string name="delete_account_local">Workout history, measurements, goals, and achievements stored for this account on this phone will be removed. An older Android backup or a ZIP you already exported may still contain a copy. Strict cannot delete those copies.</string>
     <string name="delete_account_photos">Progress photos for this account on this phone will be removed. A ZIP backup you already exported stays where you saved it. Strict cannot delete that file.</string>
     <string name="delete_account_subscription">A Google Play subscription is not cancelled by deleting the account. Manage billing in Google Play. A purchase is not moved to a new Strict account.</string>
     <string name="delete_account_subscription_known">A paid subscription is known for this account. Deleting the account does not cancel it.</string>
@@ -1113,7 +1123,7 @@
     <string name="pro_info_external_workouts_import">External workout import on Pro</string>
     <string name="pro_info_external_workouts_existing">Workouts already imported stay in your history</string>
     <string name="pro_info_progress_photos_title">Progress photos</string>
-    <string name="pro_info_progress_photos_body">Keep private photos on this device and compare two of them side by side. Photos are not analyzed, scored, or uploaded.</string>
+    <string name="pro_info_progress_photos_body">Adding new progress photos requires Pro. Photos you already saved stay available to view, and you can relink a missing photo. Photos stay on this device and are not analyzed, scored, or uploaded.</string>
     <string name="pro_info_progress_photos_compare">Compare two photos you choose</string>
     <string name="pro_info_progress_photos_private">Photos stay on this device</string>
     <string name="pro_info_progress_photos_existing_stay">Photos you already saved stay available</string>

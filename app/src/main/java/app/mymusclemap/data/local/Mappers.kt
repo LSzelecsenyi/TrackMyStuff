@@ -33,6 +33,8 @@ fun ProgressPhotoEntity.toModel(): ProgressPhoto {
         date = LocalDate.parse(date),
         fileName = fileName,
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        sourceUri = sourceUri,
+        sourceFingerprint = sourceFingerprint
     )
 }

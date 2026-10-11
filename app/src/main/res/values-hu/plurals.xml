@@ -12,6 +12,10 @@
         <item quantity="one">%d hetes széria</item>
         <item quantity="other">%d hetes széria</item>
     </plurals>
+    <plurals name="weekly_goal_header_streak">
+        <item quantity="one">Heti cél · %d hetes sorozat</item>
+        <item quantity="other">Heti cél · %d hetes sorozat</item>
+    </plurals>
     <plurals name="weekly_overview_workouts">
         <item quantity="one">%d edzés</item>
         <item quantity="other">%d edzés</item>

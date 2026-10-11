@@ -744,6 +744,13 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
     }
 }
 
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `progress_photos` ADD COLUMN `sourceUri` TEXT")
+        db.execSQL("ALTER TABLE `progress_photos` ADD COLUMN `sourceFingerprint` TEXT")
+    }
+}
+
 val MIGRATION_13_14 = object : Migration(13, 14) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

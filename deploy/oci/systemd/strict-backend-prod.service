@@ -1,0 +1,23 @@
+[Unit]
+Description=Strict backend (PROD)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+WorkingDirectory=/opt/strict/prod
+Environment=SERVER_ADDRESS=127.0.0.1
+Environment=SERVER_PORT=8082
+EnvironmentFile=/etc/strict/strict-backend-prod.env
+ExecStart=/usr/bin/java -jar /opt/strict/prod/strict-backend.jar
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+NoNewPrivileges=true
+MemoryMax=768M
+MemoryHigh=640M
+
+[Install]
+WantedBy=multi-user.target

@@ -11,9 +11,13 @@ package app.mymusclemap.data.auth
  *
  * An emulator can instead set `strict.api.baseUrl=http://10.0.2.2:8082` in `local.properties`.
  * That alias is emulator-only. A USB phone should use `adb reverse` and the loopback default.
+ *
+ * The side-by-side DEV application (`applicationId` `com.strictworkout.app.dev`) uses [DEVELOPMENT].
+ * Debug installs stay `com.strictworkout.app.debug` and keep the loopback default.
  */
 object StrictBackendUrls {
     const val PRODUCTION = "https://api.strictworkout.eu"
+    const val DEVELOPMENT = "https://api-dev.strictworkout.eu"
     const val DEBUG_LOOPBACK = "http://127.0.0.1:8082"
 
     fun requireReleaseUrl(url: String) {

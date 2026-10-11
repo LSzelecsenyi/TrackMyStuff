@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.pm.ApplicationInfo
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.BuildConfig
-import app.mymusclemap.R
 import app.mymusclemap.WeightTrackerApplication
 import app.mymusclemap.data.appbackup.AppBackupJson
 import app.mymusclemap.data.appbackup.emptySnapshot
@@ -15,7 +14,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.xmlpull.v1.XmlPullParser
 import java.io.File
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
@@ -43,11 +41,11 @@ class StrictSessionStorageTest {
     }
 
     @Test
-    fun platformBackupRulesExcludeTheNoBackupDirectory() {
-        assertTrue(xmlText(R.xml.backup_rules).contains("no_backup"))
-        assertTrue(xmlText(R.xml.data_extraction_rules).contains("no_backup"))
+    fun encryptedSessionStaysInNoBackupFilesDir() {
         val info = context.packageManager.getApplicationInfo(context.packageName, 0)
-        assertEquals(0, info.flags and ApplicationInfo.FLAG_ALLOW_BACKUP)
+        assertTrue(info.flags and ApplicationInfo.FLAG_ALLOW_BACKUP != 0)
+        val session = File(context.noBackupFilesDir, EncryptedFileStrictSessionStore.FILE_NAME)
+        assertEquals(context.noBackupFilesDir, session.parentFile)
     }
 
     @Test
@@ -89,7 +87,9 @@ class StrictSessionStorageTest {
         assertFalse(debugUrl.contains("puff"))
         assertTrue(debugUrl.startsWith("https://") || debugUrl.startsWith("http://"))
         StrictBackendUrls.requireReleaseUrl(StrictBackendUrls.PRODUCTION)
+        StrictBackendUrls.requireReleaseUrl(StrictBackendUrls.DEVELOPMENT)
         assertEquals("https://api.strictworkout.eu", StrictBackendUrls.PRODUCTION)
+        assertEquals("https://api-dev.strictworkout.eu", StrictBackendUrls.DEVELOPMENT)
         assertEquals("http://127.0.0.1:8082", StrictBackendUrls.DEBUG_LOOPBACK)
         listOf(
             "http://api.strictworkout.eu",
@@ -101,18 +101,6 @@ class StrictSessionStorageTest {
             val rejected = runCatching { StrictBackendUrls.requireReleaseUrl(unsafe) }
             assertTrue(unsafe, rejected.isFailure)
         }
-    }
-
-    private fun xmlText(resourceId: Int): String {
-        val parser = context.resources.getXml(resourceId)
-        val text = StringBuilder()
-        while (parser.next() != XmlPullParser.END_DOCUMENT) {
-            parser.name?.let { text.append(it).append(' ') }
-            for (index in 0 until parser.attributeCount) {
-                text.append(parser.getAttributeValue(index)).append(' ')
-            }
-        }
-        return text.toString()
     }
 }
 

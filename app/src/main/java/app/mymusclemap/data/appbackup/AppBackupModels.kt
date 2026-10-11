@@ -36,6 +36,8 @@ object AppBackupFormat {
     const val ARCHIVE_ACHIEVEMENT_SCHEMA_VERSION = 10
     /** Structured JSON stored inside a photo archive. Not accepted as a loose JSON file. */
     const val ARCHIVE_DATA_SCHEMA_VERSION = 11
+    /** Optional progress-photo gallery URI and original-byte fingerprint. Older archives still restore. */
+    const val ARCHIVE_PHOTO_SOURCE_SCHEMA_VERSION = 12
     const val CONTAINER_VERSION = 1
     const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024

@@ -5,8 +5,14 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import app.mymusclemap.data.account.AccountDirectory
+import app.mymusclemap.data.account.AccountLocalDataEraser
 import app.mymusclemap.data.auth.SignInCoordinator
 import app.mymusclemap.data.auth.StoredStrictSession
+import app.mymusclemap.data.founder.FounderWorkoutOutbox
+import app.mymusclemap.data.founder.FounderWorkoutSyncScheduler
+import app.mymusclemap.data.local.AccountDatabaseMigrator
+import app.mymusclemap.data.local.DatabaseOpenProblem
+import app.mymusclemap.data.local.databaseOpenProblemFor
 import app.mymusclemap.data.preferences.LanguagePreferences
 import app.mymusclemap.domain.locale.AppLanguage
 import app.mymusclemap.domain.locale.AppLanguageApplicator
@@ -14,10 +20,12 @@ import app.mymusclemap.domain.locale.AppLanguagePolicy
 import app.mymusclemap.domain.locale.SystemLanguage
 import kotlinx.coroutines.runBlocking
 import app.mymusclemap.domain.account.AppAuthState
+import app.mymusclemap.domain.account.accountDatabaseName
 import app.mymusclemap.domain.account.resolveAppAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -39,6 +47,9 @@ class WeightTrackerApplication : Application() {
     var resolvedLanguage: AppLanguage = AppLanguage.EN
         private set
 
+    val databaseOpenProblem = MutableStateFlow<DatabaseOpenProblem?>(null)
+    val inactiveMigrationFailures = MutableStateFlow<List<String>>(emptyList())
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -50,6 +61,8 @@ class WeightTrackerApplication : Application() {
         resumePendingLocalDeletion()
         if (startupDecision().state == AppAuthState.AUTHENTICATED) {
             openSignedInContainer()
+        } else {
+            inactiveMigrationFailures.value = AccountDatabaseMigrator(this).migrateAll().map { it.fileName }
         }
     }
 
@@ -77,7 +90,24 @@ class WeightTrackerApplication : Application() {
         if (container != null) {
             return
         }
-        val opened = AppContainer(this, userId)
+        val fileName = accountDatabaseName(userId)
+        val failures = AccountDatabaseMigrator(this).migrateAll()
+        inactiveMigrationFailures.value = failures.filter { it.fileName != fileName }.map { it.fileName }
+        if (failures.any { it.fileName == fileName }) {
+            databaseOpenProblem.value = DatabaseOpenProblem.MigrationFailed
+            return
+        }
+        val opened = try {
+            AppContainer(this, userId)
+        } catch (error: Throwable) {
+            val problem = databaseOpenProblemFor(error)
+            if (problem == null) {
+                throw error
+            }
+            databaseOpenProblem.value = problem
+            return
+        }
+        databaseOpenProblem.value = null
         container = opened
         opened.activeWorkoutNotifications.start()
         applicationScope.launch {
@@ -92,6 +122,14 @@ class WeightTrackerApplication : Application() {
             opened.entitlementRevisions.drop(1).collect {
                 opened.achievementRepository.reconcile()
             }
+        }
+    }
+
+    fun retryDatabaseOpen() {
+        databaseOpenProblem.value = null
+        openSignedInContainer()
+        if (container != null) {
+            restartProcess()
         }
     }
 
@@ -116,8 +154,9 @@ class WeightTrackerApplication : Application() {
     }
 
     fun retryPendingLocalDeletion(): Boolean {
-        val eraser = app.mymusclemap.data.account.AccountLocalDataEraser(this)
+        val eraser = AccountLocalDataEraser(this)
         val pending = eraser.pendingUserId() ?: return true
+        dropFounderQueue(pending)
         val erased = eraser.erase(pending)
         if (erased) {
             eraser.clearPending()
@@ -126,21 +165,22 @@ class WeightTrackerApplication : Application() {
     }
 
     fun pendingLocalDeletion(): Boolean {
-        return app.mymusclemap.data.account.AccountLocalDataEraser(this).pendingUserId() != null
+        return AccountLocalDataEraser(this).pendingUserId() != null
     }
 
     private fun resumePendingLocalDeletion() {
-        val eraser = app.mymusclemap.data.account.AccountLocalDataEraser(this)
+        val eraser = AccountLocalDataEraser(this)
         val pending = eraser.pendingUserId() ?: return
         signIn.clearLocalSession()
         accounts.detach(pending)
+        dropFounderQueue(pending)
         if (eraser.erase(pending)) {
             eraser.clearPending()
         }
     }
 
     private suspend fun finishLocalDeletion(userId: String): Boolean {
-        val eraser = app.mymusclemap.data.account.AccountLocalDataEraser(this)
+        val eraser = AccountLocalDataEraser(this)
         if (!eraser.markPending(userId)) {
             return false
         }
@@ -148,7 +188,13 @@ class WeightTrackerApplication : Application() {
         container?.founderApprovalCelebrations?.forget(userId)
         signIn.clearLocalSession()
         accounts.detach(userId)
+        dropFounderQueue(userId)
         return eraser.erase(userId)
+    }
+
+    private fun dropFounderQueue(userId: String) {
+        runBlocking { FounderWorkoutOutbox(this@WeightTrackerApplication).removeForUser(userId) }
+        FounderWorkoutSyncScheduler.cancel(this)
     }
 
     private fun session(): StoredStrictSession? = signIn.auth.storedSession()

@@ -139,13 +139,84 @@ class ProgressPhotoRepositoryTest {
         assertEquals(4, ProgressPhotoProcessor.sampleSize(64, 32, 16))
     }
 
-    private fun repository(database: WeightDatabase, directory: File): ProgressPhotoRepository {
+    @Test
+    fun verifiedGalleryBytesRecreateAMissingPhotoAndAMismatchDoesNot() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val database = database(context)
+        val directory = directory(context, "recover")
+        val original = jpeg(12, 8)
+        val changed = jpeg(4, 4)
+        try {
+            val matching = repository(database, directory) { original.inputStream() }
+            val saved = matching.import(original.inputStream(), today, "content://gallery/1") as ProgressPhotoImportResult.Saved
+            assertTrue(saved.photo.sourceFingerprint.orEmpty().isNotBlank())
+            assertEquals("content://gallery/1", saved.photo.sourceUri)
+            assertTrue(File(directory, saved.photo.fileName).delete())
+            assertFalse(matching.isAvailable(saved.photo.fileName))
+            assertTrue(matching.recoverOriginal(saved.photo.id))
+            assertTrue(matching.isAvailable(saved.photo.fileName))
+
+            assertTrue(File(directory, saved.photo.fileName).delete())
+            val mismatch = repository(database, directory) { changed.inputStream() }
+            assertFalse(mismatch.recoverOriginal(saved.photo.id))
+            assertFalse(mismatch.isAvailable(saved.photo.fileName))
+            assertEquals(1, matching.observeAll().first().size)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun relinkKeepsTheRowAndAFailureDoesNotReplaceIt() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val database = database(context)
+        val directory = directory(context, "relink")
+        try {
+            val repository = repository(database, directory)
+            val saved = repository.import(jpeg(8, 8).inputStream(), today) as ProgressPhotoImportResult.Saved
+            assertTrue(repository.relink(saved.photo.id, UnreadableStream(), "content://new") is ProgressPhotoImportResult.Unreadable)
+            val intact = repository.observeAll().first().single()
+            assertEquals(saved.photo.id, intact.id)
+            assertEquals(saved.photo.date, intact.date)
+            assertEquals(saved.photo.createdAt, intact.createdAt)
+            assertNull(intact.sourceUri)
+            assertTrue(File(directory, saved.photo.fileName).isFile)
+
+            val later = Clock.fixed(Instant.parse("2026-09-27T09:00:00Z"), ZoneOffset.UTC)
+            val relinking = ProgressPhotoRepository(
+                dao = database.progressPhotoDao(),
+                store = ProgressPhotoStore(directory),
+                clock = later,
+                dateProvider = dateProvider,
+                maxEdge = 32
+            )
+            val replaced = relinking.relink(saved.photo.id, jpeg(10, 10).inputStream(), "content://gallery/2")
+                as ProgressPhotoImportResult.Saved
+            assertEquals(saved.photo.id, replaced.photo.id)
+            assertEquals(saved.photo.date, replaced.photo.date)
+            assertEquals(saved.photo.createdAt, replaced.photo.createdAt)
+            assertEquals(later.millis(), replaced.photo.updatedAt)
+            assertEquals("content://gallery/2", replaced.photo.sourceUri)
+            assertTrue(replaced.photo.sourceFingerprint.orEmpty().isNotBlank())
+            assertEquals(1, repository.observeAll().first().size)
+            assertTrue(File(directory, saved.photo.fileName).isFile)
+        } finally {
+            database.close()
+        }
+    }
+
+    private fun repository(
+        database: WeightDatabase,
+        directory: File,
+        openOriginal: (String) -> InputStream? = { null }
+    ): ProgressPhotoRepository {
         return ProgressPhotoRepository(
             dao = database.progressPhotoDao(),
             store = ProgressPhotoStore(directory),
             clock = clock,
             dateProvider = dateProvider,
-            maxEdge = 32
+            maxEdge = 32,
+            openOriginal = openOriginal
         )
     }
 
@@ -178,6 +249,12 @@ class ProgressPhotoRepositoryTest {
         override suspend fun insert(entity: ProgressPhotoEntity): Long {
             throw IllegalStateException("insert failed")
         }
+        override suspend fun updateSource(
+            id: Long,
+            sourceUri: String?,
+            sourceFingerprint: String?,
+            updatedAt: Long
+        ) = Unit
         override suspend fun deleteById(id: Long) = Unit
     }
 

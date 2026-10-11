@@ -1,0 +1,16 @@
+[Unit]
+Description=Strict DEV Cloudflare Tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=opc
+Group=opc
+ExecStart=/usr/bin/cloudflared --config /etc/strict/cloudflared/config.yml tunnel run
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

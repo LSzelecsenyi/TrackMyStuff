@@ -1,6 +1,7 @@
 package app.mymusclemap.data.local
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -26,7 +27,7 @@ import androidx.room.RoomDatabase
         AchievementStateEntity::class,
         TargetWeightGoalEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
@@ -43,12 +44,30 @@ abstract class WeightDatabase : RoomDatabase() {
     abstract fun targetWeightGoalDao(): TargetWeightGoalDao
 
     companion object {
-        fun create(context: Context, name: String = "weight_tracker.db"): WeightDatabase {
-            return Room.databaseBuilder(
-                context.applicationContext,
-                WeightDatabase::class.java,
+        fun create(
+            context: Context,
+            name: String = "weight_tracker.db",
+            allowMainThreadQueries: Boolean = false
+        ): WeightDatabase {
+            val appContext = context.applicationContext
+            val location = if (AccountDatabaseLocation.isAccountDatabase(name)) {
+                AccountDatabaseMigrator(appContext).migrateNamed(name)
+                val file = AccountDatabaseLocation.accountFile(appContext, name)
+                file.parentFile?.mkdirs()
+                if (!file.exists()) {
+                    // SQLiteOpenHelper will not create a database whose absolute path is outside
+                    // the databases directory on every runtime. Create the empty file first.
+                    SQLiteDatabase.openOrCreateDatabase(file, null).close()
+                }
+                file.absolutePath
+            } else {
                 name
-            )
+            }
+            val builder = Room.databaseBuilder(appContext, WeightDatabase::class.java, location)
+            if (allowMainThreadQueries) {
+                builder.allowMainThreadQueries()
+            }
+            return builder
                 .addMigrations(
                     MIGRATION_1_2,
                     MIGRATION_2_3,
@@ -63,7 +82,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
-                    MIGRATION_14_15
+                    MIGRATION_14_15,
+                    MIGRATION_15_16
                 )
                 .build()
         }

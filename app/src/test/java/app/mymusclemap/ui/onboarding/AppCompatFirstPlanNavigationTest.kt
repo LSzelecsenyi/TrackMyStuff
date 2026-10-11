@@ -23,7 +23,6 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigationevent.findViewTreeNavigationEventDispatcherOwner
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.MainActivity
 import app.mymusclemap.WeightViewModelFactory
@@ -174,7 +173,7 @@ class AppCompatFirstPlanNavigationTest {
     }
 
     @Test
-    fun freshInstallShowsSignInAndInstallsTheNavigationDispatcher() {
+    fun freshInstallShowsSignIn() {
         val activity = composeRule.activity
         assertSame(activity, activity.window.decorView.findViewTreeNavigationEventDispatcherOwner())
         composeRule.onNodeWithTag(WELCOME_ROOT).assertIsDisplayed()
@@ -188,7 +187,14 @@ class AppCompatFirstPlanNavigationTest {
         assertEquals(AppAuthState.AUTHENTICATED, signedIn.state)
         assertEquals(0, runBlocking { database.exerciseDao().countAll() })
         assertEquals(0, runBlocking { database.workoutTemplateDao().countAll() })
-        assertEquals(accountDatabaseName(userA), database.openHelper.databaseName)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        assertEquals(
+            app.mymusclemap.data.local.AccountDatabaseLocation.accountFile(
+                context,
+                accountDatabaseName(userA)
+            ).absolutePath,
+            database.openHelper.databaseName
+        )
         assertEquals(FirstRunDecision.ShowOnboarding, runBlocking { coordinator.prepare() })
         assertTrue(runBlocking { database.exerciseDao().countAll() } > 0)
         assertEquals(0, runBlocking { database.workoutTemplateDao().countAll() })
@@ -407,19 +413,24 @@ class AppCompatFirstPlanNavigationTest {
     }
 
     private fun openAccountDatabase(context: Context, userId: String): WeightDatabase {
-        return Room.databaseBuilder(
+        return WeightDatabase.create(
             context,
-            WeightDatabase::class.java,
-            accountDatabaseName(userId)
+            accountDatabaseName(userId),
+            allowMainThreadQueries = true
         )
-            .allowMainThreadQueries()
-            .build()
     }
 
     private fun deleteAccountDatabase(context: Context, userId: String) {
-        val path = context.getDatabasePath(accountDatabaseName(userId))
-        path.delete()
-        File("${path.path}-wal").delete()
-        File("${path.path}-shm").delete()
+        listOf(
+            context.getDatabasePath(accountDatabaseName(userId)),
+            app.mymusclemap.data.local.AccountDatabaseLocation.accountFile(
+                context,
+                accountDatabaseName(userId)
+            )
+        ).forEach { path ->
+            path.delete()
+            File("${path.path}-wal").delete()
+            File("${path.path}-shm").delete()
+        }
     }
 }

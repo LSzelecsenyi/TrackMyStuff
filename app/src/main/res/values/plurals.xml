@@ -12,6 +12,10 @@
         <item quantity="one">%d week streak</item>
         <item quantity="other">%d week streak</item>
     </plurals>
+    <plurals name="weekly_goal_header_streak">
+        <item quantity="one">Weekly Goal · %d-week streak</item>
+        <item quantity="other">Weekly Goal · %d-week streak</item>
+    </plurals>
     <plurals name="weekly_overview_workouts">
         <item quantity="one">%d workout</item>
         <item quantity="other">%d workouts</item>

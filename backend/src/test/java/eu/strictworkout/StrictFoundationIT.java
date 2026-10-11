@@ -85,6 +85,7 @@ class StrictFoundationIT {
                 String.class
         );
         assertEquals(List.of(
+                "account_deletion_marker",
                 "account_status_grant",
                 "admin_session",
                 "admin_user",

@@ -946,16 +946,18 @@ fun WeightTrackerNavHost(
                         state = photos,
                         onBack = { navController.popBackStack() },
                         onAdd = photosViewModel::requestAdd,
+                        onRelink = photosViewModel::requestRelink,
                         onConsumeLaunchPicker = photosViewModel::consumeLaunchPicker,
                         onPicked = { uri ->
                             if (uri == null) {
                                 photosViewModel.onPickerCancelled()
                             } else {
+                                app.mymusclemap.data.progress.GalleryUriAccess.retain(context, uri)
                                 val stream = context.contentResolver.openInputStream(uri)
                                 if (stream == null) {
-                                    photosViewModel.import(java.io.ByteArrayInputStream(byteArrayOf()))
+                                    photosViewModel.import(java.io.ByteArrayInputStream(byteArrayOf()), uri.toString())
                                 } else {
-                                    photosViewModel.import(stream)
+                                    photosViewModel.import(stream, uri.toString())
                                 }
                             }
                         },

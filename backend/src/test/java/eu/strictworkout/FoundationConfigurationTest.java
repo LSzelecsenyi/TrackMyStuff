@@ -38,6 +38,18 @@ class FoundationConfigurationTest {
         assertTrue(prod.contains("${STRICT_GOOGLE_CLIENT_ID}"));
         assertFalse(prod.contains("${STRICT_GOOGLE_CLIENT_ID:"));
         assertTrue(local.contains("session-lifetime: ${STRICT_AUTH_SESSION_LIFETIME:30d}"));
+
+        String dev = resource("application-dev.yml");
+        assertFalse(dev.contains("puff"));
+        assertFalse(dev.contains("localhost"));
+        assertFalse(dev.contains("127.0.0.1"));
+        assertTrue(dev.contains("${SPRING_DATASOURCE_URL}"));
+        assertFalse(dev.contains("${SPRING_DATASOURCE_URL:"));
+        assertFalse(dev.contains("${SPRING_DATASOURCE_PASSWORD:"));
+        assertTrue(dev.contains("${STRICT_GOOGLE_CLIENT_ID}"));
+        assertFalse(dev.contains("${STRICT_GOOGLE_CLIENT_ID:"));
+        assertTrue(dev.contains("com.strictworkout.app.dev"));
+        assertTrue(dev.contains("rules: ${STRICT_FOUNDER_RULES:production}"));
     }
 
     private static String resource(String name) throws IOException {

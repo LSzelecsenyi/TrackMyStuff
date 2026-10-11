@@ -9,10 +9,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import app.mymusclemap.R
+import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.testString
 import app.mymusclemap.ui.pro.PRO_BADGE
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -49,8 +51,39 @@ class ProgressPhotosScreenLayoutTest {
             }
         }
         composeRule.onNodeWithText(testString(R.string.progress_photos_empty)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.progress_photos_add)).performClick()
         assertTrue(added)
+    }
+
+    @Test
+    fun freeAddExplainsThatNewPhotosRequireProAndDismissesWithGotIt() {
+        composeRule.setContent {
+            WeightTrackerThemeForPreview {
+                ProgressPhotosScreen(
+                    state = ProgressPhotosUiState(
+                        canAdd = false,
+                        showProBadge = true,
+                        loaded = true,
+                        lockedFeature = AppFeature.ProgressPhotos
+                    ),
+                    onBack = {},
+                    onAdd = {},
+                    onConsumeLaunchPicker = {},
+                    onPicked = {},
+                    onOpenPhoto = {},
+                    onBeginCompare = {},
+                    onToggleCompare = {},
+                    onCancelCompare = {},
+                    onShowCompare = { _, _ -> },
+                    onDismissLocked = {},
+                    decode = { _, _ -> null }
+                )
+            }
+        }
+        composeRule.onNodeWithText(testString(R.string.pro_info_progress_photos_body)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.onboarding_got_it)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_ok)).assertDoesNotExist()
     }
 
     @Test
@@ -102,6 +135,7 @@ class ProgressPhotosScreenLayoutTest {
                 )
             }
         }
+        composeRule.onNodeWithTag(PRO_BADGE, useUnmergedTree = true).assertDoesNotExist()
         assertEquals(2, composeRule.onAllNodesWithText("Sep 27").fetchSemanticsNodes().size)
         composeRule.onNodeWithText(testString(R.string.progress_photos_missing)).assertIsDisplayed()
         composeRule.onNodeWithTag(PROGRESS_PHOTO_CELL + 2).performClick()
@@ -183,5 +217,39 @@ class ProgressPhotosScreenLayoutTest {
         composeRule.onNodeWithText("Sep 27").assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.progress_photos_missing)).assertIsDisplayed()
         composeRule.onNodeWithTag(PROGRESS_PHOTO_COMPARE_SCREEN).assertIsDisplayed()
+    }
+
+    @Test
+    fun freeMissingPhotoOffersRelinkWithoutAddingAPhoto() {
+        var relinked: Long? = null
+        var added = false
+        composeRule.setContent {
+            WeightTrackerThemeForPreview {
+                ProgressPhotosScreen(
+                    state = ProgressPhotosUiState(
+                        photos = listOf(ProgressPhotoListItem(4, today, "gone.jpg", missing = true)),
+                        canAdd = false,
+                        showProBadge = true,
+                        loaded = true
+                    ),
+                    onBack = {},
+                    onAdd = { added = true },
+                    onRelink = { relinked = it },
+                    onConsumeLaunchPicker = {},
+                    onPicked = {},
+                    onOpenPhoto = {},
+                    onBeginCompare = {},
+                    onToggleCompare = {},
+                    onCancelCompare = {},
+                    onShowCompare = { _, _ -> },
+                    onDismissLocked = {}
+                )
+            }
+        }
+        composeRule.onNodeWithText(testString(R.string.progress_photos_missing)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_relink)).performClick()
+        composeRule.onNodeWithText(testString(R.string.progress_photos_relink_note)).assertIsDisplayed()
+        assertEquals(4L, relinked)
+        assertFalse(added)
     }
 }

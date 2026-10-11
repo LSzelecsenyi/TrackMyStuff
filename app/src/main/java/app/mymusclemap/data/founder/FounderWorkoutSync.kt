@@ -36,6 +36,8 @@ class FounderWorkoutSync(
     private val submit: suspend (PendingFounderWorkout) -> FounderWorkoutSubmission,
     private val onAccepted: suspend (BackendFounderSnapshot) -> Unit,
     private val onUnauthenticated: suspend () -> Unit,
+    private val ownerUserId: () -> String,
+    private val sessionUserId: () -> String?,
     private val schedule: () -> Unit = {}
 ) {
     suspend fun onNativeWorkoutCompleted(clientWorkoutId: String) {
@@ -50,20 +52,36 @@ class FounderWorkoutSync(
         if (runCatching { LocalDate.parse(workout.localDate) }.isFailure) {
             return
         }
+        val owner = ownerUserId().trim()
+        if (owner.isEmpty()) {
+            return
+        }
         outbox.enqueue(
             PendingFounderWorkout(
                 clientWorkoutId = workout.clientWorkoutId,
                 completedAtEpochMilli = workout.completedAtEpochMilli,
                 localDate = workout.localDate,
-                observation = workout.observation
+                observation = workout.observation,
+                ownerUserId = owner
             )
         )
         schedule()
     }
 
     suspend fun flush(): FounderWorkoutFlush {
+        outbox.quarantineUnowned()
+        val account = ownerUserId().trim()
+        if (account.isEmpty()) {
+            return FounderWorkoutFlush.Done
+        }
         while (true) {
-            val event = outbox.pending().firstOrNull() ?: return FounderWorkoutFlush.Done
+            if (sessionUserId() != account) {
+                return FounderWorkoutFlush.Done
+            }
+            val event = outbox.pendingFor(account).firstOrNull() ?: return FounderWorkoutFlush.Done
+            if (sessionUserId() != account || event.ownerUserId != account) {
+                return FounderWorkoutFlush.Done
+            }
             when (val result = submit(event)) {
                 is FounderWorkoutSubmission.Accepted -> {
                     onAccepted(result.snapshot)

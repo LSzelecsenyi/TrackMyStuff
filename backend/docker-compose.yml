@@ -1,3 +1,5 @@
+# Local PostgreSQL only. Do not start this file on the OCI VM.
+# OCI uses deploy/oci/docker-compose.postgres.yml on 127.0.0.1:5434.
 name: strict
 
 services:

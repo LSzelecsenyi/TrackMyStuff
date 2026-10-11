@@ -1,17 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Used on Android 11 and lower. allowBackup=false already turns Auto Backup
-  off; these excludes keep user data out if a device still consults the rules.
+  Android 8–11 full-backup rules. Only account user-data databases and the
+  appearance/settings plus language files are included.
+  Android 8 (API 26–27) ignores requireFlags, so encrypted cloud backup cannot
+  be required there.
+  Android 9–11 honor requireFlags="clientSideEncryption". If the transport
+  cannot encrypt, these includes are skipped and this app stores nothing.
+  The platform already excludes noBackupFilesDir. That directory is not a domain.
 -->
 <full-backup-content>
-    <exclude domain="root" path="." />
-    <exclude domain="file" path="." />
-    <exclude domain="database" path="." />
-    <exclude domain="sharedpref" path="." />
-    <exclude domain="external" path="." />
-    <exclude domain="device_root" path="." />
-    <exclude domain="device_file" path="." />
-    <exclude domain="device_database" path="." />
-    <exclude domain="device_sharedpref" path="." />
-    <exclude domain="root" path="no_backup" />
+    <include
+        domain="file"
+        path="strict_user_data"
+        requireFlags="clientSideEncryption" />
+    <include
+        domain="file"
+        path="datastore/weight_tracker_settings.preferences_pb"
+        requireFlags="clientSideEncryption" />
+    <include
+        domain="file"
+        path="datastore/app_language.preferences_pb"
+        requireFlags="clientSideEncryption" />
 </full-backup-content>

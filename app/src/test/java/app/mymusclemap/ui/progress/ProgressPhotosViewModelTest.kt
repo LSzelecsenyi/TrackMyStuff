@@ -126,6 +126,45 @@ class ProgressPhotosViewModelTest {
         }
     }
 
+    @Test
+    fun freeRelinkKeepsTheSameRowAndDate() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val database = database(context)
+        val directory = directory(context)
+        try {
+            val repository = repository(database, directory)
+            val entitled = viewModel(repository, SelectiveFeatureEntitlements(setOf(AppFeature.ProgressPhotos)))
+            entitled.uiState.first { it.loaded }
+            entitled.import(jpeg().inputStream())
+            val saved = entitled.uiState.first { it.photos.size == 1 }.photos.single()
+            val createdAt = repository.observeAll().first().single().createdAt
+            val storedFile = File(directory, saved.fileName)
+            assertTrue(storedFile.isFile)
+            val aside = File(directory, "aside.bin")
+            assertTrue(storedFile.renameTo(aside) || storedFile.delete())
+
+            val free = viewModel(repository, SelectiveFeatureEntitlements(emptySet()))
+            val missing = free.uiState.first { it.loaded && it.photos.single().missing }
+            assertFalse(missing.canAdd)
+            free.requestRelink(saved.id)
+            assertTrue(free.uiState.value.launchPicker)
+            assertNull(free.uiState.value.lockedFeature)
+            free.consumeLaunchPicker()
+            free.import(jpeg().inputStream(), "content://gallery/relink")
+            val restored = free.uiState.first { it.photos.single().missing.not() }
+            assertEquals(1, restored.photos.size)
+            assertEquals(saved.id, restored.photos.single().id)
+            assertEquals(saved.date, restored.photos.single().date)
+            val stored = repository.observeAll().first().single()
+            assertEquals(saved.id, stored.id)
+            assertEquals(saved.date, stored.date)
+            assertEquals(createdAt, stored.createdAt)
+            assertEquals("content://gallery/relink", stored.sourceUri)
+        } finally {
+            database.close()
+        }
+    }
+
     private fun viewModel(
         repository: ProgressPhotoRepository,
         entitlements: SelectiveFeatureEntitlements

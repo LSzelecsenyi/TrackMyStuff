@@ -51,6 +51,48 @@ class ProgressPhotoStore(
         return File(parent, "${directory.name}_restore_marker.json")
     }
 
+    /**
+     * Replaces the private JPEG. The previous file is kept aside until [discardBackup]
+     * or put back by [rollback].
+     */
+    fun replace(fileName: String, incoming: File): Boolean {
+        val target = resolve(fileName) ?: return false
+        prepare()
+        val backup = backupFile(fileName) ?: return false
+        backup.delete()
+        val hadTarget = target.isFile
+        if (hadTarget && !target.renameTo(backup)) {
+            return false
+        }
+        if (!incoming.renameTo(target)) {
+            if (hadTarget) {
+                backup.renameTo(target)
+            }
+            return false
+        }
+        return target.isFile
+    }
+
+    fun rollback(fileName: String) {
+        val target = resolve(fileName) ?: return
+        val backup = backupFile(fileName) ?: return
+        if (backup.isFile) {
+            target.delete()
+            backup.renameTo(target)
+        } else {
+            target.delete()
+        }
+    }
+
+    fun discardBackup(fileName: String) {
+        backupFile(fileName)?.delete()
+    }
+
+    private fun backupFile(fileName: String): File? {
+        val target = resolve(fileName) ?: return null
+        return File(target.parentFile, "$fileName.bak")
+    }
+
     fun copyFrom(fileName: String, source: File): Boolean {
         val target = resolve(fileName) ?: return false
         if (source.canonicalFile == target.canonicalFile) return true

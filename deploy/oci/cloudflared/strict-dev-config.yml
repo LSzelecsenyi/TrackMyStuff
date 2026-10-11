@@ -1,0 +1,12 @@
+# Optional second tunnel. Use this only when a separate cloudflared process is wanted.
+# Do not replace /etc/cloudflared/config.yml and do not run `cloudflared service install`.
+# That command rewrites the existing system unit and can disconnect PUFF.
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /etc/strict/cloudflared/strict-dev.json
+
+ingress:
+  - hostname: admin-dev.strictworkout.eu
+    service: http://127.0.0.1:80
+  - hostname: api-dev.strictworkout.eu
+    service: http://127.0.0.1:8083
+  - service: http_status:404

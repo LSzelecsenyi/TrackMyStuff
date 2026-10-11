@@ -28,7 +28,7 @@ describe('Admin shell', () => {
 
   it('shows the wordmark and one section', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.wordmark')?.textContent).toBe('Strict');
+    expect(compiled.querySelector('.brand-mark')?.getAttribute('alt')).toBe('Strict');
     expect(compiled.querySelector('.admin-label')?.textContent).toBe('Admin');
     const links = [...compiled.querySelectorAll('nav a')].map((link) => link.textContent?.trim());
     expect(links).toEqual(['Founder applications']);

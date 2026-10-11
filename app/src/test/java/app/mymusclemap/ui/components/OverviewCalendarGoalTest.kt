@@ -3,6 +3,7 @@ package app.mymusclemap.ui.components
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -11,16 +12,21 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import app.mymusclemap.R
 import app.mymusclemap.domain.calendar.MonthGridCalculator
+import app.mymusclemap.domain.calendar.WeekCalendar
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.domain.workout.WeeklyGoalRevision
+import app.mymusclemap.domain.workout.WeeklyGoalStatus
 import app.mymusclemap.testQuantity
 import app.mymusclemap.testString
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +46,78 @@ class OverviewCalendarGoalTest {
         composeRule.onNodeWithText(testString(R.string.weekly_goal_set_cta)).assertIsDisplayed().performClick()
         assertEquals(1, opens.get())
         composeRule.onAllNodesWithTag("overview-weekly-streak").assertCountEquals(0)
+        composeRule.onNodeWithTag("overview-calendar-heading", useUnmergedTree = true)
+            .assertTextEquals(testString(R.string.weekly_goal_header))
+        composeRule.onNodeWithTag("overview-calendar-range", useUnmergedTree = true)
+            .assertTextEquals(weekRange(WeekCalendar.start(today)))
+    }
+
+    @Test
+    fun headerNamesTheActiveStreakAndPlacesTheSelectedWeekUnderIt() {
+        val status = fourWeekStreak()
+        assertEquals(4, status.current.streak)
+        render(status)
+        val heading = composeRule.onNodeWithTag("overview-calendar-heading", useUnmergedTree = true)
+        val range = composeRule.onNodeWithTag("overview-calendar-range", useUnmergedTree = true)
+        heading.assertTextEquals(testQuantity(R.plurals.weekly_goal_header_streak, 4))
+        range.assertTextEquals(weekRange(WeekCalendar.start(today)))
+        val headingBounds = heading.getBoundsInRoot()
+        val rangeBounds = range.getBoundsInRoot()
+        assertTrue(rangeBounds.top >= headingBounds.bottom)
+        assertEquals(headingBounds.left.value, rangeBounds.left.value, 1f)
+        composeRule.onNodeWithText(testString(R.string.weekly_goal_progress, 1, 1)).assertIsDisplayed()
+        composeRule.onNodeWithTag("calendar-trophy-achieved", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("overview-weekly-streak").assertIsDisplayed()
+    }
+
+    @Test
+    fun headerOmitsTheStreakSuffixWhenTheActiveStreakIsZero() {
+        val status = WeeklyGoalLogic.evaluate(
+            listOf(WeeklyGoalRevision(LocalDate.of(2026, 3, 9), 3, graceWeek = false)),
+            emptyMap(),
+            today
+        )
+        assertEquals(0, status.current.streak)
+        render(status)
+        composeRule.onNodeWithTag("overview-calendar-heading", useUnmergedTree = true)
+            .assertTextEquals(testString(R.string.weekly_goal_header))
+        composeRule.onNodeWithText(
+            testQuantity(R.plurals.weekly_goal_header_streak, 1),
+            useUnmergedTree = true
+        ).assertDoesNotExist()
+        composeRule.onNodeWithTag("overview-calendar-range", useUnmergedTree = true)
+            .assertTextEquals(weekRange(WeekCalendar.start(today)))
+        composeRule.onNodeWithText(testString(R.string.weekly_goal_progress, 0, 3)).assertIsDisplayed()
+        composeRule.onNodeWithTag("calendar-trophy-pending", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun selectingAnotherWeekKeepsTheActiveStreakAndChangesTheDateRange() {
+        val status = fourWeekStreak()
+        render(status)
+        val heading = testQuantity(R.plurals.weekly_goal_header_streak, 4)
+        composeRule.onNodeWithTag("overview-calendar-pager").performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("overview-calendar-heading", useUnmergedTree = true)
+            .assertTextEquals(heading)
+        composeRule.onNodeWithTag("overview-calendar-range", useUnmergedTree = true)
+            .assertTextEquals(weekRange(WeekCalendar.start(today).plusWeeks(1)))
+        composeRule.onNodeWithTag("overview-calendar-today").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("overview-weekly-streak").assertCountEquals(0)
+        composeRule.onNodeWithText(testString(R.string.weekly_goal_progress, 0, 1)).assertIsDisplayed()
+    }
+
+    @Test
+    fun headerStillExpandsAndCollapsesTheMonth() {
+        render(fourWeekStreak())
+        composeRule.onNodeWithTag("overview-calendar-expand").performClick()
+        composeRule.onNodeWithTag("overview-calendar-collapse").assertIsDisplayed()
+        composeRule.onNodeWithTag("overview-calendar-range").assertDoesNotExist()
+        composeRule.onNodeWithTag("overview-calendar-collapse").performClick()
+        composeRule.onNodeWithTag("overview-calendar-heading", useUnmergedTree = true)
+            .assertTextEquals(testQuantity(R.plurals.weekly_goal_header_streak, 4))
+        composeRule.onNodeWithTag("overview-calendar-range", useUnmergedTree = true)
+            .assertTextEquals(weekRange(WeekCalendar.start(today)))
     }
 
     @Test
@@ -122,7 +200,24 @@ class OverviewCalendarGoalTest {
         composeRule.onAllNodesWithTag("calendar-selection-ring", useUnmergedTree = true).assertCountEquals(1)
     }
 
-    private fun incompleteWeek(): app.mymusclemap.domain.workout.WeeklyGoalStatus {
+    private fun fourWeekStreak(): WeeklyGoalStatus {
+        return WeeklyGoalLogic.evaluate(
+            listOf(WeeklyGoalRevision(LocalDate.of(2026, 2, 16), 1, graceWeek = false)),
+            mapOf(
+                LocalDate.of(2026, 2, 16) to 1,
+                LocalDate.of(2026, 2, 23) to 1,
+                LocalDate.of(2026, 3, 2) to 1,
+                LocalDate.of(2026, 3, 10) to 1
+            ),
+            today
+        )
+    }
+
+    private fun weekRange(weekStart: java.time.LocalDate): String {
+        return UiFormatters.inclusiveDateRange(weekStart, WeekCalendar.end(weekStart))
+    }
+
+    private fun incompleteWeek(): WeeklyGoalStatus {
         return WeeklyGoalLogic.evaluate(
             listOf(WeeklyGoalRevision(LocalDate.of(2026, 3, 2), 4, graceWeek = false)),
             mapOf(

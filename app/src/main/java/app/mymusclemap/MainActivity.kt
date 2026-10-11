@@ -9,9 +9,18 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
@@ -40,7 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.mymusclemap.data.founder.FounderWorkoutSyncScheduler
 import app.mymusclemap.data.health.HealthConnectGateway
+import app.mymusclemap.data.local.DatabaseOpenProblem
 import app.mymusclemap.data.repository.FirstRunDecision
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.workout.SessionStatus
@@ -81,9 +92,27 @@ class MainActivity : AppCompatActivity() {
         initializeViewTreeOwners()
         setContent {
             initializeViewTreeOwners()
+            val openProblem by app.databaseOpenProblem.collectAsStateWithLifecycle()
             if (container == null) {
                 SideEffect { splashReady = true }
-                WelcomeGate(app)
+                if (openProblem != null) {
+                    WeightTrackerTheme {
+                        DatabaseOpenRecovery(
+                            problem = openProblem ?: DatabaseOpenProblem.Unreadable,
+                            onRetry = { app.retryDatabaseOpen() },
+                            onSignOut = {
+                                lifecycleScope.launch {
+                                    app.signIn.auth.logout()
+                                    app.accounts.clearActive()
+                                    FounderWorkoutSyncScheduler.cancel(app)
+                                    app.restartProcess()
+                                }
+                            }
+                        )
+                    }
+                } else {
+                    WelcomeGate(app)
+                }
                 return@setContent
             }
             val appearance by container.themePreferences.appearance.collectAsStateWithLifecycle(
@@ -115,6 +144,25 @@ class MainActivity : AppCompatActivity() {
                 LocalFeatureEntitlements provides container.featureEntitlements
             ) {
                 WeightTrackerTheme(appearance = appearance) {
+                    val otherAccounts by app.inactiveMigrationFailures.collectAsStateWithLifecycle()
+                    var dismissedMigration by rememberSaveable { mutableStateOf(false) }
+                    if (!dismissedMigration && otherAccounts.isNotEmpty()) {
+                        AlertDialog(
+                            onDismissRequest = { dismissedMigration = true },
+                            title = { Text(stringResource(R.string.database_migration_other_title)) },
+                            text = { Text(stringResource(R.string.database_migration_other_body)) },
+                            confirmButton = {
+                                TextButton(onClick = { app.retryDatabaseOpen() }) {
+                                    Text(stringResource(R.string.database_migration_retry))
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { dismissedMigration = true }) {
+                                    Text(stringResource(R.string.database_migration_dismiss))
+                                }
+                            }
+                        )
+                    }
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -215,6 +263,7 @@ class MainActivity : AppCompatActivity() {
                                     lifecycleScope.launch {
                                         app.signIn.auth.logout()
                                         app.accounts.clearActive()
+                                        FounderWorkoutSyncScheduler.cancel(app)
                                         app.restartProcess()
                                     }
                                 },
@@ -379,6 +428,45 @@ private fun WelcomeGate(app: WeightTrackerApplication) {
             },
             onOpenPrivacy = { showPrivacy = true }
         )
+    }
+}
+
+@Composable
+private fun DatabaseOpenRecovery(
+    problem: DatabaseOpenProblem,
+    onRetry: () -> Unit,
+    onSignOut: () -> Unit
+) {
+    val body = when (problem) {
+        DatabaseOpenProblem.MigrationFailed -> R.string.database_open_migration_failed
+        DatabaseOpenProblem.NewerSchema -> R.string.database_open_newer_schema
+        DatabaseOpenProblem.Unreadable -> R.string.database_open_unreadable
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.Start
+    ) {
+        Text(
+            text = stringResource(R.string.database_open_title),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = stringResource(body),
+            modifier = Modifier.padding(top = 12.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Button(onClick = onRetry, modifier = Modifier.padding(top = 24.dp)) {
+            Text(stringResource(R.string.database_migration_retry))
+        }
+        TextButton(onClick = onSignOut, modifier = Modifier.padding(top = 8.dp)) {
+            Text(stringResource(R.string.settings_sign_out))
+        }
     }
 }
 

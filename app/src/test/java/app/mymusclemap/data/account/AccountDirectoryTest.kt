@@ -2,6 +2,7 @@ package app.mymusclemap.data.account
 
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
+import app.mymusclemap.data.local.AccountDatabaseLocation
 import app.mymusclemap.domain.account.LegacyClaim
 import app.mymusclemap.domain.account.accountDatabaseName
 import org.junit.Assert.assertEquals
@@ -23,8 +24,10 @@ class AccountDirectoryTest {
     @Before
     fun clean() {
         context.getDatabasePath("weight_tracker.db").delete()
-        context.getDatabasePath(accountDatabaseName(userA)).delete()
-        context.getDatabasePath(accountDatabaseName(userB)).delete()
+        listOf(userA, userB).forEach { userId ->
+            context.getDatabasePath(accountDatabaseName(userId)).delete()
+            accountFile(userId).delete()
+        }
         File(context.noBackupFilesDir, "legacy_claim.txt").delete()
         File(context.noBackupFilesDir, "active_account.txt").delete()
         File(context.noBackupFilesDir, "verified_account.json").delete()
@@ -39,19 +42,20 @@ class AccountDirectoryTest {
 
         assertEquals(LegacyClaim.MOVE, accounts.claimLegacy(userA))
         assertFalse(legacy.exists())
-        assertEquals("workouts", context.getDatabasePath(accountDatabaseName(userA)).readText())
+        assertEquals("workouts", accountFile(userA).readText())
+        assertFalse(context.getDatabasePath(accountDatabaseName(userA)).exists())
         assertFalse(accounts.legacyUnclaimed())
 
         assertEquals(LegacyClaim.ALREADY_MINE, accounts.claimLegacy(userA))
         assertEquals(LegacyClaim.OWNED_BY_OTHER, accounts.claimLegacy(userB))
-        assertEquals("workouts", context.getDatabasePath(accountDatabaseName(userA)).readText())
-        assertFalse(context.getDatabasePath(accountDatabaseName(userB)).exists())
+        assertEquals("workouts", accountFile(userA).readText())
+        assertFalse(accountFile(userB).exists())
     }
 
     @Test
     fun anInterruptedMoveStillBelongsToTheSameAccount() {
         val legacy = context.getDatabasePath("weight_tracker.db")
-        val target = context.getDatabasePath(accountDatabaseName(userA))
+        val target = accountFile(userA)
         target.parentFile?.mkdirs()
         target.writeText("kept")
         assertFalse(legacy.exists())
@@ -65,7 +69,7 @@ class AccountDirectoryTest {
     fun signOutClearsTheActiveAccountAndLeavesItsDatabase() {
         val profile = VerifiedAccountProfile(userA, "a@example.com", "Ada")
         accounts.activate(profile)
-        val database = context.getDatabasePath(accountDatabaseName(userA))
+        val database = accountFile(userA)
         database.parentFile?.mkdirs()
         database.writeText("kept")
 
@@ -82,6 +86,25 @@ class AccountDirectoryTest {
     @Test
     fun nothingToClaimLeavesBothAccountsEmpty() {
         assertEquals(LegacyClaim.NOTHING_TO_CLAIM, accounts.claimLegacy(userA))
-        assertFalse(context.getDatabasePath(accountDatabaseName(userA)).exists())
+        assertFalse(accountFile(userA).exists())
+    }
+
+    @Test
+    fun claimDoesNotReplaceAnUnmigratedAccountDatabase() {
+        val legacy = context.getDatabasePath("weight_tracker.db")
+        legacy.parentFile?.mkdirs()
+        legacy.writeText("legacy")
+        val existing = context.getDatabasePath(accountDatabaseName(userA))
+        existing.parentFile?.mkdirs()
+        existing.writeText("real-account")
+
+        assertEquals(LegacyClaim.OWNED_BY_OTHER, accounts.claimLegacy(userA))
+        assertEquals("legacy", legacy.readText())
+        assertEquals("real-account", existing.readText())
+        assertFalse(accountFile(userA).exists())
+    }
+
+    private fun accountFile(userId: String): File {
+        return AccountDatabaseLocation.accountFile(context, accountDatabaseName(userId))
     }
 }

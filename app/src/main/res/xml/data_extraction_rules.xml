@@ -1,34 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Manual backup/restore is the only supported portable copy of user data.
-  allowBackup=false disables cloud backup on Android 11 and lower, and cloud
-  backup on Android 12 and higher. It does not disable device-to-device
-  transfer on every Android 12+ device, so every domain is excluded here.
+  Android 12+ cloud backup and device transfer use the same user-data allowlist.
+  disableIfNoEncryptionCapabilities skips the whole cloud backup when the device
+  cannot use client-side encryption. Device transfer is not blocked by that flag.
+  Per-include requireFlags are ignored on this schema.
+  Cross-platform transfer is disabled by excluding each domain root and listing
+  no includes. Omitting this section would fall back to a broader backup.
+  The platform already excludes noBackupFilesDir.
 -->
 <data-extraction-rules>
-    <cloud-backup>
-        <exclude domain="root" path="." />
-        <exclude domain="file" path="." />
-        <exclude domain="database" path="." />
-        <exclude domain="sharedpref" path="." />
-        <exclude domain="external" path="." />
-        <exclude domain="device_root" path="." />
-        <exclude domain="device_file" path="." />
-        <exclude domain="device_database" path="." />
-        <exclude domain="device_sharedpref" path="." />
-        <exclude domain="root" path="no_backup" />
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <include
+            domain="file"
+            path="strict_user_data" />
+        <include
+            domain="file"
+            path="datastore/weight_tracker_settings.preferences_pb" />
+        <include
+            domain="file"
+            path="datastore/app_language.preferences_pb" />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="root" path="." />
-        <exclude domain="file" path="." />
-        <exclude domain="database" path="." />
-        <exclude domain="sharedpref" path="." />
-        <exclude domain="external" path="." />
-        <exclude domain="device_root" path="." />
-        <exclude domain="device_file" path="." />
-        <exclude domain="device_database" path="." />
-        <exclude domain="device_sharedpref" path="." />
-        <exclude domain="root" path="no_backup" />
+        <include
+            domain="file"
+            path="strict_user_data" />
+        <include
+            domain="file"
+            path="datastore/weight_tracker_settings.preferences_pb" />
+        <include
+            domain="file"
+            path="datastore/app_language.preferences_pb" />
     </device-transfer>
     <cross-platform-transfer platform="ios">
         <exclude domain="root" path="." />
@@ -40,6 +41,5 @@
         <exclude domain="device_file" path="." />
         <exclude domain="device_database" path="." />
         <exclude domain="device_sharedpref" path="." />
-        <exclude domain="root" path="no_backup" />
     </cross-platform-transfer>
 </data-extraction-rules>

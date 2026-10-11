@@ -95,7 +95,7 @@ class AuthSessionIT {
         assertEquals(2, countSessions(userId(first)));
         assertEquals("Bearer", first.get("tokenType"));
         assertEquals(Set.of("accessToken", "tokenType", "expiresAt", "user"), first.keySet());
-        assertEquals(Set.of("id"), user(first).keySet());
+        assertEquals(Set.of("id", "email", "displayName"), user(first).keySet());
     }
 
     @Test

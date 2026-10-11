@@ -1,0 +1,35 @@
+name: strict-oci
+
+# Strict PostgreSQL for the OCI VM. This is not the PUFF database.
+# Bind is loopback only. The named volume survives container recreation.
+# Do not point this file at a PUFF volume, network, container, or port.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: strict-postgres
+    environment:
+      POSTGRES_DB: strict
+      POSTGRES_USER: strict_app
+      POSTGRES_PASSWORD: ${STRICT_POSTGRES_PASSWORD:?set STRICT_POSTGRES_PASSWORD in /etc/strict/strict-postgres.env}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - strict_postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - strict_internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U strict_app -d strict"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  strict_internal:
+    name: strict_internal
+
+volumes:
+  strict_postgres_data:
+    name: strict_postgres_data

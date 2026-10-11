@@ -25,7 +25,7 @@ describe('App', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('strict-admin-shell')).not.toBeNull();
-    expect(compiled.querySelector('.wordmark')?.textContent).toContain('Strict');
+    expect(compiled.querySelector('.brand-mark')?.getAttribute('alt')).toBe('Strict');
   });
 
   it('opens the Founder list from the root route', async () => {

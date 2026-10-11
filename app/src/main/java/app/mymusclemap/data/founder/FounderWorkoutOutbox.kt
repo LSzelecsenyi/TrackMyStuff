@@ -16,7 +16,8 @@ data class PendingFounderWorkout(
     val clientWorkoutId: String,
     val completedAtEpochMilli: Long,
     val localDate: String,
-    val observation: FounderWorkoutObservation? = null
+    val observation: FounderWorkoutObservation? = null,
+    val ownerUserId: String? = null
 )
 
 /**
@@ -46,7 +47,8 @@ class FounderWorkoutOutbox(context: Context) {
                         clientWorkoutId = id,
                         completedAtEpochMilli = completedAt,
                         localDate = localDate,
-                        observation = item.toObservation()
+                        observation = item.toObservation(),
+                        ownerUserId = item.optionalString("ownerUserId")
                     )
                 )
             }
@@ -60,6 +62,59 @@ class FounderWorkoutOutbox(context: Context) {
                 return@edit
             }
             prefs[KEY_EVENTS] = encode(current + event)
+        }
+    }
+
+    suspend fun pendingFor(userId: String): List<PendingFounderWorkout> {
+        return pending().filter { it.ownerUserId == userId }
+    }
+
+    suspend fun quarantined(): List<PendingFounderWorkout> {
+        val raw = dataStore.data.first()[KEY_QUARANTINE].orEmpty()
+        return decode(raw)
+    }
+
+    /**
+     * Moves events with no canonical user id out of the submittable queue.
+     * The signed-in account is not treated as their owner.
+     */
+    suspend fun quarantineUnowned() {
+        dataStore.edit { prefs ->
+            val current = decode(prefs[KEY_EVENTS])
+            val unowned = current.filter { it.ownerUserId.isNullOrBlank() }
+            if (unowned.isEmpty()) {
+                return@edit
+            }
+            val owned = current.filter { !it.ownerUserId.isNullOrBlank() }
+            val held = decode(prefs[KEY_QUARANTINE]) + unowned
+            prefs[KEY_QUARANTINE] = encode(held)
+            if (owned.isEmpty()) {
+                prefs.remove(KEY_EVENTS)
+            } else {
+                prefs[KEY_EVENTS] = encode(owned)
+            }
+        }
+    }
+
+    suspend fun removeForUser(userId: String) {
+        dataStore.edit { prefs ->
+            val current = decode(prefs[KEY_EVENTS]).filter { it.ownerUserId != userId }
+            if (current.isEmpty()) {
+                prefs.remove(KEY_EVENTS)
+            } else {
+                prefs[KEY_EVENTS] = encode(current)
+            }
+        }
+    }
+
+    suspend fun removeQuarantined(clientWorkoutId: String) {
+        dataStore.edit { prefs ->
+            val current = decode(prefs[KEY_QUARANTINE]).filter { it.clientWorkoutId != clientWorkoutId }
+            if (current.isEmpty()) {
+                prefs.remove(KEY_QUARANTINE)
+            } else {
+                prefs[KEY_QUARANTINE] = encode(current)
+            }
         }
     }
 
@@ -77,6 +132,7 @@ class FounderWorkoutOutbox(context: Context) {
     companion object {
         const val PREFERENCES_NAME = "founder_workout_outbox"
         private val KEY_EVENTS = stringPreferencesKey("events")
+        private val KEY_QUARANTINE = stringPreferencesKey("quarantine")
 
         private fun decode(raw: String?): List<PendingFounderWorkout> {
             if (raw.isNullOrBlank()) {
@@ -97,7 +153,8 @@ class FounderWorkoutOutbox(context: Context) {
                             clientWorkoutId = id,
                             completedAtEpochMilli = completedAt,
                             localDate = localDate,
-                            observation = item.toObservation()
+                            observation = item.toObservation(),
+                            ownerUserId = item.optionalString("ownerUserId")
                         )
                     )
                 }
@@ -157,6 +214,7 @@ class FounderWorkoutOutbox(context: Context) {
                     .put("clientWorkoutId", event.clientWorkoutId)
                     .put("completedAtEpochMilli", event.completedAtEpochMilli)
                     .put("localDate", event.localDate)
+                event.ownerUserId?.let { owner -> item.put("ownerUserId", owner) }
                 event.observation?.let { observation -> item.putObservation(observation) }
                 array.put(item)
             }
