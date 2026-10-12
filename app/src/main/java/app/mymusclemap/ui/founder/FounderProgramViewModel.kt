@@ -285,8 +285,9 @@ class FounderProgramViewModel(
     }
 
     /**
-     * Reloads the backend Founder snapshot and entitlement.
-     * One call runs at a time. A failure leaves the last stored state in place.
+     * Reloads account entitlements for the signed-in user, and the Founder snapshot
+     * when this program is backend-owned. One call runs at a time. A failure leaves
+     * the last stored state in place.
      */
     fun refreshFromBackend() {
         if (!authorityRefreshInFlight.compareAndSet(false, true)) {

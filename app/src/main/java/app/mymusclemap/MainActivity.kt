@@ -302,7 +302,7 @@ class MainActivity : AppCompatActivity() {
         container.activeWorkoutNotifications.refresh()
         lifecycleScope.launch {
             container.refreshFounderProgramFromStore()
-            container.refreshFounderAuthority()
+            container.refreshAccountAuthorityFromBackend()
             container.refreshPromotionAvailability()
             container.refreshBilling()
         }

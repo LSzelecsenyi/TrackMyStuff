@@ -116,7 +116,7 @@ class WeightTrackerApplication : Application() {
             opened.migrateLegacyTrial()
             opened.refreshPromotionAvailability()
             opened.refreshBilling()
-            opened.refreshFounderAuthority()
+            opened.refreshAccountAuthorityFromBackend()
             opened.appBackupRepository.recoverInterruptedPhotoRestore()
             opened.achievementRepository.reconcile()
             opened.entitlementRevisions.drop(1).collect {

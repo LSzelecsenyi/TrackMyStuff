@@ -13,7 +13,7 @@ import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.auth.FounderEntitlementCall
 import app.mymusclemap.data.auth.FounderReportSubmission
-import app.mymusclemap.data.auth.FounderSnapshotCall
+import app.mymusclemap.data.founder.AccountAuthorityRefresh
 import app.mymusclemap.data.founder.BackendFounderSnapshot
 import app.mymusclemap.data.founder.FounderJoinCoordinator
 import app.mymusclemap.data.founder.FounderProgramCoordinator
@@ -506,28 +506,14 @@ class AppContainer(context: Context, val accountUserId: String) {
         }
     }
 
-    suspend fun refreshFounderAuthority() {
-        if (!founderProgram.currentState().backendOwned) {
-            return
-        }
+    /**
+     * Reads `GET /api/v1/entitlements` for the signed-in account.
+     * The Founder snapshot and workout outbox are included only when the program
+     * is already backend-owned. One refresh runs at a time.
+     */
+    suspend fun refreshAccountAuthorityFromBackend() {
         founderAuthorityRefresh.withLock {
-            reloadFounderAuthority()
-        }
-    }
-
-    private suspend fun reloadFounderAuthority() {
-        when (val current = strictAccount.api.currentFounder(founderZone)) {
-            is FounderSnapshotCall.Loaded -> founderProgram.applyBackendEnrollment(current.snapshot)
-            FounderSnapshotCall.Unauthenticated -> founderEntitlementCache.drop()
-            else -> Unit
-        }
-        when (val entitlements = strictAccount.api.currentEntitlements()) {
-            is FounderEntitlementCall.Loaded -> saveLoadedEntitlements(entitlements)
-            FounderEntitlementCall.Unauthenticated -> founderEntitlementCache.drop()
-            else -> Unit
-        }
-        if (founderWorkoutOutbox.pendingFor(accountUserId).isNotEmpty()) {
-            FounderWorkoutSyncScheduler.enqueue(appContext)
+            accountAuthorityRefresh.refresh()
         }
     }
 
@@ -608,6 +594,18 @@ class AppContainer(context: Context, val accountUserId: String) {
 
     private val founderZone = ZoneId.systemDefault()
     private val founderWorkoutOutbox = FounderWorkoutOutbox(appContext)
+    private val accountAuthorityRefresh by lazy {
+        AccountAuthorityRefresh(
+            api = strictAccount.api,
+            zone = founderZone,
+            founderBackendOwned = { founderProgram.currentState().backendOwned },
+            applyFounderSnapshot = { snapshot -> founderProgram.applyBackendEnrollment(snapshot) },
+            saveEntitlements = { loaded -> saveLoadedEntitlements(loaded) },
+            dropEntitlementCache = { founderEntitlementCache.drop() },
+            founderWorkoutsPending = { founderWorkoutOutbox.pendingFor(accountUserId).isNotEmpty() },
+            scheduleFounderWorkoutSync = { FounderWorkoutSyncScheduler.enqueue(appContext) }
+        )
+    }
     private val founderWorkoutSync by lazy {
         FounderWorkoutSync(
             outbox = founderWorkoutOutbox,
@@ -820,7 +818,7 @@ class AppContainer(context: Context, val accountUserId: String) {
         founderSubmitReport = { submissionId, feedback, appVersion ->
             submitFounderTesterReport(submissionId, feedback, appVersion)
         },
-        founderRefreshAuthority = { refreshFounderAuthority() },
+        founderRefreshAuthority = { refreshAccountAuthorityFromBackend() },
         achievementRepository = achievementRepository,
         targetWeightGoalRepository = targetWeightGoalRepository
     )
