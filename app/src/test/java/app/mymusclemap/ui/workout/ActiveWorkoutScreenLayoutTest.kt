@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.width
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertCountEquals
@@ -539,6 +541,41 @@ class ActiveWorkoutScreenLayoutTest {
     }
 
     @Test
+    fun completedSetEditorCollapsesAfterTheEditingStateClears() {
+        val collapsed = mixedSetsState()
+        val displayed = render(state = collapsed, width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithText(testString(R.string.action_edit_set)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_update_set)).assertDoesNotExist()
+        composeRule.onNodeWithText("8 · BW · 0:00").assertIsDisplayed()
+        composeRule.onAllNodesWithTag(SET_REPS_MINUS).assertCountEquals(2)
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
+
+        displayed.value = collapsed.copy(
+            editingSetIds = setOf(1L),
+            dirtySetIds = setOf(1L),
+            drafts = collapsed.drafts + (
+                1L to ActualSetDraft(repsText = "12", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+                )
+        )
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(testString(R.string.action_update_set)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_edit_set)).assertDoesNotExist()
+        composeRule.onNodeWithText("8 · BW · 0:00").assertDoesNotExist()
+        composeRule.onNodeWithText("12 · BW · 0:00").assertDoesNotExist()
+        composeRule.onAllNodesWithTag(SET_REPS_MINUS).assertCountEquals(3)
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
+
+        displayed.value = displayed.value.copy(editingSetIds = emptySet(), dirtySetIds = emptySet())
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(testString(R.string.action_edit_set)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_update_set)).assertDoesNotExist()
+        composeRule.onNodeWithText("12 · BW · 0:00").assertIsDisplayed()
+        composeRule.onNodeWithText("8 · BW · 0:00").assertDoesNotExist()
+        composeRule.onAllNodesWithTag(SET_REPS_MINUS).assertCountEquals(2)
+        composeRule.onNode(hasStateDescription(testString(R.string.active_exercise_badge))).assertIsDisplayed()
+    }
+
+    @Test
     fun repsStepperClickDoesNotFocusInput() {
         render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
         composeRule.onAllNodesWithTag("set-numeric-field")[0].assertIsNotFocused()
@@ -708,7 +745,8 @@ class ActiveWorkoutScreenLayoutTest {
         onReps: (Long, String) -> Unit = { _, _ -> },
         onFinished: (WorkoutCompletionSummary) -> Unit = {},
         backDispatcher: AtomicReference<OnBackPressedDispatcher?>? = null
-    ) {
+    ): MutableState<ActiveWorkoutUiState> {
+        val displayed = mutableStateOf(state)
         composeRule.setContent {
             val density = LocalDensity.current
             if (backDispatcher != null) {
@@ -725,7 +763,7 @@ class ActiveWorkoutScreenLayoutTest {
                             .then(if (height != null) Modifier.height(height) else Modifier.fillMaxSize())
                     ) {
                         ActiveWorkoutScreen(
-                            state = state,
+                            state = displayed.value,
                             onBack = {},
                             onReps = onReps,
                             onStepReps = { _, _ -> },
@@ -736,6 +774,7 @@ class ActiveWorkoutScreenLayoutTest {
                             onDistance = { _, _ -> },
                             onDistanceUnit = { _, _ -> },
                             onComplete = onComplete,
+                            onEditSet = {},
                             onSkip = onSkip,
                             onUndoSkip = {},
                             onAddExtra = {},
@@ -757,6 +796,7 @@ class ActiveWorkoutScreenLayoutTest {
             }
         }
         composeRule.waitForIdle()
+        return displayed
     }
 
     private fun mixedSetsState(

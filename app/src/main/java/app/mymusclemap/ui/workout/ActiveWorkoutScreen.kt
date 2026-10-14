@@ -226,6 +226,7 @@ fun ActiveWorkoutScreen(
     onDistance: (Long, String) -> Unit,
     onDistanceUnit: (Long, DistanceUnit) -> Unit,
     onComplete: (Long) -> Unit,
+    onEditSet: (Long) -> Unit,
     onSkip: (Long) -> Unit,
     onUndoSkip: (Long) -> Unit,
     onAddExtra: (Long) -> Unit,
@@ -437,6 +438,7 @@ fun ActiveWorkoutScreen(
                             dismissInput()
                             onComplete(setId)
                         },
+                        onEditSet = onEditSet,
                         onSkip = { setId ->
                             dismissInput()
                             if (setId in state.dirtySetIds) {
@@ -755,6 +757,7 @@ private fun ExerciseBlock(
     onDistance: (Long, String) -> Unit,
     onDistanceUnit: (Long, DistanceUnit) -> Unit,
     onComplete: (Long) -> Unit,
+    onEditSet: (Long) -> Unit,
     onSkip: (Long) -> Unit,
     onUndoSkip: (Long) -> Unit,
     onAddExtra: () -> Unit,
@@ -766,7 +769,6 @@ private fun ExerciseBlock(
     val toggleLabel = stringResource(
         if (expanded) R.string.action_collapse_exercise else R.string.action_expand_exercise
     )
-    var editingIds by remember { mutableStateOf(emptySet<Long>()) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -843,7 +845,7 @@ private fun ExerciseBlock(
                     dirty = set.id in state.dirtySetIds,
                     completing = discarding || set.id in state.completingSetIds,
                     current = set.id == currentSetId,
-                    editing = set.id in editingIds,
+                    editing = set.id in state.editingSetIds,
                     currentSetCoordinates = currentSetCoordinates,
                     onReps = { onReps(set.id, it) },
                     onStepReps = { onStepReps(set.id, it) },
@@ -857,7 +859,7 @@ private fun ExerciseBlock(
                     onSkip = { onSkip(set.id) },
                     onUndoSkip = { onUndoSkip(set.id) },
                     onRemoveExtra = { onRemoveExtra(set.id) },
-                    onEdit = { editingIds = editingIds + set.id },
+                    onEdit = { onEditSet(set.id) },
                     historyLine = if (set.id == currentSetId) {
                         ExerciseHistoryLogic.currentLine(
                             history = state.exerciseHistory,

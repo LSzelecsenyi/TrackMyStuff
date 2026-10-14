@@ -1285,6 +1285,7 @@ fun WeightTrackerNavHost(
                     onDistance = viewModel::onDistance,
                     onDistanceUnit = viewModel::onDistanceUnit,
                     onComplete = viewModel::completeSet,
+                    onEditSet = viewModel::editCompletedSet,
                     onSkip = viewModel::skipSet,
                     onUndoSkip = viewModel::undoSkip,
                     onAddExtra = viewModel::addExtraSet,

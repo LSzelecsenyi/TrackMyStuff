@@ -72,6 +72,7 @@ data class ActiveWorkoutUiState(
     val focusEvent: WorkoutFocusEvent? = null,
     val focusedSetId: Long? = null,
     val expandedExerciseIds: Set<Long> = emptySet(),
+    val editingSetIds: Set<Long> = emptySet(),
     val finishing: Boolean = false,
     val completionSummary: WorkoutCompletionSummary? = null,
     val exerciseHistory: InWorkoutExerciseHistory = InWorkoutExerciseHistory.Loading
@@ -120,6 +121,7 @@ class ActiveWorkoutViewModel(
     private val focusEvent = MutableStateFlow<WorkoutFocusEvent?>(null)
     private val focusedSetId = MutableStateFlow<Long?>(null)
     private val expandedIds = MutableStateFlow<Set<Long>>(emptySet())
+    private val editingSetIds = MutableStateFlow<Set<Long>>(emptySet())
     private var focusGeneration = 0L
     private val draftJobs = mutableMapOf<Long, Job>()
     private val exerciseHistory = MutableStateFlow<InWorkoutExerciseHistory>(InWorkoutExerciseHistory.Loading)
@@ -150,7 +152,8 @@ class ActiveWorkoutViewModel(
         val completing: Set<Long>,
         val errors: Map<Long, List<TemplateFieldError>>,
         val message: ActiveWorkoutMessage?,
-        val completionSummary: WorkoutCompletionSummary?
+        val completionSummary: WorkoutCompletionSummary?,
+        val editingSetIds: Set<Long>
     )
 
     private data class FocusChrome(
@@ -162,16 +165,23 @@ class ActiveWorkoutViewModel(
     private val workoutState: StateFlow<ActiveWorkoutUiState> = combine(
         sessionRepository.observeAggregate(sessionId),
         selectedIndex,
-        combine(drafts, dirtyIds, completingIds, setErrors, combine(message, completionSummary) { currentMessage, summary ->
-            currentMessage to summary
-        }) { currentDrafts, dirty, completing, errors, messageAndSummary ->
+        combine(
+            drafts,
+            dirtyIds,
+            completingIds,
+            setErrors,
+            combine(message, completionSummary, editingSetIds) { currentMessage, summary, editing ->
+                Triple(currentMessage, summary, editing)
+            }
+        ) { currentDrafts, dirty, completing, errors, messageSummaryEditing ->
             EditorSignals(
                 currentDrafts,
                 dirty,
                 completing,
                 errors,
-                messageAndSummary.first,
-                messageAndSummary.second
+                messageSummaryEditing.first,
+                messageSummaryEditing.second,
+                messageSummaryEditing.third
             )
         },
         combine(
@@ -204,6 +214,7 @@ class ActiveWorkoutViewModel(
                 focusEvent = chrome.focus,
                 focusedSetId = chrome.focusedSetId,
                 expandedExerciseIds = chrome.expanded,
+                editingSetIds = signals.editingSetIds,
                 finishing = dialogs.finishing,
                 completionSummary = signals.completionSummary
             )
@@ -235,6 +246,7 @@ class ActiveWorkoutViewModel(
             focusEvent = chrome.focus,
             focusedSetId = chrome.focusedSetId,
             expandedExerciseIds = chrome.expanded,
+            editingSetIds = signals.editingSetIds,
             finishing = dialogs.finishing,
             completionSummary = signals.completionSummary
         )
@@ -390,6 +402,21 @@ class ActiveWorkoutViewModel(
         updateDraft(setId) { it.copy(distanceUnit = unit) }
     }
 
+    fun editCompletedSet(setId: Long) {
+        if (discarding.value) {
+            return
+        }
+        val set = uiState.value.aggregate
+            ?.exercises
+            ?.flatMap { it.sets }
+            ?.firstOrNull { it.id == setId }
+            ?: return
+        if (set.status != SessionSetStatus.COMPLETED) {
+            return
+        }
+        editingSetIds.value = editingSetIds.value + setId
+    }
+
     fun completeSet(setId: Long) {
         if (discarding.value || setId in completingIds.value) {
             return
@@ -417,6 +444,9 @@ class ActiveWorkoutViewModel(
                             advanceAfterResolved(setId)
                         } else {
                             locallyResolving.remove(setId)
+                            if (currentStatus == SessionSetStatus.COMPLETED) {
+                                editingSetIds.value = editingSetIds.value - setId
+                            }
                         }
                     }
                     is SessionMutationResult.Invalid -> {

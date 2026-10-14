@@ -701,6 +701,169 @@ class ActiveWorkoutViewModelTest {
         assertEquals(9, row.actualReps)
     }
 
+    @Test
+    fun reopeningACompletedSetExpandsOnlyThatSet() = runTest {
+        val viewModel = startPullSets(4)
+        val sets = viewModel.loaded().aggregate!!.exercises.single().sets
+        sets.take(3).forEach { viewModel.finishPending(it.id) }
+        val earlier = sets[0]
+        val edited = sets[1]
+        val later = sets[2]
+        val active = sets[3]
+        viewModel.consumeFocusEvent()
+        awaitReal { viewModel.uiState.first { it.focusEvent == null } }
+
+        viewModel.editCompletedSet(active.id)
+        assertFalse(active.id in viewModel.uiState.value.editingSetIds)
+
+        viewModel.editCompletedSet(edited.id)
+
+        val state = viewModel.uiState.value
+        assertEquals(setOf(edited.id), state.editingSetIds)
+        assertFalse(earlier.id in state.editingSetIds)
+        assertFalse(later.id in state.editingSetIds)
+        assertEquals(SessionSetStatus.COMPLETED, state.setRow(edited.id).status)
+        assertEquals("8", state.drafts[edited.id]?.repsText)
+        assertEquals(active.id, state.currentSetId)
+        assertEquals(active.id, state.focusedSetId)
+        assertEquals(SessionSetStatus.PENDING, state.setRow(active.id).status)
+        assertNull(state.focusEvent)
+    }
+
+    @Test
+    fun savingAnEditedCompletedSetCollapsesItAndKeepsTheActiveSet() = runTest {
+        val viewModel = startPullSets(4)
+        val exerciseId = viewModel.loaded().aggregate!!.exercises.single().exercise.id
+        val sets = viewModel.uiState.value.aggregate!!.exercises.single().sets
+        sets.take(3).forEach { viewModel.finishPending(it.id) }
+        val earlier = sets[0]
+        val edited = sets[1]
+        val later = sets[2]
+        val active = sets[3]
+        viewModel.consumeFocusEvent()
+        awaitReal { viewModel.uiState.first { it.focusEvent == null } }
+        val focusedBefore = viewModel.uiState.value.focusedSetId
+        val expandedBefore = viewModel.uiState.value.expandedExerciseIds
+        val selectedBefore = viewModel.uiState.value.selectedIndex
+
+        viewModel.editCompletedSet(edited.id)
+        viewModel.onReps(edited.id, "12")
+        val open = viewModel.uiState.value
+        assertTrue(edited.id in open.editingSetIds)
+        assertEquals("12", open.drafts[edited.id]?.repsText)
+        assertEquals(active.id, open.currentSetId)
+
+        viewModel.completeSet(edited.id)
+        val state = awaitReal {
+            viewModel.uiState.first { ui ->
+                edited.id !in ui.editingSetIds &&
+                    edited.id !in ui.completingSetIds &&
+                    edited.id !in ui.dirtySetIds &&
+                    ui.setRow(edited.id).actualReps == 12
+            }
+        }
+        assertEquals("12", state.drafts[edited.id]?.repsText)
+        assertEquals(SessionSetStatus.COMPLETED, state.setRow(edited.id).status)
+        assertEquals(8, state.setRow(earlier.id).actualReps)
+        assertEquals(8, state.setRow(later.id).actualReps)
+        assertEquals("8", state.drafts[earlier.id]?.repsText)
+        assertEquals("8", state.drafts[later.id]?.repsText)
+        assertFalse(earlier.id in state.editingSetIds)
+        assertFalse(later.id in state.editingSetIds)
+        assertTrue(state.editingSetIds.isEmpty())
+        assertEquals(SessionSetStatus.PENDING, state.setRow(active.id).status)
+        assertEquals(active.id, state.currentSetId)
+        assertEquals(focusedBefore, state.focusedSetId)
+        assertEquals(expandedBefore, state.expandedExerciseIds)
+        assertEquals(selectedBefore, state.selectedIndex)
+        assertTrue(exerciseId in state.expandedExerciseIds)
+        assertNull(state.focusEvent)
+        assertNull(state.message)
+        assertFalse(state.finished)
+        assertEquals(3, state.aggregate!!.exercises.single().sets.count { it.status == SessionSetStatus.COMPLETED })
+        val persisted = sessions.getAggregate(sessionId)!!
+        assertEquals(SessionStatus.IN_PROGRESS, persisted.session.status)
+        assertEquals(12, persisted.exercises.single().sets.first { it.id == edited.id }.actualReps)
+        assertEquals(8, persisted.exercises.single().sets.first { it.id == earlier.id }.actualReps)
+        assertEquals(8, persisted.exercises.single().sets.first { it.id == later.id }.actualReps)
+        assertEquals(
+            SessionSetStatus.PENDING,
+            persisted.exercises.single().sets.first { it.id == active.id }.status
+        )
+    }
+
+    @Test
+    fun failedEditOfACompletedSetKeepsTheEditorAndUnsavedValues() = runTest {
+        val viewModel = startPullSets(4)
+        val sets = viewModel.loaded().aggregate!!.exercises.single().sets
+        sets.take(3).forEach { viewModel.finishPending(it.id) }
+        val earlier = sets[0]
+        val edited = sets[1]
+        val later = sets[2]
+        val active = sets[3]
+        viewModel.editCompletedSet(edited.id)
+        viewModel.onReps(edited.id, "0")
+        viewModel.completeSet(edited.id)
+        val state = awaitReal {
+            viewModel.uiState.first { ui ->
+                edited.id !in ui.completingSetIds && ui.setErrors[edited.id].orEmpty().isNotEmpty()
+            }
+        }
+        assertTrue(edited.id in state.editingSetIds)
+        assertEquals("0", state.drafts[edited.id]?.repsText)
+        assertTrue(edited.id in state.dirtySetIds)
+        assertEquals(SessionSetStatus.COMPLETED, state.setRow(edited.id).status)
+        assertEquals(8, state.setRow(edited.id).actualReps)
+        assertEquals(active.id, state.currentSetId)
+        assertEquals(SessionSetStatus.PENDING, state.setRow(active.id).status)
+        assertFalse(earlier.id in state.editingSetIds)
+        assertFalse(later.id in state.editingSetIds)
+        assertEquals(8, state.setRow(earlier.id).actualReps)
+        assertEquals(8, state.setRow(later.id).actualReps)
+        val persisted = sessions.getAggregate(sessionId)!!
+        assertEquals(8, persisted.exercises.single().sets.first { it.id == edited.id }.actualReps)
+        assertEquals(SessionStatus.IN_PROGRESS, persisted.session.status)
+        assertFalse(state.finished)
+    }
+
+    @Test
+    fun completingAPendingSetStillCollapsesItAndAdvances() = runTest {
+        val viewModel = startPullSets(2)
+        val sets = viewModel.loaded().aggregate!!.exercises.single().sets
+        val first = sets[0]
+        val next = sets[1]
+        viewModel.onReps(first.id, "9")
+        viewModel.completeSet(first.id)
+        val state = awaitReal {
+            viewModel.uiState.first { ui ->
+                first.id !in ui.completingSetIds && ui.currentSetId == next.id
+            }
+        }
+        assertTrue(state.editingSetIds.isEmpty())
+        assertEquals(SessionSetStatus.COMPLETED, state.setRow(first.id).status)
+        assertEquals(9, state.setRow(first.id).actualReps)
+        assertEquals("9", state.drafts[first.id]?.repsText)
+        assertEquals(SessionSetStatus.PENDING, state.setRow(next.id).status)
+        assertEquals(next.id, state.currentSetId)
+        assertEquals(next.id, state.focusedSetId)
+        assertFalse(state.finished)
+    }
+
+    private fun ActiveWorkoutUiState.setRow(setId: Long) =
+        aggregate!!.exercises.single().sets.first { it.id == setId }
+
+    private suspend fun ActiveWorkoutViewModel.finishPending(setId: Long) {
+        completeSet(setId)
+        awaitReal {
+            uiState.first { state ->
+                setId !in state.completingSetIds &&
+                    state.aggregate?.exercises?.flatMap { it.sets }?.any {
+                        it.id == setId && it.status == SessionSetStatus.COMPLETED
+                    } == true
+            }
+        }
+    }
+
     private suspend fun awaitDraft(setId: Long): String {
         lateinit var payload: String
         withContext(Dispatchers.Default.limitedParallelism(1)) {
@@ -726,6 +889,21 @@ class ActiveWorkoutViewModelTest {
         val templateId = saveTemplate("Push A", listOf(pull to twoSets(), dip to twoSets()))
         val started = sessions.start(templateId)
             as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        return active(started.sessionId)
+    }
+
+    private suspend fun startPullSets(count: Int): ActiveWorkoutViewModel {
+        val pull = savePull()
+        val planned = List(count) { index ->
+            PlannedSetDraft(
+                localId = -(index + 1L),
+                minRepsText = "8",
+                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
+            )
+        }
+        val templateId = saveTemplate("Push A", listOf(pull to planned))
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
         sessionId = started.sessionId
         return active(started.sessionId)
     }
