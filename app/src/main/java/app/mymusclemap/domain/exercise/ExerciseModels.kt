@@ -340,8 +340,16 @@ object ExerciseEnumCodec {
         return parse(raw, WeightInterpretation.NOT_APPLICABLE)
     }
 
+    /**
+     * Historical workouts stored the trapezius as TRAPS. That identifier now
+     * means UPPER_BACK. The stored rows are left in place; readers translate them.
+     */
+    fun canonicalMuscleName(raw: String): String {
+        return if (raw == "TRAPS") MuscleGroup.UPPER_BACK.name else raw
+    }
+
     fun muscle(raw: String): MuscleGroup? {
-        return runCatching { MuscleGroup.valueOf(raw) }.getOrNull()
+        return runCatching { MuscleGroup.valueOf(canonicalMuscleName(raw)) }.getOrNull()
     }
 
     fun muscleOrFallback(raw: String): MuscleGroup {

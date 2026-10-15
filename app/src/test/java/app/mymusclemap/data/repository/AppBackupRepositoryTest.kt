@@ -385,6 +385,55 @@ class AppBackupRepositoryTest {
         assertEquals(photoId, targetDb.progressPhotoDao().getAll().single().id)
     }
 
+    @Test
+    fun serratusBackupRoundTripsWithoutChangingExistingExercises() = runTest {
+        val snapshot = representativeSnapshot()
+        val withSerratus = snapshot.copy(
+            tables = snapshot.tables.copy(
+                exerciseMuscles = snapshot.tables.exerciseMuscles + ExerciseMuscleEntity(
+                    exerciseId = 50,
+                    muscleGroup = MuscleGroup.SERRATUS.name,
+                    role = MuscleRole.SECONDARY.name
+                )
+            )
+        )
+        val parsed = AppBackupJson.parse(AppBackupJson.encode(withSerratus)) as AppBackupParseResult.Success
+        assertEquals(snapshot.tables.exercises, parsed.snapshot.tables.exercises)
+        assertEquals(snapshot.tables.workoutSessions, parsed.snapshot.tables.workoutSessions)
+        assertTrue(parsed.snapshot.tables.exerciseMuscles.any { it.muscleGroup == MuscleGroup.SERRATUS.name })
+        assertEquals(
+            snapshot.tables.exerciseMuscles.count { it.muscleGroup == MuscleGroup.CHEST.name },
+            parsed.snapshot.tables.exerciseMuscles.count { it.muscleGroup == MuscleGroup.CHEST.name }
+        )
+    }
+
+    @Test
+    fun legacyTrapsBackupImportsAsUpperBackWithoutResettingTheCatalog() = runTest {
+        val originalExercises = representativeTables().exercises
+        sourceDb.appBackupDao().replaceAll(representativeTables())
+        val exported = AppBackupJson.encode(representativeSnapshot())
+        assertTrue(exported.contains("\"CHEST\""))
+        val legacy = exported.replace("CHEST", "TRAPS")
+        val parsed = AppBackupJson.parse(legacy) as AppBackupParseResult.Success
+        assertTrue(parsed.snapshot.tables.exercises.map { it.name } == originalExercises.map { it.name })
+        assertTrue(parsed.snapshot.tables.exerciseMuscles.none { it.muscleGroup == "TRAPS" })
+        assertTrue(parsed.snapshot.tables.exerciseMuscles.any { it.muscleGroup == MuscleGroup.UPPER_BACK.name })
+        assertTrue(parsed.snapshot.tables.workoutSessionExercises.none { it.primaryMuscle == "TRAPS" })
+        assertTrue(parsed.snapshot.tables.workoutSessionExerciseMuscles.none { it.muscleGroup == "TRAPS" })
+        val restored = AppBackupRepository(targetDb, themePreferences).restoreJson(legacy)
+        assertEquals(AppBackupRestoreResult.Success, restored)
+        assertEquals(originalExercises.size, targetDb.exerciseDao().countAll())
+        assertEquals(
+            originalExercises.map { it.name }.toSet(),
+            targetDb.exerciseDao().getAll().map { it.name }.toSet()
+        )
+        assertTrue(targetDb.appBackupDao().loadTables().exerciseMuscles.none { it.muscleGroup == "TRAPS" })
+        val rewritten = AppBackupJson.encode(
+            representativeSnapshot().copy(tables = targetDb.appBackupDao().loadTables())
+        )
+        assertFalse(rewritten.contains("\"TRAPS\""))
+    }
+
     private fun sqliteSequence(table: String): Long? {
         val cursor = targetDb.openHelper.readableDatabase.query(
             "SELECT seq FROM sqlite_sequence WHERE name = ?",

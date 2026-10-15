@@ -1,15 +1,13 @@
 package app.mymusclemap.ui.widget
 
+import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Paint
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asAndroidPath
-import androidx.compose.ui.graphics.toArgb
-import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.musclemap.MuscleHeatmapState
-import app.mymusclemap.ui.components.musclemap.MUSCLE_MAP_STROKE_WIDTH
+import app.mymusclemap.ui.components.musclemap.MuscleMapAnatomy
 import app.mymusclemap.ui.components.musclemap.MuscleMapColors
-import app.mymusclemap.ui.components.musclemap.ParsedMuscleRegion
+import app.mymusclemap.ui.components.musclemap.MuscleMapFigurePainter
+import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector
 import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapView
 import app.mymusclemap.ui.components.musclemap.figureLayout
 import app.mymusclemap.ui.components.musclemap.paintOrderedRegions
@@ -31,10 +29,10 @@ data class MuscleMapBitmaps(
 object MuscleMapBitmapRenderer {
     const val MAX_FIGURE_WIDTH_PX = 400
     /** Narrow dark rim so a pale untrained body still reads on a light wallpaper. */
-    const val EDGE_DARK_WIDTH = 0.34f
+    const val EDGE_DARK_WIDTH = 0.34f * 526f / 35f
     const val EDGE_DARK_COLOR = 0x73000000
     /** Wider light rim underneath it, so the silhouette still reads on a dark wallpaper. */
-    const val EDGE_LIGHT_WIDTH = 0.85f
+    const val EDGE_LIGHT_WIDTH = 0.85f * 526f / 35f
     val EDGE_LIGHT_COLOR = 0xB3FFFFFF.toInt()
 
     /**
@@ -44,6 +42,7 @@ object MuscleMapBitmapRenderer {
     const val MAX_FIGURE_BYTES = 350_000
 
     fun render(
+        context: Context,
         state: MuscleHeatmapState,
         widthPx: Int,
         heightPx: Int,
@@ -52,20 +51,30 @@ object MuscleMapBitmapRenderer {
         val (width, height) = pixelSize(widthPx, heightPx)
         val parsed = parseMuscleRegions()
         val fills = MuscleMapColors.heatmapFills(state)
+        val anatomy = MuscleMapAnatomy.load(context)
+        val artwork = MuscleMapArtworkSelector.current()
         return MuscleMapBitmaps(
             front = drawFigure(
+                anatomy = anatomy.front,
+                lighting = anatomy.frontLighting,
                 regions = paintOrderedRegions(parsed.filter { it.region.view == MuscleMapView.FRONT }),
                 fills = fills,
                 widthPx = width,
                 heightPx = height,
-                chrome = chrome
+                chrome = chrome,
+                viewWidth = artwork.viewWidth,
+                viewHeight = artwork.viewHeight
             ),
             back = drawFigure(
+                anatomy = anatomy.back,
+                lighting = anatomy.backLighting,
                 regions = paintOrderedRegions(parsed.filter { it.region.view == MuscleMapView.BACK }),
                 fills = fills,
                 widthPx = width,
                 heightPx = height,
-                chrome = chrome
+                chrome = chrome,
+                viewWidth = artwork.viewWidth,
+                viewHeight = artwork.viewHeight
             )
         )
     }
@@ -88,56 +97,41 @@ object MuscleMapBitmapRenderer {
     }
 
     private fun drawFigure(
-        regions: List<ParsedMuscleRegion>,
-        fills: Map<MuscleGroup, Color>,
+        anatomy: Bitmap,
+        lighting: Bitmap,
+        regions: List<app.mymusclemap.ui.components.musclemap.ParsedMuscleRegion>,
+        fills: Map<app.mymusclemap.domain.exercise.MuscleGroup, Color>,
         widthPx: Int,
         heightPx: Int,
-        chrome: MuscleMapBitmapChrome
+        chrome: MuscleMapBitmapChrome,
+        viewWidth: Float,
+        viewHeight: Float
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bitmap)
         val layout = figureLayout(widthPx.toFloat(), heightPx.toFloat())
-        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
-        val themeStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = MUSCLE_MAP_STROKE_WIDTH
-            strokeJoin = Paint.Join.ROUND
-            strokeCap = Paint.Cap.ROUND
-        }
-        val darkEdge = edgePaint(EDGE_DARK_WIDTH, EDGE_DARK_COLOR)
-        val lightEdge = edgePaint(EDGE_LIGHT_WIDTH, EDGE_LIGHT_COLOR)
         canvas.save()
         canvas.translate(layout.offsetX, layout.offsetY)
         canvas.scale(layout.scale, layout.scale)
-        regions.forEach { parsed ->
-            val fill = parsed.region.muscleGroup?.let { fills[it] } ?: chrome.unmappedFill
-            fillPaint.color = fill.toArgb()
-            canvas.drawPath(parsed.path.asAndroidPath(), fillPaint)
-        }
-        regions.forEach { parsed ->
-            val path = parsed.path.asAndroidPath()
-            themeStroke.color = if (parsed.region.muscleGroup != null) {
-                chrome.mappedOutline.toArgb()
-            } else {
-                chrome.outline.toArgb()
-            }
-            canvas.drawPath(path, themeStroke)
-            canvas.drawPath(path, lightEdge)
-            canvas.drawPath(path, darkEdge)
-        }
+        MuscleMapFigurePainter.draw(
+            canvas = canvas,
+            anatomy = anatomy,
+            lighting = lighting,
+            regions = regions,
+            fills = fills,
+            unmappedFill = chrome.unmappedFill,
+            outline = chrome.outline,
+            mappedOutline = chrome.mappedOutline,
+            selectedOutline = chrome.mappedOutline,
+            selected = null,
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            edgeDarkWidth = EDGE_DARK_WIDTH,
+            edgeDarkColor = EDGE_DARK_COLOR,
+            edgeLightWidth = EDGE_LIGHT_WIDTH,
+            edgeLightColor = EDGE_LIGHT_COLOR
+        )
         canvas.restore()
         return bitmap
-    }
-
-    private fun edgePaint(width: Float, color: Int): Paint {
-        return Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = width
-            strokeJoin = Paint.Join.ROUND
-            strokeCap = Paint.Cap.ROUND
-            this.color = color
-        }
     }
 }

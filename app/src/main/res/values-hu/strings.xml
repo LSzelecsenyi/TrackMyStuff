@@ -509,7 +509,7 @@
     <string name="exercise_weight_na">Nem értelmezhető</string>
     <string name="muscle_chest">Mell</string>
     <string name="muscle_lats">Széles hátizom</string>
-    <string name="muscle_upper_back">Trapéz</string>
+    <string name="muscle_upper_back">Felső hát</string>
     <string name="muscle_lower_back">Alsó hát</string>
     <string name="muscle_front_delt">Elülső delta</string>
     <string name="muscle_side_delt">Oldalsó delta</string>
@@ -519,6 +519,7 @@
     <string name="muscle_forearms">Alkar</string>
     <string name="muscle_abs">Has</string>
     <string name="muscle_obliques">Ferde hasizom</string>
+    <string name="muscle_serratus">Elülső fűrészizom</string>
     <string name="muscle_glutes">Farizom</string>
     <string name="muscle_quads">Négyfejű combizom</string>
     <string name="muscle_hamstrings">Hátsó combizom</string>

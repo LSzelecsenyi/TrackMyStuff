@@ -78,6 +78,7 @@ fun MuscleGroup.labelRes(): Int {
         MuscleGroup.FOREARMS -> R.string.muscle_forearms
         MuscleGroup.ABS -> R.string.muscle_abs
         MuscleGroup.OBLIQUES -> R.string.muscle_obliques
+        MuscleGroup.SERRATUS -> R.string.muscle_serratus
         MuscleGroup.GLUTES -> R.string.muscle_glutes
         MuscleGroup.QUADRICEPS -> R.string.muscle_quads
         MuscleGroup.HAMSTRINGS -> R.string.muscle_hamstrings

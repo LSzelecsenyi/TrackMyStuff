@@ -58,6 +58,7 @@ enum class MuscleGroup {
     FOREARMS,
     ABS,
     OBLIQUES,
+    SERRATUS,
     GLUTES,
     QUADRICEPS,
     HAMSTRINGS,

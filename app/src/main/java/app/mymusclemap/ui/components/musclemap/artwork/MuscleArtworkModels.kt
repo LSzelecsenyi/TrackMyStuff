@@ -1,10 +1,15 @@
 /*
- * Region model for the adapted body-muscles artwork.
- * Provenance, revision, and modifications are recorded on BodyMusclesArtwork.
+ * Logical muscle regions are separate from the SVG path ids that draw them.
+ * Male and female artwork can use different path ids for the same MuscleGroup.
  */
 package app.mymusclemap.ui.components.musclemap.artwork
 
 import app.mymusclemap.domain.exercise.MuscleGroup
+
+enum class MuscleMapSex {
+    MALE,
+    FEMALE
+}
 
 enum class MuscleMapView {
     FRONT,
@@ -23,4 +28,13 @@ data class MuscleArtworkRegion(
     val side: AnatomicalSide,
     val muscleGroup: MuscleGroup?,
     val pathData: String
+)
+
+data class MuscleMapFigureArtwork(
+    val sex: MuscleMapSex,
+    val viewWidth: Float,
+    val viewHeight: Float,
+    val splitX: Float,
+    val anatomyAsset: String,
+    val regions: List<MuscleArtworkRegion>
 )

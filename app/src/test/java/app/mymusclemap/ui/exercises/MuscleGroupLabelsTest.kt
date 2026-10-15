@@ -6,12 +6,15 @@ import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.ExerciseEnumCodec
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
-import app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesCatalog
+import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.w3c.dom.Element
+import java.io.File
+import javax.xml.parsers.DocumentBuilderFactory
 
 @RunWith(RobolectricTestRunner::class)
 class MuscleGroupLabelsTest {
@@ -31,8 +34,24 @@ class MuscleGroupLabelsTest {
             resources.getString(R.string.muscle_lower_back),
             resources.getString(MuscleGroup.LOWER_BACK.labelRes())
         )
-        assertEquals("Traps", resources.getString(MuscleGroup.UPPER_BACK.labelRes()))
+        assertEquals("Upper back", resources.getString(MuscleGroup.UPPER_BACK.labelRes()))
         assertEquals("Lower back", resources.getString(MuscleGroup.LOWER_BACK.labelRes()))
+        assertEquals("Felső hát", hungarianString("muscle_upper_back"))
+    }
+
+    private fun hungarianString(name: String): String {
+        val candidates = listOf(
+            File("src/main/res/values-hu/strings.xml"),
+            File("app/src/main/res/values-hu/strings.xml")
+        )
+        val file = candidates.first { it.isFile }
+        val nodes = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
+            .getElementsByTagName("string")
+        for (index in 0 until nodes.length) {
+            val node = nodes.item(index) as Element
+            if (node.getAttribute("name") == name) return node.textContent
+        }
+        error("Missing Hungarian string $name")
     }
 
     @Test
@@ -47,16 +66,16 @@ class MuscleGroupLabelsTest {
 
     @Test
     fun persistedEnumValuesStillMapToArtworkAndNewLabels() {
-        assertTrue(BodyMusclesCatalog.hasAnatomicalPaths(MuscleGroup.UPPER_BACK))
-        assertTrue(BodyMusclesCatalog.hasAnatomicalPaths(MuscleGroup.LOWER_BACK))
-        assertTrue(BodyMusclesCatalog.regionsFor(MuscleGroup.UPPER_BACK).any { it.id.startsWith("traps-") })
-        assertTrue(BodyMusclesCatalog.regionsFor(MuscleGroup.LOWER_BACK).any { it.id.startsWith("lower-back-") })
+        val regions = MuscleMapArtworkSelector.current().regions
+        assertTrue(regions.any { it.muscleGroup == MuscleGroup.UPPER_BACK && it.id == "upper_back" })
+        assertTrue(regions.any { it.muscleGroup == MuscleGroup.UPPER_BACK && it.id == "traps_front" })
+        assertTrue(regions.any { it.muscleGroup == MuscleGroup.LOWER_BACK && it.id == "lower_back" })
         val heatmapSelection = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.UPPER_BACK.labelRes()),
             resources.getQuantityString(R.plurals.heatmap_days_ago, 2, 2)
         )
-        assertEquals("Traps: 2 days ago", heatmapSelection)
+        assertEquals("Upper back: 2 days ago", heatmapSelection)
         val lower = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.LOWER_BACK.labelRes()),
@@ -81,7 +100,7 @@ class MuscleGroupLabelsTest {
         assertTrue(MuscleGroup.NECK in MuscleGroup.entries)
         assertEquals(MuscleGroup.NECK, ExerciseEnumCodec.muscle("NECK"))
         assertEquals("NECK", MuscleGroup.NECK.name)
-        assertTrue(BodyMusclesCatalog.hasAnatomicalPaths(MuscleGroup.NECK))
+        assertTrue(MuscleMapArtworkSelector.current().regions.any { it.muscleGroup == MuscleGroup.NECK })
         val heatmapSelection = resources.getString(
             R.string.heatmap_selection,
             resources.getString(MuscleGroup.NECK.labelRes()),

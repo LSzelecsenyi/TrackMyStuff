@@ -83,6 +83,7 @@ internal fun MuscleHeatmapWidgetContent(
         val requestedHeight = (layout.figureHeight.value * density).roundToInt()
         try {
             MuscleMapBitmapRenderer.render(
+                context = context,
                 state = heatmap,
                 widthPx = requestedWidth,
                 heightPx = requestedHeight,

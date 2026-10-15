@@ -211,6 +211,12 @@ android {
     namespace = "app.mymusclemap"
     compileSdk = 37
 
+    // The source SVG embeds the same anatomy bitmap that ships as anatomy.png.
+    androidResources {
+        ignoreAssetsPattern =
+            "!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:!*male_msucle_map.svg"
+    }
+
     defaultConfig {
         applicationId = "com.strictworkout.app"
         minSdk = 26

@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
 import androidx.compose.ui.unit.isSpecified
-import app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesArtwork
+import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector
 import kotlin.math.min
 
 internal data class HeatmapWidgetLayout(
@@ -21,7 +21,8 @@ internal fun heatmapWidgetLayout(width: Dp, height: Dp): HeatmapWidgetLayout {
     val gap = HEATMAP_WIDGET_GAP
     val availableWidth = (bounded(width) - padding * 2).coerceAtLeast(0.dp)
     val availableHeight = (bounded(height) - padding * 2).coerceAtLeast(0.dp)
-    val aspect = BodyMusclesArtwork.VIEW_HEIGHT / BodyMusclesArtwork.VIEW_WIDTH
+    val artwork = MuscleMapArtworkSelector.current()
+    val aspect = artwork.viewHeight / artwork.viewWidth
     val widthLimited = ((availableWidth - gap) / 2f).coerceAtLeast(0.dp)
     val heightLimited = (availableHeight / aspect).coerceAtLeast(0.dp)
     val figureWidth = min(widthLimited.value, heightLimited.value).dp

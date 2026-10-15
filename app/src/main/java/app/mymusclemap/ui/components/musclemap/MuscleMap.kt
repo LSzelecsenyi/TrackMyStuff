@@ -18,10 +18,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.asAndroidPath
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -32,9 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
 import androidx.compose.ui.unit.isSpecified
 import app.mymusclemap.domain.exercise.MuscleGroup
-import app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesArtwork
-import app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesCatalog
 import app.mymusclemap.ui.components.musclemap.artwork.MuscleArtworkRegion
+import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector
 import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapView
 import kotlin.math.min
 
@@ -50,7 +50,8 @@ fun rememberParsedMuscleRegions(): List<ParsedMuscleRegion> {
 }
 
 fun parseMuscleRegions(): List<ParsedMuscleRegion> {
-    return BodyMusclesCatalog.regions.map { region ->
+    val artwork = MuscleMapArtworkSelector.current()
+    return artwork.regions.map { region ->
         val parser = PathParser()
         parser.parsePathString(region.pathData)
         val raw = parser.toPath()
@@ -58,7 +59,7 @@ fun parseMuscleRegions(): List<ParsedMuscleRegion> {
         val path = if (region.view == MuscleMapView.BACK) {
             Path().apply {
                 fillType = PathFillType.NonZero
-                addPath(raw, Offset(-BodyMusclesArtwork.BACK_OFFSET_X, 0f))
+                addPath(raw, Offset(-artwork.splitX, 0f))
             }
         } else {
             raw
@@ -89,6 +90,8 @@ fun MuscleMap(
     interactive: Boolean = true,
     maxFigureHeight: Dp = Dp.Unspecified
 ) {
+    val context = LocalContext.current
+    val anatomy = remember { MuscleMapAnatomy.load(context) }
     val parsed = rememberParsedMuscleRegions()
     val front = remember(parsed) {
         paintOrderedRegions(parsed.filter { it.region.view == MuscleMapView.FRONT })
@@ -133,6 +136,8 @@ fun MuscleMap(
                 .height(pair.figureHeight)
             MuscleFigure(
                 regions = front,
+                anatomy = anatomy.front,
+                lighting = anatomy.frontLighting,
                 fills = fills,
                 unmappedFill = unmappedFill,
                 outline = outline,
@@ -146,6 +151,8 @@ fun MuscleMap(
             )
             MuscleFigure(
                 regions = back,
+                anatomy = anatomy.back,
+                lighting = anatomy.backLighting,
                 fills = fills,
                 unmappedFill = unmappedFill,
                 outline = outline,
@@ -164,6 +171,8 @@ fun MuscleMap(
 @Composable
 private fun MuscleFigure(
     regions: List<ParsedMuscleRegion>,
+    anatomy: android.graphics.Bitmap,
+    lighting: android.graphics.Bitmap,
     fills: Map<MuscleGroup, Color>,
     unmappedFill: Color,
     outline: Color,
@@ -175,6 +184,7 @@ private fun MuscleFigure(
     testTag: String,
     modifier: Modifier
 ) {
+    val artwork = MuscleMapArtworkSelector.current()
     Canvas(
         modifier = modifier
             .testTag(testTag)
@@ -191,40 +201,41 @@ private fun MuscleFigure(
             }
     ) {
         val layout = figureLayout(size.width, size.height)
-        withTransform({
-            translate(layout.offsetX, layout.offsetY)
-            scale(scaleX = layout.scale, scaleY = layout.scale, pivot = Offset.Zero)
-        }) {
-            regions.forEach { parsed ->
-                val group = parsed.region.muscleGroup
-                val fill = group?.let { fills[it] } ?: unmappedFill
-                drawPath(parsed.path, color = fill)
-                val isSelected = group != null && group == selected
-                val strokeColor = when {
-                    isSelected -> selectedOutline
-                    group != null -> mappedOutline
-                    else -> outline
-                }
-                drawPath(
-                    path = parsed.path,
-                    color = strokeColor,
-                    style = Stroke(
-                        width = if (isSelected) {
-                            MUSCLE_MAP_SELECTED_STROKE_WIDTH
-                        } else {
-                            MUSCLE_MAP_STROKE_WIDTH
-                        }
-                    )
-                )
-            }
+        drawIntoCanvas { composeCanvas ->
+            val native = composeCanvas.nativeCanvas
+            native.save()
+            native.translate(layout.offsetX, layout.offsetY)
+            native.scale(layout.scale, layout.scale)
+            MuscleMapFigurePainter.draw(
+                canvas = native,
+                anatomy = anatomy,
+                lighting = lighting,
+                regions = regions,
+                fills = fills,
+                unmappedFill = unmappedFill,
+                outline = outline,
+                mappedOutline = mappedOutline,
+                selectedOutline = selectedOutline,
+                selected = selected,
+                viewWidth = artwork.viewWidth,
+                viewHeight = artwork.viewHeight
+            )
+            native.restore()
         }
     }
 }
 
 internal val MUSCLE_MAP_FIGURE_GAP = 12.dp
-internal const val MUSCLE_MAP_STROKE_WIDTH = 0.12f
-internal const val MUSCLE_MAP_SELECTED_STROKE_WIDTH = 0.28f
-internal val MUSCLE_MAP_ASPECT = BodyMusclesArtwork.VIEW_HEIGHT / BodyMusclesArtwork.VIEW_WIDTH
+
+/** Stroke widths keep the weight they had on the previous 35-unit artwork. */
+private const val LEGACY_VIEW_WIDTH = 35f
+internal const val MUSCLE_MAP_STROKE_WIDTH = 0.12f * 526f / LEGACY_VIEW_WIDTH
+internal const val MUSCLE_MAP_SELECTED_STROKE_WIDTH = 0.28f * 526f / LEGACY_VIEW_WIDTH
+internal val MUSCLE_MAP_ASPECT: Float
+    get() {
+        val artwork = MuscleMapArtworkSelector.current()
+        return artwork.viewHeight / artwork.viewWidth
+    }
 
 internal data class MuscleMapPairLayout(
     val figureWidth: Dp,
@@ -271,12 +282,13 @@ internal data class FigureLayout(
 )
 
 internal fun figureLayout(width: Float, height: Float): FigureLayout {
+    val artwork = MuscleMapArtworkSelector.current()
     val scale = min(
-        width / BodyMusclesArtwork.VIEW_WIDTH,
-        height / BodyMusclesArtwork.VIEW_HEIGHT
+        width / artwork.viewWidth,
+        height / artwork.viewHeight
     )
-    val drawnWidth = BodyMusclesArtwork.VIEW_WIDTH * scale
-    val drawnHeight = BodyMusclesArtwork.VIEW_HEIGHT * scale
+    val drawnWidth = artwork.viewWidth * scale
+    val drawnHeight = artwork.viewHeight * scale
     return FigureLayout(
         scale = scale,
         offsetX = (width - drawnWidth) / 2f,
@@ -328,7 +340,7 @@ internal fun overlayRegionIds(
 internal fun hitTest(
     regions: List<ParsedMuscleRegion>,
     point: Offset,
-    inflate: Float = 1.8f
+    inflate: Float = 1.8f * 526f / 35f
 ): MuscleGroup? {
     data class Candidate(
         val group: MuscleGroup,
@@ -363,7 +375,7 @@ internal fun pathContains(path: Path, point: Offset): Boolean {
     val source = android.graphics.Path(path.asAndroidPath())
     val bounds = android.graphics.RectF()
     source.computeBounds(bounds, true)
-    val half = 0.02f
+    val half = 0.02f * 526f / 35f
     if (
         point.x < bounds.left - half ||
         point.x > bounds.right + half ||

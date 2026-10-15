@@ -509,7 +509,7 @@
     <string name="exercise_weight_na">Not applicable</string>
     <string name="muscle_chest">Chest</string>
     <string name="muscle_lats">Lats</string>
-    <string name="muscle_upper_back">Traps</string>
+    <string name="muscle_upper_back">Upper back</string>
     <string name="muscle_lower_back">Lower back</string>
     <string name="muscle_front_delt">Front delts</string>
     <string name="muscle_side_delt">Side delts</string>
@@ -519,6 +519,7 @@
     <string name="muscle_forearms">Forearms</string>
     <string name="muscle_abs">Abs</string>
     <string name="muscle_obliques">Obliques</string>
+    <string name="muscle_serratus">Serratus</string>
     <string name="muscle_glutes">Glutes</string>
     <string name="muscle_quads">Quads</string>
     <string name="muscle_hamstrings">Hamstrings</string>

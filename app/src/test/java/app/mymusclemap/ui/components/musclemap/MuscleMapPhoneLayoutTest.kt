@@ -142,7 +142,7 @@ class MuscleMapPhoneLayoutTest {
         assertEquals(frontWidth(front).value, frontWidth(back).value, 1.5f)
         assertEquals(front.top.value, back.top.value, 1.5f)
         assertTrue("stacked vertically at $width", front.right.value <= back.left.value + 1.5f)
-        val expectedAspect = BodyMusclesArtworkAspect
+        val expectedAspect = MuscleMapArtworkAspect
         assertTrue(abs(frontHeight(front).value / frontWidth(front).value - expectedAspect) < 0.05f)
         assertTrue(abs(frontHeight(back).value / frontWidth(back).value - expectedAspect) < 0.05f)
         val occupied = frontWidth(front).value + frontWidth(back).value
@@ -154,6 +154,6 @@ private fun frontWidth(bounds: androidx.compose.ui.unit.DpRect): Dp = bounds.rig
 
 private fun frontHeight(bounds: androidx.compose.ui.unit.DpRect): Dp = bounds.bottom - bounds.top
 
-private val BodyMusclesArtworkAspect =
-    app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesArtwork.VIEW_HEIGHT /
-        app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesArtwork.VIEW_WIDTH
+private val MuscleMapArtworkAspect =
+    app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector.current().viewHeight /
+        app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector.current().viewWidth

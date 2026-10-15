@@ -1,6 +1,6 @@
 package app.mymusclemap.ui.components.musclemap
 
-import app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesArtwork
+import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector
 import app.mymusclemap.ui.theme.AppDimens
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -20,7 +20,8 @@ class MuscleMapPairLayoutTest {
         assertTrue(layout.placesSideBySide)
         assertEquals(2, layout.figureCount)
         assertEquals(154.dp, layout.figureWidth)
-        assertEquals(154f * BodyMusclesArtwork.VIEW_HEIGHT / BodyMusclesArtwork.VIEW_WIDTH, layout.figureHeight.value, 0.01f)
+        val artwork = MuscleMapArtworkSelector.current()
+        assertEquals(154f * artwork.viewHeight / artwork.viewWidth, layout.figureHeight.value, 0.01f)
         assertEquals(available.value, layout.figureWidth.value * 2 + layout.gap.value, 0.01f)
         assertTrue(layout.figureWidth > 0.dp)
         assertTrue(layout.figureHeight > 0.dp)
@@ -43,8 +44,9 @@ class MuscleMapPairLayoutTest {
             assertTrue(width.toString(), layout.placesSideBySide)
             assertEquals(2, layout.figureCount)
             assertEquals(layout.figureWidth.value, ((width - layout.gap) / 2f).value, 0.01f)
+            val artwork = MuscleMapArtworkSelector.current()
             assertEquals(
-                layout.figureWidth.value * BodyMusclesArtwork.VIEW_HEIGHT / BodyMusclesArtwork.VIEW_WIDTH,
+                layout.figureWidth.value * artwork.viewHeight / artwork.viewWidth,
                 layout.figureHeight.value,
                 0.01f
             )
@@ -63,9 +65,10 @@ class MuscleMapPairLayoutTest {
     @Test
     fun allocatedFigureFullyContainsArtwork() {
         val layout = muscleMapPairLayout(280.dp)
+        val artwork = MuscleMapArtworkSelector.current()
         val figure = figureLayout(layout.figureWidth.value, layout.figureHeight.value)
-        val drawnWidth = BodyMusclesArtwork.VIEW_WIDTH * figure.scale
-        val drawnHeight = BodyMusclesArtwork.VIEW_HEIGHT * figure.scale
+        val drawnWidth = artwork.viewWidth * figure.scale
+        val drawnHeight = artwork.viewHeight * figure.scale
         assertEquals(layout.figureWidth.value, drawnWidth, 0.01f)
         assertEquals(layout.figureHeight.value, drawnHeight, 0.01f)
         assertEquals(0f, figure.offsetX, 0.01f)

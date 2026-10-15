@@ -15,7 +15,8 @@ import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.domain.workout.SessionStatus
-import app.mymusclemap.ui.components.musclemap.artwork.BodyMusclesCatalog
+import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector
+import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapCatalog
 import app.mymusclemap.ui.theme.toComposeColorScheme
 import app.mymusclemap.domain.theme.ColorSchemeFactory
 import org.junit.Assert.assertEquals
@@ -100,15 +101,15 @@ class MuscleMapColorsTest {
     }
 
     @Test
-    fun unmappedRegionsAreNotAssignedNeverTrainedState() {
-        val unmapped = BodyMusclesCatalog.regions.filter { it.muscleGroup == null }
-        assertTrue(unmapped.isNotEmpty())
+    fun everyInteractivePathIsALogicalMuscleAndSystemGroupsStayOffTheMap() {
+        val regions = MuscleMapArtworkSelector.current().regions
+        assertTrue(regions.none { it.muscleGroup == null })
+        assertTrue(regions.none { it.id in MuscleMapCatalog.groupByPathId.keys && it.muscleGroup == null })
         val fills = MuscleMapColors.heatmapFills(MuscleHeatmapAssembler.assemble(emptyList(), today))
-        unmapped.forEach { region ->
-            assertEquals(region.id, null, region.muscleGroup)
-        }
         assertTrue(fills.keys.all { it in MuscleHeatmapAssembler.anatomicalGroups })
-        assertFalse(fills.keys.any { it == MuscleGroup.FULL_BODY || it == MuscleGroup.CARDIOVASCULAR })
+        assertFalse(fills.containsKey(MuscleGroup.FULL_BODY))
+        assertFalse(fills.containsKey(MuscleGroup.CARDIOVASCULAR))
+        assertEquals(MuscleMapColors.NeverTrained, fills.getValue(MuscleGroup.SERRATUS))
     }
 
     @Test

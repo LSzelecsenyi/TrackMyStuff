@@ -18,6 +18,7 @@ import app.mymusclemap.data.local.WorkoutTemplateEntity
 import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
 import app.mymusclemap.data.local.WeeklyWorkoutGoalEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
+import app.mymusclemap.domain.exercise.ExerciseEnumCodec
 import app.mymusclemap.domain.exercise.StarterCatalog
 import org.json.JSONArray
 import org.json.JSONException
@@ -122,12 +123,17 @@ object AppBackupJson {
             AppBackupFormat.TABLE_EXERCISE_MUSCLES,
             JSONArray().also { array ->
                 snapshot.tables.exerciseMuscles
-                    .sortedWith(compareBy({ it.exerciseId }, { it.muscleGroup }))
+                    .sortedWith(
+                        compareBy(
+                            { it.exerciseId },
+                            { ExerciseEnumCodec.canonicalMuscleName(it.muscleGroup) }
+                        )
+                    )
                     .forEach { row ->
                         array.put(
                             JSONObject()
                                 .put("exerciseId", row.exerciseId)
-                                .put("muscleGroup", row.muscleGroup)
+                                .put("muscleGroup", ExerciseEnumCodec.canonicalMuscleName(row.muscleGroup))
                                 .put("role", row.role)
                         )
                     }
@@ -246,7 +252,7 @@ object AppBackupJson {
                             .put("measurementType", row.measurementType)
                             .put("resistanceBasis", row.resistanceBasis)
                             .put("weightInterpretation", row.weightInterpretation)
-                            .put("primaryMuscle", row.primaryMuscle)
+                            .put("primaryMuscle", ExerciseEnumCodec.canonicalMuscleName(row.primaryMuscle))
                             .put("notes", nullable(row.notes))
                     )
                 }
@@ -256,12 +262,17 @@ object AppBackupJson {
             AppBackupFormat.TABLE_WORKOUT_SESSION_EXERCISE_MUSCLES,
             JSONArray().also { array ->
                 snapshot.tables.workoutSessionExerciseMuscles
-                    .sortedWith(compareBy({ it.sessionExerciseId }, { it.muscleGroup }))
+                    .sortedWith(
+                        compareBy(
+                            { it.sessionExerciseId },
+                            { ExerciseEnumCodec.canonicalMuscleName(it.muscleGroup) }
+                        )
+                    )
                     .forEach { row ->
                         array.put(
                             JSONObject()
                                 .put("sessionExerciseId", row.sessionExerciseId)
-                                .put("muscleGroup", row.muscleGroup)
+                                .put("muscleGroup", ExerciseEnumCodec.canonicalMuscleName(row.muscleGroup))
                                 .put("role", row.role)
                         )
                     }
@@ -875,7 +886,8 @@ object AppBackupJson {
         errors: MutableList<AppBackupError>
     ): ExerciseMuscleEntity? {
         val exerciseId = obj.requiredId("exerciseId", errors) ?: return null
-        val muscleGroup = obj.requiredString("muscleGroup", errors) ?: return null
+        val muscleGroup = obj.requiredString("muscleGroup", errors)?.let(ExerciseEnumCodec::canonicalMuscleName)
+            ?: return null
         val role = obj.requiredString("role", errors) ?: return null
         return ExerciseMuscleEntity(exerciseId, muscleGroup, role)
     }
@@ -1059,7 +1071,8 @@ object AppBackupJson {
         val measurementType = obj.requiredString("measurementType", errors) ?: return null
         val resistanceBasis = obj.requiredString("resistanceBasis", errors) ?: return null
         val weightInterpretation = obj.requiredString("weightInterpretation", errors) ?: return null
-        val primaryMuscle = obj.requiredString("primaryMuscle", errors) ?: return null
+        val primaryMuscle = obj.requiredString("primaryMuscle", errors)?.let(ExerciseEnumCodec::canonicalMuscleName)
+            ?: return null
         val notes = obj.optionalNullableString("notes", errors)
         return WorkoutSessionExerciseEntity(
             id,
@@ -1082,7 +1095,8 @@ object AppBackupJson {
         errors: MutableList<AppBackupError>
     ): WorkoutSessionExerciseMuscleEntity? {
         val sessionExerciseId = obj.requiredId("sessionExerciseId", errors) ?: return null
-        val muscleGroup = obj.requiredString("muscleGroup", errors) ?: return null
+        val muscleGroup = obj.requiredString("muscleGroup", errors)?.let(ExerciseEnumCodec::canonicalMuscleName)
+            ?: return null
         val role = obj.requiredString("role", errors) ?: return null
         return WorkoutSessionExerciseMuscleEntity(sessionExerciseId, muscleGroup, role)
     }
