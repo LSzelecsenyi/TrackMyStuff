@@ -124,8 +124,6 @@ import app.mymusclemap.ui.reports.ReportsScreen
 import app.mymusclemap.ui.reports.ReportsViewModel
 import app.mymusclemap.ui.statistics.StatisticsExerciseDetailScreen
 import app.mymusclemap.ui.statistics.StatisticsExerciseListScreen
-import app.mymusclemap.ui.statistics.StatisticsMuscleDistributionScreen
-import app.mymusclemap.ui.statistics.StatisticsRestScreen
 import app.mymusclemap.ui.statistics.StatisticsScreen
 import app.mymusclemap.ui.statistics.StatisticsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorScreen
@@ -161,6 +159,8 @@ private const val ARG_COMPLETED_SETS = "completedSets"
 private const val ARG_DURATION_MILLIS = "durationMillis"
 private const val ARG_CLIENT_WORKOUT_ID = "clientWorkoutId"
 private const val ARG_STATISTICS_EXERCISE_ID = "exerciseId"
+private const val ARG_MUSCLE_INSIGHTS_MUSCLE = "muscle"
+private const val ARG_MUSCLE_INSIGHTS_PERIOD = "period"
 private const val ARG_REPORT_KIND = "kind"
 private const val ARG_REPORT_START = "start"
 private const val ARG_BODY_TYPE = "type"
@@ -181,6 +181,13 @@ private fun templateEditorRoute(templateId: Long?): String {
 
 private fun statisticsExerciseRoute(exerciseId: Long): String {
     return "${AppRoutes.STATISTICS_EXERCISE}?$ARG_STATISTICS_EXERCISE_ID=$exerciseId"
+}
+
+private fun muscleInsightsRoute(
+    muscle: app.mymusclemap.domain.exercise.MuscleGroup,
+    period: app.mymusclemap.domain.muscleinsights.MuscleInsightsPeriod
+): String {
+    return "${AppRoutes.MUSCLE_INSIGHTS}?$ARG_MUSCLE_INSIGHTS_MUSCLE=${muscle.name}&$ARG_MUSCLE_INSIGHTS_PERIOD=${period.name}"
 }
 
 private fun reportDetailRoute(period: ReportPeriod): String {
@@ -492,6 +499,16 @@ fun WeightTrackerNavHost(
                         }
                     },
                     onOpenWeightDetails = { navController.navigateInternal(AppRoutes.WEIGHT_DETAILS) },
+                    onOpenMuscleInsights = { muscle ->
+                        navController.navigate(
+                            muscleInsightsRoute(
+                                muscle,
+                                app.mymusclemap.domain.muscleinsights.MuscleInsightsPeriod.Weeks4
+                            )
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
                     onOpenSchedulePicker = viewModel::openSchedulePicker,
                     onDismissSchedulePicker = viewModel::dismissSchedulePicker,
                     onScheduleTemplate = viewModel::scheduleTemplate,
@@ -789,10 +806,18 @@ fun WeightTrackerNavHost(
                         onBack = { navController.popBackStack() },
                         onRangeSelected = viewModel::onRangeSelected,
                         onDismissLocked = viewModel::consumeLockedFeature,
-                        onOpenMuscleDistribution = {
-                            navController.navigateInternal(AppRoutes.STATISTICS_MUSCLES)
+                        onOpenMuscleInsights = {
+                            val muscle = state.muscleInsights.featuredMuscle
+                                ?: app.mymusclemap.domain.exercise.MuscleGroup.CHEST
+                            navController.navigate(
+                                muscleInsightsRoute(
+                                    muscle,
+                                    app.mymusclemap.domain.muscleinsights.MuscleInsightsPeriod.fromStatistics(state.range)
+                                )
+                            ) {
+                                launchSingleTop = true
+                            }
                         },
-                        onOpenRest = { navController.navigateInternal(AppRoutes.STATISTICS_REST) },
                         onOpenExercises = {
                             navController.navigateInternal(AppRoutes.STATISTICS_EXERCISES)
                         },
@@ -802,20 +827,30 @@ fun WeightTrackerNavHost(
                         onOpenReports = { navController.navigateInternal(AppRoutes.REPORTS_GRAPH) }
                     )
                 }
-                composable(AppRoutes.STATISTICS_MUSCLES) { entry ->
-                    val viewModel = statisticsViewModel(navController, factory, entry)
-                    val state by viewModel.uiState.collectAsStateWithLifecycle()
-                    StatisticsMuscleDistributionScreen(
-                        muscles = state.dashboard.muscleDistribution,
-                        onBack = { navController.popBackStack() }
+                composable(
+                    route = AppRoutes.MUSCLE_INSIGHTS_PATTERN,
+                    arguments = listOf(
+                        navArgument(ARG_MUSCLE_INSIGHTS_MUSCLE) {
+                            type = NavType.StringType
+                            defaultValue = app.mymusclemap.domain.exercise.MuscleGroup.CHEST.name
+                        },
+                        navArgument(ARG_MUSCLE_INSIGHTS_PERIOD) {
+                            type = NavType.StringType
+                            defaultValue = app.mymusclemap.domain.muscleinsights.MuscleInsightsPeriod.Weeks4.name
+                        }
                     )
-                }
-                composable(AppRoutes.STATISTICS_REST) { entry ->
-                    val viewModel = statisticsViewModel(navController, factory, entry)
-                    val state by viewModel.uiState.collectAsStateWithLifecycle()
-                    StatisticsRestScreen(
-                        rest = state.dashboard.restBetweenSessions,
-                        onBack = { navController.popBackStack() }
+                ) { entry ->
+                    val viewModel: app.mymusclemap.ui.muscleinsights.MuscleInsightsViewModel =
+                        viewModel(factory = factory)
+                    val insights by viewModel.uiState.collectAsStateWithLifecycle()
+                    app.mymusclemap.ui.muscleinsights.MuscleInsightsScreen(
+                        state = insights,
+                        onBack = { navController.popBackStack() },
+                        onMuscleSelected = viewModel::onMuscleSelected,
+                        onPeriodSelected = viewModel::onPeriodSelected,
+                        onExplain = viewModel::onExplain,
+                        onDismissExplanation = viewModel::dismissExplanation,
+                        onUpgrade = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) }
                     )
                 }
                 composable(AppRoutes.STATISTICS_EXERCISES) { entry ->

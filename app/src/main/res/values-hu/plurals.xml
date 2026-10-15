@@ -24,6 +24,14 @@
         <item quantity="one">%d sorozat</item>
         <item quantity="other">%d sorozat</item>
     </plurals>
+    <plurals name="muscle_insights_minutes_ago">
+        <item quantity="one">%d perce</item>
+        <item quantity="other">%d perce</item>
+    </plurals>
+    <plurals name="muscle_insights_hours_ago">
+        <item quantity="one">%d órája</item>
+        <item quantity="other">%d órája</item>
+    </plurals>
     <plurals name="heatmap_days_ago">
         <item quantity="one">%d napja</item>
         <item quantity="other">%d napja</item>

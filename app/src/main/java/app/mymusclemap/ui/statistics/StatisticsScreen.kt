@@ -33,6 +33,7 @@ import app.mymusclemap.domain.statistics.ExerciseBest
 import app.mymusclemap.domain.statistics.ExerciseHistoryKind
 import app.mymusclemap.domain.statistics.ExerciseHistoryPoint
 import app.mymusclemap.domain.statistics.ExerciseProgressSummary
+import app.mymusclemap.domain.muscleinsights.MuscleInsightsPreview
 import app.mymusclemap.domain.statistics.MuscleRestSummary
 import app.mymusclemap.domain.statistics.MuscleTrainingCount
 import app.mymusclemap.domain.statistics.PlanAdherence
@@ -47,6 +48,8 @@ import app.mymusclemap.domain.workout.ElapsedTime
 import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.SeriesChart
+import app.mymusclemap.ui.muscleinsights.MuscleInsightsBars
+import app.mymusclemap.ui.muscleinsights.stimulusText
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.exercises.labelRes
 import app.mymusclemap.ui.pro.ProInfoSheet
@@ -61,8 +64,7 @@ fun StatisticsScreen(
     onBack: () -> Unit,
     onRangeSelected: (StatisticsRange) -> Unit = {},
     onDismissLocked: () -> Unit = {},
-    onOpenMuscleDistribution: () -> Unit = {},
-    onOpenRest: () -> Unit = {},
+    onOpenMuscleInsights: () -> Unit = {},
     onOpenExercises: () -> Unit = {},
     onOpenExercise: (Long) -> Unit = {},
     onOpenReports: () -> Unit = {}
@@ -117,14 +119,9 @@ fun StatisticsScreen(
                     CompactEditorDivider()
                     VolumeSection(state.dashboard.volume, state.dashboard.range)
                     CompactEditorDivider()
-                    MuscleSection(
-                        muscles = state.dashboard.muscleDistribution,
-                        onSeeDetails = onOpenMuscleDistribution
-                    )
-                    CompactEditorDivider()
-                    RestSection(
-                        rest = state.dashboard.restBetweenSessions,
-                        onSeeDetails = onOpenRest
+                    MuscleInsightsSection(
+                        preview = state.muscleInsights,
+                        onExplore = onOpenMuscleInsights
                     )
                     CompactEditorDivider()
                     ExerciseSection(
@@ -292,88 +289,57 @@ private fun VolumeSection(volume: TrainingVolume, range: StatisticsRange) {
 }
 
 @Composable
-private fun MuscleSection(
-    muscles: List<MuscleTrainingCount>,
-    onSeeDetails: () -> Unit
+private fun MuscleInsightsSection(
+    preview: MuscleInsightsPreview,
+    onExplore: () -> Unit
 ) {
     CompactEditorSection(
-        title = stringResource(R.string.statistics_muscles_title).uppercase(AppLocale.UI),
-        modifier = Modifier.testTag(STATISTICS_MUSCLES)
+        title = stringResource(R.string.muscle_insights_title).uppercase(AppLocale.UI),
+        modifier = Modifier.testTag(STATISTICS_INSIGHTS)
     ) {
+        if (preview.demo) {
+            Text(
+                text = stringResource(R.string.muscle_insights_demo),
+                style = AppTypeTokens.sectionKicker,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+        }
         Text(
-            text = stringResource(R.string.statistics_muscles_scope),
+            text = stringResource(R.string.muscle_insights_stats_scope),
             style = AppTypeTokens.statCaption,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(AppDimens.itemGap))
-        if (muscles.isEmpty()) {
+        if (preview.isEmpty) {
             Text(
-                text = stringResource(R.string.statistics_muscles_empty),
+                text = stringResource(R.string.muscle_insights_stats_empty),
                 style = AppTypeTokens.statSecondary,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            StatisticsCard {
-                TrainingStatisticsLogic.summaryMuscles(muscles).forEach { count ->
-                    StatRow(
-                        label = stringResource(count.muscle.labelRes()),
-                        value = pluralStringResource(
-                            R.plurals.statistics_muscle_sets,
-                            count.completedSetCount,
-                            count.completedSetCount
-                        )
-                    )
-                }
-            }
-            if (muscles.size > TrainingStatisticsLogic.SUMMARY_MUSCLES) {
-                SeeMoreRow(
-                    label = stringResource(R.string.statistics_see_details),
-                    onClick = onSeeDetails,
-                    testTag = STATISTICS_SEE_MUSCLES
+            preview.featuredMuscle?.let { muscle ->
+                Text(
+                    text = stringResource(
+                        R.string.heatmap_selection,
+                        stringResource(muscle.labelRes()),
+                        stimulusText(preview.featuredStimulus)
+                    ),
+                    style = AppTypeTokens.statSecondary,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
+                Spacer(Modifier.height(AppDimens.itemGap))
+            }
+            StatisticsCard {
+                MuscleInsightsBars(bars = preview.bars)
             }
         }
-    }
-}
-
-@Composable
-private fun RestSection(
-    rest: List<MuscleRestSummary>,
-    onSeeDetails: () -> Unit
-) {
-    CompactEditorSection(
-        title = stringResource(R.string.statistics_rest_title).uppercase(AppLocale.UI),
-        modifier = Modifier.testTag(STATISTICS_REST)
-    ) {
-        Text(
-            text = stringResource(R.string.statistics_rest_scope),
-            style = AppTypeTokens.statCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        Spacer(Modifier.height(AppDimens.headerStackGap))
+        SeeMoreRow(
+            label = stringResource(R.string.muscle_insights_explore),
+            onClick = onExplore,
+            testTag = STATISTICS_EXPLORE_INSIGHTS
         )
-        Spacer(Modifier.height(AppDimens.itemGap))
-        if (rest.isEmpty()) {
-            Text(
-                text = stringResource(R.string.statistics_rest_empty),
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            StatisticsCard {
-                TrainingStatisticsLogic.summaryRest(rest).forEach { summary ->
-                    StatRow(
-                        label = stringResource(summary.muscle.labelRes()),
-                        value = stringResource(R.string.statistics_rest_days_value, summary.averageDays)
-                    )
-                }
-            }
-            if (rest.size > TrainingStatisticsLogic.SUMMARY_REST) {
-                SeeMoreRow(
-                    label = stringResource(R.string.statistics_see_details),
-                    onClick = onSeeDetails,
-                    testTag = STATISTICS_SEE_REST
-                )
-            }
-        }
     }
 }
 

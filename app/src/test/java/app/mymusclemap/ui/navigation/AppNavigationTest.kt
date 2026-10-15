@@ -182,6 +182,8 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_GRAPH))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_MUSCLES))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_REST))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.MUSCLE_INSIGHTS_PATTERN))
+        assertFalse(AppNavigation.showsBottomBar("muscle_insights?muscle=CHEST&period=Weeks4"))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_EXERCISES))
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.STATISTICS_EXERCISE_PATTERN))
         assertFalse(AppNavigation.showsBottomBar("statistics_exercise?exerciseId=4"))

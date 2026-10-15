@@ -31,9 +31,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.MuscleGroup
+import app.mymusclemap.domain.muscleinsights.MuscleQuickInsight
 import app.mymusclemap.domain.musclemap.MuscleHeatmapEntry
 import app.mymusclemap.domain.musclemap.MuscleHeatmapState
 import app.mymusclemap.domain.musclemap.MuscleRecencyBand
+import app.mymusclemap.ui.muscleinsights.MuscleQuickInsightsSheet
 import app.mymusclemap.ui.exercises.labelRes
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
@@ -42,7 +44,9 @@ import app.mymusclemap.ui.theme.AppTypeTokens
 @Composable
 fun MuscleHeatmapCard(
     state: MuscleHeatmapState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    quickInsights: Map<MuscleGroup, MuscleQuickInsight> = emptyMap(),
+    onOpenInsights: (MuscleGroup) -> Unit = {}
 ) {
     val scheme = MaterialTheme.colorScheme
     val fills = remember(state) { MuscleMapColors.heatmapFills(state) }
@@ -111,6 +115,17 @@ fun MuscleHeatmapCard(
                 modifier = Modifier.padding(top = AppDimens.statSecondaryGap)
             )
         }
+    }
+    selectedEntry?.let { entry ->
+        MuscleQuickInsightsSheet(
+            entry = entry,
+            insight = quickInsights[entry.group],
+            onDismiss = { selected = null },
+            onOpenInsights = { muscle ->
+                selected = null
+                onOpenInsights(muscle)
+            }
+        )
     }
 }
 
@@ -250,7 +265,7 @@ private const val LegendScale = 1f
 
 // Short phones also show the weekly-goal line under the calendar heading. These caps
 // give that line back so the collapsed week still fits above the bottom bar.
-private val NarrowOverviewFigureHeight = 260.dp
-private val NarrowOverviewEmptyFigureHeight = 220.dp
+private val NarrowOverviewFigureHeight = 325.dp
+private val NarrowOverviewEmptyFigureHeight = 275.dp
 private val LegendDotSize = 8.dp * LegendScale
 private val LegendDotLabelGap = 4.dp * LegendScale

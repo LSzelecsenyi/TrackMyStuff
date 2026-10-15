@@ -25,6 +25,9 @@ import app.mymusclemap.domain.WeightParseError
 import app.mymusclemap.domain.calendar.MonthGrid
 import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
+import app.mymusclemap.domain.exercise.MuscleGroup
+import app.mymusclemap.domain.muscleinsights.MuscleInsightsLogic
+import app.mymusclemap.domain.muscleinsights.MuscleQuickInsight
 import app.mymusclemap.domain.musclemap.MuscleHeatmapAssembler
 import app.mymusclemap.domain.musclemap.MuscleHeatmapState
 import app.mymusclemap.domain.model.ChartRange
@@ -48,6 +51,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import java.time.ZoneId
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -82,6 +86,7 @@ data class DashboardUiState(
     val daySheet: DaySheetState? = null,
     val showDayDeleteConfirm: Boolean = false,
     val heatmap: MuscleHeatmapState = MuscleHeatmapAssembler.assemble(emptyList(), LocalDate.of(1970, 1, 1)),
+    val quickInsights: Map<MuscleGroup, MuscleQuickInsight> = emptyMap(),
     val schedulePickerVisible: Boolean = false,
     val availableTemplates: List<TemplateListItem> = emptyList(),
     val rescheduleTarget: ScheduledWorkout? = null,
@@ -327,13 +332,19 @@ class DashboardViewModel(
                 )
             )
         },
-        sessionRepository.observeHeatmapExercises(),
+        combine(
+            sessionRepository.observeHeatmapExercises(),
+            sessionRepository.observeCompletedAggregates()
+        ) { exercises, aggregates -> exercises to aggregates },
         dialogs,
         onboardingChrome,
         weeklyGoalStatus
-    ) { state, exercises, dialogState, onboardingState, goal ->
+    ) { state, training, dialogState, onboardingState, goal ->
+        val (exercises, aggregates) = training
         state.copy(
             heatmap = MuscleHeatmapAssembler.assemble(exercises, state.today),
+            quickInsights = MuscleInsightsLogic.index(aggregates, ZoneId.systemDefault())
+                .quick(state.today, dateProvider.now()),
             schedulePickerVisible = dialogState.pickerVisible,
             rescheduleTarget = dialogState.reschedule,
             removeTarget = dialogState.remove,

@@ -210,6 +210,14 @@ class WeightViewModelFactory(
                     extras.createSavedStateHandle()
                 )
             }
+            modelClass.isAssignableFrom(app.mymusclemap.ui.muscleinsights.MuscleInsightsViewModel::class.java) -> {
+                app.mymusclemap.ui.muscleinsights.MuscleInsightsViewModel(
+                    workoutSessionRepository,
+                    dateProvider,
+                    featureEntitlements,
+                    extras.createSavedStateHandle()
+                )
+            }
             modelClass.isAssignableFrom(ProgressPhotosViewModel::class.java) -> {
                 ProgressPhotosViewModel(progressPhotoRepository, featureEntitlements)
             }

@@ -25,6 +25,7 @@ import app.mymusclemap.domain.exercise.MovementPattern
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
+import app.mymusclemap.domain.muscleinsights.MuscleInsightsDemo
 import app.mymusclemap.domain.statistics.StatisticsRange
 import app.mymusclemap.domain.workout.ActualSetDraft
 import app.mymusclemap.domain.workout.PlannedLoadKind
@@ -50,6 +51,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 @RunWith(RobolectricTestRunner::class)
@@ -148,6 +150,26 @@ class StatisticsViewModelTest {
         assertTrue(state.dashboard.restBetweenSessions.isEmpty())
         assertEquals(1, sessions.observeCompletedAggregates().first().size)
         assertEquals("Pull-up", viewModel.exercise(state.dashboard.exercises.single().exerciseId)?.name)
+    }
+
+    @Test
+    fun freePreviewUsesDemoDataAndDoesNotUseTheRecordedWorkout() = runTest {
+        val templateId = saveTemplate()
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        val aggregate = sessions.getAggregate(started.sessionId)!!
+        sessions.completeSet(
+            aggregate.exercises.single().sets.first().id,
+            ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+        )
+        sessions.finish(started.sessionId, skipRemaining = true)
+        val free = viewModel(entitlements = SelectiveFeatureEntitlements(emptySet()))
+        val demoState = free.uiState.first { !it.loading }
+        val demo = MuscleInsightsDemo.preview(today, dateProvider.now(), ZoneId.systemDefault())
+        assertEquals(demo, demoState.muscleInsights)
+        assertEquals(MuscleGroup.CHEST, demoState.muscleInsights.featuredMuscle)
+        val personal = viewModel().uiState.first { !it.loading }
+        assertFalse(personal.muscleInsights.demo)
+        assertEquals(MuscleGroup.LATS, personal.muscleInsights.featuredMuscle)
     }
 
     @Test

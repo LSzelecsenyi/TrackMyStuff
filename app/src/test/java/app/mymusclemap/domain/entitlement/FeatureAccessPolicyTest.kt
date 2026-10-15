@@ -199,7 +199,17 @@ class FeatureAccessPolicyTest {
         val proEntitlements = PolicyBackedEntitlements(pro)
         assertFalse(freeEntitlements.hasAccess(AppFeature.ProgressPhotos))
         assertFalse(freeEntitlements.hasAccess(AppFeature.UnlimitedWorkoutPlans))
-        assertTrue(freeEntitlements.hasAccess(AppFeature.AdvancedMuscleAnalytics))
+        assertFalse(freeEntitlements.hasAccess(AppFeature.AdvancedMuscleAnalytics))
+        val founder = FeatureAccessPolicy(
+            EffectiveEntitlement(
+                tier = EntitlementTier.Pro,
+                subscriptionValid = false,
+                founderLifetime = true,
+                temporaryTesterPro = false
+            )
+        )
+        assertTrue(founder.canViewAdvancedMuscleInsights())
+        assertTrue(PolicyBackedEntitlements(founder).hasAccess(AppFeature.AdvancedMuscleAnalytics))
         AppFeature.entries.forEach { feature ->
             assertTrue(proEntitlements.hasAccess(feature))
         }

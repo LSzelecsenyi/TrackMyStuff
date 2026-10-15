@@ -50,6 +50,9 @@ class FeatureAccessPolicy(
         return kind == ReportKind.Monthly || pro
     }
 
+    /** Detailed Muscle Insights. The heatmap and quick facts stay available without this. */
+    fun canViewAdvancedMuscleInsights(): Boolean = pro
+
     fun progressPhotos(): ProgressPhotoPermissions {
         return ProgressPhotoPermissions(canAdd = pro)
     }

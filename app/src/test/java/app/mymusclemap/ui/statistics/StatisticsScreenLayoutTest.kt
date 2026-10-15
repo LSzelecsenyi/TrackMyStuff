@@ -25,6 +25,9 @@ import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.model.SeriesPoint
+import app.mymusclemap.domain.muscleinsights.MuscleInsightsPreview
+import app.mymusclemap.domain.muscleinsights.MuscleSetBar
+import app.mymusclemap.domain.muscleinsights.StimulusAge
 import app.mymusclemap.domain.statistics.ExerciseBest
 import app.mymusclemap.domain.statistics.ExerciseHistoryKind
 import app.mymusclemap.domain.statistics.ExerciseHistoryPoint
@@ -91,10 +94,12 @@ class StatisticsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.statistics_trend_insufficient))
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.statistics_rest_empty))
+        composeRule.onNodeWithText(testString(R.string.muscle_insights_stats_empty))
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Bench press").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.starter_exercise_bench_press))
+            .performScrollTo()
+            .assertIsDisplayed()
         composeRule.onNodeWithTag(STATISTICS_SEE_MUSCLES).assertDoesNotExist()
     }
 
@@ -107,10 +112,12 @@ class StatisticsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.statistics_adherence_percent, 83)).assertIsDisplayed()
         composeRule.onNodeWithTag(STATISTICS_VOLUME).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.statistics_volume_scope)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Bench press").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(STATISTICS_MUSCLES).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.starter_exercise_bench_press))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_INSIGHTS).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.muscle_chest)).onFirst().assertIsDisplayed()
-        composeRule.onNodeWithTag(STATISTICS_REST).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(STATISTICS_EXPLORE_INSIGHTS).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(STATISTICS_REPORTS).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.reports_entry_title)).assertIsDisplayed()
     }
@@ -142,7 +149,7 @@ class StatisticsScreenLayoutTest {
             ),
             onOpenMuscles = { opened[0] += 1 }
         )
-        composeRule.onNodeWithTag(STATISTICS_SEE_MUSCLES).performScrollTo().performClick()
+        composeRule.onNodeWithTag(STATISTICS_EXPLORE_INSIGHTS).performScrollTo().performClick()
         assertEquals(1, opened[0])
     }
 
@@ -243,6 +250,11 @@ class StatisticsScreenLayoutTest {
                 exercises = listOf(
                     exercise("Bench press", 80.0, 75.0, historySize = 2)
                 )
+            ),
+            muscleInsights = MuscleInsightsPreview(
+                bars = muscles.take(3).map { MuscleSetBar(it.muscle, it.completedSetCount) },
+                featuredMuscle = muscles.firstOrNull()?.muscle,
+                featuredStimulus = StimulusAge.Days(2)
             )
         )
     }
@@ -291,7 +303,7 @@ class StatisticsScreenLayoutTest {
                             state = state,
                             onBack = onBack,
                             onRangeSelected = onRangeSelected,
-                            onOpenMuscleDistribution = onOpenMuscles,
+                            onOpenMuscleInsights = onOpenMuscles,
                             onOpenExercise = onOpenExercise
                         )
                     }

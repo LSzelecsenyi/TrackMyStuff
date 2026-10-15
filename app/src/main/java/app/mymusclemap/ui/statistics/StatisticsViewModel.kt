@@ -10,6 +10,9 @@ import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.entitlement.ProAccess
+import app.mymusclemap.domain.muscleinsights.MuscleInsightsDemo
+import app.mymusclemap.domain.muscleinsights.MuscleInsightsLogic
+import app.mymusclemap.domain.muscleinsights.MuscleInsightsPreview
 import app.mymusclemap.domain.statistics.ExerciseProgressSummary
 import app.mymusclemap.domain.statistics.StatisticsRange
 import app.mymusclemap.domain.statistics.TrainingStatistics
@@ -19,11 +22,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import java.time.ZoneId
 
 data class StatisticsUiState(
     val loading: Boolean = true,
     val range: StatisticsRange = StatisticsRange.Days30,
     val dashboard: TrainingStatistics = TrainingStatistics(),
+    val muscleInsights: MuscleInsightsPreview = MuscleInsightsPreview(),
     val lockedFeature: AppFeature? = null
 )
 
@@ -45,10 +50,18 @@ class StatisticsViewModel(
         combine(lockedFeature, entitlements.changes()) { locked, _ -> locked }
     ) { aggregates, scheduled, today, rangeName, locked ->
         val requested = resolvedRange(rangeName)
+        val now = dateProvider.now()
+        val zone = ZoneId.systemDefault()
+        val muscleInsights = if (entitlements.hasAccess(AppFeature.AdvancedMuscleAnalytics)) {
+            MuscleInsightsLogic.index(aggregates, zone).preview(today, now, requested)
+        } else {
+            MuscleInsightsDemo.preview(today, now, zone)
+        }
         StatisticsUiState(
             loading = false,
             range = requested,
             dashboard = TrainingStatisticsLogic.assemble(aggregates, scheduled, today, requested),
+            muscleInsights = muscleInsights,
             lockedFeature = locked
         )
     }.stateIn(

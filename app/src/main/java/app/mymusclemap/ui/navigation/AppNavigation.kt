@@ -18,6 +18,8 @@ object AppRoutes {
     const val STATISTICS = "statistics"
     const val STATISTICS_MUSCLES = "statistics_muscles"
     const val STATISTICS_REST = "statistics_rest"
+    const val MUSCLE_INSIGHTS = "muscle_insights"
+    const val MUSCLE_INSIGHTS_PATTERN = "muscle_insights?muscle={muscle}&period={period}"
     const val STATISTICS_EXERCISES = "statistics_exercises"
     const val STATISTICS_EXERCISE = "statistics_exercise"
     const val STATISTICS_EXERCISE_PATTERN = "statistics_exercise?exerciseId={exerciseId}"

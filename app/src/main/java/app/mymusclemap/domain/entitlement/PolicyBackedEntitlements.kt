@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Adapts [FeatureAccessPolicy] to the existing capability checks used by screens.
- * Muscle heatmap stays available on Free, matching the product matrix.
+ * The muscle heatmap stays available on Free. Advanced Muscle Insights does not.
  */
 class PolicyBackedEntitlements(
     private val policySource: () -> FeatureAccessPolicy,
@@ -23,7 +23,7 @@ class PolicyBackedEntitlements(
         return when (feature) {
             AppFeature.AdvancedStatistics -> policy.canViewStatistics(StatisticsRange.All)
             AppFeature.AdvancedReports -> policy.canViewReport(ReportKind.Quarterly)
-            AppFeature.AdvancedMuscleAnalytics -> true
+            AppFeature.AdvancedMuscleAnalytics -> policy.canViewAdvancedMuscleInsights()
             AppFeature.UnlimitedWorkoutPlans -> policy.workoutPlans(Int.MAX_VALUE).canCreate
             AppFeature.AdvancedPlanning -> policy.scheduling().canCreate
             AppFeature.AdvancedBodyMeasurements -> policy.advancedMeasurement(fieldAlreadyHasValue = false).canCreateNew

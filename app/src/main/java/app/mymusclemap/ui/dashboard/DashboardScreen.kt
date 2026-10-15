@@ -143,6 +143,7 @@ fun DashboardScreen(
     onOpenCatalog: () -> Unit,
     onOpenWorkout: (Long) -> Unit,
     onOpenWeightDetails: () -> Unit,
+    onOpenMuscleInsights: (app.mymusclemap.domain.exercise.MuscleGroup) -> Unit = {},
     onOpenSchedulePicker: () -> Unit = {},
     onDismissSchedulePicker: () -> Unit = {},
     onScheduleTemplate: (Long) -> Unit = {},
@@ -271,6 +272,8 @@ fun DashboardScreen(
             OverviewSectionDivider()
             MuscleHeatmapCard(
                 state = state.heatmap,
+                quickInsights = state.quickInsights,
+                onOpenInsights = onOpenMuscleInsights,
                 modifier = Modifier
                     .testTag("dashboard_heatmap")
                     .onGloballyPositioned { coordinates ->
