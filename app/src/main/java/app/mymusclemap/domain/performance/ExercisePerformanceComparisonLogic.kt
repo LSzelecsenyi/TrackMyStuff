@@ -75,19 +75,35 @@ object ExercisePerformanceComparisonLogic {
     }
 
     /**
-     * Lists exercises whose latest snapshotted primary-muscle occurrence falls
-     * in [period]. The reference may be older than the period, still inside
-     * the 90-day window. Secondary muscles are ignored.
+     * Lists exercises that have an eligible primary-muscle occurrence inside
+     * [period], ending at [periodEnd] or [today], whichever is earlier.
+     *
+     * The current occurrence is the latest one inside that window. A newer
+     * occurrence outside the window is ignored. The reference may be older
+     * than the period and stays inside the 90-day window. Secondary muscles
+     * are ignored. [compareExercise] and [compareAll] still use the global
+     * latest occurrence.
      */
     fun summarizeMuscle(
         aggregates: List<WorkoutSessionAggregate>,
         muscle: MuscleGroup,
         period: MuscleInsightsPeriod,
-        today: LocalDate
+        today: LocalDate,
+        periodEnd: LocalDate = today
     ): MuscleExercisePerformance {
+        val end = if (periodEnd.isAfter(today)) today else periodEnd
         val exercises = occurrencesByExercise(aggregates, today, muscle)
-            .map { (exerciseId, occurrences) -> compareOccurrences(exerciseId, occurrences) }
-            .filter { period.contains(it.currentDate, today) }
+            .mapNotNull { (exerciseId, occurrences) ->
+                val ordered = occurrences.sortedWith(newestFirst)
+                val currentIndex = ordered.indexOfFirst {
+                    dateInListedPeriod(it.date, period, today, end)
+                }
+                if (currentIndex < 0) {
+                    null
+                } else {
+                    compareOccurrences(exerciseId, ordered.drop(currentIndex))
+                }
+            }
             .sortedWith(outputOrder)
         return MuscleExercisePerformance(
             muscle = muscle,
@@ -299,6 +315,16 @@ object ExercisePerformanceComparisonLogic {
                 ComparisonLimitation.ASSISTANCE_EXCLUDED
             else -> ComparisonLimitation.UNSUPPORTED_TYPE
         }
+    }
+
+    private fun dateInListedPeriod(
+        date: LocalDate,
+        period: MuscleInsightsPeriod,
+        today: LocalDate,
+        periodEnd: LocalDate
+    ): Boolean {
+        if (date.isAfter(periodEnd)) return false
+        return period.contains(date, today)
     }
 
     private fun withinWindow(latest: LocalDate, earlier: LocalDate): Boolean {

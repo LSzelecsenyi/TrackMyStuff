@@ -859,6 +859,34 @@ class ExercisePerformanceComparisonTest {
     }
 
     @Test
+    fun newerOccurrenceOutsideTheListedPeriodDoesNotBecomeCurrent() {
+        val newer = weighted(id = 3, daysAgo = 6, weight = 80.0, reps = 5)
+        val inside = weighted(id = 2, daysAgo = 20, weight = 80.0, reps = 8)
+        val older = weighted(id = 1, daysAgo = 40, weight = 80.0, reps = 10)
+        val history = listOf(newer, inside, older)
+        val unbounded = ExercisePerformanceComparisonLogic.summarizeMuscle(
+            history,
+            MuscleGroup.CHEST,
+            MuscleInsightsPeriod.Weeks4,
+            TODAY
+        )
+        assertEquals(3L, unbounded.exercises.single().currentSessionId)
+
+        val bounded = ExercisePerformanceComparisonLogic.summarizeMuscle(
+            history,
+            MuscleGroup.CHEST,
+            MuscleInsightsPeriod.Weeks4,
+            TODAY,
+            periodEnd = TODAY.minusDays(15)
+        )
+        val exercise = bounded.exercises.single()
+        assertEquals(2L, exercise.currentSessionId)
+        assertEquals(1L, exercise.referenceSessionId)
+        assertEquals(TODAY.minusDays(20), exercise.currentDate)
+        assertEquals(-2.0, exercise.only().delta, 0.0)
+    }
+
+    @Test
     fun exerciseAbsentFromTheSelectedReportingPeriodIsNotListed() {
         val old = weighted(id = 1, daysAgo = 76, weight = 80.0, reps = 8, exerciseId = 4L, name = "Old press")
         val recent = weighted(id = 2, daysAgo = 0, weight = 40.0, reps = 10, exerciseId = 5L, name = "Recent press")

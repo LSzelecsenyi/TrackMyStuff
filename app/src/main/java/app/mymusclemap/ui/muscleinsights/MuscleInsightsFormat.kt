@@ -78,6 +78,7 @@ fun MuscleInsightTopic.titleRes(): Int {
         MuscleInsightTopic.CHART -> R.string.muscle_insights_chart_title
         MuscleInsightTopic.SPACING -> R.string.muscle_insights_spacing
         MuscleInsightTopic.CONTRIBUTION -> R.string.muscle_insights_contribution_title
+        MuscleInsightTopic.EXERCISE_PROGRESSION -> R.string.exercise_progression_title
     }
 }
 
@@ -88,6 +89,7 @@ fun MuscleInsightTopic.bodyRes(): Int {
         MuscleInsightTopic.CHART -> R.string.muscle_insights_explain_chart
         MuscleInsightTopic.SPACING -> R.string.muscle_insights_explain_spacing
         MuscleInsightTopic.CONTRIBUTION -> R.string.muscle_insights_explain_contribution
+        MuscleInsightTopic.EXERCISE_PROGRESSION -> R.string.exercise_progression_explain
     }
 }
 

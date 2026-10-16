@@ -44,6 +44,41 @@ class LocalizationResourceTest {
         assertEquals("6 hónap", hungarian.getValue("muscle_insights_period_name_6m"))
         assertEquals("1 év", hungarian.getValue("muscle_insights_period_name_1y"))
         assertEquals("Teljes időszak", hungarian.getValue("muscle_insights_period_name_all"))
+        assertEquals("Gyakorlatok fejlődése", hungarian.getValue("exercise_progression_title"))
+        assertEquals("Előző", hungarian.getValue("exercise_progression_previous"))
+        assertEquals("Aktuális", hungarian.getValue("exercise_progression_current_label"))
+        assertTrue(
+            hungarian.getValue("exercise_progression_explain").contains(
+                "legjobb teljesített sorozaton alapul, nem az edzés összes ismétlésén"
+            )
+        )
+        assertTrue(hungarian.getValue("exercise_progression_explain").contains("hosszabb időtartam"))
+        assertTrue(
+            english.getValue("exercise_progression_explain").contains(
+                "best completed set under matching conditions, not the total repetitions across the workout"
+            )
+        )
+        assertTrue(english.getValue("exercise_progression_explain").contains("higher load at the same repetitions"))
+        assertTrue(english.getValue("exercise_progression_explain").contains("longer duration"))
+        assertEquals("Javult", hungarian.getValue("exercise_progression_improved"))
+        assertEquals("Alacsonyabb rögzített teljesítmény", hungarian.getValue("exercise_progression_lower"))
+        assertEquals("Változatlan", hungarian.getValue("exercise_progression_stable"))
+        assertEquals("Vegyes", hungarian.getValue("exercise_progression_mixed"))
+        assertEquals("Nem összehasonlítható közvetlenül", hungarian.getValue("exercise_progression_not_comparable"))
+        assertEquals("Kevés előzmény", hungarian.getValue("exercise_progression_insufficient"))
+        assertEquals("Nem támogatott összehasonlítás", hungarian.getValue("exercise_progression_unsupported"))
+        assertEquals(
+            "Nincs korábbi befejezett edzés az összehasonlításhoz.",
+            hungarian.getValue("exercise_progression_insufficient_only")
+        )
+        assertEquals(
+            "Vannak korábbi edzések, de 90 napon belül nincs egyező terhelési vagy ismétlésszám-feltétel.",
+            hungarian.getValue("exercise_progression_not_comparable_body")
+        )
+        assertEquals(
+            "Ez a gyakorlat vagy a rögzített terheléstípus nem támogatott az összehasonlításban.",
+            hungarian.getValue("exercise_progression_unsupported_body")
+        )
         englishPlurals.forEach { (name, items) ->
             assertEquals(name, items.keys, hungarianPlurals.getValue(name).keys)
             items.forEach { (quantity, value) ->

@@ -14,11 +14,16 @@ import app.mymusclemap.domain.muscleinsights.MuscleInsightTopic
 import app.mymusclemap.domain.muscleinsights.MuscleInsightsDemo
 import app.mymusclemap.domain.muscleinsights.MuscleInsightsLogic
 import app.mymusclemap.domain.muscleinsights.MuscleInsightsPeriod
+import app.mymusclemap.domain.performance.ExercisePerformanceComparisonLogic
+import app.mymusclemap.domain.performance.ExerciseProgressionDemo
+import app.mymusclemap.domain.performance.MuscleExercisePerformance
+import app.mymusclemap.domain.workout.WorkoutSessionAggregate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import java.time.LocalDate
 import java.time.ZoneId
 
 data class MuscleInsightsUiState(
@@ -27,6 +32,16 @@ data class MuscleInsightsUiState(
     val muscle: MuscleGroup = MuscleGroup.CHEST,
     val period: MuscleInsightsPeriod = MuscleInsightsPeriod.Weeks4,
     val insight: MuscleInsight = MuscleInsight.empty(MuscleGroup.CHEST),
+    val progression: MuscleExercisePerformance = MuscleExercisePerformance(
+        muscle = MuscleGroup.CHEST,
+        period = MuscleInsightsPeriod.Weeks4,
+        exercises = emptyList(),
+        improved = 0,
+        lowerRecordedPerformance = 0,
+        stable = 0,
+        mixed = 0,
+        insufficientOrNotComparable = 0
+    ),
     val explanation: MuscleInsightTopic? = null
 )
 
@@ -62,12 +77,20 @@ class MuscleInsightsViewModel(
         } else {
             MuscleInsightsLogic.index(aggregates, zone).insight(safeMuscle, today, now, period)
         }
+        val progression = resolveExerciseProgression(
+            demo = demo,
+            aggregates = aggregates,
+            muscle = safeMuscle,
+            period = period,
+            today = today
+        )
         MuscleInsightsUiState(
             loading = false,
             demo = demo,
             muscle = safeMuscle,
             period = period,
             insight = insight,
+            progression = progression,
             explanation = topic
         )
     }.stateIn(
@@ -104,5 +127,23 @@ class MuscleInsightsViewModel(
     private companion object {
         const val MUSCLE = "muscle"
         const val PERIOD = "period"
+    }
+}
+
+/**
+ * Free preview uses the fixed demo history. Pro uses the observed completed
+ * workouts, including references older than the selected period.
+ */
+internal fun resolveExerciseProgression(
+    demo: Boolean,
+    aggregates: List<WorkoutSessionAggregate>,
+    muscle: MuscleGroup,
+    period: MuscleInsightsPeriod,
+    today: LocalDate
+): MuscleExercisePerformance {
+    return if (demo) {
+        ExerciseProgressionDemo.summarize(muscle, period, today)
+    } else {
+        ExercisePerformanceComparisonLogic.summarizeMuscle(aggregates, muscle, period, today)
     }
 }

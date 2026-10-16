@@ -159,5 +159,6 @@ enum class MuscleInsightTopic {
     RECENT_LOAD,
     CHART,
     SPACING,
-    CONTRIBUTION
+    CONTRIBUTION,
+    EXERCISE_PROGRESSION
 }

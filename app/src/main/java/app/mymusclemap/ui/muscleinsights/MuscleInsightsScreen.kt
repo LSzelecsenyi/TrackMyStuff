@@ -106,6 +106,9 @@ fun MuscleInsightsScreen(
     onDismissExplanation: () -> Unit,
     onUpgrade: () -> Unit
 ) {
+    var openExerciseId by remember(state.muscle, state.period, state.demo) {
+        mutableStateOf<Long?>(null)
+    }
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
@@ -165,6 +168,11 @@ fun MuscleInsightsScreen(
                     SummarySection(state.insight, onExplain)
                     ChartSection(state.insight, onExplain)
                     ComparisonSection(state.insight, onExplain)
+                    ProgressionSection(
+                        progression = state.progression,
+                        onExplain = onExplain,
+                        onOpen = { openExerciseId = it }
+                    )
                     RecoverySection(state.insight, onExplain)
                     ContributionSection(state.period, state.insight, onExplain)
                 }
@@ -176,6 +184,13 @@ fun MuscleInsightsScreen(
             topic = topic,
             insight = state.insight,
             onDismiss = onDismissExplanation
+        )
+    }
+    val openExercise = state.progression.exercises.firstOrNull { it.exerciseId == openExerciseId }
+    if (openExercise != null) {
+        ExerciseProgressionDetailSheet(
+            exercise = openExercise,
+            onDismiss = { openExerciseId = null }
         )
     }
 }
@@ -381,17 +396,23 @@ private fun ContributionSection(
 }
 
 @Composable
-private fun InsightSection(
+internal fun InsightSection(
     title: String,
     onExplain: (() -> Unit)? = null,
     infoTag: String? = null,
+    infoDescription: String? = null,
     caption: String? = null,
     captionTag: String? = null,
     cardTag: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        SectionTitle(title = title, onExplain = onExplain, infoTag = infoTag)
+        SectionTitle(
+            title = title,
+            onExplain = onExplain,
+            infoTag = infoTag,
+            infoDescription = infoDescription
+        )
         if (caption != null) {
             Text(
                 text = caption,
@@ -473,7 +494,8 @@ private fun ExplainedRow(
 private fun SectionTitle(
     title: String,
     onExplain: (() -> Unit)? = null,
-    infoTag: String? = null
+    infoTag: String? = null,
+    infoDescription: String? = null
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -495,7 +517,8 @@ private fun SectionTitle(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Info,
-                    contentDescription = stringResource(R.string.muscle_insights_calc_title)
+                    contentDescription = infoDescription
+                        ?: stringResource(R.string.muscle_insights_calc_title)
                 )
             }
         }
