@@ -217,6 +217,7 @@ enum class AchievementId(
     FRIDAY_THE_STRONGTEENTH(AchievementCategory.HIDDEN_GEMS, secret = true),
     ONE_MORE_THING(AchievementCategory.HIDDEN_GEMS, secret = true),
     TRIPLE_CROWN(AchievementCategory.HIDDEN_GEMS, secret = true),
+    THE_MAGNIFICENT_SEVEN(AchievementCategory.HIDDEN_GEMS, secret = true),
     FOUNDER(
         AchievementCategory.SPECIAL,
         access = AchievementAccess.SPECIAL

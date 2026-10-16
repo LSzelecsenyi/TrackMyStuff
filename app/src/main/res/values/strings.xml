@@ -1482,6 +1482,8 @@
     <string name="achievement_one_more_thing_requirement">Finish every planned set, then complete one more set on an exercise in that plan.</string>
     <string name="achievement_triple_crown_name">Triple Crown</string>
     <string name="achievement_triple_crown_requirement">Set a new weight PR, rep PR, and volume PR in the same workout.</string>
+    <string name="achievement_magnificent_seven_name">The Magnificent Seven</string>
+    <string name="achievement_magnificent_seven_requirement">Complete a Strict workout on every day of a single Monday–Sunday calendar week.</string>
     <string name="achievement_pr_hunter_name">PR Hunter</string>
     <string name="achievement_pr_hunter_requirement">Record %1$d personal records</string>
     <string name="achievement_exercise_mastery_name">Exercise Mastery</string>

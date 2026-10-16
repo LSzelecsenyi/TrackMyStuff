@@ -92,7 +92,8 @@ class BadgeArtworkResolverTest {
                 AchievementId.LEAP_DAY_LIFTER to R.drawable.leap_day_lifter_badge,
                 AchievementId.FRIDAY_THE_STRONGTEENTH to R.drawable.friday_the_strongteenth_badge,
                 AchievementId.ONE_MORE_THING to R.drawable.one_more_thing_badge,
-                AchievementId.TRIPLE_CROWN to R.drawable.triple_crown_badge
+                AchievementId.TRIPLE_CROWN to R.drawable.triple_crown_badge,
+                AchievementId.THE_MAGNIFICENT_SEVEN to R.drawable.the_magnificent_seven_badge
             ),
             AchievementCatalog.secrets.associateWith { drawable(it) }
         )

@@ -1482,6 +1482,8 @@
     <string name="achievement_one_more_thing_requirement">Végezd el a terv minden sorozatát, majd még egy sorozatot ugyanabban az edzésben.</string>
     <string name="achievement_triple_crown_name">Hármas korona</string>
     <string name="achievement_triple_crown_requirement">Egy edzésben legyen új súly-, ismétlés- és volumenrekord.</string>
+    <string name="achievement_magnificent_seven_name">A nagyszerű hetes</string>
+    <string name="achievement_magnificent_seven_requirement">Végezz egy Strict edzést egy hétfőtől vasárnapig tartó naptári hét minden napján.</string>
     <string name="achievement_pr_hunter_name">Rekordvadász</string>
     <string name="achievement_pr_hunter_requirement">Rögzíts %1$d személyes rekordot</string>
     <string name="achievement_exercise_mastery_name">Gyakorlatmester</string>

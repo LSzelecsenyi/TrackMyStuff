@@ -41,13 +41,15 @@ class SecretAchievementUiTest {
                     Text(achievementTitle(AchievementId.TRICK_OR_LIFT, revealed = false))
                     Text(achievementRequirement(AchievementId.TRICK_OR_LIFT, revealed = false))
                     Text(achievementRequirement(AchievementId.FRIDAY_THE_STRONGTEENTH, revealed = false))
+                    Text(achievementTitle(AchievementId.THE_MAGNIFICENT_SEVEN, revealed = false))
+                    Text(achievementRequirement(AchievementId.THE_MAGNIFICENT_SEVEN, revealed = false))
                     Text(achievementTitle(AchievementId.TRIPLE_CROWN, revealed = true))
                     Text(achievementRequirement(AchievementId.ONE_MORE_THING, revealed = true))
                 }
             }
         }
-        composeRule.onAllNodesWithText("???").assertCountEquals(2)
-        composeRule.onAllNodesWithText("A secret achievement discovered through training.").assertCountEquals(2)
+        composeRule.onAllNodesWithText("???").assertCountEquals(3)
+        composeRule.onAllNodesWithText("A secret achievement discovered through training.").assertCountEquals(3)
         composeRule.onNodeWithText("Triple Crown").assertIsDisplayed()
         composeRule.onNodeWithText(
             "Finish every planned set, then complete one more set on an exercise in that plan."
@@ -58,6 +60,10 @@ class SecretAchievementUiTest {
         composeRule.onAllNodesWithText("Trick or Lift").assertCountEquals(0)
         composeRule.onAllNodesWithText("Complete a workout on October 31.").assertCountEquals(0)
         composeRule.onAllNodesWithText("Complete a workout on Friday the 13th.").assertCountEquals(0)
+        composeRule.onAllNodesWithText("The Magnificent Seven").assertCountEquals(0)
+        composeRule.onAllNodesWithText(
+            "Complete a Strict workout on every day of a single Monday–Sunday calendar week."
+        ).assertCountEquals(0)
     }
 
     @Test
@@ -112,6 +118,41 @@ class SecretAchievementUiTest {
     }
 
     @Test
+    fun anUnlockedMagnificentSevenCelebrationUsesItsDrawable() {
+        composeRule.setContent {
+            WeightTrackerThemeForPreview {
+                CelebrationDialog(
+                    celebrations = listOf(
+                        app.mymusclemap.domain.achievements.PendingCelebration.SecretUnlocked(
+                            achievementId = AchievementId.THE_MAGNIFICENT_SEVEN,
+                            triggerClientWorkoutId = "sunday",
+                            acknowledgement = app.mymusclemap.domain.achievements.CelebrationAcknowledgement(
+                                achievementId = AchievementId.THE_MAGNIFICENT_SEVEN.name
+                            )
+                        )
+                    ),
+                    onDismiss = {}
+                )
+            }
+        }
+        composeRule.onNodeWithText("The Magnificent Seven").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Complete a Strict workout on every day of a single Monday–Sunday calendar week."
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            "celebration-badge-${AchievementId.THE_MAGNIFICENT_SEVEN.name}"
+        ).assertIsDisplayed()
+        assertEquals(
+            R.drawable.the_magnificent_seven_badge,
+            BadgeArtworkResolver.drawableForWall(AchievementId.THE_MAGNIFICENT_SEVEN, unlocked = true)
+        )
+        assertEquals(
+            R.drawable.hidden_gem_placeholder,
+            BadgeArtworkResolver.drawableForWall(AchievementId.THE_MAGNIFICENT_SEVEN, unlocked = false)
+        )
+    }
+
+    @Test
     fun lockedHalloweenStaysHiddenOnTheWallAndUnlockedChristmasShowsItsArtwork() {
         val unlockedAt = 1_700_000_000_000L
         val board = AchievementBoardAssembler.assemble(
@@ -143,6 +184,11 @@ class SecretAchievementUiTest {
             "achievement-badge-unlocked-${AchievementId.SILENT_NIGHT.name}",
             useUnmergedTree = true
         ).assertCountEquals(1)
+        composeRule.onAllNodesWithTag(
+            "achievement-badge-locked-${AchievementId.THE_MAGNIFICENT_SEVEN.name}",
+            useUnmergedTree = true
+        ).assertCountEquals(1)
+        composeRule.onAllNodesWithText("The Magnificent Seven").assertCountEquals(0)
     }
 
     private val AchievementAccessFilter = AchievementAccess.FREE

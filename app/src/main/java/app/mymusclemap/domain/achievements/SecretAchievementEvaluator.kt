@@ -1,5 +1,6 @@
 package app.mymusclemap.domain.achievements
 
+import app.mymusclemap.domain.calendar.WeekCalendar
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionSetStatus
@@ -42,7 +43,8 @@ object SecretAchievementEvaluator {
                 it.dayOfWeek == DayOfWeek.FRIDAY && it.dayOfMonth == 13
             },
             earliestAggregate(eligible, AchievementId.ONE_MORE_THING) { oneMoreThing(it) },
-            tripleCrown(records)
+            tripleCrown(records),
+            magnificentSeven(eligible)
         )
     }
 
@@ -115,6 +117,56 @@ object SecretAchievementEvaluator {
             unlockedAt = PerformanceRecordEvaluator.completedAt(match),
             clientWorkoutId = match.session.clientWorkoutId.takeIf { it.isNotBlank() }
         )
+    }
+
+    /**
+     * Earliest Monday–Sunday week that has one native completed workout on every date.
+     * The unlock instant is when the last missing date of that week was first completed,
+     * using [PerformanceRecordEvaluator.completedAt]. Monday is [java.time.DayOfWeek.MONDAY],
+     * not the device's first day of week. Imported workouts carry a fingerprint and do not count.
+     */
+    private fun magnificentSeven(eligible: List<WorkoutSessionAggregate>): SecretQualification? {
+        val earliestByDate = HashMap<LocalDate, WorkoutSessionAggregate>()
+        eligible.forEach { aggregate ->
+            if (aggregate.session.importFingerprint != null) return@forEach
+            val date = aggregate.session.workoutDate
+            val current = earliestByDate[date]
+            if (current == null || completesBefore(aggregate, current)) {
+                earliestByDate[date] = aggregate
+            }
+        }
+        var bestAt = Long.MAX_VALUE
+        var best: WorkoutSessionAggregate? = null
+        earliestByDate.keys.map { WeekCalendar.start(it) }.distinct().forEach { weekStart ->
+            val days = WeekCalendar.dates(weekStart).map { earliestByDate[it] }
+            if (days.any { it == null }) return@forEach
+            val crossing = days.filterNotNull().maxWith(
+                compareBy<WorkoutSessionAggregate> { PerformanceRecordEvaluator.completedAt(it) }
+                    .thenBy { it.session.id }
+            )
+            val at = PerformanceRecordEvaluator.completedAt(crossing)
+            val chosen = best
+            if (chosen == null || at < bestAt || (at == bestAt && crossing.session.id < chosen.session.id)) {
+                bestAt = at
+                best = crossing
+            }
+        }
+        val crossing = best ?: return null
+        return SecretQualification(
+            achievementId = AchievementId.THE_MAGNIFICENT_SEVEN,
+            unlockedAt = bestAt,
+            clientWorkoutId = crossing.session.clientWorkoutId.takeIf { it.isNotBlank() }
+        )
+    }
+
+    private fun completesBefore(
+        candidate: WorkoutSessionAggregate,
+        incumbent: WorkoutSessionAggregate
+    ): Boolean {
+        val candidateAt = PerformanceRecordEvaluator.completedAt(candidate)
+        val incumbentAt = PerformanceRecordEvaluator.completedAt(incumbent)
+        return candidateAt < incumbentAt ||
+            (candidateAt == incumbentAt && candidate.session.id < incumbent.session.id)
     }
 
     private fun tripleCrown(events: List<PerformanceRecordEvent>): SecretQualification? {

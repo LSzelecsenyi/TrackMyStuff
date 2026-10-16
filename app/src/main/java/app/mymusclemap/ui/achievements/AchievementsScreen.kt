@@ -670,6 +670,8 @@ internal fun achievementTitle(id: AchievementId, revealed: Boolean = !id.secret)
         id == AchievementId.FRIDAY_THE_STRONGTEENTH -> stringResource(R.string.achievement_friday_thirteenth_name)
         id == AchievementId.ONE_MORE_THING -> stringResource(R.string.achievement_one_more_thing_name)
         id == AchievementId.TRIPLE_CROWN -> stringResource(R.string.achievement_triple_crown_name)
+        id == AchievementId.THE_MAGNIFICENT_SEVEN ->
+            stringResource(R.string.achievement_magnificent_seven_name)
         id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_name)
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_name)
         id == AchievementId.EARLY_ADOPTER -> stringResource(R.string.achievement_early_adopter_name)
@@ -701,6 +703,8 @@ internal fun achievementRequirement(id: AchievementId, revealed: Boolean = !id.s
             stringResource(R.string.achievement_friday_thirteenth_requirement)
         id == AchievementId.ONE_MORE_THING -> stringResource(R.string.achievement_one_more_thing_requirement)
         id == AchievementId.TRIPLE_CROWN -> stringResource(R.string.achievement_triple_crown_requirement)
+        id == AchievementId.THE_MAGNIFICENT_SEVEN ->
+            stringResource(R.string.achievement_magnificent_seven_requirement)
         id == AchievementId.IRON_DISCIPLINE -> stringResource(R.string.achievement_iron_discipline_requirement)
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_requirement)
         id == AchievementId.EARLY_ADOPTER -> stringResource(R.string.achievement_early_adopter_requirement)

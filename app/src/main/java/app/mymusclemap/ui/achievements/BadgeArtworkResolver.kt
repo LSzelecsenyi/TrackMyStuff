@@ -64,6 +64,7 @@ object BadgeArtworkResolver {
             AchievementId.FRIDAY_THE_STRONGTEENTH.name -> R.drawable.friday_the_strongteenth_badge
             AchievementId.ONE_MORE_THING.name -> R.drawable.one_more_thing_badge
             AchievementId.TRIPLE_CROWN.name -> R.drawable.triple_crown_badge
+            AchievementId.THE_MAGNIFICENT_SEVEN.name -> R.drawable.the_magnificent_seven_badge
             else -> R.drawable.ic_badge_placeholder
         }
     }

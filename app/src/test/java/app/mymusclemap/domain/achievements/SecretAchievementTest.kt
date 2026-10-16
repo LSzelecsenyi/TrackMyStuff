@@ -1,5 +1,6 @@
 package app.mymusclemap.domain.achievements
 
+import app.mymusclemap.domain.calendar.WeekCalendar
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MovementPattern
@@ -20,8 +21,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.temporal.TemporalAdjusters
+import java.util.Locale
 
 class SecretAchievementTest {
     @Test
@@ -340,6 +345,275 @@ class SecretAchievementTest {
         assertTrue(BadgeWallPresenter.almostThere(pending).none { it.achievementId.secret })
     }
 
+    @Test
+    fun magnificentSevenUnlocksOneNativeWorkoutOnEachDayOfOneMondayWeek() {
+        val first = LocalDate.of(2024, 12, 30)
+        val later = first.plusWeeks(2)
+        assertEquals(DayOfWeek.MONDAY, first.dayOfWeek)
+        val history = magnificentWeek(first) + magnificentWeek(later) { it.dayOfWeek.value * 100L + 10_000L }
+        val award = magnificent(history)
+        val sunday = first.plusDays(6)
+        assertEquals("day-$sunday", award.clientWorkoutId)
+        assertEquals(
+            history.first { it.session.workoutDate == sunday }.session.finishedAt,
+            award.unlockedAt
+        )
+        assertEquals(listOf(award), SecretAchievementEvaluator.qualifications(history).filter {
+            it.achievementId == AchievementId.THE_MAGNIFICENT_SEVEN
+        })
+    }
+
+    @Test
+    fun aMissingDayKeepsMagnificentSevenLocked() {
+        val monday = mondayOf(LocalDate.of(2026, 6, 8))
+        val history = magnificentWeek(monday).filter { it.session.workoutDate.dayOfWeek != DayOfWeek.SUNDAY }
+        assertNull(magnificentOrNull(history))
+    }
+
+    @Test
+    fun duplicateWorkoutsOnOneDayCannotReplaceAMissingDay() {
+        val monday = mondayOf(LocalDate.of(2026, 6, 15))
+        val history = magnificentWeek(monday)
+            .filter { it.session.workoutDate.dayOfWeek != DayOfWeek.THURSDAY }
+            .plus(workout(monday, client = "monday-again", startedAt = 800L))
+        assertEquals(7, history.size)
+        assertEquals(6, history.map { it.session.workoutDate }.toSet().size)
+        assertNull(magnificentOrNull(history))
+    }
+
+    @Test
+    fun sevenConsecutiveDaysSpanningTwoCalendarWeeksDoNotUnlock() {
+        val monday = mondayOf(LocalDate.of(2026, 7, 6))
+        val tuesday = monday.plusDays(1)
+        val history = (0 until 7).map { offset ->
+            val date = tuesday.plusDays(offset.toLong())
+            workout(date, client = "span-$date", startedAt = 100L + offset)
+        }
+        assertEquals(DayOfWeek.MONDAY, history.last().session.workoutDate.dayOfWeek)
+        assertEquals(DayOfWeek.TUESDAY, history.first().session.workoutDate.dayOfWeek)
+        assertNull(magnificentOrNull(history))
+    }
+
+    @Test
+    fun weekdaysFromDifferentWeeksDoNotCombine() {
+        val first = mondayOf(LocalDate.of(2026, 8, 3))
+        val second = first.plusWeeks(1)
+        val history = magnificentWeek(first).filter { it.session.workoutDate.dayOfWeek <= DayOfWeek.FRIDAY } +
+            magnificentWeek(second).filter { it.session.workoutDate.dayOfWeek >= DayOfWeek.SATURDAY }
+        assertEquals(7, history.size)
+        assertNull(magnificentOrNull(history))
+    }
+
+    @Test
+    fun aWeekCrossingAMonthBoundaryUnlocks() {
+        val monday = mondayOf(LocalDate.of(2026, 4, 1))
+        val sunday = monday.plusDays(6)
+        assertTrue(monday.monthValue != sunday.monthValue)
+        val award = magnificent(magnificentWeek(monday))
+        assertEquals("day-$sunday", award.clientWorkoutId)
+    }
+
+    @Test
+    fun aDecemberJanuaryWeekUnlocksWithoutMergingAnotherWeeksSameWeekNumber() {
+        val first = LocalDate.of(2024, 12, 30)
+        val second = LocalDate.of(2025, 12, 29)
+        assertEquals(DayOfWeek.MONDAY, first.dayOfWeek)
+        assertEquals(DayOfWeek.MONDAY, second.dayOfWeek)
+        assertEquals(2025, first.plusDays(6).year)
+        assertEquals(2026, second.plusDays(6).year)
+        val mixed = WeekCalendar.dates(first).take(4).map { date ->
+            workout(date, client = "early-$date", startedAt = date.dayOfWeek.value * 10L)
+        } + WeekCalendar.dates(second).takeLast(3).map { date ->
+            workout(date, client = "late-$date", startedAt = 100L + date.dayOfWeek.value)
+        }
+        assertEquals(7, mixed.map { it.session.workoutDate }.toSet().size)
+        assertNull(magnificentOrNull(mixed))
+        val award = magnificent(magnificentWeek(first) + mixed.takeLast(3))
+        assertEquals("day-${first.plusDays(6)}", award.clientWorkoutId)
+    }
+
+    @Test
+    fun canonicalWorkoutDateWinsNearUtcMidnight() {
+        val monday = mondayOf(LocalDate.of(2026, 9, 7))
+        val mondayUtc = monday.atStartOfDay(ZoneOffset.UTC).toInstant()
+        val datedMonday = workout(
+            date = monday,
+            client = "monday-date",
+            startedAt = mondayUtc.minusSeconds(30 * 60).toEpochMilli()
+        )
+        val datedSunday = workout(
+            date = monday.minusDays(1),
+            client = "sunday-date",
+            startedAt = mondayUtc.plusSeconds(30 * 60).toEpochMilli()
+        )
+        val withoutMonday = magnificentWeek(monday)
+            .filter { it.session.workoutDate != monday }
+            .plus(datedSunday)
+        assertNull(magnificentOrNull(withoutMonday))
+        val award = magnificent(
+            magnificentWeek(monday).filter { it.session.workoutDate != monday }.plus(datedMonday)
+        )
+        assertEquals("monday-date", award.clientWorkoutId)
+    }
+
+    @Test
+    fun mondayIsTheFirstDayRegardlessOfLocale() {
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.US)
+        try {
+            val monday = mondayOf(LocalDate.of(2026, 10, 5))
+            val sundayFirst = (0 until 7).map { offset ->
+                val date = monday.minusDays(1).plusDays(offset.toLong())
+                workout(date, client = "us-$date", startedAt = 100L + offset)
+            }
+            assertEquals(DayOfWeek.SUNDAY, sundayFirst.first().session.workoutDate.dayOfWeek)
+            assertEquals(DayOfWeek.SATURDAY, sundayFirst.last().session.workoutDate.dayOfWeek)
+            assertNull(magnificentOrNull(sundayFirst))
+            val sunday = monday.plusDays(6)
+            assertEquals("day-$sunday", magnificent(magnificentWeek(monday)).clientWorkoutId)
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun ineligibleAndImportedWorkoutsDoNotFillAMagnificentDay() {
+        val monday = mondayOf(LocalDate.of(2026, 11, 2))
+        val valid = magnificentWeek(monday).filter { it.session.workoutDate != monday }
+        val blocked = listOf(
+            workout(monday, client = "active", status = SessionStatus.IN_PROGRESS),
+            workout(monday, client = "abandoned", status = SessionStatus.ABANDONED),
+            workout(monday, client = "skipped", performed = false),
+            workout(monday, client = "imported", fingerprint = "external-import")
+        )
+        blocked.forEach { candidate ->
+            assertNull(magnificentOrNull(valid + candidate))
+        }
+        val award = magnificent(valid + workout(monday, client = "native-monday", startedAt = 9_000L))
+        assertEquals("native-monday", award.clientWorkoutId)
+    }
+
+    @Test
+    fun outOfOrderCompletionsUseTheWorkoutThatCompletedTheSeventhDay() {
+        val monday = mondayOf(LocalDate.of(2026, 4, 6))
+        val history = magnificentWeek(monday) { date ->
+            if (date.dayOfWeek == DayOfWeek.WEDNESDAY) 5_000L else date.dayOfWeek.value * 10L
+        }
+        val wednesday = history.first { it.session.workoutDate.dayOfWeek == DayOfWeek.WEDNESDAY }
+        val award = magnificent(history)
+        assertEquals(wednesday.session.clientWorkoutId, award.clientWorkoutId)
+        assertEquals(wednesday.session.finishedAt, award.unlockedAt)
+    }
+
+    @Test
+    fun historicalReconciliationAndRestoreRecognizeMagnificentSevenSilently() {
+        val monday = mondayOf(LocalDate.of(2024, 1, 1))
+        val award = magnificent(magnificentWeek(monday))
+        val startup = AchievementReconciler.plan(
+            request(initialized = false, trigger = award.clientWorkoutId, qualifications = listOf(award)),
+            unlocks = emptyList(),
+            events = emptyList()
+        ).insertUnlocks.single { it.achievementId == AchievementId.THE_MAGNIFICENT_SEVEN }
+        assertEquals(1_000L, startup.celebratedAt)
+        assertNull(startup.triggerClientWorkoutId)
+        assertEquals(award.unlockedAt, startup.unlockedAt)
+        val restored = AchievementReconciler.plan(
+            request(initialized = true, trigger = "restore-workout", qualifications = listOf(award)),
+            unlocks = emptyList(),
+            events = emptyList()
+        ).insertUnlocks.single { it.achievementId == AchievementId.THE_MAGNIFICENT_SEVEN }
+        assertEquals(1_000L, restored.celebratedAt)
+        assertNull(restored.triggerClientWorkoutId)
+    }
+
+    @Test
+    fun repeatedEvaluationDoesNotDuplicateTheAwardOrItsCelebration() {
+        val monday = mondayOf(LocalDate.of(2026, 5, 4))
+        val award = magnificent(magnificentWeek(monday))
+        assertEquals(award, magnificent(magnificentWeek(monday)))
+        val live = AchievementReconciler.plan(
+            request(initialized = true, trigger = award.clientWorkoutId, qualifications = listOf(award)),
+            unlocks = emptyList(),
+            events = emptyList()
+        ).insertUnlocks.single { it.achievementId == AchievementId.THE_MAGNIFICENT_SEVEN }
+        assertNull(live.celebratedAt)
+        assertEquals(award.clientWorkoutId, live.triggerClientWorkoutId)
+        val again = AchievementReconciler.plan(
+            request(initialized = true, trigger = award.clientWorkoutId, qualifications = listOf(award, award)),
+            unlocks = listOf(StoredUnlock(AchievementId.THE_MAGNIFICENT_SEVEN, celebratedAt = null)),
+            events = emptyList()
+        )
+        assertTrue(again.insertUnlocks.none { it.achievementId == AchievementId.THE_MAGNIFICENT_SEVEN })
+    }
+
+    @Test
+    fun earnedOwnershipSurvivesDeletedOrEditedHistory() {
+        val monday = mondayOf(LocalDate.of(2023, 5, 1))
+        val award = magnificent(magnificentWeek(monday))
+        val stored = StoredUnlock(AchievementId.THE_MAGNIFICENT_SEVEN, celebratedAt = 40L)
+        val deleted = AchievementReconciler.plan(
+            request(initialized = true, trigger = null, qualifications = emptyList()),
+            unlocks = listOf(stored),
+            events = emptyList()
+        )
+        assertTrue(deleted.insertUnlocks.isEmpty())
+        assertFalse(AchievementId.THE_MAGNIFICENT_SEVEN in deleted.revoke)
+        val board = AchievementBoardAssembler.assemble(
+            completedWorkoutCount = 0,
+            unlocks = listOf(
+                UnlockSnapshot(
+                    AchievementId.THE_MAGNIFICENT_SEVEN,
+                    unlockedAt = award.unlockedAt,
+                    celebratedAt = 40L,
+                    triggerClientWorkoutId = null
+                )
+            ),
+            events = emptyList()
+        )
+        val owned = board.items.single { it.id == AchievementId.THE_MAGNIFICENT_SEVEN }
+        assertTrue(owned.unlocked)
+        assertEquals(award.unlockedAt, owned.unlockedAt)
+        assertNull(magnificentOrNull(magnificentWeek(monday).drop(1)))
+    }
+
+    @Test
+    fun magnificentSevenIsAFreeHiddenGem() {
+        val id = AchievementId.THE_MAGNIFICENT_SEVEN
+        assertEquals(AchievementCategory.HIDDEN_GEMS, id.category)
+        assertEquals(AchievementAccess.FREE, id.access)
+        assertEquals(AchievementVisibility.ALWAYS, id.visibility)
+        assertTrue(id.secret)
+        assertTrue(AchievementCatalog.secrets.contains(id))
+        assertEquals(
+            AchievementId.entries.count { it.visibility == AchievementVisibility.ALWAYS },
+            AchievementId.entries.count { it.visibility == AchievementVisibility.ALWAYS && !it.secret } +
+                AchievementCatalog.secrets.size
+        )
+    }
+
+    private fun mondayOf(date: LocalDate): LocalDate {
+        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    }
+
+    private fun magnificentWeek(
+        monday: LocalDate,
+        startedAt: (LocalDate) -> Long = { it.dayOfWeek.value * 100L }
+    ): List<WorkoutSessionAggregate> {
+        check(monday.dayOfWeek == DayOfWeek.MONDAY)
+        return WeekCalendar.dates(monday).map { date ->
+            workout(date, client = "day-$date", startedAt = startedAt(date))
+        }
+    }
+
+    private fun magnificent(history: List<WorkoutSessionAggregate>): SecretQualification {
+        return magnificentOrNull(history) ?: error("expected The Magnificent Seven")
+    }
+
+    private fun magnificentOrNull(history: List<WorkoutSessionAggregate>): SecretQualification? {
+        return SecretAchievementEvaluator.qualifications(history)
+            .singleOrNull { it.achievementId == AchievementId.THE_MAGNIFICENT_SEVEN }
+    }
+
     private fun client(awards: List<SecretQualification>, id: AchievementId): String? {
         return awards.single { it.achievementId == id }.clientWorkoutId
     }
@@ -368,7 +642,8 @@ class SecretAchievementTest {
         client: String,
         status: SessionStatus = SessionStatus.COMPLETED,
         performed: Boolean = true,
-        startedAt: Long = 10L
+        startedAt: Long = 10L,
+        fingerprint: String? = null
     ): WorkoutSessionAggregate {
         return WorkoutSessionAggregate(
             session = session(
@@ -378,7 +653,8 @@ class SecretAchievementTest {
                 status = status,
                 templateId = 1L,
                 startedAt = startedAt,
-                finishedAt = if (status == SessionStatus.COMPLETED) startedAt + 50 else null
+                finishedAt = if (status == SessionStatus.COMPLETED) startedAt + 50 else null,
+                fingerprint = fingerprint
             ),
             exercises = listOf(
                 item(
