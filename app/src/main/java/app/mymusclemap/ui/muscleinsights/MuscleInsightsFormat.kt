@@ -9,6 +9,9 @@ import app.mymusclemap.domain.muscleinsights.LoadComparison
 import app.mymusclemap.domain.muscleinsights.MuscleInsightTopic
 import app.mymusclemap.domain.muscleinsights.MuscleInsightsPeriod
 import app.mymusclemap.domain.muscleinsights.StimulusAge
+import java.text.NumberFormat
+import kotlin.math.abs
+import kotlin.math.round
 
 @Composable
 fun stimulusText(age: StimulusAge): String {
@@ -58,6 +61,16 @@ fun MuscleInsightsPeriod.labelRes(): Int {
     }
 }
 
+fun MuscleInsightsPeriod.rangeNameRes(): Int {
+    return when (this) {
+        MuscleInsightsPeriod.Weeks4 -> R.string.muscle_insights_period_name_4w
+        MuscleInsightsPeriod.Months3 -> R.string.muscle_insights_period_name_3m
+        MuscleInsightsPeriod.Months6 -> R.string.muscle_insights_period_name_6m
+        MuscleInsightsPeriod.Year1 -> R.string.muscle_insights_period_name_1y
+        MuscleInsightsPeriod.All -> R.string.muscle_insights_period_name_all
+    }
+}
+
 fun MuscleInsightTopic.titleRes(): Int {
     return when (this) {
         MuscleInsightTopic.LAST_STIMULUS -> R.string.muscle_insights_last_stimulus
@@ -79,10 +92,47 @@ fun MuscleInsightTopic.bodyRes(): Int {
 }
 
 fun formatWeeklySets(value: Double): String {
-    val rounded = kotlin.math.round(value * 10.0) / 10.0
+    val rounded = round(value * 10.0) / 10.0
     return if (rounded % 1.0 == 0.0) {
         rounded.toInt().toString()
     } else {
         String.format(AppLocale.UI, "%.1f", rounded)
     }
+}
+
+/** Whole-number display of the existing comparison inputs. Null when the ratio is undefined. */
+fun loadChangeWholePercent(recentSets: Int, baselineWeeklySets: Double?): Int? {
+    if (baselineWeeklySets == null || baselineWeeklySets == 0.0) return null
+    return round(((recentSets - baselineWeeklySets) / baselineWeeklySets) * 100.0).toInt()
+}
+
+fun signedChangeNumber(percent: Int): String {
+    val digits = NumberFormat.getIntegerInstance(AppLocale.UI).format(abs(percent))
+    return when {
+        percent > 0 -> "+$digits"
+        percent < 0 -> "\u2212$digits"
+        else -> digits
+    }
+}
+
+@Composable
+fun completedSetsLabel(count: Int): String {
+    return pluralStringResource(R.plurals.muscle_insights_set_count, count, count)
+}
+
+@Composable
+fun weeklySetsLabel(weekly: Double): String {
+    val rounded = round(weekly * 10.0) / 10.0
+    return if (rounded % 1.0 == 0.0) {
+        completedSetsLabel(rounded.toInt())
+    } else {
+        stringResource(R.string.muscle_insights_sets_value, formatWeeklySets(weekly))
+    }
+}
+
+@Composable
+fun loadChangeLabel(recentSets: Int, baselineWeeklySets: Double?, comparison: LoadComparison): String? {
+    if (comparison == LoadComparison.INSUFFICIENT) return null
+    val percent = loadChangeWholePercent(recentSets, baselineWeeklySets) ?: return null
+    return stringResource(R.string.muscle_insights_change_percent, signedChangeNumber(percent))
 }

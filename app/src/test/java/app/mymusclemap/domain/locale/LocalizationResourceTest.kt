@@ -25,6 +25,25 @@ class LocalizationResourceTest {
         val hungarianPlurals = loadPlurals("src/main/res/values-hu/plurals.xml") +
             loadPlurals("src/main/res/values-hu/strings.xml")
         assertEquals(englishPlurals.keys, hungarianPlurals.keys)
+        listOf(english, hungarian).forEach { resources ->
+            val calculation = resources.getValue("muscle_insights_explain_load")
+            assertTrue(calculation, calculation.contains("15%"))
+            assertTrue(calculation, !calculation.contains("%%"))
+            assertTrue(resources.getValue("muscle_insights_explain_chart").contains("28"))
+        }
+        assertEquals("Elsődleges sorozatok", hungarian.getValue("muscle_insights_primary_sets"))
+        assertEquals("Másodlagos érintettség", hungarian.getValue("muscle_insights_secondary_sets"))
+        assertEquals(
+            "A másodlagos érintettséget külön mutatjuk, és nem számítjuk bele az elsődleges sorozatok számába.",
+            hungarian.getValue("muscle_insights_secondary_limit")
+        )
+        assertEquals("Kiválasztott időszak: %1\$s", hungarian.getValue("muscle_insights_selected_period"))
+        assertEquals("Elmúlt 7 nap vs. előző 4 hét", hungarian.getValue("muscle_insights_comparison_window"))
+        assertEquals("4 hét", hungarian.getValue("muscle_insights_period_name_4w"))
+        assertEquals("3 hónap", hungarian.getValue("muscle_insights_period_name_3m"))
+        assertEquals("6 hónap", hungarian.getValue("muscle_insights_period_name_6m"))
+        assertEquals("1 év", hungarian.getValue("muscle_insights_period_name_1y"))
+        assertEquals("Teljes időszak", hungarian.getValue("muscle_insights_period_name_all"))
         englishPlurals.forEach { (name, items) ->
             assertEquals(name, items.keys, hungarianPlurals.getValue(name).keys)
             items.forEach { (quantity, value) ->
