@@ -254,6 +254,7 @@ object AppBackupJson {
                             .put("weightInterpretation", row.weightInterpretation)
                             .put("primaryMuscle", ExerciseEnumCodec.canonicalMuscleName(row.primaryMuscle))
                             .put("notes", nullable(row.notes))
+                            .put("addedDuringWorkout", row.addedDuringWorkout)
                     )
                 }
             }
@@ -1074,6 +1075,11 @@ object AppBackupJson {
         val primaryMuscle = obj.requiredString("primaryMuscle", errors)?.let(ExerciseEnumCodec::canonicalMuscleName)
             ?: return null
         val notes = obj.optionalNullableString("notes", errors)
+        val addedDuringWorkout = if (!obj.has("addedDuringWorkout") || obj.isNull("addedDuringWorkout")) {
+            false
+        } else {
+            obj.requiredBoolean("addedDuringWorkout", errors) ?: return null
+        }
         return WorkoutSessionExerciseEntity(
             id,
             sessionId,
@@ -1086,7 +1092,8 @@ object AppBackupJson {
             resistanceBasis,
             weightInterpretation,
             primaryMuscle,
-            notes
+            notes,
+            addedDuringWorkout
         )
     }
 

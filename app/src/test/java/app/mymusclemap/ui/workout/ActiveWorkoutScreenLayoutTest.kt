@@ -287,6 +287,55 @@ class ActiveWorkoutScreenLayoutTest {
     }
 
     @Test
+    fun completionReadyCopyOffersOneExtraExerciseAction() {
+        render(state = completedState(), width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithTag(WORKOUT_FINISH_KEY).performScrollTo()
+        composeRule.onNodeWithText(testString(R.string.active_workout_ready_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_workout_ready_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_workout_ready_add_exercise)).assertIsDisplayed()
+        composeRule.onNodeWithTag(WORKOUT_READY_ADD_EXTRA).assertIsDisplayed()
+        composeRule.onNodeWithTag(WORKOUT_ADD_EXTRA_EXERCISE).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.active_workout_all_sets_done)).assertDoesNotExist()
+        composeRule.onNodeWithTag(WORKOUT_FINISH_CTA_STRONG).assertIsDisplayed()
+    }
+
+    @Test
+    fun inProgressWorkoutShowsTheGeneralAddExtraExerciseAction() {
+        render(state = mixedSetsState(), width = 360.dp, fontScale = 1f)
+        composeRule.onNodeWithTag(WORKOUT_ADD_EXTRA_EXERCISE).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_workout_ready_title)).assertDoesNotExist()
+        composeRule.onNodeWithTag(WORKOUT_READY_ADD_EXTRA).assertDoesNotExist()
+    }
+
+    @Test
+    fun unfinishedExtraExerciseReturnsToTheInProgressCopy() {
+        val planned = item(10L, "Húzódzkodás", 0, listOf(set(1L, 10L, 0, SessionSetStatus.COMPLETED)))
+        val extraSet = set(2L, 11L, 0, SessionSetStatus.PENDING)
+        val extra = item(11L, "Tolódzkodás", 1, listOf(extraSet)).let { item ->
+            item.copy(exercise = item.exercise.copy(addedDuringWorkout = true))
+        }
+        render(
+            state = ActiveWorkoutUiState(
+                loading = false,
+                aggregate = WorkoutSessionAggregate(session(), listOf(planned, extra)),
+                currentExerciseId = 11L,
+                currentSetId = extraSet.id,
+                expandedExerciseIds = setOf(11L),
+                drafts = mapOf(
+                    extraSet.id to ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+                )
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithText(testString(R.string.active_workout_extra_badge)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_remove_extra_exercise)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.active_workout_ready_title)).assertDoesNotExist()
+        composeRule.onNodeWithTag(WORKOUT_ADD_EXTRA_EXERCISE).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(WORKOUT_READY_ADD_EXTRA).assertDoesNotExist()
+    }
+
+    @Test
     fun nextExerciseScrollIndexUsesStableExerciseId() {
         val ids = listOf(10L, 22L)
         assertEquals(2, workoutListIndexFor(WorkoutFocusTarget.Set(5L, 22L), ids))
@@ -778,7 +827,9 @@ class ActiveWorkoutScreenLayoutTest {
                             onSkip = onSkip,
                             onUndoSkip = {},
                             onAddExtra = {},
+                            onAddExtraExercise = {},
                             onRemoveExtra = {},
+                            onRemoveExtraExercise = {},
                             onToggleExercise = {},
                             onRequestFinish = {},
                             onDismissFinish = {},

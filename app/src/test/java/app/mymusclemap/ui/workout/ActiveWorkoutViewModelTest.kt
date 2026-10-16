@@ -883,6 +883,51 @@ class ActiveWorkoutViewModelTest {
         return payload
     }
 
+    @Test
+    fun extraExerciseBeforeThePlanIsDoneDoesNotStealTheCurrentSet() = runTest {
+        val dip = saveDip()
+        val viewModel = startSingleSet()
+        val initial = viewModel.loaded()
+        viewModel.addExtraExercise(dip)
+        val after = awaitReal {
+            viewModel.uiState.first { state ->
+                val exercises = state.aggregate?.exercises.orEmpty()
+                exercises.size == 2 && exercises.last().sets.any { it.status == SessionSetStatus.PENDING }
+            }
+        }
+        assertEquals(initial.currentSetId, after.currentSetId)
+        assertTrue(after.progress.pending > 1)
+        assertFalse(after.aggregate!!.exercises.first().exercise.addedDuringWorkout)
+        assertTrue(after.aggregate!!.exercises.last().exercise.addedDuringWorkout)
+        val restored = active(sessionId).loaded()
+        assertEquals(2, restored.aggregate!!.exercises.size)
+        assertTrue(restored.aggregate!!.exercises.last().exercise.addedDuringWorkout)
+    }
+
+    @Test
+    fun extraExerciseReopensAFinishedPlanUntilItsOwnSetsAreDone() = runTest {
+        val dip = saveDip()
+        val viewModel = startSingleSet()
+        val initial = viewModel.loaded()
+        val templateId = initial.aggregate!!.session.templateId!!
+        val planBefore = database.workoutTemplateDao().getExercises(templateId)
+        viewModel.completeSet(initial.currentSetId!!)
+        awaitReal { viewModel.uiState.first { it.progress.pending == 0 } }
+        viewModel.addExtraExercise(dip)
+        val reopened = awaitReal {
+            viewModel.uiState.first { it.aggregate!!.exercises.size == 2 && it.progress.pending > 0 }
+        }
+        val extra = reopened.aggregate!!.exercises.single { it.exercise.addedDuringWorkout }
+        assertEquals(dip, extra.exercise.exerciseId)
+        assertTrue(extra.sets.all { it.addedDuringWorkout })
+        assertEquals(extra.sets.single().id, reopened.currentSetId)
+        assertEquals(planBefore, database.workoutTemplateDao().getExercises(templateId))
+        viewModel.completeSet(extra.sets.single().id)
+        val done = awaitReal { viewModel.uiState.first { it.progress.pending == 0 } }
+        assertEquals(0, done.progress.pending)
+        assertEquals(2, done.aggregate!!.exercises.size)
+    }
+
     private suspend fun startTwoExercises(): ActiveWorkoutViewModel {
         val pull = savePull()
         val dip = saveDip()

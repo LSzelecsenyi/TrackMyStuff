@@ -347,6 +347,36 @@ abstract class WorkoutSessionDao {
     @Query("DELETE FROM workout_session_sets WHERE id = :id")
     abstract suspend fun deleteSet(id: Long)
 
+    @Query("DELETE FROM workout_session_exercises WHERE id = :id")
+    abstract suspend fun deleteExercise(id: Long)
+
+    @Query("UPDATE workout_session_exercises SET position = :position WHERE id = :id")
+    abstract suspend fun updateExercisePosition(id: Long, position: Int)
+
+    @Transaction
+    open suspend fun insertAddedExercise(
+        exercise: WorkoutSessionExerciseEntity,
+        muscles: List<WorkoutSessionExerciseMuscleEntity>,
+        set: WorkoutSessionSetEntity
+    ): InsertedSessionExercise {
+        val sessionExerciseId = insertExercise(exercise)
+        if (muscles.isNotEmpty()) {
+            insertMuscles(muscles.map { it.copy(sessionExerciseId = sessionExerciseId) })
+        }
+        val setId = insertSet(set.copy(sessionExerciseId = sessionExerciseId))
+        return InsertedSessionExercise(sessionExerciseId, setId)
+    }
+
+    @Transaction
+    open suspend fun deleteExerciseAndReindex(sessionExerciseId: Long, sessionId: Long) {
+        deleteExercise(sessionExerciseId)
+        getExercises(sessionId).sortedBy { it.position }.forEachIndexed { index, remaining ->
+            if (remaining.position != index) {
+                updateExercisePosition(remaining.id, index)
+            }
+        }
+    }
+
     @Query("DELETE FROM workout_sessions WHERE id = :id")
     abstract suspend fun deleteSessionById(id: Long): Int
 
@@ -465,6 +495,11 @@ abstract class WorkoutSessionDao {
         return InsertStartedSessionResult.Inserted(sessionId)
     }
 }
+
+data class InsertedSessionExercise(
+    val sessionExerciseId: Long,
+    val setId: Long
+)
 
 sealed class InsertStartedSessionResult {
     data class Inserted(val sessionId: Long) : InsertStartedSessionResult()

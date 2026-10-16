@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
@@ -114,6 +115,8 @@ import app.mymusclemap.ui.theme.StrictBrand
 import app.mymusclemap.ui.theme.WorkoutColors
 internal const val WORKOUT_HEADER_KEY = "workout-header"
 internal const val WORKOUT_FINISH_KEY = "workout-finish"
+internal const val WORKOUT_ADD_EXTRA_EXERCISE = "workout-add-extra-exercise"
+internal const val WORKOUT_READY_ADD_EXTRA = "workout-ready-add-extra"
 internal const val WORKOUT_FINISH_CTA = "workout-finish-cta"
 internal const val WORKOUT_FINISH_CTA_STRONG = "workout-finish-cta-strong"
 internal const val SET_COMPLETE_ACTION = "complete-set"
@@ -230,7 +233,9 @@ fun ActiveWorkoutScreen(
     onSkip: (Long) -> Unit,
     onUndoSkip: (Long) -> Unit,
     onAddExtra: (Long) -> Unit,
+    onAddExtraExercise: (Long) -> Unit,
     onRemoveExtra: (Long) -> Unit,
+    onRemoveExtraExercise: (Long) -> Unit,
     onToggleExercise: (Long) -> Unit,
     onRequestFinish: () -> Unit,
     onDismissFinish: () -> Unit,
@@ -249,6 +254,8 @@ fun ActiveWorkoutScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var pendingSkipId by remember { mutableStateOf<Long?>(null) }
+    var pendingRemoveExerciseId by remember { mutableStateOf<Long?>(null) }
+    var pickerOpen by remember { mutableStateOf(false) }
     var historyOpen by remember { mutableStateOf(false) }
     LaunchedEffect(state.currentExerciseId, state.currentSetId) {
         historyOpen = false
@@ -450,39 +457,65 @@ fun ActiveWorkoutScreen(
                         onUndoSkip = onUndoSkip,
                         onAddExtra = { onAddExtra(item.exercise.id) },
                         onRemoveExtra = onRemoveExtra,
+                        onRemoveExercise = { pendingRemoveExerciseId = item.exercise.id },
                         onOpenHistory = { historyOpen = true }
                     )
                 }
                 item(key = WORKOUT_FINISH_KEY) {
+                    val ready = state.progress.pending == 0
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag(WORKOUT_FINISH_KEY)
                             .padding(top = AppDimens.sectionGap, bottom = AppDimens.scrollEndPadding)
                     ) {
+                        if (!ready) {
+                            AddExtraExerciseAction(
+                                label = stringResource(R.string.action_add_extra_exercise),
+                                testTag = WORKOUT_ADD_EXTRA_EXERCISE,
+                                enabled = !state.discarding,
+                                onClick = { pickerOpen = true }
+                            )
+                            Spacer(Modifier.height(AppDimens.itemGap))
+                        }
                         HorizontalDivider(
                             thickness = AppDimens.strokeThin,
                             color = MaterialTheme.colorScheme.outlineVariant
                         )
                         Spacer(Modifier.height(AppDimens.itemGap))
-                        Text(
-                            text = stringResource(R.string.action_finish_workout),
-                            style = AppTypeTokens.sectionTitle
-                        )
-                        Spacer(Modifier.height(AppDimens.statSecondaryGap))
-                        Text(
-                            text = if (state.progress.pending == 0) {
-                                stringResource(R.string.active_workout_all_sets_done)
-                            } else {
-                                pluralStringResource(
+                        if (ready) {
+                            Text(
+                                text = stringResource(R.string.active_workout_ready_title),
+                                style = AppTypeTokens.sectionTitle
+                            )
+                            Spacer(Modifier.height(AppDimens.statSecondaryGap))
+                            Text(
+                                text = stringResource(R.string.active_workout_ready_subtitle),
+                                style = AppTypeTokens.statSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            AddExtraExerciseAction(
+                                label = stringResource(R.string.active_workout_ready_add_exercise),
+                                testTag = WORKOUT_READY_ADD_EXTRA,
+                                enabled = !state.discarding,
+                                onClick = { pickerOpen = true }
+                            )
+                        } else {
+                            Text(
+                                text = stringResource(R.string.action_finish_workout),
+                                style = AppTypeTokens.sectionTitle
+                            )
+                            Spacer(Modifier.height(AppDimens.statSecondaryGap))
+                            Text(
+                                text = pluralStringResource(
                                     R.plurals.finish_pending_body,
                                     state.progress.pending,
                                     state.progress.pending
-                                )
-                            },
-                            style = AppTypeTokens.statSecondary,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                                ),
+                                style = AppTypeTokens.statSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -582,6 +615,41 @@ fun ActiveWorkoutScreen(
                 ) {
                     Text(stringResource(R.string.action_continue_workout))
                 }
+            }
+        )
+    }
+    pendingRemoveExerciseId?.let { exerciseId ->
+        AlertDialog(
+            onDismissRequest = { pendingRemoveExerciseId = null },
+            title = { Text(stringResource(R.string.remove_extra_exercise_title)) },
+            text = { Text(stringResource(R.string.remove_extra_exercise_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingRemoveExerciseId = null
+                        onRemoveExtraExercise(exerciseId)
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.action_remove),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRemoveExerciseId = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+    if (pickerOpen) {
+        ExtraExercisePickerSheet(
+            exercises = state.catalog,
+            onDismiss = { pickerOpen = false },
+            onSelect = { exercise ->
+                pickerOpen = false
+                onAddExtraExercise(exercise.id)
             }
         )
     }
@@ -762,6 +830,7 @@ private fun ExerciseBlock(
     onUndoSkip: (Long) -> Unit,
     onAddExtra: () -> Unit,
     onRemoveExtra: (Long) -> Unit,
+    onRemoveExercise: () -> Unit,
     onOpenHistory: () -> Unit
 ) {
     val done = item.sets.isNotEmpty() && item.sets.none { it.status == SessionSetStatus.PENDING }
@@ -799,6 +868,13 @@ private fun ExerciseBlock(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
+                    if (item.exercise.addedDuringWorkout) {
+                        Text(
+                            text = stringResource(R.string.active_workout_extra_badge),
+                            style = AppTypeTokens.statCaption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     if (done) {
                         Text(
                             text = stringResource(R.string.set_status_completed_label),
@@ -886,6 +962,18 @@ private fun ExerciseBlock(
                 modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
             ) {
                 Text(stringResource(R.string.action_add_extra_set))
+            }
+            if (item.exercise.addedDuringWorkout) {
+                TextButton(
+                    onClick = onRemoveExercise,
+                    enabled = !discarding,
+                    modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
+                ) {
+                    Text(
+                        stringResource(R.string.action_remove_extra_exercise),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
         HorizontalDivider(
@@ -1156,6 +1244,34 @@ private fun SetRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AddExtraExerciseAction(
+    label: String,
+    testTag: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag(testTag)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Add,
+            contentDescription = null,
+            tint = if (enabled) StrictBrand.lime else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = label,
+            color = if (enabled) StrictBrand.lime else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        )
     }
 }
 
@@ -1584,7 +1700,10 @@ private fun ActiveWorkoutMessage.labelRes(): Int {
         ActiveWorkoutMessage.SetUpdated -> R.string.message_template_updated
         ActiveWorkoutMessage.ExtraAdded -> R.string.message_extra_set_added
         ActiveWorkoutMessage.ExtraRemoved -> R.string.message_extra_set_removed
+        ActiveWorkoutMessage.ExtraExerciseAdded -> R.string.message_extra_exercise_added
+        ActiveWorkoutMessage.ExtraExerciseRemoved -> R.string.message_extra_exercise_removed
         ActiveWorkoutMessage.CannotRemoveOriginal -> R.string.message_cannot_remove_original
+        ActiveWorkoutMessage.CannotRemovePlannedExercise -> R.string.message_cannot_remove_planned_exercise
         ActiveWorkoutMessage.SaveFailed -> R.string.message_set_save_failed
         ActiveWorkoutMessage.DiscardFailed -> R.string.message_workout_discard_failed
     }

@@ -20,6 +20,9 @@ import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.workout.AbandonWorkoutResult
 import app.mymusclemap.domain.workout.ActualSetDraft
+import app.mymusclemap.domain.workout.AddExtraExerciseResult
+import app.mymusclemap.domain.workout.SessionProgressLogic
+import app.mymusclemap.domain.workout.WorkoutCompletionLogic
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.FinishWorkoutResult
 import app.mymusclemap.domain.workout.PlannedLoadKind
@@ -499,6 +502,174 @@ class WorkoutSessionRepositoryRoomTest {
             clock,
             SystemDateProvider(clock)
         )
+    }
+
+    @Test
+    fun extraExercisesStayInTheSessionAndOutOfThePlan() = runTest {
+        val pull = savePull()
+        val dip = saveDip()
+        val catalogBefore = exercises.all().size
+        val templateId = saveTemplate("Push A", listOf(pull to fourSets()))
+        val planBefore = database.workoutTemplateDao().getExercises(templateId)
+        val planSetsBefore = planBefore.flatMap { database.workoutTemplateDao().getSets(it.id) }
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        val planned = sessions.getAggregate(started.sessionId)!!.exercises.single()
+        assertFalse(planned.exercise.addedDuringWorkout)
+        assertTrue(planned.sets.none { it.addedDuringWorkout })
+
+        val first = sessions.addExtraExercise(started.sessionId, dip) as AddExtraExerciseResult.Added
+        var aggregate = sessions.getAggregate(started.sessionId)!!
+        assertEquals(listOf(false, true), aggregate.exercises.map { it.exercise.addedDuringWorkout })
+        val extra = aggregate.exercises.single { it.exercise.id == first.sessionExerciseId }
+        assertEquals(dip, extra.exercise.exerciseId)
+        assertTrue(extra.sets.single().addedDuringWorkout)
+        assertEquals(SessionSetStatus.PENDING, extra.sets.single().status)
+        assertEquals(planned.sets.map { it.id }, aggregate.exercises.first().sets.map { it.id })
+
+        val duplicatePlanned = sessions.addExtraExercise(started.sessionId, pull) as AddExtraExerciseResult.Added
+        val duplicateExtra = sessions.addExtraExercise(started.sessionId, dip) as AddExtraExerciseResult.Added
+        aggregate = sessions.getAggregate(started.sessionId)!!
+        assertEquals(4, aggregate.exercises.size)
+        assertEquals(
+            2,
+            aggregate.exercises.count { it.exercise.exerciseId == dip && it.exercise.addedDuringWorkout }
+        )
+        assertNotEquals(duplicatePlanned.sessionExerciseId, planned.exercise.id)
+        assertNotEquals(duplicateExtra.setId, first.setId)
+
+        assertEquals(SessionMutationResult.Updated, sessions.addExtraSet(first.sessionExerciseId))
+        val withExtraSet = sessions.getAggregate(started.sessionId)!!
+            .exercises
+            .single { it.exercise.id == first.sessionExerciseId }
+        assertEquals(2, withExtraSet.sets.size)
+        assertTrue(withExtraSet.sets.all { it.addedDuringWorkout })
+
+        val blocked = sessions.finish(started.sessionId, skipRemaining = false) as FinishWorkoutResult.PendingRemaining
+        assertTrue(blocked.count > 0)
+        assertEquals(SessionMutationResult.OriginalSetProtected, sessions.removeExtraExercise(planned.exercise.id))
+        assertEquals(SessionMutationResult.Updated, sessions.removeExtraExercise(duplicatePlanned.sessionExerciseId))
+        aggregate = sessions.getAggregate(started.sessionId)!!
+        assertEquals(listOf(0, 1, 2), aggregate.exercises.map { it.exercise.position })
+        assertTrue(aggregate.exercises.any { it.exercise.id == first.sessionExerciseId })
+        assertTrue(aggregate.exercises.any { it.exercise.id == duplicateExtra.sessionExerciseId })
+        assertEquals(planBefore, database.workoutTemplateDao().getExercises(templateId))
+        assertEquals(
+            planSetsBefore,
+            database.workoutTemplateDao().getExercises(templateId).flatMap { database.workoutTemplateDao().getSets(it.id) }
+        )
+        assertEquals(catalogBefore, exercises.all().size)
+
+        val draft = ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+        while (true) {
+            val pendingSet = sessions.getAggregate(started.sessionId)!!
+                .exercises
+                .flatMap { it.sets }
+                .firstOrNull { it.status == SessionSetStatus.PENDING }
+                ?: break
+            assertEquals(SessionMutationResult.Updated, sessions.completeSet(pendingSet.id, draft))
+        }
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(started.sessionId, skipRemaining = false))
+        val completed = sessions.getAggregate(started.sessionId)!!
+        val summary = WorkoutCompletionLogic.from(completed)!!
+        assertEquals(3, summary.exerciseCount)
+        assertEquals(
+            completed.exercises.sumOf { item -> item.sets.count { it.status == SessionSetStatus.COMPLETED } },
+            summary.completedSetCount
+        )
+        assertTrue(summary.completedSetCount > planned.sets.size)
+        assertTrue(completed.exercises.any { it.exercise.addedDuringWorkout && it.sets.all { set -> set.addedDuringWorkout } })
+        assertTrue(completed.exercises.any { !it.exercise.addedDuringWorkout && it.sets.none { set -> set.addedDuringWorkout } })
+        assertEquals(catalogBefore, exercises.all().size)
+        val heatmap = sessions.observeHeatmapExercises().first()
+        assertTrue(heatmap.any { it.primaryMuscle == MuscleGroup.TRICEPS && it.completedSetCount > 0 })
+
+        val again = sessions.start(templateId) as StartWorkoutResult.Started
+        val resumed = sessions.addExtraExercise(again.sessionId, dip) as AddExtraExerciseResult.Added
+        val againAggregate = sessions.getAggregate(again.sessionId)!!
+        val resumedExercise = againAggregate.exercises.single { it.exercise.id == resumed.sessionExerciseId }.exercise
+        assertTrue(sessions.loadPreviousExerciseHistory(againAggregate, resumedExercise) != null)
+        assertEquals(AbandonWorkoutResult.Abandoned, sessions.abandon(again.sessionId))
+        assertNull(sessions.getAggregate(again.sessionId))
+        assertEquals(planBefore, database.workoutTemplateDao().getExercises(templateId))
+    }
+
+    @Test
+    fun addingAnExtraExerciseAfterPlannedSetsAreDoneReopensTheSession() = runTest {
+        val pull = savePull()
+        val dip = saveDip()
+        val templateId = saveTemplate(
+            "Push A",
+            listOf(pull to listOf(PlannedSetDraft(-1, "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
+        )
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        val plannedSet = sessions.getAggregate(started.sessionId)!!.exercises.single().sets.single()
+        val draft = ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+        assertEquals(SessionMutationResult.Updated, sessions.completeSet(plannedSet.id, draft))
+        assertEquals(0, SessionProgressLogic.fromAggregate(sessions.getAggregate(started.sessionId)!!).pending)
+        val added = sessions.addExtraExercise(started.sessionId, dip) as AddExtraExerciseResult.Added
+        assertEquals(1, SessionProgressLogic.fromAggregate(sessions.getAggregate(started.sessionId)!!).pending)
+        assertEquals(SessionMutationResult.Updated, sessions.completeSet(added.setId, draft))
+        assertEquals(0, SessionProgressLogic.fromAggregate(sessions.getAggregate(started.sessionId)!!).pending)
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(started.sessionId, skipRemaining = false))
+    }
+
+    @Test
+    fun extraExerciseCanBeAddedWhenTheSessionHasNoSavedPlan() = runTest {
+        val pull = savePull()
+        val sessionId = database.workoutSessionDao().insertAggregate(
+            WorkoutSessionEntity(
+                templateId = null,
+                templateName = "Open workout",
+                status = SessionStatus.IN_PROGRESS.name,
+                workoutDate = today.toString(),
+                startedAt = 1_000L,
+                finishedAt = null,
+                abandonedAt = null,
+                notes = null,
+                bodyWeightKg = null,
+                bodyWeightSource = BodyWeightSource.UNKNOWN.name,
+                bodyWeightSourceDate = null,
+                createdAt = 1_000L,
+                updatedAt = 1_000L,
+                activeLock = 1
+            ),
+            emptyList()
+        )
+        val added = sessions.addExtraExercise(sessionId, pull) as AddExtraExerciseResult.Added
+        val aggregate = sessions.getAggregate(sessionId)!!
+        assertNull(aggregate.session.templateId)
+        assertTrue(aggregate.exercises.single().exercise.addedDuringWorkout)
+        assertEquals(added.setId, aggregate.exercises.single().sets.single().id)
+        assertEquals(
+            SessionMutationResult.Updated,
+            sessions.completeSet(
+                added.setId,
+                ActualSetDraft(repsText = "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)
+            )
+        )
+        assertEquals(FinishWorkoutResult.Finished, sessions.finish(sessionId, skipRemaining = false))
+        val summary = WorkoutCompletionLogic.from(sessions.getAggregate(sessionId)!!)!!
+        assertEquals(1, summary.exerciseCount)
+        assertEquals(1, summary.completedSetCount)
+    }
+
+    @Test
+    fun archivedCatalogExerciseIsNotAddedToTheSession() = runTest {
+        val pull = savePull()
+        val hidden = saveDip()
+        assertTrue(exercises.archive(hidden))
+        val templateId = saveTemplate(
+            "Push A",
+            listOf(pull to listOf(PlannedSetDraft(-1, "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
+        )
+        val catalogBefore = exercises.all().size
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        assertEquals(
+            AddExtraExerciseResult.ExerciseArchived,
+            sessions.addExtraExercise(started.sessionId, hidden)
+        )
+        assertEquals(1, sessions.getAggregate(started.sessionId)!!.exercises.size)
+        assertEquals(catalogBefore, exercises.all().size)
     }
 
     private suspend fun savePull(): Long {

@@ -1,5 +1,6 @@
 package app.mymusclemap.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -134,7 +135,17 @@ data class WorkoutSessionExerciseEntity(
     val resistanceBasis: String,
     val weightInterpretation: String,
     val primaryMuscle: String,
-    val notes: String?
+    val notes: String?,
+    /**
+     * True only for an occurrence added to an in-progress session.
+     * Exercises copied from a plan at start stay false, as do imported workouts and
+     * rows created before this column existed. Those historical rows are not extras:
+     * the product had no way to add an exercise during a workout, so the default is
+     * not a guess about origin. This flag is not a link to a template-exercise row.
+     * The session's templateId is the plan relationship this model stores.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val addedDuringWorkout: Boolean = false
 )
 
 @Entity(

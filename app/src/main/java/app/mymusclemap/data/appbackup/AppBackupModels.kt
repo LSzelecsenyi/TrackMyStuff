@@ -38,6 +38,12 @@ object AppBackupFormat {
     const val ARCHIVE_DATA_SCHEMA_VERSION = 11
     /** Optional progress-photo gallery URI and original-byte fingerprint. Older archives still restore. */
     const val ARCHIVE_PHOTO_SOURCE_SCHEMA_VERSION = 12
+    /**
+     * Session-exercise origin. Older archives omit the field and restore those rows as planned.
+     * Loose JSON schema 8 may include the field when exported by this version; files that omit it
+     * still restore, with addedDuringWorkout false.
+     */
+    const val ARCHIVE_EXERCISE_ORIGIN_SCHEMA_VERSION = 13
     const val CONTAINER_VERSION = 1
     const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024

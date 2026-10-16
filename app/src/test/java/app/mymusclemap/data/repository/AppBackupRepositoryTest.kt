@@ -133,8 +133,47 @@ class AppBackupRepositoryTest {
             loaded.workoutSessionExercises.map { it.id }.toSet()
         )
         assertTrue(loaded.workoutSessionSets.any { it.addedDuringWorkout })
+        assertTrue(loaded.workoutSessionExercises.none { it.addedDuringWorkout })
         assertTrue(loaded.workoutSessionSets.any { it.status == SessionSetStatus.SKIPPED.name })
         assertNotEquals(junkTables().weightMeasurements, loaded.weightMeasurements)
+    }
+
+    @Test
+    fun extraExerciseOriginSurvivesBackupAndLegacyFilesStayPlanned() = runTest {
+        val tables = representativeTables().let { source ->
+            source.copy(
+                workoutSessionExercises = source.workoutSessionExercises.map { exercise ->
+                    if (exercise.id == 2010L) exercise.copy(addedDuringWorkout = true) else exercise
+                }
+            )
+        }
+        val exportedAt = Instant.parse("2026-09-25T10:15:30Z")
+        val archivePayload = AppBackupSnapshot(
+            formatVersion = AppBackupFormat.FORMAT_VERSION,
+            schemaVersion = AppBackupFormat.ARCHIVE_EXERCISE_ORIGIN_SCHEMA_VERSION,
+            exportedAt = exportedAt,
+            source = AppBackupSource("app.mymusclemap", "test"),
+            tables = tables,
+            settings = AppearanceCodec.encode(AppearanceSettings.Default)
+        )
+        val encoded = AppBackupJson.encode(archivePayload)
+        val parsed = AppBackupJson.parse(
+            encoded,
+            maxSchemaVersion = AppBackupFormat.ARCHIVE_EXERCISE_ORIGIN_SCHEMA_VERSION
+        ) as AppBackupParseResult.Success
+        assertEquals(AppBackupFormat.ARCHIVE_EXERCISE_ORIGIN_SCHEMA_VERSION, parsed.snapshot.schemaVersion)
+        assertTrue(parsed.snapshot.tables.workoutSessionExercises.single { it.id == 2010L }.addedDuringWorkout)
+        assertTrue(parsed.snapshot.tables.workoutSessionExercises.filter { it.id != 2010L }.none { it.addedDuringWorkout })
+
+        val legacy = JSONObject(encoded)
+        legacy.put("schemaVersion", AppBackupFormat.SCHEMA_VERSION)
+        val exercises = legacy.getJSONObject("tables").getJSONArray("workout_session_exercises")
+        for (index in 0 until exercises.length()) {
+            exercises.getJSONObject(index).remove("addedDuringWorkout")
+        }
+        val restored = AppBackupJson.parse(legacy.toString()) as AppBackupParseResult.Success
+        assertTrue(restored.snapshot.tables.workoutSessionExercises.none { it.addedDuringWorkout })
+        assertEquals(tables.workoutSessionExercises.size, restored.snapshot.tables.workoutSessionExercises.size)
     }
 
     @Test

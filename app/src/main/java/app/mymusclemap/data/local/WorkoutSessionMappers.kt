@@ -55,7 +55,8 @@ fun WorkoutSessionExerciseEntity.toModel(
         weightInterpretation = ExerciseEnumCodec.weight(weightInterpretation),
         primaryMuscle = ExerciseEnumCodec.muscleOrFallback(primaryMuscle),
         secondaryMuscles = secondary,
-        notes = notes
+        notes = notes,
+        addedDuringWorkout = addedDuringWorkout
     )
 }
 

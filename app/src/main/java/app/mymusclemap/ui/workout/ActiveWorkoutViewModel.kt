@@ -4,7 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.WorkoutSessionRepository
+import app.mymusclemap.domain.exercise.Exercise
 import app.mymusclemap.domain.workout.AbandonWorkoutResult
+import app.mymusclemap.domain.workout.AddExtraExerciseResult
 import app.mymusclemap.domain.workout.ActualSetDraft
 import app.mymusclemap.domain.workout.ActualSetLogic
 import app.mymusclemap.domain.workout.DistanceUnit
@@ -32,10 +34,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -75,7 +79,8 @@ data class ActiveWorkoutUiState(
     val editingSetIds: Set<Long> = emptySet(),
     val finishing: Boolean = false,
     val completionSummary: WorkoutCompletionSummary? = null,
-    val exerciseHistory: InWorkoutExerciseHistory = InWorkoutExerciseHistory.Loading
+    val exerciseHistory: InWorkoutExerciseHistory = InWorkoutExerciseHistory.Loading,
+    val catalog: List<Exercise> = emptyList()
 ) {
     val progress: SessionProgress
         get() = aggregate?.let(SessionProgressLogic::fromAggregate) ?: SessionProgress(0, 0, 0, 0)
@@ -91,7 +96,10 @@ sealed interface ActiveWorkoutMessage {
     data object SetUpdated : ActiveWorkoutMessage
     data object ExtraAdded : ActiveWorkoutMessage
     data object ExtraRemoved : ActiveWorkoutMessage
+    data object ExtraExerciseAdded : ActiveWorkoutMessage
+    data object ExtraExerciseRemoved : ActiveWorkoutMessage
     data object CannotRemoveOriginal : ActiveWorkoutMessage
+    data object CannotRemovePlannedExercise : ActiveWorkoutMessage
     data object SaveFailed : ActiveWorkoutMessage
     data object DiscardFailed : ActiveWorkoutMessage
 }
@@ -100,6 +108,7 @@ class ActiveWorkoutViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val sessionRepository: WorkoutSessionRepository,
     private val clock: Clock = Clock.systemUTC(),
+    private val observeCatalog: Flow<List<Exercise>> = flowOf(emptyList()),
     private val loadExerciseHistory: suspend (WorkoutSessionAggregate, SessionExercise) -> ExerciseHistorySelection? =
         { aggregate, exercise -> sessionRepository.loadPreviousExerciseHistory(aggregate, exercise) }
 ) : ViewModel() {
@@ -256,8 +265,12 @@ class ActiveWorkoutViewModel(
         initialValue = ActiveWorkoutUiState()
     )
 
-    val uiState: StateFlow<ActiveWorkoutUiState> = combine(workoutState, exerciseHistory) { workout, history ->
-        workout.copy(exerciseHistory = history)
+    val uiState: StateFlow<ActiveWorkoutUiState> = combine(
+        workoutState,
+        exerciseHistory,
+        observeCatalog
+    ) { workout, history, catalog ->
+        workout.copy(exerciseHistory = history, catalog = catalog)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -524,6 +537,61 @@ class ActiveWorkoutViewModel(
         viewModelScope.launch {
             if (sessionRepository.addExtraSet(sessionExerciseId) == SessionMutationResult.Updated) {
                 message.value = ActiveWorkoutMessage.ExtraAdded
+            }
+        }
+    }
+
+    fun addExtraExercise(exerciseId: Long) {
+        if (discarding.value) {
+            return
+        }
+        val keepCurrentSet = uiState.value.progress.pending > 0
+        viewModelScope.launch {
+            when (val result = sessionRepository.addExtraExercise(sessionId, exerciseId)) {
+                is AddExtraExerciseResult.Added -> {
+                    expandedIds.value = expandedIds.value + result.sessionExerciseId
+                    message.value = ActiveWorkoutMessage.ExtraExerciseAdded
+                    if (!keepCurrentSet) {
+                        focusedSetId.value = result.setId
+                        emitFocus(WorkoutFocusTarget.Set(result.setId, result.sessionExerciseId))
+                    }
+                }
+                AddExtraExerciseResult.SessionNotFound,
+                AddExtraExerciseResult.NotActive,
+                AddExtraExerciseResult.ExerciseNotFound,
+                AddExtraExerciseResult.ExerciseArchived -> message.value = ActiveWorkoutMessage.SaveFailed
+            }
+        }
+    }
+
+    fun removeExtraExercise(sessionExerciseId: Long) {
+        if (discarding.value) {
+            return
+        }
+        val removedSets = uiState.value.aggregate
+            ?.exercises
+            ?.firstOrNull { it.exercise.id == sessionExerciseId }
+            ?.sets
+            .orEmpty()
+        val wasCurrent = uiState.value.currentExerciseId == sessionExerciseId
+        removedSets.forEach { set -> cancelDraftPersist(set.id) }
+        viewModelScope.launch {
+            when (sessionRepository.removeExtraExercise(sessionExerciseId)) {
+                SessionMutationResult.Updated -> {
+                    val ids = removedSets.map { it.id }.toSet()
+                    dirtyIds.value = dirtyIds.value - ids
+                    setErrors.value = setErrors.value - ids
+                    drafts.value = drafts.value - ids
+                    editingSetIds.value = editingSetIds.value - ids
+                    expandedIds.value = expandedIds.value - sessionExerciseId
+                    message.value = ActiveWorkoutMessage.ExtraExerciseRemoved
+                    if (wasCurrent) {
+                        sessionRepository.getAggregate(sessionId)?.let { focusAuthoritative(it) }
+                    }
+                }
+                SessionMutationResult.OriginalSetProtected ->
+                    message.value = ActiveWorkoutMessage.CannotRemovePlannedExercise
+                else -> message.value = ActiveWorkoutMessage.SaveFailed
             }
         }
     }

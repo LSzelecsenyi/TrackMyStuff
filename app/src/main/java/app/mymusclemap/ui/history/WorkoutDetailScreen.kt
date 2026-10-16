@@ -268,6 +268,13 @@ private fun ExerciseDetailSection(
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Text(starterExerciseLabel(item.exercise.name), style = MaterialTheme.typography.titleLarge)
+    if (item.exercise.addedDuringWorkout) {
+        Text(
+            text = stringResource(R.string.workout_detail_extra),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
     Text(
         text = stringResource(item.exercise.primaryMuscle.labelRes()),
         style = MaterialTheme.typography.bodyMedium

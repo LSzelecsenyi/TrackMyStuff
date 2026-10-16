@@ -28,6 +28,14 @@ class FeatureAccessPolicyTest {
     }
 
     @Test
+    fun freeUsersCanStillUseAnExistingExerciseWhenCreationIsLimited() {
+        val limited = free.customExercises(FeatureAccessPolicy.FREE_CUSTOM_EXERCISE_LIMIT)
+        assertFalse(limited.canCreate)
+        assertTrue(limited.canUseInWorkout)
+        assertTrue(free.workoutLogging().canEdit)
+    }
+
+    @Test
     fun freeCustomExerciseCreationAllowsFewerThanFive() {
         assertTrue(free.customExercises(0).canCreate)
         assertTrue(free.customExercises(4).canCreate)

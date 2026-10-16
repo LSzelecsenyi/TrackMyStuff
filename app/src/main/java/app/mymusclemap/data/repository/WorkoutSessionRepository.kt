@@ -14,6 +14,7 @@ import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.exercise.ExerciseEnumCodec
 import app.mymusclemap.domain.exercise.MuscleRole
 import app.mymusclemap.domain.workout.AbandonWorkoutResult
+import app.mymusclemap.domain.workout.AddExtraExerciseResult
 import app.mymusclemap.domain.workout.DeleteWorkoutResult
 import app.mymusclemap.domain.workout.ActiveSessionSummary
 import app.mymusclemap.domain.workout.ActualSetDraft
@@ -498,7 +499,8 @@ class WorkoutSessionRepository(
                 primaryMuscle = catalogMuscles.firstOrNull { it.role == MuscleRole.PRIMARY.name }?.muscleGroup
                     ?: catalogMuscles.firstOrNull()?.muscleGroup
                     ?: "FULL_BODY",
-                notes = relation.notes
+                notes = relation.notes,
+                addedDuringWorkout = false
             )
             val muscleSnapshots = catalogMuscles.map { muscle ->
                 WorkoutSessionExerciseMuscleEntity(
@@ -716,6 +718,88 @@ class WorkoutSessionRepository(
                 addedDuringWorkout = true
             )
         )
+        touchSession(session)
+        SessionMutationResult.Updated
+    }
+
+    /**
+     * Appends a catalog exercise to the active session. The saved plan is not read or written.
+     * The new occurrence and its first set are both marked as added during the workout.
+     * Selecting an existing exercise does not create a catalog row.
+     */
+    suspend fun addExtraExercise(sessionId: Long, exerciseId: Long): AddExtraExerciseResult = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return AddExtraExerciseResult.SessionNotFound
+        if (session.status != SessionStatus.IN_PROGRESS.name) {
+            return AddExtraExerciseResult.NotActive
+        }
+        val exercise = exerciseDao.getById(exerciseId) ?: return AddExtraExerciseResult.ExerciseNotFound
+        if (exercise.archived) {
+            return AddExtraExerciseResult.ExerciseArchived
+        }
+        val catalogMuscles = exerciseDao.getMuscles(exerciseId)
+        val existing = sessionDao.getExercises(sessionId)
+        val measurement = ExerciseEnumCodec.measurement(exercise.measurementType)
+        val resistance = ExerciseEnumCodec.resistance(exercise.resistanceBasis)
+        val (planned, actual) = ActualSetLogic.extraSetDefaults(measurement, resistance)
+        val parsed = ActualSetLogic.parse(actual, measurement, resistance).first
+        val position = (existing.maxOfOrNull { it.position } ?: -1) + 1
+        val inserted = sessionDao.insertAddedExercise(
+            exercise = WorkoutSessionExerciseEntity(
+                sessionId = sessionId,
+                exerciseId = exercise.id,
+                position = position,
+                name = exercise.name,
+                category = exercise.category,
+                movementPattern = exercise.movementPattern,
+                measurementType = exercise.measurementType,
+                resistanceBasis = exercise.resistanceBasis,
+                weightInterpretation = exercise.weightInterpretation,
+                primaryMuscle = catalogMuscles.firstOrNull { it.role == MuscleRole.PRIMARY.name }?.muscleGroup
+                    ?: catalogMuscles.firstOrNull()?.muscleGroup
+                    ?: "FULL_BODY",
+                notes = null,
+                addedDuringWorkout = true
+            ),
+            muscles = catalogMuscles.map { muscle ->
+                WorkoutSessionExerciseMuscleEntity(
+                    sessionExerciseId = 0L,
+                    muscleGroup = muscle.muscleGroup,
+                    role = muscle.role
+                )
+            },
+            set = WorkoutSessionSetEntity(
+                sessionExerciseId = 0L,
+                position = 0,
+                plannedMinReps = planned.minReps,
+                plannedMaxReps = planned.maxReps,
+                plannedLoadKind = planned.loadKind.name,
+                plannedWeightKg = planned.weightKg,
+                plannedDurationSeconds = planned.durationSeconds,
+                plannedDistanceMeters = planned.distanceMeters,
+                actualReps = parsed?.reps ?: planned.minReps,
+                actualLoadKind = (parsed?.loadKind ?: planned.loadKind).name,
+                actualWeightKg = parsed?.weightKg ?: planned.weightKg,
+                actualDurationSeconds = parsed?.durationSeconds ?: planned.durationSeconds,
+                actualDistanceMeters = parsed?.distanceMeters ?: planned.distanceMeters,
+                status = SessionSetStatus.PENDING.name,
+                completedAt = null,
+                addedDuringWorkout = true
+            )
+        )
+        touchSession(session)
+        AddExtraExerciseResult.Added(inserted.sessionExerciseId, inserted.setId)
+    }
+
+    suspend fun removeExtraExercise(sessionExerciseId: Long): SessionMutationResult = mutex.withLock {
+        val exercise = sessionDao.getExercise(sessionExerciseId) ?: return SessionMutationResult.NotFound
+        if (!exercise.addedDuringWorkout) {
+            return SessionMutationResult.OriginalSetProtected
+        }
+        val session = sessionDao.getById(exercise.sessionId) ?: return SessionMutationResult.NotFound
+        if (session.status != SessionStatus.IN_PROGRESS.name) {
+            return SessionMutationResult.NotActive
+        }
+        sessionDao.deleteExerciseAndReindex(exercise.id, session.id)
         touchSession(session)
         SessionMutationResult.Updated
     }

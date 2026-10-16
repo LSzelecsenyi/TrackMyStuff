@@ -117,7 +117,7 @@ internal object AppBackupArchive {
             )
         }
         if (declared.dataSchemaVersion !in
-            AppBackupFormat.ARCHIVE_PHOTO_SCHEMA_VERSION..AppBackupFormat.ARCHIVE_PHOTO_SOURCE_SCHEMA_VERSION
+            AppBackupFormat.ARCHIVE_PHOTO_SCHEMA_VERSION..AppBackupFormat.ARCHIVE_EXERCISE_ORIGIN_SCHEMA_VERSION
         ) {
             return reject(
                 staging,
@@ -127,7 +127,7 @@ internal object AppBackupArchive {
         }
         val parsed = AppBackupJson.parse(
             data.toString(Charsets.UTF_8),
-            maxSchemaVersion = AppBackupFormat.ARCHIVE_PHOTO_SOURCE_SCHEMA_VERSION
+            maxSchemaVersion = AppBackupFormat.ARCHIVE_EXERCISE_ORIGIN_SCHEMA_VERSION
         )
         if (parsed is AppBackupParseResult.Failure) {
             staging.deleteRecursively()

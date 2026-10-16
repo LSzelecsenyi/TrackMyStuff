@@ -41,7 +41,13 @@ data class SessionExercise(
     val weightInterpretation: WeightInterpretation,
     val primaryMuscle: MuscleGroup,
     val secondaryMuscles: List<MuscleGroup>,
-    val notes: String?
+    val notes: String?,
+    /**
+     * True when this occurrence was added during the session.
+     * False means it was copied from the plan at start, imported, or stored before
+     * extra exercises existed. Position and name are not origin.
+     */
+    val addedDuringWorkout: Boolean = false
 )
 
 data class SessionSet(
@@ -176,6 +182,14 @@ sealed class FinishWorkoutResult {
     data object AlreadyTerminal : FinishWorkoutResult()
     data object NotFound : FinishWorkoutResult()
     data class PendingRemaining(val count: Int) : FinishWorkoutResult()
+}
+
+sealed class AddExtraExerciseResult {
+    data class Added(val sessionExerciseId: Long, val setId: Long) : AddExtraExerciseResult()
+    data object SessionNotFound : AddExtraExerciseResult()
+    data object NotActive : AddExtraExerciseResult()
+    data object ExerciseNotFound : AddExtraExerciseResult()
+    data object ExerciseArchived : AddExtraExerciseResult()
 }
 
 sealed class AbandonWorkoutResult {

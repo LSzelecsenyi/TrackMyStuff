@@ -180,7 +180,8 @@ class WeightViewModelFactory(
             modelClass.isAssignableFrom(ActiveWorkoutViewModel::class.java) -> {
                 ActiveWorkoutViewModel(
                     extras.createSavedStateHandle(),
-                    workoutSessionRepository
+                    workoutSessionRepository,
+                    observeCatalog = exerciseRepository.observeActive()
                 )
             }
             modelClass.isAssignableFrom(WorkoutDetailViewModel::class.java) -> {
