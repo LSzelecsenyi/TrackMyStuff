@@ -25,7 +25,12 @@ data class WorkoutSession(
     val updatedAt: Long,
     val importFingerprint: String? = null,
     val scheduledWorkoutId: Long? = null,
-    val clientWorkoutId: String = ""
+    val clientWorkoutId: String = "",
+    /**
+     * True after this completed workout's approved plan update was committed.
+     * A later visit must not apply that workout's progression again.
+     */
+    val planProgressionApplied: Boolean = false
 )
 
 data class SessionExercise(
@@ -46,8 +51,12 @@ data class SessionExercise(
      * True when this occurrence was added during the session.
      * False means it was copied from the plan at start, imported, or stored before
      * extra exercises existed. Position and name are not origin.
+     * [sourceTemplateExerciseId] is the plan-exercise row copied at start.
+     * Null means this occurrence has no reliable plan source, including history
+     * from before that id was stored. Do not infer one.
      */
-    val addedDuringWorkout: Boolean = false
+    val addedDuringWorkout: Boolean = false,
+    val sourceTemplateExerciseId: Long? = null
 )
 
 data class SessionSet(
@@ -68,7 +77,9 @@ data class SessionSet(
     val status: SessionSetStatus,
     val completedAt: Long?,
     val addedDuringWorkout: Boolean,
-    val draft: ActualSetDraft? = null
+    val draft: ActualSetDraft? = null,
+    /** Plan-set row copied at start. Null when this set has no reliable plan source. */
+    val sourceTemplateSetId: Long? = null
 )
 
 data class SessionExerciseItem(

@@ -105,6 +105,7 @@ fun TemplateEditorScreen(
     onDistance: (Long, Long, String) -> Unit,
     onDistanceUnit: (Long, Long, DistanceUnit) -> Unit,
     onSave: () -> Unit,
+    onReload: () -> Unit = {},
     onDismissDiscard: () -> Unit,
     onConfirmDiscard: () -> Unit,
     onFinished: (Boolean, Boolean) -> Unit,
@@ -207,6 +208,17 @@ fun TemplateEditorScreen(
                                     if (message != null) Text(message)
                                 }
                             )
+                            if (state.stalePlan) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.error_template_stale),
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                TextButton(onClick = onReload) {
+                                    Text(stringResource(R.string.action_template_reload))
+                                }
+                            }
                             Spacer(Modifier.height(12.dp))
                             OutlinedTextField(
                                 value = state.draft.notes,

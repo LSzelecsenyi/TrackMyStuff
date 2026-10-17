@@ -4,6 +4,7 @@ import app.mymusclemap.ui.exercises.starterExerciseLabel
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,11 +22,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,8 +41,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -50,9 +52,11 @@ import app.mymusclemap.domain.achievements.HighlightMeasure
 import app.mymusclemap.domain.achievements.PerformanceHighlight
 import app.mymusclemap.domain.achievements.PerformanceRecordKind
 import app.mymusclemap.domain.achievements.PendingCelebration
+import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.journal.WorkoutSetCopy
+import app.mymusclemap.domain.workout.PlanSetProgression
+import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.QuantityParser
-import app.mymusclemap.domain.workout.WorkoutSummaryExercise
 import app.mymusclemap.ui.achievements.BadgeArtworkResolver
 import app.mymusclemap.ui.achievements.celebrationDetail
 import app.mymusclemap.ui.achievements.celebrationName
@@ -70,21 +74,31 @@ internal const val WORKOUT_COMPLETE_HEATMAP = "workout-complete-heatmap"
 internal const val WORKOUT_COMPLETE_CELEBRATIONS = "workout-complete-celebrations"
 internal const val WORKOUT_COMPLETE_LOADING = "workout-complete-loading"
 internal const val WORKOUT_COMPLETE_HIGHLIGHTS = "workout-complete-highlights"
-internal const val WORKOUT_COMPLETE_EXERCISES = "workout-complete-exercises"
+internal const val WORKOUT_COMPLETE_PROGRESS = "workout-complete-progress"
+internal const val WORKOUT_COMPLETE_PLAN_CHECKBOX = "workout-complete-plan-checkbox"
+internal const val WORKOUT_COMPLETE_PLAN_SHOW_ALL = "workout-complete-plan-show-all"
+private const val PLAN_PROGRESS_PREVIEW_LIMIT = 3
 
 @Composable
 fun WorkoutCompletionScreen(
     state: WorkoutSummaryUiState,
-    onLeave: () -> Unit,
+    onLeave: (applyPlanUpdates: Boolean) -> Unit,
     playAnimation: Boolean = true,
-    celebrations: List<PendingCelebration> = emptyList()
+    celebrations: List<PendingCelebration> = emptyList(),
+    notice: PlanProgressionNotice? = null,
+    applying: Boolean = false,
+    approvalEpoch: Int = 0
 ) {
     var acceptLeave by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
-    val leave = {
-        if (acceptLeave && !leaving) {
-            leaving = true
-            onLeave()
+    var approved by remember(approvalEpoch) { mutableStateOf(false) }
+    var showAllChanges by remember(approvalEpoch) { mutableStateOf(false) }
+    val leave: (Boolean) -> Unit = { apply ->
+        if (acceptLeave && !leaving && !applying) {
+            if (!apply) {
+                leaving = true
+            }
+            onLeave(apply)
         }
     }
     LaunchedEffect(Unit) {
@@ -94,10 +108,7 @@ fun WorkoutCompletionScreen(
         acceptLeave = true
     }
     BackHandler {
-        if (acceptLeave && !leaving) {
-            leaving = true
-            onLeave()
-        }
+        leave(false)
     }
     Scaffold(
         modifier = Modifier
@@ -161,14 +172,22 @@ fun WorkoutCompletionScreen(
                         )
                     }
                     is WorkoutSummaryUiState.Ready -> {
-                        ReadySummary(state, celebrations)
+                        ReadySummary(
+                            state = state,
+                            celebrations = celebrations,
+                            notice = notice,
+                            approved = approved,
+                            onApprovedChange = { approved = it },
+                            showAllChanges = showAllChanges,
+                            onShowAllChanges = { showAllChanges = true }
+                        )
                     }
                 }
             }
             Spacer(Modifier.height(AppDimens.itemGap))
             Button(
-                onClick = leave,
-                enabled = !leaving,
+                onClick = { leave(approved) },
+                enabled = !leaving && !applying,
                 shape = AppShapeTokens.button,
                 colors = StrictBrand.actionButtonColors(),
                 modifier = Modifier
@@ -185,7 +204,12 @@ fun WorkoutCompletionScreen(
 @Composable
 private fun ReadySummary(
     state: WorkoutSummaryUiState.Ready,
-    celebrations: List<PendingCelebration>
+    celebrations: List<PendingCelebration>,
+    notice: PlanProgressionNotice?,
+    approved: Boolean,
+    onApprovedChange: (Boolean) -> Unit,
+    showAllChanges: Boolean,
+    onShowAllChanges: () -> Unit
 ) {
     val summary = state.summary
     summary.workoutName?.let { name ->
@@ -230,6 +254,26 @@ private fun ReadySummary(
             )
         }
     }
+    if (state.progression.updates.isNotEmpty()) {
+        PlanProgressionSection(
+            updates = state.progression.updates,
+            approved = approved,
+            onApprovedChange = onApprovedChange,
+            showAllChanges = showAllChanges,
+            onShowAllChanges = onShowAllChanges
+        )
+    }
+    notice?.let { current ->
+        Spacer(Modifier.height(AppDimens.itemGap))
+        Text(
+            text = progressionNotice(current),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("workout-complete-plan-notice")
+        )
+    }
     if (summary.highlights.isNotEmpty()) {
         SectionTitle(stringResource(R.string.workout_summary_highlights))
         Column(
@@ -253,19 +297,6 @@ private fun ReadySummary(
         ) {
             celebrations.forEach { celebration ->
                 AchievementRow(celebration)
-            }
-        }
-    }
-    if (summary.exercises.isNotEmpty()) {
-        SectionTitle(stringResource(R.string.workout_summary_exercises_section))
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(WORKOUT_COMPLETE_EXERCISES),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
-        ) {
-            summary.exercises.forEach { exercise ->
-                ExerciseBlock(exercise)
             }
         }
     }
@@ -394,34 +425,168 @@ private fun AchievementRow(celebration: PendingCelebration) {
 }
 
 @Composable
-private fun ExerciseBlock(exercise: WorkoutSummaryExercise) {
-    val resources = LocalResources.current
-    Column(modifier = Modifier.fillMaxWidth()) {
+private fun PlanProgressionSection(
+    updates: List<PlanSetProgression>,
+    approved: Boolean,
+    onApprovedChange: (Boolean) -> Unit,
+    showAllChanges: Boolean,
+    onShowAllChanges: () -> Unit
+) {
+    val visible = if (showAllChanges) updates else updates.take(PLAN_PROGRESS_PREVIEW_LIMIT)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(WORKOUT_COMPLETE_PROGRESS)
+    ) {
+        SectionTitle(stringResource(R.string.plan_progress_title))
         Text(
-            text = starterExerciseLabel(exercise.name),
+            text = stringResource(R.string.plan_progress_subtitle),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        Text(
+            text = if (updates.size == 1) {
+                stringResource(R.string.plan_progress_improved_one)
+            } else {
+                stringResource(R.string.plan_progress_improved_many, updates.size)
+            },
+            style = MaterialTheme.typography.titleSmall,
+            color = StrictBrand.lime
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        visible.forEach { update ->
+            PlanChangeRow(update)
+            Spacer(Modifier.height(AppDimens.itemGap))
+        }
+        if (!showAllChanges && updates.size > PLAN_PROGRESS_PREVIEW_LIMIT) {
+            TextButton(
+                onClick = onShowAllChanges,
+                modifier = Modifier.testTag(WORKOUT_COMPLETE_PLAN_SHOW_ALL)
+            ) {
+                Text(
+                    text = stringResource(R.string.plan_progress_show_all, updates.size),
+                    color = StrictBrand.lime
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = AppDimens.minTouch)
+                .toggleable(
+                    value = approved,
+                    role = Role.Checkbox,
+                    onValueChange = onApprovedChange
+                )
+                .testTag(WORKOUT_COMPLETE_PLAN_CHECKBOX),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = approved,
+                onCheckedChange = null
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.plan_progress_update_label),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.plan_progress_update_support),
+                    style = AppTypeTokens.statSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Text(
+            text = stringResource(R.string.plan_progress_update_detail),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun PlanChangeRow(update: PlanSetProgression) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("workout-complete-plan-set-${update.sourceTemplateSetId}")
+    ) {
+        Text(
+            text = starterExerciseLabel(update.displayName),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = pluralStringResource(
-                R.plurals.workout_summary_set_count,
-                exercise.completedSets.size,
-                exercise.completedSets.size
-            ),
+            text = stringResource(R.string.plan_progress_set, update.setNumber),
             style = AppTypeTokens.statSecondary,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        exercise.completedSets.forEach { set ->
-            val performed = WorkoutSetCopy.performedValue(resources, set, exercise.interpretation)
-            if (performed.isNotBlank()) {
-                Text(
-                    text = performed,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-        Spacer(Modifier.height(AppDimens.itemGap))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text(
+            text = stringResource(
+                R.string.plan_progress_change,
+                progressionValue(update, before = true),
+                progressionValue(update, before = false)
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun progressionValue(update: PlanSetProgression, before: Boolean): String {
+    val resources = LocalResources.current
+    val reps = if (before) update.beforeReps else update.afterReps
+    val weight = if (before) update.beforeWeightKg else update.afterWeightKg
+    val showReps = update.repsChanged || !update.weightChanged
+    val showWeight = update.weightChanged || !update.repsChanged
+    if (update.repsChanged && update.weightChanged) {
+        return WorkoutSetCopy.formatValue(
+            resources = resources,
+            repsText = reps.toString(),
+            loadKind = update.loadKind,
+            weightKg = weight,
+            durationSeconds = null,
+            distanceMeters = null,
+            interpretation = update.weightInterpretation
+        )
+    }
+    if (showReps && update.repsChanged) {
+        return stringResource(R.string.set_copy_reps, reps.toString())
+    }
+    return weightLabel(update.loadKind, weight, update.weightInterpretation)
+}
+
+@Composable
+private fun weightLabel(
+    kind: PlannedLoadKind,
+    weightKg: Double?,
+    interpretation: WeightInterpretation
+): String {
+    val resources = LocalResources.current
+    return WorkoutSetCopy.formatValue(
+        resources = resources,
+        repsText = null,
+        loadKind = kind,
+        weightKg = weightKg,
+        durationSeconds = null,
+        distanceMeters = null,
+        interpretation = interpretation
+    )
+}
+
+@Composable
+private fun progressionNotice(notice: PlanProgressionNotice): String {
+    return when (notice) {
+        is PlanProgressionNotice.Partial -> stringResource(
+            R.string.plan_progress_partial,
+            notice.updated,
+            notice.skipped
+        )
+        PlanProgressionNotice.Unavailable -> stringResource(R.string.plan_progress_unavailable)
+        PlanProgressionNotice.Failed -> stringResource(R.string.plan_progress_failed)
     }
 }

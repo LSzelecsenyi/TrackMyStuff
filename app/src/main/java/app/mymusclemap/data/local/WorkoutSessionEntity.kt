@@ -96,7 +96,10 @@ data class WorkoutSessionEntity(
     val activeLock: Int?,
     val importFingerprint: String? = null,
     val scheduledWorkoutId: Long? = null,
-    val clientWorkoutId: String = java.util.UUID.randomUUID().toString()
+    val clientWorkoutId: String = java.util.UUID.randomUUID().toString(),
+    /** Set in the same transaction as an approved plan update from this workout. */
+    @ColumnInfo(defaultValue = "0")
+    val planProgressionApplied: Boolean = false
 )
 
 @Entity(
@@ -141,11 +144,14 @@ data class WorkoutSessionExerciseEntity(
      * Exercises copied from a plan at start stay false, as do imported workouts and
      * rows created before this column existed. Those historical rows are not extras:
      * the product had no way to add an exercise during a workout, so the default is
-     * not a guess about origin. This flag is not a link to a template-exercise row.
-     * The session's templateId is the plan relationship this model stores.
+     * not a guess about origin.
+     * [sourceTemplateExerciseId] is the plan-exercise row copied when the session
+     * started. It is null for extras, imports, and sessions started before the
+     * column existed. Those nulls are not backfilled.
      */
     @ColumnInfo(defaultValue = "0")
-    val addedDuringWorkout: Boolean = false
+    val addedDuringWorkout: Boolean = false,
+    val sourceTemplateExerciseId: Long? = null
 )
 
 @Entity(
@@ -206,5 +212,7 @@ data class WorkoutSessionSetEntity(
     val status: String,
     val completedAt: Long?,
     val addedDuringWorkout: Boolean,
-    val draftPayload: String? = null
+    val draftPayload: String? = null,
+    /** Plan-set row copied at start. Null when this set has no reliable plan source. */
+    val sourceTemplateSetId: Long? = null
 )

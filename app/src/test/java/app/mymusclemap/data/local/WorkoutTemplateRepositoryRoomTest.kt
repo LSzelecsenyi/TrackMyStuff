@@ -19,6 +19,7 @@ import app.mymusclemap.domain.workout.PlannedSetDraft
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
 import app.mymusclemap.domain.workout.TemplateSaveResult
+import app.mymusclemap.domain.workout.toSetDraft
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -109,6 +110,9 @@ class WorkoutTemplateRepositoryRoomTest {
         assertEquals("6", stored.exercises.single().sets[3].minReps.toString())
         assertEquals(8, stored.exercises.single().sets[0].minReps)
         assertNotEquals(stored.template.createdAt, stored.template.updatedAt)
+        assertEquals(original.exercises.single().relation.id, stored.exercises.single().relation.id)
+        assertEquals(original.exercises.single().sets.map { it.id }, stored.exercises.single().sets.map { it.id })
+        assertEquals(original.exercises.single().relation.createdAt, stored.exercises.single().relation.createdAt)
     }
 
     @Test
@@ -177,6 +181,200 @@ class WorkoutTemplateRepositoryRoomTest {
     }
 
     @Test
+    fun savingAnUnchangedPlanPreservesEveryExerciseAndSetId() = runTest {
+        val pull = savePull()
+        val created = templates.save(draft("Push A", pull)) as TemplateSaveResult.Created
+        val before = templates.getAggregate(created.id)!!
+        val saved = templates.save(reopen(created.id))
+        val after = templates.getAggregate(created.id)!!
+        assertTrue(saved is TemplateSaveResult.Updated)
+        assertEquals(before.exercises.map { it.relation.id }, after.exercises.map { it.relation.id })
+        assertEquals(before.exercises.single().sets.map { it.id }, after.exercises.single().sets.map { it.id })
+        assertEquals(before.exercises.single().sets.map { it.minReps }, after.exercises.single().sets.map { it.minReps })
+    }
+
+    @Test
+    fun editingNameRepsAndWeightPreservesRetainedIds() = runTest {
+        val curl = saveCurl()
+        val created = templates.save(
+            TemplateDraft(
+                name = "Arms",
+                exercises = listOf(
+                    TemplateExerciseDraft(-1, curl, sets = listOf(weightedSet(-2, 8, "15"), weightedSet(-3, 8, "15")))
+                )
+            )
+        ) as TemplateSaveResult.Created
+        val before = templates.getAggregate(created.id)!!
+        val exercise = reopen(created.id).exercises.single()
+        val sets = exercise.sets.toMutableList()
+        sets[0] = sets[0].copy(minRepsText = "10")
+        sets[1] = sets[1].copy(weightText = "17.5")
+        val saved = templates.save(
+            reopen(created.id).copy(
+                name = "Arms B",
+                exercises = listOf(exercise.copy(sets = sets))
+            )
+        )
+        val after = templates.getAggregate(created.id)!!
+        assertTrue(saved is TemplateSaveResult.Updated)
+        assertEquals("Arms B", after.template.name)
+        assertEquals(before.exercises.single().relation.id, after.exercises.single().relation.id)
+        assertEquals(before.exercises.single().sets.map { it.id }, after.exercises.single().sets.map { it.id })
+        assertEquals(10, after.exercises.single().sets[0].minReps)
+        assertEquals(17.5, after.exercises.single().sets[1].weightKg!!, 0.0)
+        val reopened = templates.getAggregate(created.id)!!
+        assertEquals(after.exercises.single().sets.map { it.id to it.minReps }, reopened.exercises.single().sets.map { it.id to it.minReps })
+    }
+
+    @Test
+    fun reorderAddAndRemovePreserveOnlyRetainedIds() = runTest {
+        val pull = savePull()
+        val dip = saveDip()
+        val curl = saveCurl()
+        val created = templates.save(
+            TemplateDraft(
+                name = "Push A",
+                exercises = listOf(
+                    TemplateExerciseDraft(-1, pull, sets = fourSets()),
+                    TemplateExerciseDraft(-2, dip, sets = fourSets())
+                )
+            )
+        ) as TemplateSaveResult.Created
+        val before = templates.getAggregate(created.id)!!
+        val pullItem = before.exercises[0]
+        val dipItem = before.exercises[1]
+        val removedSetId = dipItem.sets.last().id
+        val loaded = reopen(created.id)
+        val pullDraft = loaded.exercises[0]
+        val dipDraft = loaded.exercises[1]
+        val reorderedSets = listOf(pullDraft.sets[2], pullDraft.sets[0], pullDraft.sets[1], pullDraft.sets[3])
+        val saved = templates.save(
+            loaded.copy(
+                name = "Push B",
+                exercises = listOf(
+                    dipDraft.copy(sets = dipDraft.sets.dropLast(1)),
+                    pullDraft.copy(
+                        sets = reorderedSets + PlannedSetDraft(
+                            localId = -50,
+                            minRepsText = "5",
+                            loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
+                        )
+                    ),
+                    TemplateExerciseDraft(
+                        localId = -60,
+                        exerciseId = curl,
+                        sets = listOf(weightedSet(-61, 12, "10"))
+                    ),
+                    TemplateExerciseDraft(
+                        localId = -70,
+                        exerciseId = pull,
+                        sets = listOf(
+                            PlannedSetDraft(
+                                localId = -71,
+                                minRepsText = "6",
+                                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        val after = templates.getAggregate(created.id)!!
+        assertTrue(saved is TemplateSaveResult.Updated)
+        assertEquals(dipItem.relation.id, after.exercises[0].relation.id)
+        assertEquals(pullItem.relation.id, after.exercises[1].relation.id)
+        assertEquals(listOf(0, 1, 2), after.exercises[0].sets.map { it.position })
+        assertEquals(dipItem.sets.dropLast(1).map { it.id }, after.exercises[0].sets.map { it.id })
+        assertEquals(
+            listOf(pullItem.sets[2].id, pullItem.sets[0].id, pullItem.sets[1].id, pullItem.sets[3].id),
+            after.exercises[1].sets.take(4).map { it.id }
+        )
+        assertNotEquals(removedSetId, after.exercises[1].sets.last().id)
+        assertFalse(setExists(removedSetId))
+        assertEquals(2, after.exercises.size - before.exercises.size)
+        assertNotEquals(pullItem.relation.id, after.exercises[3].relation.id)
+        assertEquals(pull, after.exercises[1].exercise.id)
+        assertEquals(pull, after.exercises[3].exercise.id)
+        assertEquals(5, after.exercises[1].sets.last().minReps)
+    }
+
+    @Test
+    fun duplicatingAPlanCreatesIndependentChildIds() = runTest {
+        val pull = savePull()
+        val created = templates.save(draft("Push A", pull)) as TemplateSaveResult.Created
+        val loaded = reopen(created.id)
+        val duplicate = templates.save(
+            loaded.copy(id = null, name = "Push copy", baselineUpdatedAt = null)
+        ) as TemplateSaveResult.Created
+        val original = templates.getAggregate(created.id)!!
+        val copied = templates.getAggregate(duplicate.id)!!
+        assertEquals(loaded.exercises.map { it.localId }, original.exercises.map { it.relation.id })
+        assertNotEquals(original.template.id, copied.template.id)
+        assertNotEquals(original.exercises.map { it.relation.id }, copied.exercises.map { it.relation.id })
+        assertNotEquals(original.exercises.single().sets.map { it.id }, copied.exercises.single().sets.map { it.id })
+    }
+
+    @Test
+    fun aFailedSaveLeavesTheOriginalHierarchyUnchanged() = runTest {
+        val pull = savePull()
+        val created = templates.save(draft("Push A", pull)) as TemplateSaveResult.Created
+        val before = templates.getAggregate(created.id)!!
+        database.openHelper.writableDatabase.execSQL(
+            """
+            CREATE TRIGGER abort_plan_set_update
+            BEFORE UPDATE OF minReps ON workout_template_sets
+            BEGIN
+                SELECT RAISE(ABORT, 'fail');
+            END
+            """.trimIndent()
+        )
+        val exercise = reopen(created.id).exercises.single()
+        val sets = exercise.sets.toMutableList()
+        sets[0] = sets[0].copy(minRepsText = "3")
+        val result = runCatching {
+            templates.save(
+                reopen(created.id).copy(exercises = listOf(exercise.copy(sets = sets)))
+            )
+        }
+        val after = templates.getAggregate(created.id)!!
+        if (result.isSuccess) {
+            assertFalse(result.getOrThrow() is TemplateSaveResult.Updated)
+        }
+        assertEquals(before.template.updatedAt, after.template.updatedAt)
+        assertEquals(before.exercises.map { it.relation.id }, after.exercises.map { it.relation.id })
+        assertEquals(before.exercises.single().sets.map { it.id to it.minReps }, after.exercises.single().sets.map { it.id to it.minReps })
+    }
+
+    @Test
+    fun staleEditorSaveDoesNotOverwriteANewerPlan() = runTest {
+        val pull = savePull()
+        val created = templates.save(draft("Push A", pull)) as TemplateSaveResult.Created
+        val loaded = reopen(created.id)
+        val later = WorkoutTemplateRepository(
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            Clock.fixed(Instant.ofEpochMilli(9_000L), ZoneOffset.UTC)
+        )
+        val newerExercise = reopen(created.id).exercises.single()
+        val newerSets = newerExercise.sets.toMutableList()
+        newerSets[0] = newerSets[0].copy(minRepsText = "12")
+        assertTrue(
+            later.save(
+                reopen(created.id).copy(
+                    exercises = listOf(newerExercise.copy(sets = newerSets))
+                )
+            ) is TemplateSaveResult.Updated
+        )
+        val stale = templates.save(loaded.copy(name = "Push B"))
+        val stored = templates.getAggregate(created.id)!!
+        assertEquals(TemplateSaveResult.Stale, stale)
+        assertEquals("Push A", stored.template.name)
+        assertEquals(12, stored.exercises.single().sets[0].minReps)
+        assertEquals(loaded.exercises.single().localId, stored.exercises.single().relation.id)
+        assertEquals(loaded.exercises.single().sets.map { it.localId }, stored.exercises.single().sets.map { it.id })
+    }
+
+    @Test
     fun setTableHasNoPerformedWorkoutColumns() = runTest {
         val cursor = database.openHelper.readableDatabase.query("PRAGMA table_info(workout_template_sets)")
         val columns = mutableListOf<String>()
@@ -226,6 +424,58 @@ class WorkoutTemplateRepositoryRoomTest {
                 loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
             )
         }
+    }
+
+    private suspend fun saveCurl(): Long {
+        val result = exercises.save(
+            ExerciseDraft(
+                name = "Bicepsz",
+                category = ExerciseCategory.STRENGTH,
+                movementPattern = MovementPattern.ISOLATION,
+                measurementType = MeasurementType.REPETITIONS_AND_WEIGHT,
+                resistanceBasis = ResistanceBasis.BODYWEIGHT,
+                weightInterpretation = WeightInterpretation.TOTAL,
+                primaryMuscle = MuscleGroup.BICEPS
+            )
+        ) as ExerciseSaveResult.Created
+        return result.id
+    }
+
+    private fun weightedSet(localId: Long, reps: Int, weight: String): PlannedSetDraft {
+        return PlannedSetDraft(
+            localId = localId,
+            minRepsText = reps.toString(),
+            loadKind = PlannedLoadKind.ADDED_WEIGHT,
+            weightText = weight
+        )
+    }
+
+    private suspend fun reopen(id: Long): TemplateDraft {
+        val aggregate = templates.getAggregate(id)!!
+        return TemplateDraft(
+            id = aggregate.template.id,
+            name = aggregate.template.name,
+            notes = aggregate.template.notes.orEmpty(),
+            createdAt = aggregate.template.createdAt,
+            baselineUpdatedAt = aggregate.template.updatedAt,
+            exercises = aggregate.exercises.map { item ->
+                TemplateExerciseDraft(
+                    localId = item.relation.id,
+                    exerciseId = item.exercise.id,
+                    notes = item.relation.notes.orEmpty(),
+                    sets = item.sets.map { set -> set.toSetDraft(set.id) }
+                )
+            }
+        )
+    }
+
+    private fun setExists(id: Long): Boolean {
+        val cursor = database.openHelper.readableDatabase.query(
+            "SELECT id FROM workout_template_sets WHERE id = $id"
+        )
+        val found = cursor.moveToFirst()
+        cursor.close()
+        return found
     }
 
     private fun draft(name: String, exerciseId: Long): TemplateDraft {

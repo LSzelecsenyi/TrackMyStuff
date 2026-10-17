@@ -174,6 +174,53 @@ class AppBackupRepositoryTest {
         val restored = AppBackupJson.parse(legacy.toString()) as AppBackupParseResult.Success
         assertTrue(restored.snapshot.tables.workoutSessionExercises.none { it.addedDuringWorkout })
         assertEquals(tables.workoutSessionExercises.size, restored.snapshot.tables.workoutSessionExercises.size)
+
+        val sourced = tables.copy(
+            workoutSessions = tables.workoutSessions.map { session ->
+                session.copy(planProgressionApplied = session.id == tables.workoutSessions.first().id)
+            },
+            workoutSessionExercises = tables.workoutSessionExercises.map { exercise ->
+                if (exercise.id == 2010L) exercise.copy(sourceTemplateExerciseId = 44L) else exercise
+            },
+            workoutSessionSets = tables.workoutSessionSets.map { set ->
+                if (set.sessionExerciseId == 2010L) set.copy(sourceTemplateSetId = 55L) else set
+            }
+        )
+        val current = AppBackupJson.encode(
+            archivePayload.copy(
+                schemaVersion = AppBackupFormat.ARCHIVE_PLAN_SOURCE_SCHEMA_VERSION,
+                tables = sourced
+            )
+        )
+        val roundTrip = AppBackupJson.parse(
+            current,
+            maxSchemaVersion = AppBackupFormat.ARCHIVE_PLAN_SOURCE_SCHEMA_VERSION
+        ) as AppBackupParseResult.Success
+        assertEquals(44L, roundTrip.snapshot.tables.workoutSessionExercises.single { it.id == 2010L }.sourceTemplateExerciseId)
+        assertTrue(
+            roundTrip.snapshot.tables.workoutSessionSets
+                .filter { it.sessionExerciseId == 2010L }
+                .all { it.sourceTemplateSetId == 55L }
+        )
+        assertTrue(roundTrip.snapshot.tables.workoutSessions.single { it.id == tables.workoutSessions.first().id }.planProgressionApplied)
+        val withoutSources = JSONObject(current)
+        withoutSources.put("schemaVersion", AppBackupFormat.SCHEMA_VERSION)
+        val sessionRows = withoutSources.getJSONObject("tables").getJSONArray("workout_sessions")
+        val exerciseRows = withoutSources.getJSONObject("tables").getJSONArray("workout_session_exercises")
+        val setRows = withoutSources.getJSONObject("tables").getJSONArray("workout_session_sets")
+        for (index in 0 until sessionRows.length()) {
+            sessionRows.getJSONObject(index).remove("planProgressionApplied")
+        }
+        for (index in 0 until exerciseRows.length()) {
+            exerciseRows.getJSONObject(index).remove("sourceTemplateExerciseId")
+        }
+        for (index in 0 until setRows.length()) {
+            setRows.getJSONObject(index).remove("sourceTemplateSetId")
+        }
+        val legacySources = AppBackupJson.parse(withoutSources.toString()) as AppBackupParseResult.Success
+        assertTrue(legacySources.snapshot.tables.workoutSessions.none { it.planProgressionApplied })
+        assertTrue(legacySources.snapshot.tables.workoutSessionExercises.none { it.sourceTemplateExerciseId != null })
+        assertTrue(legacySources.snapshot.tables.workoutSessionSets.none { it.sourceTemplateSetId != null })
     }
 
     @Test

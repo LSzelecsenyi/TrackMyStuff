@@ -17,11 +17,20 @@ import app.mymusclemap.domain.exercise.MovementPattern
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
+import app.mymusclemap.domain.workout.PlannedLoadKind
+import app.mymusclemap.domain.workout.PlannedSetDraft
+import app.mymusclemap.domain.workout.TemplateDraft
+import app.mymusclemap.domain.workout.TemplateExerciseDraft
+import app.mymusclemap.domain.workout.TemplateSaveResult
+import app.mymusclemap.domain.workout.toSetDraft
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -114,7 +123,11 @@ class TemplateEditorViewModelTest {
         val viewModel = editor()
         val catalog = catalogExercise(pull)
         viewModel.selectExercise(catalog)
-        withTimeout(5_000) { viewModel.uiState.first { it.scrollEvent != null } }
+        withContext(Dispatchers.Default.limitedParallelism(1)) {
+            withTimeout(5_000) {
+                viewModel.uiState.first { it.scrollEvent != null && it.draft.exercises.isNotEmpty() }
+            }
+        }
         viewModel.consumeScrollEvent()
         viewModel.selectExercise(catalog)
         val state = withTimeout(5_000) { viewModel.uiState.first { it.pendingDuplicate != null } }
@@ -151,12 +164,85 @@ class TemplateEditorViewModelTest {
         assertTrue(state.draft.exercises.map { it.localId }.distinct().size == 2)
     }
 
-    private fun editor(): TemplateEditorViewModel {
-        return TemplateEditorViewModel(
-            SavedStateHandle(),
-            templates,
-            exercises
+    @Test
+    fun aRejectedStaleSaveShowsAnErrorAndLeavesThePlanUnchanged() = runTest {
+        val pull = savePull()
+        val created = templates.save(
+            TemplateDraft(
+                name = "Push A",
+                exercises = listOf(
+                    TemplateExerciseDraft(
+                        localId = -1,
+                        exerciseId = pull,
+                        sets = listOf(
+                            PlannedSetDraft(
+                                localId = -2,
+                                minRepsText = "8",
+                                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
+                            )
+                        )
+                    )
+                )
+            )
+        ) as TemplateSaveResult.Created
+        val viewModel = editor(created.id)
+        withContext(Dispatchers.Default.limitedParallelism(1)) {
+            withTimeout(5_000) {
+                viewModel.uiState.first { !it.loading && it.draft.exercises.isNotEmpty() }
+            }
+        }
+        val later = WorkoutTemplateRepository(
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            Clock.fixed(Instant.ofEpochMilli(9_000L), ZoneOffset.UTC),
+            database.workoutSessionDao()
         )
+        val current = templates.getAggregate(created.id)!!
+        assertTrue(
+            later.save(
+                TemplateDraft(
+                    id = created.id,
+                    name = current.template.name,
+                    createdAt = current.template.createdAt,
+                    baselineUpdatedAt = current.template.updatedAt,
+                    exercises = current.exercises.map { item ->
+                        TemplateExerciseDraft(
+                            localId = item.relation.id,
+                            exerciseId = item.exercise.id,
+                            sets = item.sets.map { set ->
+                                set.toSetDraft(set.id).copy(minRepsText = "12")
+                            }
+                        )
+                    }
+                )
+            ) is TemplateSaveResult.Updated
+        )
+        viewModel.onNameChange("Push B")
+        viewModel.save()
+        val rejected = withContext(Dispatchers.Default.limitedParallelism(1)) {
+            withTimeout(5_000) { viewModel.uiState.first { it.stalePlan } }
+        }
+        assertFalse(rejected.finished)
+        assertFalse(rejected.saved)
+        val stored = templates.getAggregate(created.id)!!
+        assertEquals("Push A", stored.template.name)
+        assertEquals(12, stored.exercises.single().sets.single().minReps)
+        viewModel.reload()
+        val reloaded = withContext(Dispatchers.Default.limitedParallelism(1)) {
+            withTimeout(5_000) {
+                viewModel.uiState.first { !it.loading && !it.stalePlan && it.draft.name == "Push A" }
+            }
+        }
+        assertEquals(stored.exercises.single().relation.id, reloaded.draft.exercises.single().localId)
+    }
+
+    private fun editor(templateId: Long? = null): TemplateEditorViewModel {
+        val handle = if (templateId == null) {
+            SavedStateHandle()
+        } else {
+            SavedStateHandle(mapOf(TemplateEditorViewModel.TEMPLATE_ID_KEY to templateId))
+        }
+        return TemplateEditorViewModel(handle, templates, exercises)
     }
 
     private suspend fun catalogExercise(id: Long): Exercise {

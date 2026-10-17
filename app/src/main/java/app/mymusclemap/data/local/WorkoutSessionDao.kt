@@ -494,6 +494,94 @@ abstract class WorkoutSessionDao {
         )
         return InsertStartedSessionResult.Inserted(sessionId)
     }
+
+    @Query("SELECT * FROM workout_template_exercises WHERE id = :id LIMIT 1")
+    abstract suspend fun getTemplateExercise(id: Long): WorkoutTemplateExerciseEntity?
+
+    @Query("SELECT * FROM workout_template_sets WHERE id = :id LIMIT 1")
+    abstract suspend fun getTemplateSet(id: Long): WorkoutTemplateSetEntity?
+
+    @Query(
+        """
+        UPDATE workout_template_sets
+        SET minReps = :minReps, maxReps = :maxReps, weightKg = :weightKg
+        WHERE id = :id
+        """
+    )
+    abstract suspend fun updateTemplateSetTarget(
+        id: Long,
+        minReps: Int?,
+        maxReps: Int?,
+        weightKg: Double?
+    ): Int
+
+    @Query("UPDATE workout_templates SET updatedAt = :updatedAt WHERE id = :id")
+    abstract suspend fun touchTemplate(id: Long, updatedAt: Long)
+
+    @Query(
+        """
+        UPDATE workout_sessions
+        SET planProgressionApplied = 1, updatedAt = :updatedAt
+        WHERE id = :id AND planProgressionApplied = 0
+        """
+    )
+    abstract suspend fun markPlanProgressionApplied(id: Long, updatedAt: Long): Int
+
+    /**
+     * Writes every still-matching plan target, then marks the session.
+     * A lost row or a changed baseline is skipped. An unexpected write failure
+     * aborts the whole transaction, including targets already updated in this call.
+     */
+    @Transaction
+    open suspend fun applyPlanProgression(
+        sessionId: Long,
+        templateId: Long,
+        updatedAt: Long,
+        updates: List<PlanSetTargetWrite>
+    ): PlanProgressionWriteResult {
+        val session = getById(sessionId) ?: return PlanProgressionWriteResult.SessionMissing
+        if (session.planProgressionApplied) {
+            return PlanProgressionWriteResult.AlreadyApplied
+        }
+        if (session.templateId != templateId || getTemplate(templateId) == null) {
+            return PlanProgressionWriteResult.PlanMissing
+        }
+        val accepted = ArrayList<PlanSetTargetWrite>()
+        var skipped = 0
+        updates.forEach { update ->
+            val exercise = getTemplateExercise(update.sourceTemplateExerciseId)
+            val set = getTemplateSet(update.sourceTemplateSetId)
+            if (exercise == null ||
+                set == null ||
+                exercise.templateId != templateId ||
+                set.templateExerciseId != exercise.id ||
+                !update.matches(set)
+            ) {
+                skipped += 1
+            } else {
+                accepted += update
+            }
+        }
+        if (accepted.isEmpty()) {
+            return PlanProgressionWriteResult.NothingApplied(skipped)
+        }
+        accepted.forEach { update ->
+            val rows = updateTemplateSetTarget(
+                id = update.sourceTemplateSetId,
+                minReps = update.newMinReps,
+                maxReps = update.newMaxReps,
+                weightKg = update.newWeightKg
+            )
+            if (rows != 1) {
+                throw PlanProgressionWriteException()
+            }
+        }
+        if (markPlanProgressionApplied(sessionId, updatedAt) != 1) {
+            throw PlanProgressionWriteException()
+        }
+        touchTemplate(templateId, updatedAt)
+        return PlanProgressionWriteResult.Applied(accepted.size, skipped)
+    }
 }
 
 data class InsertedSessionExercise(
@@ -511,3 +599,44 @@ sealed class InsertStartedSessionResult {
     data object ScheduleAlreadyStarted : InsertStartedSessionResult()
     data object ScheduleNotOnToday : InsertStartedSessionResult()
 }
+
+data class PlanSetTargetWrite(
+    val sourceTemplateExerciseId: Long,
+    val sourceTemplateSetId: Long,
+    val baselineMinReps: Int?,
+    val baselineMaxReps: Int?,
+    val baselineLoadKind: String,
+    val baselineWeightKg: Double?,
+    val baselineDurationSeconds: Int?,
+    val baselineDistanceMeters: Double?,
+    val newMinReps: Int?,
+    val newMaxReps: Int?,
+    val newWeightKg: Double?
+) {
+    fun matches(set: WorkoutTemplateSetEntity): Boolean {
+        return set.minReps == baselineMinReps &&
+            set.maxReps == baselineMaxReps &&
+            set.loadKind == baselineLoadKind &&
+            sameNumber(set.weightKg, baselineWeightKg) &&
+            set.durationSeconds == baselineDurationSeconds &&
+            sameNumber(set.distanceMeters, baselineDistanceMeters)
+    }
+
+    private fun sameNumber(left: Double?, right: Double?): Boolean {
+        if (left == null || right == null) {
+            return left == right
+        }
+        return kotlin.math.abs(left - right) < 0.000_000_1
+    }
+}
+
+sealed class PlanProgressionWriteResult {
+    data class Applied(val updated: Int, val skipped: Int) : PlanProgressionWriteResult()
+    data class NothingApplied(val skipped: Int) : PlanProgressionWriteResult()
+    data object AlreadyApplied : PlanProgressionWriteResult()
+    data object PlanMissing : PlanProgressionWriteResult()
+    data object SessionMissing : PlanProgressionWriteResult()
+}
+
+class PlanProgressionWriteException : RuntimeException()
+

@@ -31,7 +31,8 @@ fun WorkoutSessionEntity.toModel(): WorkoutSession {
         updatedAt = updatedAt,
         importFingerprint = importFingerprint,
         scheduledWorkoutId = scheduledWorkoutId,
-        clientWorkoutId = clientWorkoutId
+        clientWorkoutId = clientWorkoutId,
+        planProgressionApplied = planProgressionApplied
     )
 }
 
@@ -56,7 +57,8 @@ fun WorkoutSessionExerciseEntity.toModel(
         primaryMuscle = ExerciseEnumCodec.muscleOrFallback(primaryMuscle),
         secondaryMuscles = secondary,
         notes = notes,
-        addedDuringWorkout = addedDuringWorkout
+        addedDuringWorkout = addedDuringWorkout,
+        sourceTemplateExerciseId = sourceTemplateExerciseId
     )
 }
 
@@ -80,7 +82,8 @@ fun WorkoutSessionSetEntity.toModel(): SessionSet {
         status = runCatching { SessionSetStatus.valueOf(status) }.getOrDefault(SessionSetStatus.PENDING),
         completedAt = completedAt,
         addedDuringWorkout = addedDuringWorkout,
-        draft = SetDraftCodec.decode(draftPayload)
+        draft = SetDraftCodec.decode(draftPayload),
+        sourceTemplateSetId = sourceTemplateSetId
     )
 }
 

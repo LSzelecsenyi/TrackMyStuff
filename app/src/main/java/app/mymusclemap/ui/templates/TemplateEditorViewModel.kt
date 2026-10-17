@@ -60,6 +60,7 @@ data class TemplateEditorUiState(
     val pickerExercises: List<Exercise> = emptyList(),
     val issues: List<TemplateValidationIssue> = emptyList(),
     val duplicateName: Boolean = false,
+    val stalePlan: Boolean = false,
     val pendingDuplicate: Exercise? = null,
     val showDiscardConfirm: Boolean = false,
     val finished: Boolean = false,
@@ -97,7 +98,7 @@ class TemplateEditorViewModel(
     private val saved = MutableStateFlow(false)
     private val loading = MutableStateFlow(templateId != null)
     private val scrollEvent = MutableStateFlow<TemplateScrollEvent?>(null)
-    private val lockedFeature = MutableStateFlow<AppFeature?>(null)
+    private val chrome = MutableStateFlow(TemplateEditorChrome())
     private var nextLocalId = -1L
     private var scrollGeneration = 0L
 
@@ -118,8 +119,8 @@ class TemplateEditorViewModel(
         combine(finished, created, saved, loading, scrollEvent) { done, wasCreated, wasSaved, isLoading, scroll ->
             EditorFinish(done, wasCreated, wasSaved, isLoading, scroll)
         },
-        lockedFeature
-    ) { core, flags, finish, locked ->
+        chrome
+    ) { core, flags, finish, currentChrome ->
         val catalog = core.exercises.associateBy { it.id }
         val pickerVisible = ExerciseCatalogLogic.filter(
             exercises = core.exercises,
@@ -140,6 +141,7 @@ class TemplateEditorViewModel(
             pickerExercises = pickerVisible,
             issues = flags.issues,
             duplicateName = flags.duplicateName,
+            stalePlan = currentChrome.stalePlan,
             pendingDuplicate = flags.pendingDuplicate,
             showDiscardConfirm = flags.showDiscard,
             finished = finish.finished,
@@ -149,7 +151,7 @@ class TemplateEditorViewModel(
                 core.draft.exercises.mapNotNull { catalog[it.exerciseId] }
             ),
             scrollEvent = finish.scroll,
-            lockedFeature = locked
+            lockedFeature = currentChrome.lockedFeature
         )
     }.stateIn(
         scope = viewModelScope,
@@ -189,22 +191,7 @@ class TemplateEditorViewModel(
                     loading.value = false
                     finished.value = true
                 } else {
-                    val loaded = TemplateDraft(
-                        id = aggregate.template.id,
-                        name = aggregate.template.name,
-                        notes = aggregate.template.notes.orEmpty(),
-                        createdAt = aggregate.template.createdAt,
-                        exercises = aggregate.exercises.map { item ->
-                            TemplateExerciseDraft(
-                                localId = item.relation.id,
-                                exerciseId = item.exercise.id,
-                                notes = item.relation.notes.orEmpty(),
-                                sets = item.sets.map { set -> set.toSetDraft(set.id) }
-                            )
-                        }
-                    )
-                    original.value = loaded
-                    draft.value = loaded
+                    applyLoaded(aggregate)
                     loading.value = false
                 }
             }
@@ -448,7 +435,7 @@ class TemplateEditorViewModel(
             if (current.id == null &&
                 !WorkoutPlanAccess.canCreateAnother(templateRepository.planCount(), entitlements)
             ) {
-                lockedFeature.value = AppFeature.UnlimitedWorkoutPlans
+                chrome.update { it.copy(lockedFeature = AppFeature.UnlimitedWorkoutPlans) }
                 return@launch
             }
             when (val result = templateRepository.save(current)) {
@@ -465,6 +452,26 @@ class TemplateEditorViewModel(
                 is TemplateSaveResult.Invalid -> issues.value = result.issues
                 TemplateSaveResult.DuplicateName -> duplicateName.value = true
                 TemplateSaveResult.NotFound -> finished.value = true
+                TemplateSaveResult.Stale -> chrome.update { it.copy(stalePlan = true) }
+            }
+        }
+    }
+
+    fun reload() {
+        val id = templateId ?: return
+        viewModelScope.launch {
+            loading.value = true
+            chrome.update { it.copy(stalePlan = false) }
+            val aggregate = templateRepository.getAggregate(id)
+            if (aggregate == null) {
+                loading.value = false
+                finished.value = true
+            } else {
+                nextLocalId = -1L
+                issues.value = emptyList()
+                duplicateName.value = false
+                applyLoaded(aggregate)
+                loading.value = false
             }
         }
     }
@@ -474,7 +481,7 @@ class TemplateEditorViewModel(
     }
 
     fun consumeLockedFeature() {
-        lockedFeature.value = null
+        chrome.update { it.copy(lockedFeature = null) }
     }
 
     fun requestLeave() {
@@ -492,6 +499,26 @@ class TemplateEditorViewModel(
     fun confirmDiscard() {
         showDiscardConfirm.value = false
         finished.value = true
+    }
+
+    private fun applyLoaded(aggregate: app.mymusclemap.domain.workout.WorkoutTemplateAggregate) {
+        val loaded = TemplateDraft(
+            id = aggregate.template.id,
+            name = aggregate.template.name,
+            notes = aggregate.template.notes.orEmpty(),
+            createdAt = aggregate.template.createdAt,
+            baselineUpdatedAt = aggregate.template.updatedAt,
+            exercises = aggregate.exercises.map { item ->
+                TemplateExerciseDraft(
+                    localId = item.relation.id,
+                    exerciseId = item.exercise.id,
+                    notes = item.relation.notes.orEmpty(),
+                    sets = item.sets.map { set -> set.toSetDraft(set.id) }
+                )
+            }
+        )
+        original.value = loaded
+        draft.value = loaded
     }
 
     private fun isDirty(): Boolean {
@@ -534,6 +561,11 @@ class TemplateEditorViewModel(
         issues.value = emptyList()
         duplicateName.value = false
     }
+
+    private data class TemplateEditorChrome(
+        val lockedFeature: AppFeature? = null,
+        val stalePlan: Boolean = false
+    )
 
     companion object {
         const val TEMPLATE_ID_KEY = "templateId"

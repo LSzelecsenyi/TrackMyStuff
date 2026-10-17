@@ -5,6 +5,7 @@ import app.mymusclemap.data.local.ExerciseDao
 import app.mymusclemap.data.local.ScheduledWorkoutDao
 import app.mymusclemap.data.local.WorkoutSessionDao
 import app.mymusclemap.data.local.WorkoutTemplateDao
+import app.mymusclemap.data.local.TemplateAggregateWrite
 import app.mymusclemap.data.local.WorkoutTemplateEntity
 import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
@@ -142,10 +143,11 @@ class WorkoutTemplateRepository(
             createdAt = existing?.createdAt ?: now,
             updatedAt = now
         )
+        val preserving = existing != null
         val children = draft.exercises.map { item ->
             val exercise = catalog.getValue(item.exerciseId)
             val relation = WorkoutTemplateExerciseEntity(
-                id = 0L,
+                id = if (preserving && item.localId > 0L) item.localId else 0L,
                 templateId = template.id,
                 exerciseId = item.exerciseId,
                 position = 0,
@@ -155,8 +157,12 @@ class WorkoutTemplateRepository(
             val sets = item.sets.map { setDraft ->
                 val values = PlannedSetLogic.parseValues(setDraft, exercise).first!!
                 WorkoutTemplateSetEntity(
-                    id = 0L,
-                    templateExerciseId = 0L,
+                    id = if (preserving && relation.id > 0L && setDraft.localId > 0L) {
+                        setDraft.localId
+                    } else {
+                        0L
+                    },
+                    templateExerciseId = relation.id,
                     position = 0,
                     minReps = values.minReps,
                     maxReps = values.maxReps,
@@ -169,12 +175,23 @@ class WorkoutTemplateRepository(
             relation to sets
         }
         return try {
-            val id = templateDao.saveAggregate(template, children)
-            if (existing == null) {
-                notifyPlansChanged()
-                TemplateSaveResult.Created(id)
-            } else {
-                TemplateSaveResult.Updated(id)
+            when (
+                val write = templateDao.saveAggregate(
+                    template,
+                    children,
+                    expectedUpdatedAt = if (preserving) draft.baselineUpdatedAt else null
+                )
+            ) {
+                is TemplateAggregateWrite.Saved -> {
+                    if (existing == null) {
+                        notifyPlansChanged()
+                        TemplateSaveResult.Created(write.id)
+                    } else {
+                        TemplateSaveResult.Updated(write.id)
+                    }
+                }
+                TemplateAggregateWrite.NotFound -> TemplateSaveResult.NotFound
+                TemplateAggregateWrite.Stale -> TemplateSaveResult.Stale
             }
         } catch (error: Exception) {
             if (isUniqueConstraint(error)) {

@@ -44,6 +44,11 @@ object AppBackupFormat {
      * still restore, with addedDuringWorkout false.
      */
     const val ARCHIVE_EXERCISE_ORIGIN_SCHEMA_VERSION = 13
+    /**
+     * Plan-source ids and the one-time plan-update guard. Older files omit the keys.
+     * Missing ids stay null, so those workouts are not offered a plan update.
+     */
+    const val ARCHIVE_PLAN_SOURCE_SCHEMA_VERSION = 14
     const val CONTAINER_VERSION = 1
     const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024

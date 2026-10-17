@@ -70,7 +70,8 @@ data class TemplateDraft(
     val name: String = "",
     val notes: String = "",
     val createdAt: Long? = null,
-    val exercises: List<TemplateExerciseDraft> = emptyList()
+    val exercises: List<TemplateExerciseDraft> = emptyList(),
+    val baselineUpdatedAt: Long? = null
 )
 
 data class TemplateExerciseDraft(
@@ -114,6 +115,7 @@ sealed class TemplateSaveResult {
     data class Invalid(val issues: List<TemplateValidationIssue>) : TemplateSaveResult()
     data object DuplicateName : TemplateSaveResult()
     data object NotFound : TemplateSaveResult()
+    data object Stale : TemplateSaveResult()
 }
 
 sealed class TemplateDeleteResult {

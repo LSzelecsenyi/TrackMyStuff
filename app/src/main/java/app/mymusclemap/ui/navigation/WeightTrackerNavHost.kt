@@ -71,6 +71,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import app.mymusclemap.domain.reports.ReportPeriod
 import app.mymusclemap.domain.onboarding.OnboardingResumeTarget
+import app.mymusclemap.domain.workout.ApplyPlanProgressionResult
 import app.mymusclemap.domain.workout.LockScreenEnableDecision
 import app.mymusclemap.domain.workout.LockScreenEnablePolicy
 import app.mymusclemap.domain.workout.WorkoutCompletionSummary
@@ -1273,6 +1274,7 @@ fun WeightTrackerNavHost(
                     onDistance = viewModel::onDistance,
                     onDistanceUnit = viewModel::onDistanceUnit,
                     onSave = viewModel::save,
+                    onReload = viewModel::reload,
                     onDismissDiscard = viewModel::dismissDiscard,
                     onConfirmDiscard = viewModel::confirmDiscard,
                     onScrollConsumed = viewModel::consumeScrollEvent,
@@ -1382,6 +1384,9 @@ fun WeightTrackerNavHost(
                 val clientWorkoutId = entry.arguments?.getString(ARG_CLIENT_WORKOUT_ID).orEmpty()
                 val completionViewModel: WorkoutCompletionViewModel = viewModel(factory = factory)
                 val summaryState by completionViewModel.state.collectAsStateWithLifecycle()
+                val progressionNotice by completionViewModel.notice.collectAsStateWithLifecycle()
+                val applyingProgression by completionViewModel.applying.collectAsStateWithLifecycle()
+                val approvalEpoch by completionViewModel.approvalEpoch.collectAsStateWithLifecycle()
                 LaunchedEffect(clientWorkoutId) {
                     completionViewModel.load(clientWorkoutId)
                 }
@@ -1394,25 +1399,43 @@ fun WeightTrackerNavHost(
                     achievementsViewModel.holdWorkoutCelebrations(workoutCelebrations)
                 }
                 var leavingCompletion by remember { mutableStateOf(false) }
+                var handlingCompletion by remember { mutableStateOf(false) }
                 val completionScope = rememberCoroutineScope()
-                val leaveCompletion = {
-                    if (!leavingCompletion) {
-                        leavingCompletion = true
+                val leaveCompletion: (Boolean) -> Unit = { apply ->
+                    if (!leavingCompletion && !handlingCompletion) {
+                        handlingCompletion = true
                         completionScope.launch {
-                            acknowledgeThenNavigate(
-                                celebrations = workoutCelebrations,
-                                acknowledge = { pending ->
-                                    achievementsViewModel.acknowledgeCelebrationsAndWait(pending)
-                                },
-                                navigate = { navController.leaveWorkoutComplete() }
-                            )
+                            val shouldLeave = if (!apply) {
+                                true
+                            } else {
+                                when (val result = completionViewModel.applyApprovedPlanUpdates()) {
+                                    is ApplyPlanProgressionResult.Applied -> result.updated > 0 && result.skipped == 0
+                                    ApplyPlanProgressionResult.AlreadyApplied -> true
+                                    else -> false
+                                }
+                            }
+                            if (!shouldLeave) {
+                                handlingCompletion = false
+                            } else if (!leavingCompletion) {
+                                leavingCompletion = true
+                                acknowledgeThenNavigate(
+                                    celebrations = workoutCelebrations,
+                                    acknowledge = { pending ->
+                                        achievementsViewModel.acknowledgeCelebrationsAndWait(pending)
+                                    },
+                                    navigate = { navController.leaveWorkoutComplete() }
+                                )
+                            }
                         }
                     }
                 }
                 WorkoutCompletionScreen(
                     state = summaryState,
                     onLeave = leaveCompletion,
-                    celebrations = workoutCelebrations
+                    celebrations = workoutCelebrations,
+                    notice = progressionNotice,
+                    applying = applyingProgression,
+                    approvalEpoch = approvalEpoch
                 )
             }
             composable(

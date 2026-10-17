@@ -30,7 +30,11 @@ import app.mymusclemap.domain.achievements.HighlightMeasure
 import app.mymusclemap.domain.achievements.PendingCelebration
 import app.mymusclemap.domain.achievements.PerformanceHighlight
 import app.mymusclemap.domain.achievements.PerformanceRecordKind
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import app.mymusclemap.domain.exercise.WeightInterpretation
+import app.mymusclemap.domain.workout.PlanProgressionProposal
+import app.mymusclemap.domain.workout.PlanSetProgression
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionSetStatus
@@ -60,7 +64,7 @@ class WorkoutCompletionScreenLayoutTest {
             ready(exercises = 4, sets = 14, durationMillis = 3_020_000L, name = "Push"),
             width = 360.dp,
             fontScale = 1.3f,
-            onLeave = { left += 1 }
+            onLeave = { _ -> left += 1 }
         )
         composeRule.onNodeWithText(testString(R.string.workout_complete_title)).assertIsDisplayed()
         composeRule.onNodeWithText("Push").assertIsDisplayed()
@@ -91,7 +95,7 @@ class WorkoutCompletionScreenLayoutTest {
             ready(1, 1, 80_000L),
             width = 360.dp,
             fontScale = 1f,
-            onLeave = { left += 1 }
+            onLeave = { _ -> left += 1 }
         )
         composeRule.onNodeWithTag(WORKOUT_COMPLETE_MARK).assertIsDisplayed()
         composeRule.onNodeWithText("1:20").assertIsDisplayed()
@@ -106,7 +110,7 @@ class WorkoutCompletionScreenLayoutTest {
             ready(2, 8, 600_000L),
             width = 360.dp,
             fontScale = 1f,
-            onLeave = { left += 1 }
+            onLeave = { _ -> left += 1 }
         )
         composeRule.onAllNodesWithTag(WORKOUT_COMPLETE_BACK).assertCountEquals(1)
         composeRule.onAllNodesWithText(testString(R.string.workout_complete_see_trained)).assertCountEquals(0)
@@ -124,7 +128,7 @@ class WorkoutCompletionScreenLayoutTest {
             ready(1, 3, 60_000L, name = "First workout"),
             width = 360.dp,
             fontScale = 1f,
-            onLeave = { left += 1 },
+            onLeave = { _ -> left += 1 },
             celebrations = listOf(firstStep(), thirtyWorkouts())
         )
         composeRule.onNodeWithTag(WORKOUT_COMPLETE_CELEBRATIONS).assertIsDisplayed()
@@ -161,15 +165,14 @@ class WorkoutCompletionScreenLayoutTest {
             volumeKg = null,
             highlights = emptyList()
         )
-        render(WorkoutSummaryUiState.Ready(summary), width = 360.dp, fontScale = 1f, onLeave = {})
-        val exercises = composeRule.onNodeWithTag(WORKOUT_COMPLETE_EXERCISES).getBoundsInRoot()
-        composeRule.onNodeWithText("Ring Dips").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Plank").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.set_copy_reps, "12"), substring = true).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.set_copy_seconds, 45), substring = true).performScrollTo().assertIsDisplayed()
+        render(WorkoutSummaryUiState.Ready(summary), width = 360.dp, fontScale = 1f, onLeave = { _ -> })
+        composeRule.onAllNodesWithText(testString(R.string.workout_summary_exercises_section)).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Ring Dips").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Plank").assertCountEquals(0)
+        composeRule.onNodeWithTag("workout-complete-exercise-count").assertIsDisplayed()
+        composeRule.onNodeWithTag("workout-complete-set-count").assertIsDisplayed()
         composeRule.onAllNodesWithTag("workout-complete-volume").assertCountEquals(0)
         composeRule.onAllNodesWithText(testString(R.string.workout_summary_highlights)).assertCountEquals(0)
-        assertTrue(exercises.top > composeRule.onNodeWithTag(WORKOUT_COMPLETE_SUMMARY).getBoundsInRoot().top)
     }
 
     @Test
@@ -203,10 +206,10 @@ class WorkoutCompletionScreenLayoutTest {
                 )
             )
         )
-        render(WorkoutSummaryUiState.Ready(summary), width = 360.dp, fontScale = 1f, onLeave = {})
+        render(WorkoutSummaryUiState.Ready(summary), width = 360.dp, fontScale = 1f, onLeave = { _ -> })
         composeRule.onNodeWithTag(WORKOUT_COMPLETE_HIGHLIGHTS).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.workout_summary_weight_pr)).assertIsDisplayed()
-        composeRule.onAllNodesWithText("Weighted Dips").assertCountEquals(2)
+        composeRule.onAllNodesWithText("Weighted Dips").assertCountEquals(1)
         composeRule.onNodeWithText(
             testString(R.string.workout_summary_previous, testString(R.string.set_copy_added_weight, "20"))
         ).assertIsDisplayed()
@@ -219,7 +222,7 @@ class WorkoutCompletionScreenLayoutTest {
     @Test
     fun loadingDoesNotInventValuesOrLeave() {
         var left = 0
-        render(WorkoutSummaryUiState.Loading, width = 360.dp, fontScale = 1f, onLeave = { left += 1 })
+        render(WorkoutSummaryUiState.Loading, width = 360.dp, fontScale = 1f, onLeave = { _ -> left += 1 })
         composeRule.onNodeWithTag(WORKOUT_COMPLETE_LOADING).assertIsDisplayed()
         composeRule.onAllNodesWithTag(WORKOUT_COMPLETE_SUMMARY).assertCountEquals(0)
         assertEquals(0, left)
@@ -228,7 +231,7 @@ class WorkoutCompletionScreenLayoutTest {
     @Test
     fun aMissingSessionDoesNotInventValuesOrLeave() {
         var left = 0
-        render(WorkoutSummaryUiState.Unavailable, width = 360.dp, fontScale = 1f, onLeave = { left += 1 })
+        render(WorkoutSummaryUiState.Unavailable, width = 360.dp, fontScale = 1f, onLeave = { _ -> left += 1 })
         composeRule.onNodeWithText(testString(R.string.workout_summary_unavailable)).assertIsDisplayed()
         composeRule.onAllNodesWithTag("workout-complete-exercise-count").assertCountEquals(0)
         assertEquals(0, left)
@@ -245,7 +248,7 @@ class WorkoutCompletionScreenLayoutTest {
                 SideEffect { dispatcher.set(owner?.onBackPressedDispatcher) }
                 WorkoutCompletionScreen(
                     state = ready(1, 3, 60_000L),
-                    onLeave = { left += 1 },
+                    onLeave = { _ -> left += 1 },
                     playAnimation = false,
                     celebrations = listOf(thirtyWorkouts())
                 )
@@ -266,6 +269,124 @@ class WorkoutCompletionScreenLayoutTest {
         composeRule.runOnIdle { dispatcher.get()!!.onBackPressed() }
         composeRule.waitForIdle()
         assertEquals(1, left)
+    }
+
+    @Test
+    fun progressionSectionStartsUncheckedAndDoesNotApplyUntilApproved() {
+        var applied: Boolean? = null
+        render(
+            progressionReady(listOf(oneChange())),
+            width = 360.dp,
+            fontScale = 1f,
+            onLeave = { applied = it }
+        )
+        composeRule.onNodeWithText(testString(R.string.plan_progress_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.plan_progress_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.plan_progress_improved_one)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.plan_progress_update_label)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.plan_progress_update_support)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.plan_progress_update_detail)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testString(R.string.plan_progress_change, testString(R.string.set_copy_reps, "10"), testString(R.string.set_copy_reps, "15"))
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_PLAN_CHECKBOX).assertIsOff()
+        composeRule.onAllNodesWithText(testString(R.string.workout_summary_exercises_section)).assertCountEquals(0)
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_BACK).performClick()
+        assertEquals(false, applied)
+    }
+
+    @Test
+    fun approvedLeaveRequestsThePlanUpdateAndANewWorkoutStartsUnchecked() {
+        var applied: Boolean? = null
+        render(
+            progressionReady(listOf(oneChange())),
+            width = 360.dp,
+            fontScale = 1f,
+            onLeave = { applied = it }
+        )
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_PLAN_CHECKBOX).performClick()
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_PLAN_CHECKBOX).assertIsOn()
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_BACK).performClick()
+        assertEquals(true, applied)
+    }
+
+    @Test
+    fun aNewCompletionStartsWithThePlanUpdateUnchecked() {
+        var applied: Boolean? = null
+        render(
+            progressionReady(listOf(oneChange())),
+            width = 360.dp,
+            fontScale = 1f,
+            onLeave = { applied = it },
+            approvalEpoch = 1
+        )
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_PLAN_CHECKBOX).assertIsOff()
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_BACK).performClick()
+        assertEquals(false, applied)
+    }
+
+    @Test
+    fun collapsedPreviewCanShowEveryProposedChange() {
+        val updates = List(4) { index ->
+            oneChange().copy(
+                sourceTemplateSetId = index + 1L,
+                setNumber = index + 1,
+                beforeReps = 8,
+                afterReps = 9 + index
+            )
+        }
+        render(
+            progressionReady(updates),
+            width = 360.dp,
+            fontScale = 1f,
+            onLeave = { _ -> }
+        )
+        composeRule.onNodeWithText(testString(R.string.plan_progress_improved_many, 4)).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.plan_progress_set, 4)).assertCountEquals(0)
+        composeRule.onNodeWithTag(WORKOUT_COMPLETE_PLAN_SHOW_ALL).performScrollTo().performClick()
+        composeRule.onNodeWithText(testString(R.string.plan_progress_set, 4)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testString(
+                R.string.plan_progress_change,
+                testString(R.string.set_copy_reps, "8"),
+                testString(R.string.set_copy_reps, "12")
+            )
+        ).performScrollTo().assertIsDisplayed()
+    }
+
+    private fun progressionReady(updates: List<PlanSetProgression>): WorkoutSummaryUiState.Ready {
+        return WorkoutSummaryUiState.Ready(
+            summary = WorkoutSummary(
+                workoutName = "Push",
+                durationMillis = 60_000L,
+                exercises = emptyList(),
+                volumeKg = 100.0,
+                highlights = emptyList()
+            ),
+            progression = PlanProgressionProposal(updates)
+        )
+    }
+
+    private fun oneChange(): PlanSetProgression {
+        return PlanSetProgression(
+            sourceTemplateExerciseId = 1,
+            sourceTemplateSetId = 1,
+            sessionSetId = 1,
+            displayName = "Biceps Curl",
+            planExercisePosition = 0,
+            setNumber = 1,
+            beforeReps = 10,
+            afterReps = 15,
+            beforeWeightKg = 15.0,
+            afterWeightKg = 15.0,
+            loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+            weightInterpretation = WeightInterpretation.TOTAL,
+            repsChanged = true,
+            weightChanged = false,
+            newMinReps = 15,
+            newMaxReps = 15,
+            newWeightKg = 15.0
+        )
     }
 
     private fun firstStep(): PendingCelebration.JourneyUnlocked {
@@ -350,9 +471,11 @@ class WorkoutCompletionScreenLayoutTest {
         state: WorkoutSummaryUiState,
         width: Dp,
         fontScale: Float,
-        onLeave: () -> Unit,
+        onLeave: (Boolean) -> Unit,
         playAnimation: Boolean = false,
-        celebrations: List<PendingCelebration> = emptyList()
+        celebrations: List<PendingCelebration> = emptyList(),
+        approvalEpoch: Int = 0,
+        notice: PlanProgressionNotice? = null
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -369,7 +492,9 @@ class WorkoutCompletionScreenLayoutTest {
                             state = state,
                             onLeave = onLeave,
                             playAnimation = playAnimation,
-                            celebrations = celebrations
+                            celebrations = celebrations,
+                            notice = notice,
+                            approvalEpoch = approvalEpoch
                         )
                     }
                 }

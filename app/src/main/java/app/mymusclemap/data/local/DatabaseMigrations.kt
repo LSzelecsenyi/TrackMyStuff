@@ -759,6 +759,25 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
     }
 }
 
+/**
+ * Stores the plan exercise and set ids copied at session start, plus a guard that
+ * a completed workout's approved plan update runs once. Existing rows stay null / 0.
+ * Null source ids are not backfilled.
+ */
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE `workout_session_exercises` ADD COLUMN `sourceTemplateExerciseId` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_session_sets` ADD COLUMN `sourceTemplateSetId` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `planProgressionApplied` INTEGER NOT NULL DEFAULT 0"
+        )
+    }
+}
+
 val MIGRATION_13_14 = object : Migration(13, 14) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

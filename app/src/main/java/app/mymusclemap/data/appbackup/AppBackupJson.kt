@@ -232,6 +232,7 @@ object AppBackupJson {
                             .put("importFingerprint", nullable(row.importFingerprint))
                             .put("scheduledWorkoutId", nullable(row.scheduledWorkoutId))
                             .put("clientWorkoutId", row.clientWorkoutId)
+                            .put("planProgressionApplied", row.planProgressionApplied)
                     )
                 }
             }
@@ -255,6 +256,7 @@ object AppBackupJson {
                             .put("primaryMuscle", ExerciseEnumCodec.canonicalMuscleName(row.primaryMuscle))
                             .put("notes", nullable(row.notes))
                             .put("addedDuringWorkout", row.addedDuringWorkout)
+                            .put("sourceTemplateExerciseId", nullable(row.sourceTemplateExerciseId))
                     )
                 }
             }
@@ -302,6 +304,7 @@ object AppBackupJson {
                             .put("status", row.status)
                             .put("completedAt", nullable(row.completedAt))
                             .put("addedDuringWorkout", row.addedDuringWorkout)
+                            .put("sourceTemplateSetId", nullable(row.sourceTemplateSetId))
                     )
                 }
             }
@@ -1036,6 +1039,11 @@ object AppBackupJson {
             }
             parsed.toString()
         }
+        val planProgressionApplied = if (!obj.has("planProgressionApplied") || obj.isNull("planProgressionApplied")) {
+            false
+        } else {
+            obj.requiredBoolean("planProgressionApplied", errors) ?: return null
+        }
         return WorkoutSessionEntity(
             id,
             templateId,
@@ -1054,7 +1062,8 @@ object AppBackupJson {
             activeLock,
             importFingerprint,
             scheduledWorkoutId,
-            clientWorkoutId
+            clientWorkoutId,
+            planProgressionApplied
         )
     }
 
@@ -1080,6 +1089,7 @@ object AppBackupJson {
         } else {
             obj.requiredBoolean("addedDuringWorkout", errors) ?: return null
         }
+        val sourceTemplateExerciseId = obj.optionalNullableId("sourceTemplateExerciseId", errors)
         return WorkoutSessionExerciseEntity(
             id,
             sessionId,
@@ -1093,7 +1103,8 @@ object AppBackupJson {
             weightInterpretation,
             primaryMuscle,
             notes,
-            addedDuringWorkout
+            addedDuringWorkout,
+            sourceTemplateExerciseId
         )
     }
 
@@ -1129,6 +1140,7 @@ object AppBackupJson {
         val status = obj.requiredString("status", errors) ?: return null
         val completedAt = obj.optionalNullableLong("completedAt", errors)
         val addedDuringWorkout = obj.requiredBoolean("addedDuringWorkout", errors) ?: return null
+        val sourceTemplateSetId = obj.optionalNullableId("sourceTemplateSetId", errors)
         return WorkoutSessionSetEntity(
             id,
             sessionExerciseId,
@@ -1146,7 +1158,8 @@ object AppBackupJson {
             actualDistanceMeters,
             status,
             completedAt,
-            addedDuringWorkout
+            addedDuringWorkout,
+            sourceTemplateSetId = sourceTemplateSetId
         )
     }
 

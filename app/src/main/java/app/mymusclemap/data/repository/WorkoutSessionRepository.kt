@@ -49,7 +49,13 @@ import app.mymusclemap.domain.workoutimport.WorkoutImportFingerprint
 import app.mymusclemap.domain.workoutimport.WorkoutImportPersistenceResult
 import app.mymusclemap.domain.workoutimport.WorkoutImportPlan
 import app.mymusclemap.domain.workoutimport.WorkoutImportResolvedWorkout
+import app.mymusclemap.data.local.PlanProgressionWriteException
+import app.mymusclemap.data.local.PlanProgressionWriteResult
+import app.mymusclemap.data.local.PlanSetTargetWrite
+import app.mymusclemap.domain.workout.ApplyPlanProgressionResult
+import app.mymusclemap.domain.workout.PlanProgressionProposal
 import app.mymusclemap.domain.workout.PlannedLoadKind
+import app.mymusclemap.domain.workout.WorkoutPlanProgressionEvaluator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -257,6 +263,113 @@ class WorkoutSessionRepository(
         val session = sessionDao.getByClientWorkoutId(clientWorkoutId) ?: return null
         if (session.status != SessionStatus.COMPLETED.name) return null
         return getAggregate(session.id)
+    }
+
+    suspend fun planProgression(clientWorkoutId: String): PlanProgressionProposal {
+        val aggregate = completedAggregate(clientWorkoutId) ?: return PlanProgressionProposal.EMPTY
+        return progressionFor(aggregate)
+    }
+
+    /**
+     * Revalidates the completed workout against the current plan and writes only the
+     * targets that still match the session's copied baseline. The completed session
+     * rows are not rewritten. The apply flag and the plan writes commit together.
+     */
+    suspend fun applyPlanProgression(
+        clientWorkoutId: String,
+        approvedSourceSetIds: Set<Long> = emptySet()
+    ): ApplyPlanProgressionResult = mutex.withLock {
+        val aggregate = completedAggregate(clientWorkoutId) ?: return ApplyPlanProgressionResult.SessionMissing
+        if (aggregate.session.planProgressionApplied) {
+            return ApplyPlanProgressionResult.AlreadyApplied
+        }
+        if (templateMissing(aggregate)) {
+            return ApplyPlanProgressionResult.PlanMissing
+        }
+        if (approvedSourceSetIds.isEmpty()) {
+            return ApplyPlanProgressionResult.NothingToApply
+        }
+        val proposal = progressionFor(aggregate)
+        val requested = proposal.updates.filter { it.sourceTemplateSetId in approvedSourceSetIds }
+        val skippedBeforeWrite = approvedSourceSetIds.count { id ->
+            requested.none { it.sourceTemplateSetId == id }
+        }
+        if (requested.isEmpty()) {
+            return if (skippedBeforeWrite > 0) {
+                ApplyPlanProgressionResult.Applied(0, skippedBeforeWrite)
+            } else {
+                ApplyPlanProgressionResult.NothingToApply
+            }
+        }
+        val templateId = aggregate.session.templateId ?: return ApplyPlanProgressionResult.PlanMissing
+        val setsById = aggregate.exercises.flatMap { it.sets }.associateBy { it.id }
+        val writes = requested.mapNotNull { update ->
+            val set = setsById[update.sessionSetId] ?: return@mapNotNull null
+            PlanSetTargetWrite(
+                sourceTemplateExerciseId = update.sourceTemplateExerciseId,
+                sourceTemplateSetId = update.sourceTemplateSetId,
+                baselineMinReps = set.plannedMinReps,
+                baselineMaxReps = set.plannedMaxReps,
+                baselineLoadKind = set.plannedLoadKind.name,
+                baselineWeightKg = set.plannedWeightKg,
+                baselineDurationSeconds = set.plannedDurationSeconds,
+                baselineDistanceMeters = set.plannedDistanceMeters,
+                newMinReps = update.newMinReps,
+                newMaxReps = update.newMaxReps,
+                newWeightKg = update.newWeightKg
+            )
+        }
+        if (writes.isEmpty()) {
+            return ApplyPlanProgressionResult.NothingToApply
+        }
+        return try {
+            when (
+                val written = sessionDao.applyPlanProgression(
+                    sessionId = aggregate.session.id,
+                    templateId = templateId,
+                    updatedAt = clock.millis(),
+                    updates = writes
+                )
+            ) {
+                is PlanProgressionWriteResult.Applied ->
+                    ApplyPlanProgressionResult.Applied(written.updated, skippedBeforeWrite + written.skipped)
+                is PlanProgressionWriteResult.NothingApplied ->
+                    if (skippedBeforeWrite + written.skipped > 0) {
+                        ApplyPlanProgressionResult.Applied(0, skippedBeforeWrite + written.skipped)
+                    } else {
+                        ApplyPlanProgressionResult.NothingToApply
+                    }
+                PlanProgressionWriteResult.AlreadyApplied -> ApplyPlanProgressionResult.AlreadyApplied
+                PlanProgressionWriteResult.PlanMissing -> ApplyPlanProgressionResult.PlanMissing
+                PlanProgressionWriteResult.SessionMissing -> ApplyPlanProgressionResult.SessionMissing
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: PlanProgressionWriteException) {
+            ApplyPlanProgressionResult.Failed
+        } catch (_: Exception) {
+            ApplyPlanProgressionResult.Failed
+        }
+    }
+
+    private suspend fun templateMissing(aggregate: WorkoutSessionAggregate): Boolean {
+        val templateId = aggregate.session.templateId ?: return true
+        return templateDao.getById(templateId) == null
+    }
+
+    private suspend fun progressionFor(aggregate: WorkoutSessionAggregate): PlanProgressionProposal {
+        val templateId = aggregate.session.templateId ?: return PlanProgressionProposal.EMPTY
+        val template = templateDao.getById(templateId) ?: return PlanProgressionProposal.EMPTY
+        val exercises = templateDao.getExercises(templateId).map { it.toModel() }
+        val sets = exercises.flatMap { exercise ->
+            templateDao.getSets(exercise.id).map { it.toModel() }
+        }
+        return WorkoutPlanProgressionEvaluator.evaluate(
+            aggregate,
+            template.toModel(),
+            exercises,
+            sets
+        )
     }
 
     /** Completed history used to compare a finished workout with earlier performances. */
@@ -500,7 +613,8 @@ class WorkoutSessionRepository(
                     ?: catalogMuscles.firstOrNull()?.muscleGroup
                     ?: "FULL_BODY",
                 notes = relation.notes,
-                addedDuringWorkout = false
+                addedDuringWorkout = false,
+                sourceTemplateExerciseId = relation.id
             )
             val muscleSnapshots = catalogMuscles.map { muscle ->
                 WorkoutSessionExerciseMuscleEntity(
@@ -526,7 +640,8 @@ class WorkoutSessionRepository(
                     actualDistanceMeters = planned.distanceMeters,
                     status = SessionSetStatus.PENDING.name,
                     completedAt = null,
-                    addedDuringWorkout = false
+                    addedDuringWorkout = false,
+                    sourceTemplateSetId = planned.id
                 )
             }
             Triple(snapshot, muscleSnapshots, setSnapshots)

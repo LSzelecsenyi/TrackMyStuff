@@ -135,6 +135,8 @@ class WorkoutCompletionViewModelTest {
         assertEquals(listOf(5), ready.summary.exercises[1].completedSets.map { it.actualReps })
         assertEquals(2, ready.summary.exerciseCount)
         assertEquals(2, ready.summary.completedSetCount)
+        assertEquals(listOf("Ring Dips"), ready.progression.updates.map { it.displayName })
+        assertEquals(12, ready.progression.updates.single().afterReps)
         assertEquals(ElapsedTime.forSession(stored.session), ready.summary.durationMillis)
         assertEquals(125.0, ready.summary.volumeKg!!, 0.0)
     }

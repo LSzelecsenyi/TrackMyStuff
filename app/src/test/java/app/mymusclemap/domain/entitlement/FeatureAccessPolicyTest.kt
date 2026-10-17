@@ -1,5 +1,6 @@
 package app.mymusclemap.domain.entitlement
 
+import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.reports.ReportKind
 import app.mymusclemap.domain.statistics.StatisticsRange
 import app.mymusclemap.domain.theme.AppearanceCodec
@@ -163,6 +164,15 @@ class FeatureAccessPolicyTest {
         assertTrue(locked.canDeleteImportedWorkouts)
         assertTrue(locked.canExportImportedWorkouts)
         assertTrue(pro.healthConnect().canImportExternalWorkouts)
+    }
+
+    @Test
+    fun freeUsersCanUpdateAnExistingPlanWhenCreationIsLimited() {
+        val plans = free.workoutPlans(WorkoutPlanAccess.FREE_PLAN_LIMIT)
+        assertFalse(plans.canCreate)
+        assertFalse(plans.canDuplicate)
+        assertTrue(plans.canEdit)
+        assertTrue(plans.canStartWorkout)
     }
 
     @Test
