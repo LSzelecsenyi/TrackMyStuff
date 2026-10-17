@@ -17,15 +17,19 @@ import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutSession
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
+import app.mymusclemap.EnglishDisplayLocaleRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import java.time.DayOfWeek
 import java.time.LocalDate
 
 class VolumeTrendResolutionTest {
+    @get:Rule
+    val locale = EnglishDisplayLocaleRule()
     @Test
     fun eachRangeSelectsItsResolution() {
         assertEquals(VolumeTrendResolution.Daily, VolumeTrendResolution.forRange(StatisticsRange.Days30))

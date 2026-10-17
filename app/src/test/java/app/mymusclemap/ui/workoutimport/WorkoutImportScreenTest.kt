@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.domain.exercise.Exercise
@@ -215,8 +216,9 @@ class WorkoutImportScreenTest {
             }
         }
         composeRule.onNodeWithTag("workout_import_mapping_picker").assertIsDisplayed()
-        composeRule.onNodeWithText("Biceps curl").assertIsDisplayed()
-        val bounds = composeRule.onNodeWithText("Biceps curl").getUnclippedBoundsInRoot()
+        val biceps = testString(R.string.starter_exercise_biceps_curl)
+        composeRule.onNodeWithText(biceps).performScrollTo().assertIsDisplayed()
+        val bounds = composeRule.onNodeWithText(biceps).getUnclippedBoundsInRoot()
         val labelWidth = bounds.right.value - bounds.left.value
         assertTrue("label collapsed to one character: $labelWidth", labelWidth > 48f)
     }

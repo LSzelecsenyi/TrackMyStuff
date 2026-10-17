@@ -448,7 +448,7 @@ class SettingsScreenLayoutTest {
     fun givenSendFeedbackWhenTappedThenCallbackRunsOnce() {
         val feedback = intArrayOf(0)
         render(onSendFeedback = { feedback[0] += 1 })
-        composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performClick()
         assertEquals(1, feedback[0])
     }

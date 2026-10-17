@@ -5,13 +5,17 @@ import app.mymusclemap.domain.reports.ReportHistoryCoverage
 import app.mymusclemap.domain.reports.ReportKind
 import app.mymusclemap.domain.reports.ReportPeriod
 import app.mymusclemap.domain.statistics.VolumeTrendResolution
+import app.mymusclemap.EnglishDisplayLocaleRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 
 class ReportPresentationTest {
+    @get:Rule
+    val locale = EnglishDisplayLocaleRule()
     @Test
     fun partialYearDropsMonthsThatEndBeforeHistoryAndKeepsLaterZeros() {
         val trend = (1..12).map { month ->

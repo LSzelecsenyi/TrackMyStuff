@@ -123,7 +123,7 @@ class ReportsScreenLayoutTest {
         composeRule.onNodeWithText("+1 (+100%)").assertIsDisplayed()
         composeRule.onNodeWithText("−25 pp").assertIsDisplayed()
         composeRule.onNodeWithTag(REPORT_HIGHLIGHTS).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Bench press").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.starter_exercise_bench_press)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("80.0 kg → 70.0 kg").assertIsDisplayed()
         composeRule.onNodeWithText("−10.0 kg").assertIsDisplayed()
         composeRule.onNodeWithText("Squat").assertDoesNotExist()

@@ -7,12 +7,16 @@ import app.mymusclemap.domain.workout.SessionProgress
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutSession
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
+import app.mymusclemap.EnglishDisplayLocaleRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 
 class WeeklyOverviewLogicTest {
+    @get:Rule
+    val locale = EnglishDisplayLocaleRule()
     private val today = LocalDate.of(2026, 9, 16)
 
     @Test

@@ -1,10 +1,14 @@
 package app.mymusclemap.ui.components
 
+import app.mymusclemap.EnglishDisplayLocaleRule
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 
 class UiFormattersTest {
+    @get:Rule
+    val locale = EnglishDisplayLocaleRule()
     @Test
     fun inclusiveDateRangeKeepsSameMonthCompact() {
         assertEquals(

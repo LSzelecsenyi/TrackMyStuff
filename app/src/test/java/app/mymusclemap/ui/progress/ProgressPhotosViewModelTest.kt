@@ -140,8 +140,8 @@ class ProgressPhotosViewModelTest {
             val createdAt = repository.observeAll().first().single().createdAt
             val storedFile = File(directory, saved.fileName)
             assertTrue(storedFile.isFile)
-            val aside = File(directory, "aside.bin")
-            assertTrue(storedFile.renameTo(aside) || storedFile.delete())
+            entitled.uiState.first { it.latestThumbnail != null }
+            deleteWhenReleased(storedFile)
 
             val free = viewModel(repository, SelectiveFeatureEntitlements(emptySet()))
             val missing = free.uiState.first { it.loaded && it.photos.single().missing }
@@ -190,6 +190,18 @@ class ProgressPhotosViewModelTest {
 
     private fun directory(context: Context): File {
         return File(context.cacheDir, "progress-vm-${System.nanoTime()}").apply { mkdirs() }
+    }
+
+    private fun deleteWhenReleased(file: File) {
+        for (attempt in 1..20) {
+            if (file.delete() || !file.exists()) {
+                return
+            }
+            if (attempt < 20) {
+                Thread.sleep(20)
+            }
+        }
+        assertFalse(file.exists())
     }
 
     private fun jpeg(): ByteArray {
