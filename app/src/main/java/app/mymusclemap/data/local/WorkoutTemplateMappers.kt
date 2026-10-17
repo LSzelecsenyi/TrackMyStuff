@@ -1,6 +1,7 @@
 package app.mymusclemap.data.local
 
 import app.mymusclemap.domain.workout.PlannedLoadKind
+import app.mymusclemap.domain.workout.RestProgressionMode
 import app.mymusclemap.domain.workout.WorkoutTemplate
 import app.mymusclemap.domain.workout.WorkoutTemplateExercise
 import app.mymusclemap.domain.workout.WorkoutTemplateSet
@@ -13,7 +14,8 @@ fun WorkoutTemplateEntity.toModel(): WorkoutTemplate {
         notes = notes,
         archived = archived,
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        restProgressionMode = RestProgressionMode.fromStored(restProgressionMode)
     )
 }
 
@@ -24,7 +26,8 @@ fun WorkoutTemplateExerciseEntity.toModel(): WorkoutTemplateExercise {
         exerciseId = exerciseId,
         position = position,
         notes = notes,
-        createdAt = createdAt
+        createdAt = createdAt,
+        restSeconds = restSeconds
     )
 }
 
@@ -39,6 +42,7 @@ fun WorkoutTemplateSetEntity.toModel(): WorkoutTemplateSet {
             .getOrDefault(PlannedLoadKind.NONE),
         weightKg = weightKg,
         durationSeconds = durationSeconds,
-        distanceMeters = distanceMeters
+        distanceMeters = distanceMeters,
+        restSeconds = restSeconds
     )
 }

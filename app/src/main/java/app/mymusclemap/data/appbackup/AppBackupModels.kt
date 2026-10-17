@@ -49,6 +49,11 @@ object AppBackupFormat {
      * Missing ids stay null, so those workouts are not offered a plan update.
      */
     const val ARCHIVE_PLAN_SOURCE_SCHEMA_VERSION = 14
+    /**
+     * Optional rest duration and strict/flexible progression. Older files omit the keys.
+     * Missing rest stays off, and missing progression is strict, so those plans do not start a timer.
+     */
+    const val ARCHIVE_REST_SCHEMA_VERSION = 15
     const val CONTAINER_VERSION = 1
     const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024

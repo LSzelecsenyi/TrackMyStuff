@@ -421,7 +421,14 @@ abstract class WorkoutSessionDao {
                 status = "COMPLETED",
                 finishedAt = finishedAt,
                 updatedAt = finishedAt,
-                activeLock = null
+                activeLock = null,
+                restPhase = null,
+                restOriginSetId = null,
+                restNextSetId = null,
+                restAnchorElapsedRealtimeMillis = null,
+                restDeadlineElapsedRealtimeMillis = null,
+                restDeadlineWallClockMillis = null,
+                restDurationMillis = null
             )
         )
         return 1

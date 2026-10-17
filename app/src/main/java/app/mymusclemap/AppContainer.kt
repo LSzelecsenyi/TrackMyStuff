@@ -49,6 +49,7 @@ import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.FounderRecognitionStore
 import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
+import app.mymusclemap.data.preferences.TimerSoundPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.domain.achievements.AccountAchievementAuthority
 import app.mymusclemap.data.repository.AchievementRepository
@@ -166,6 +167,7 @@ class AppContainer(context: Context, val accountUserId: String) {
         onTrainingHistoryChanged = { clientWorkoutId -> achievementRepository.reconcile(clientWorkoutId) }
     )
     val lockScreenSetCompletion = LockScreenSetCompletionPreferences(appContext)
+    val timerSounds = TimerSoundPreferences(appContext)
     val activeWorkoutNotifications = ActiveWorkoutNotificationCoordinator(
         context = appContext,
         repository = workoutSessionRepository,
@@ -812,6 +814,7 @@ class AppContainer(context: Context, val accountUserId: String) {
         founderMilestoneAcknowledgements = founderMilestoneAcknowledgements,
         founderAvailability = founderProgramAvailability,
         lockScreenSetCompletion = lockScreenSetCompletion,
+        timerSounds = timerSounds,
         founderJoin = { founderJoin.join() },
         founderSessionRevision = strictSessionRevision,
         founderSessionPresent = { strictSessionStore.read() != null },

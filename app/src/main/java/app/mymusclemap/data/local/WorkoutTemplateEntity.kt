@@ -1,5 +1,6 @@
 package app.mymusclemap.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -19,7 +20,9 @@ data class WorkoutTemplateEntity(
     val notes: String?,
     val archived: Boolean,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    @ColumnInfo(defaultValue = "STRICT")
+    val restProgressionMode: String = "STRICT"
 )
 
 @Entity(
@@ -52,7 +55,8 @@ data class WorkoutTemplateExerciseEntity(
     val exerciseId: Long,
     val position: Int,
     val notes: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    val restSeconds: Int? = null
 )
 
 @Entity(
@@ -80,5 +84,6 @@ data class WorkoutTemplateSetEntity(
     val loadKind: String,
     val weightKg: Double?,
     val durationSeconds: Int?,
-    val distanceMeters: Double?
+    val distanceMeters: Double?,
+    val restSeconds: Int? = null
 )

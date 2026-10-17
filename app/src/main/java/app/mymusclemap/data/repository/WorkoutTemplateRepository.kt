@@ -14,6 +14,7 @@ import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.SystemDateProvider
 import app.mymusclemap.domain.exercise.Exercise
 import app.mymusclemap.domain.workout.PlannedSetLogic
+import app.mymusclemap.domain.workout.RestDuration
 import app.mymusclemap.domain.workout.TemplateDeleteResult
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateDraftLogic
@@ -141,7 +142,8 @@ class WorkoutTemplateRepository(
             notes = draft.notes.trim().ifBlank { null },
             archived = existing?.archived ?: false,
             createdAt = existing?.createdAt ?: now,
-            updatedAt = now
+            updatedAt = now,
+            restProgressionMode = draft.restProgressionMode.name
         )
         val preserving = existing != null
         val children = draft.exercises.map { item ->
@@ -152,7 +154,8 @@ class WorkoutTemplateRepository(
                 exerciseId = item.exerciseId,
                 position = 0,
                 notes = item.notes.trim().ifBlank { null },
-                createdAt = now
+                createdAt = now,
+                restSeconds = item.restSeconds?.takeIf { it > 0 }?.coerceAtMost(RestDuration.MAX_SECONDS)
             )
             val sets = item.sets.map { setDraft ->
                 val values = PlannedSetLogic.parseValues(setDraft, exercise).first!!
@@ -169,7 +172,10 @@ class WorkoutTemplateRepository(
                     loadKind = values.loadKind.name,
                     weightKg = values.weightKg,
                     durationSeconds = values.durationSeconds,
-                    distanceMeters = values.distanceMeters
+                    distanceMeters = values.distanceMeters,
+                    restSeconds = setDraft.restSeconds?.let { seconds ->
+                        if (seconds <= 0) 0 else seconds.coerceAtMost(RestDuration.MAX_SECONDS)
+                    }
                 )
             }
             relation to sets

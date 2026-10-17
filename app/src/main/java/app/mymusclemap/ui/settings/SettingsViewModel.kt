@@ -8,6 +8,7 @@ import app.mymusclemap.data.appbackup.AppBackupRestoreResult
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
+import app.mymusclemap.data.preferences.TimerSoundStore
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
@@ -49,7 +50,8 @@ data class SettingsUiState(
     val privacyPolicyUrl: String? = null,
     val weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(LocalDate.of(1970, 1, 1)),
     val lockScreenSetCompletionEnabled: Boolean = false,
-    val lockScreenPermissionRequested: Boolean = false
+    val lockScreenPermissionRequested: Boolean = false,
+    val timerSoundsEnabled: Boolean = true
 ) {
     val customEditorVisible: Boolean get() = draft != null
 }
@@ -58,6 +60,13 @@ private data class SettingsChrome(
     val appearance: AppearanceSettings,
     val draft: PaletteDraft?,
     val saveError: PaletteSaveResult?
+)
+
+private data class MessageChrome(
+    val message: UserMessage?,
+    val lockEnabled: Boolean,
+    val lockRequested: Boolean,
+    val timerSounds: Boolean
 )
 
 private data class BackupChrome(
@@ -72,7 +81,8 @@ class SettingsViewModel(
     private val weeklyGoalRepository: WeeklyGoalRepository? = null,
     private val appVersionName: String = BuildConfig.VERSION_NAME,
     private val privacyPolicyUrl: String? = AboutConfig.privacyPolicyUrl,
-    private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off
+    private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off,
+    private val timerSounds: TimerSoundStore = TimerSoundStore.On
 ) : ViewModel() {
     private val appearance = MutableStateFlow(AppearanceSettings.Default)
     private val draft = MutableStateFlow<PaletteDraft?>(null)
@@ -82,6 +92,7 @@ class SettingsViewModel(
     private val userMessage = MutableStateFlow<UserMessage?>(null)
     private val lockScreenEnabled = MutableStateFlow(false)
     private val lockScreenPermissionRequested = MutableStateFlow(false)
+    private val timerSoundsEnabled = MutableStateFlow(true)
 
     private val chrome = combine(appearance, draft, saveError) { current, draftState, error ->
         SettingsChrome(current, draftState, error)
@@ -101,12 +112,19 @@ class SettingsViewModel(
 
     val uiState: StateFlow<SettingsUiState> = combine(
         chrome,
-        combine(userMessage, lockScreenEnabled, lockScreenPermissionRequested) { message, enabled, requested ->
-            Triple(message, enabled, requested)
+        combine(
+            userMessage,
+            lockScreenEnabled,
+            lockScreenPermissionRequested,
+            timerSoundsEnabled
+        ) { message, enabled, requested, sounds ->
+            MessageChrome(message, enabled, requested, sounds)
         },
         combine(backupChrome, weeklyGoalStatus) { backup, goal -> backup to goal }
     ) { chromeState, lockAndMessage, backupAndGoal ->
-        val (message, enabled, requested) = lockAndMessage
+        val message = lockAndMessage.message
+        val enabled = lockAndMessage.lockEnabled
+        val requested = lockAndMessage.lockRequested
         val (backup, goal) = backupAndGoal
         SettingsUiState(
             appearance = chromeState.appearance,
@@ -119,7 +137,8 @@ class SettingsViewModel(
             privacyPolicyUrl = privacyPolicyUrl,
             weeklyGoal = goal,
             lockScreenSetCompletionEnabled = enabled,
-            lockScreenPermissionRequested = requested
+            lockScreenPermissionRequested = requested,
+            timerSoundsEnabled = lockAndMessage.timerSounds
         )
     }.stateIn(
         scope = viewModelScope,
@@ -129,6 +148,12 @@ class SettingsViewModel(
             privacyPolicyUrl = privacyPolicyUrl
         )
     )
+
+    fun setTimerSounds(enabled: Boolean) {
+        viewModelScope.launch {
+            timerSounds.setEnabled(enabled)
+        }
+    }
 
     fun setLockScreenSetCompletion(enabled: Boolean) {
         viewModelScope.launch {
@@ -159,6 +184,9 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             lockScreenSetCompletion.enabled.collect { lockScreenEnabled.value = it }
+        }
+        viewModelScope.launch {
+            timerSounds.enabled.collect { timerSoundsEnabled.value = it }
         }
         viewModelScope.launch {
             lockScreenSetCompletion.runtimePermissionRequested.collect {

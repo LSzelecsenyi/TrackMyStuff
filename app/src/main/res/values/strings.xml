@@ -1618,4 +1618,26 @@
     <string name="welcome_back_warning_when">Ends %1$s</string>
     <string name="welcome_back_unavailable">Welcome Back is not available for this account right now.</string>
     <string name="welcome_back_expired">Your Welcome Back Pro has ended. Your workouts are still here.</string>
+    <string name="rest_between_sets">Rest between sets</string>
+    <string name="rest_off">Off</string>
+    <string name="rest_seconds">%1$d sec</string>
+    <string name="rest_custom">Custom</string>
+    <string name="rest_custom_seconds">Seconds</string>
+    <string name="rest_default">Default</string>
+    <string name="rest_set_override">Rest: %1$s</string>
+    <string name="rest_set_override_label">Rest after this set</string>
+    <string name="rest_auto_advance">Auto-advance after rest</string>
+    <string name="rest_auto_advance_info">About auto-advance</string>
+    <string name="rest_auto_advance_explanation">Strict: When rest ends, Strict automatically selects the next set. The next set is not marked complete.\n\nFlexible: When rest ends, Strict notifies you, but you decide when to move to the next set.</string>
+    <string name="rest_status">RESTING</string>
+    <string name="rest_add_ten">+10 sec</string>
+    <string name="rest_skip">Skip Rest</string>
+    <string name="rest_complete">Rest complete</string>
+    <string name="rest_next_set">Next Set</string>
+    <string name="rest_next">NEXT: %1$s — Set %2$d/%3$d</string>
+    <string name="settings_timer_sounds_title">Timer sounds</string>
+    <string name="settings_timer_sounds_body">Play a short sound when rest ends.</string>
+    <string name="notification_channel_rest">Rest timer</string>
+    <string name="notification_rest_complete">Rest complete</string>
+    <string name="notification_rest_complete_next">Next: %1$s</string>
 </resources>

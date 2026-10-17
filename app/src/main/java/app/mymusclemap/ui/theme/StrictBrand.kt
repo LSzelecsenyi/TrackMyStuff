@@ -37,6 +37,18 @@ object StrictBrand {
     }
 
     @Composable
+    fun restAccent(): Color {
+        val scheme = MaterialTheme.colorScheme
+        return Color(
+            StrictBrandTokens.restAccent(
+                scheme.background.toArgb(),
+                scheme.primary.toArgb(),
+                scheme.tertiary.toArgb()
+            )
+        )
+    }
+
+    @Composable
     fun result(): Color {
         val scheme = MaterialTheme.colorScheme
         return Color(StrictBrandTokens.result(scheme.background.toArgb(), scheme.primary.toArgb()))

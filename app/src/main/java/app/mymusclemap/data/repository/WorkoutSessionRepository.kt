@@ -26,6 +26,13 @@ import app.mymusclemap.domain.workout.FinishWorkoutResult
 import app.mymusclemap.domain.workout.NotificationSetCompletion
 import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.SessionFocusLogic
+import app.mymusclemap.domain.workout.RestClockSample
+import app.mymusclemap.domain.workout.RestExpiryResult
+import app.mymusclemap.domain.workout.RestPhase
+import app.mymusclemap.domain.workout.RestProgressionMode
+import app.mymusclemap.domain.workout.RestRemaining
+import app.mymusclemap.domain.workout.RestTimerLogic
+import app.mymusclemap.domain.workout.RestTimerSnapshot
 import app.mymusclemap.domain.workout.SessionMutationResult
 import app.mymusclemap.domain.workout.SessionProgressLogic
 import app.mymusclemap.domain.workout.SessionSetStatus
@@ -80,7 +87,13 @@ class WorkoutSessionRepository(
     private val dateProvider: DateProvider,
     private val onHeatmapDataChanged: () -> Unit = {},
     private val onNativeWorkoutCompleted: suspend (String) -> Unit = { _ -> },
-    private val onTrainingHistoryChanged: suspend (String?) -> Unit = { _ -> }
+    private val onTrainingHistoryChanged: suspend (String?) -> Unit = { _ -> },
+    private val restClock: () -> RestClockSample = {
+        RestClockSample(
+            elapsedRealtimeMillis = android.os.SystemClock.elapsedRealtime(),
+            wallClockMillis = clock.millis()
+        )
+    }
 ) {
     private val mutex = Mutex()
 
@@ -590,7 +603,8 @@ class WorkoutSessionRepository(
             activeLock = SessionStatus.IN_PROGRESS.activeLock(),
             importFingerprint = null,
             scheduledWorkoutId = scheduledWorkoutId,
-            clientWorkoutId = java.util.UUID.randomUUID().toString()
+            clientWorkoutId = java.util.UUID.randomUUID().toString(),
+            restProgressionMode = template.restProgressionMode
         )
         val children = relations.sortedBy { it.position }.mapNotNull { relation ->
             val exercise = exerciseDao.getById(relation.exerciseId) ?: return@mapNotNull null
@@ -614,7 +628,8 @@ class WorkoutSessionRepository(
                     ?: "FULL_BODY",
                 notes = relation.notes,
                 addedDuringWorkout = false,
-                sourceTemplateExerciseId = relation.id
+                sourceTemplateExerciseId = relation.id,
+                restSeconds = relation.restSeconds
             )
             val muscleSnapshots = catalogMuscles.map { muscle ->
                 WorkoutSessionExerciseMuscleEntity(
@@ -641,7 +656,8 @@ class WorkoutSessionRepository(
                     status = SessionSetStatus.PENDING.name,
                     completedAt = null,
                     addedDuringWorkout = false,
-                    sourceTemplateSetId = planned.id
+                    sourceTemplateSetId = planned.id,
+                    restSeconds = planned.restSeconds
                 )
             }
             Triple(snapshot, muscleSnapshots, setSnapshots)
@@ -708,9 +724,17 @@ class WorkoutSessionRepository(
     }
 
     suspend fun completeSet(setId: Long, draft: ActualSetDraft): SessionMutationResult = mutex.withLock {
-        mutateActiveSet(setId) { set, exercise, now ->
+        val before = sessionDao.getSet(setId)
+        val result = mutateActiveSet(setId) { set, exercise, now ->
             writeCompletedSet(set, exercise, draft, now)
         }
+        if (result == SessionMutationResult.Updated && before?.status == SessionSetStatus.PENDING.name) {
+            val exercise = sessionDao.getExercise(before.sessionExerciseId)
+            if (exercise != null && !startRestAfterPendingCompletion(before.id)) {
+                clearRestOnSession(exercise.sessionId)
+            }
+        }
+        result
     }
 
     /**
@@ -746,9 +770,15 @@ class WorkoutSessionRepository(
         val now = clock.millis()
         when (val written = writeCompletedSet(set, exercise, ActualSetLogic.draftFromSet(current), now)) {
             SessionMutationResult.Updated -> {
-                val session = sessionDao.getById(sessionId)
-                    ?: return@withLock NotificationSetCompletion.NotFound
-                touchSession(session, now)
+                if (!startRestAfterPendingCompletion(setId)) {
+                    val session = sessionDao.getById(sessionId)
+                        ?: return@withLock NotificationSetCompletion.NotFound
+                    if (session.restPhase != null) {
+                        clearRestOnSession(sessionId)
+                    } else {
+                        touchSession(session, now)
+                    }
+                }
                 NotificationSetCompletion.Updated
             }
             is SessionMutationResult.Invalid -> NotificationSetCompletion.Invalid
@@ -759,7 +789,8 @@ class WorkoutSessionRepository(
     }
 
     suspend fun skipSet(setId: Long): SessionMutationResult = mutex.withLock {
-        mutateActiveSet(setId) { set, _, _ ->
+        val before = sessionDao.getSet(setId)
+        val result = mutateActiveSet(setId) { set, _, _ ->
             sessionDao.updateSet(
                 set.copy(
                     actualReps = null,
@@ -774,10 +805,16 @@ class WorkoutSessionRepository(
             )
             SessionMutationResult.Updated
         }
+        if (result == SessionMutationResult.Updated && before != null) {
+            val exercise = sessionDao.getExercise(before.sessionExerciseId)
+            if (exercise != null) clearRestOnSession(exercise.sessionId)
+        }
+        result
     }
 
     suspend fun undoSkip(setId: Long): SessionMutationResult = mutex.withLock {
-        mutateActiveSet(setId) { set, _, _ ->
+        val before = sessionDao.getSet(setId)
+        val result = mutateActiveSet(setId) { set, _, _ ->
             if (set.status != SessionSetStatus.SKIPPED.name) {
                 return@mutateActiveSet SessionMutationResult.Updated
             }
@@ -795,6 +832,11 @@ class WorkoutSessionRepository(
             )
             SessionMutationResult.Updated
         }
+        if (result == SessionMutationResult.Updated && before?.status == SessionSetStatus.SKIPPED.name) {
+            val exercise = sessionDao.getExercise(before.sessionExerciseId)
+            if (exercise != null) clearRestOnSession(exercise.sessionId)
+        }
+        result
     }
 
     suspend fun addExtraSet(sessionExerciseId: Long): SessionMutationResult = mutex.withLock {
@@ -830,10 +872,12 @@ class WorkoutSessionRepository(
                 actualDistanceMeters = parsed?.distanceMeters ?: planned.distanceMeters,
                 status = SessionSetStatus.PENDING.name,
                 completedAt = null,
-                addedDuringWorkout = true
+                addedDuringWorkout = true,
+                restSeconds = existing.maxByOrNull { it.position }?.restSeconds
             )
         )
         touchSession(session)
+        clearRestOnSession(session.id)
         SessionMutationResult.Updated
     }
 
@@ -902,6 +946,7 @@ class WorkoutSessionRepository(
             )
         )
         touchSession(session)
+        clearRestOnSession(session.id)
         AddExtraExerciseResult.Added(inserted.sessionExerciseId, inserted.setId)
     }
 
@@ -916,6 +961,7 @@ class WorkoutSessionRepository(
         }
         sessionDao.deleteExerciseAndReindex(exercise.id, session.id)
         touchSession(session)
+        clearRestOnSession(session.id)
         SessionMutationResult.Updated
     }
 
@@ -939,6 +985,7 @@ class WorkoutSessionRepository(
             }
         }
         touchSession(session)
+        clearRestOnSession(session.id)
         SessionMutationResult.Updated
     }
 
@@ -1111,6 +1158,103 @@ class WorkoutSessionRepository(
         sessionDao.updateSession(session.copy(updatedAt = now))
     }
 
+    suspend fun extendRest(sessionId: Long, generation: Long): Boolean = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return@withLock false
+        if (session.restPhase != RestPhase.COUNTING.name || session.restGeneration != generation) {
+            return@withLock false
+        }
+        val sample = restClock()
+        val anchored = RestTimerLogic.reanchorAfterReboot(session.toRestSnapshot(), sample)
+            ?: session.toRestSnapshot()
+        val extended = RestTimerLogic.extend(anchored, sample) ?: return@withLock false
+        sessionDao.updateSession(session.withRest(extended, clock.millis()))
+        true
+    }
+
+    /**
+     * Stops the current interval and returns the completed set that rest followed.
+     * A mismatched generation means another action already owned this interval.
+     */
+    suspend fun skipRest(sessionId: Long, generation: Long): Long? = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return@withLock null
+        if (session.restPhase == null || session.restGeneration != generation) return@withLock null
+        val origin = session.restOriginSetId
+        sessionDao.updateSession(session.clearedRest(clock.millis()))
+        origin
+    }
+
+    suspend fun clearRest(sessionId: Long, generation: Long): Boolean = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return@withLock false
+        if (session.restPhase == null || session.restGeneration != generation) return@withLock false
+        sessionDao.updateSession(session.clearedRest(clock.millis()))
+        true
+    }
+
+    suspend fun acknowledgeRest(sessionId: Long, generation: Long): Long? = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return@withLock null
+        if (session.restPhase != RestPhase.AWAITING_NEXT.name || session.restGeneration != generation) {
+            return@withLock null
+        }
+        val origin = session.restOriginSetId
+        sessionDao.updateSession(session.clearedRest(clock.millis()))
+        origin
+    }
+
+    suspend fun expireRest(sessionId: Long, generation: Long): RestExpiryResult = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return@withLock RestExpiryResult.Ignored
+        if (session.status != SessionStatus.IN_PROGRESS.name ||
+            session.restPhase != RestPhase.COUNTING.name ||
+            session.restGeneration != generation
+        ) {
+            return@withLock RestExpiryResult.Ignored
+        }
+        val sample = restClock()
+        val snapshot = session.toRestSnapshot()
+        val reanchored = RestTimerLogic.reanchorAfterReboot(snapshot, sample)
+        if (reanchored != null) {
+            sessionDao.updateSession(session.withRest(reanchored, clock.millis()))
+            return@withLock RestExpiryResult.Ignored
+        }
+        if (RestTimerLogic.remaining(snapshot, sample) !is RestRemaining.Expired) {
+            return@withLock RestExpiryResult.Ignored
+        }
+        val origin = session.restOriginSetId ?: return@withLock RestExpiryResult.Ignored
+        val now = clock.millis()
+        if (RestProgressionMode.fromStored(session.restProgressionMode) == RestProgressionMode.FLEXIBLE) {
+            sessionDao.updateSession(
+                session.copy(
+                    restPhase = RestPhase.AWAITING_NEXT.name,
+                    restAnchorElapsedRealtimeMillis = null,
+                    restDeadlineElapsedRealtimeMillis = null,
+                    restDeadlineWallClockMillis = null,
+                    restDurationMillis = null,
+                    restGeneration = session.restGeneration + 1,
+                    updatedAt = now
+                )
+            )
+            return@withLock RestExpiryResult.Waiting
+        }
+        sessionDao.updateSession(session.clearedRest(now))
+        RestExpiryResult.Advanced(origin)
+    }
+
+    private suspend fun startRestAfterPendingCompletion(setId: Long): Boolean {
+        val set = sessionDao.getSet(setId) ?: return false
+        val exercise = sessionDao.getExercise(set.sessionExerciseId) ?: return false
+        val aggregate = getAggregate(exercise.sessionId) ?: return false
+        val plan = RestTimerLogic.planAfterCompletion(aggregate, setId) ?: return false
+        val session = sessionDao.getById(exercise.sessionId) ?: return false
+        val started = RestTimerLogic.started(plan, restClock(), session.restGeneration + 1)
+        sessionDao.updateSession(session.withRest(started, clock.millis()))
+        return true
+    }
+
+    private suspend fun clearRestOnSession(sessionId: Long) {
+        val session = sessionDao.getById(sessionId) ?: return
+        if (session.restPhase == null) return
+        sessionDao.updateSession(session.clearedRest(clock.millis()))
+    }
+
     private fun toSummary(
         session: WorkoutSessionEntity,
         exercises: List<WorkoutSessionExerciseEntity>,
@@ -1257,4 +1401,47 @@ class WorkoutSessionRepository(
         }
         return false
     }
+}
+
+private fun WorkoutSessionEntity.toRestSnapshot(): RestTimerSnapshot {
+    return RestTimerSnapshot(
+        phase = RestPhase.fromStored(restPhase),
+        originSetId = restOriginSetId,
+        nextSetId = restNextSetId,
+        anchorElapsedRealtimeMillis = restAnchorElapsedRealtimeMillis,
+        deadlineElapsedRealtimeMillis = restDeadlineElapsedRealtimeMillis,
+        deadlineWallClockMillis = restDeadlineWallClockMillis,
+        durationMillis = restDurationMillis,
+        generation = restGeneration,
+        mode = RestProgressionMode.fromStored(restProgressionMode)
+    )
+}
+
+private fun WorkoutSessionEntity.withRest(snapshot: RestTimerSnapshot, updatedAt: Long): WorkoutSessionEntity {
+    return copy(
+        restPhase = snapshot.phase?.name,
+        restOriginSetId = snapshot.originSetId,
+        restNextSetId = snapshot.nextSetId,
+        restAnchorElapsedRealtimeMillis = snapshot.anchorElapsedRealtimeMillis,
+        restDeadlineElapsedRealtimeMillis = snapshot.deadlineElapsedRealtimeMillis,
+        restDeadlineWallClockMillis = snapshot.deadlineWallClockMillis,
+        restDurationMillis = snapshot.durationMillis,
+        restGeneration = snapshot.generation,
+        restProgressionMode = snapshot.mode.name,
+        updatedAt = updatedAt
+    )
+}
+
+private fun WorkoutSessionEntity.clearedRest(updatedAt: Long): WorkoutSessionEntity {
+    return copy(
+        restPhase = null,
+        restOriginSetId = null,
+        restNextSetId = null,
+        restAnchorElapsedRealtimeMillis = null,
+        restDeadlineElapsedRealtimeMillis = null,
+        restDeadlineWallClockMillis = null,
+        restDurationMillis = null,
+        restGeneration = restGeneration + 1,
+        updatedAt = updatedAt
+    )
 }

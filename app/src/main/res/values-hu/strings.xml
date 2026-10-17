@@ -1618,4 +1618,26 @@
     <string name="welcome_back_warning_when">Vége: %1$s</string>
     <string name="welcome_back_unavailable">A Welcome Back ehhez a fiókhoz most nem érhető el.</string>
     <string name="welcome_back_expired">A Welcome Back Pro lejárt. Az edzéseid megmaradtak.</string>
+    <string name="rest_between_sets">Pihenő a sorozatok között</string>
+    <string name="rest_off">Ki</string>
+    <string name="rest_seconds">%1$d mp</string>
+    <string name="rest_custom">Egyéni</string>
+    <string name="rest_custom_seconds">Másodperc</string>
+    <string name="rest_default">Alapértelmezett</string>
+    <string name="rest_set_override">Pihenő: %1$s</string>
+    <string name="rest_set_override_label">Pihenő ez után a sorozat után</string>
+    <string name="rest_auto_advance">Automatikus továbblépés pihenő után</string>
+    <string name="rest_auto_advance_info">Az automatikus továbblépésről</string>
+    <string name="rest_auto_advance_explanation">Szigorú: Amikor a pihenő véget ér, a Strict automatikusan kijelöli a következő sorozatot. A következő sorozat nem lesz késznek jelölve.\n\nRugalmas: Amikor a pihenő véget ér, a Strict jelez, de te döntöd el, mikor lépsz a következő sorozatra.</string>
+    <string name="rest_status">PIHENŐ</string>
+    <string name="rest_add_ten">+10 mp</string>
+    <string name="rest_skip">Pihenő kihagyása</string>
+    <string name="rest_complete">A pihenő véget ért</string>
+    <string name="rest_next_set">Következő sorozat</string>
+    <string name="rest_next">KÖVETKEZŐ: %1$s — %2$d/%3$d. sorozat</string>
+    <string name="settings_timer_sounds_title">Időzítő hangok</string>
+    <string name="settings_timer_sounds_body">Rövid hang, amikor a pihenő véget ér.</string>
+    <string name="notification_channel_rest">Pihenő időzítő</string>
+    <string name="notification_rest_complete">A pihenő véget ért</string>
+    <string name="notification_rest_complete_next">Következő: %1$s</string>
 </resources>

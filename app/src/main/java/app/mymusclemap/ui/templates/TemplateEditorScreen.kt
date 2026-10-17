@@ -1,5 +1,7 @@
 package app.mymusclemap.ui.templates
 
+import app.mymusclemap.domain.workout.RestDuration
+import app.mymusclemap.domain.workout.RestProgressionMode
 import app.mymusclemap.ui.exercises.starterExerciseLabel
 
 import androidx.activity.compose.BackHandler
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -23,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
@@ -34,12 +38,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -104,6 +116,9 @@ fun TemplateEditorScreen(
     onSeconds: (Long, Long, String) -> Unit,
     onDistance: (Long, Long, String) -> Unit,
     onDistanceUnit: (Long, Long, DistanceUnit) -> Unit,
+    onRestMode: (Boolean) -> Unit = {},
+    onExerciseRest: (Long, Int?) -> Unit = { _, _ -> },
+    onSetRest: (Long, Long, Int?) -> Unit = { _, _, _ -> },
     onSave: () -> Unit,
     onReload: () -> Unit = {},
     onDismissDiscard: () -> Unit,
@@ -227,6 +242,11 @@ fun TemplateEditorScreen(
                                 label = { Text(stringResource(R.string.template_field_notes)) },
                                 minLines = 2
                             )
+                            Spacer(Modifier.height(12.dp))
+                            RestProgressionRow(
+                                strict = state.draft.restProgressionMode == RestProgressionMode.STRICT,
+                                onChange = onRestMode
+                            )
                             if (state.draft.exercises.isNotEmpty()) {
                                 Spacer(Modifier.height(20.dp))
                                 TemplateMuscleMapCard(state = state.musclePreview)
@@ -276,7 +296,9 @@ fun TemplateEditorScreen(
                                     onMinutes = { setId, value -> onMinutes(item.localId, setId, value) },
                                     onSeconds = { setId, value -> onSeconds(item.localId, setId, value) },
                                     onDistance = { setId, value -> onDistance(item.localId, setId, value) },
-                                    onDistanceUnit = { setId, unit -> onDistanceUnit(item.localId, setId, unit) }
+                                    onDistanceUnit = { setId, unit -> onDistanceUnit(item.localId, setId, unit) },
+                                    onExerciseRest = { onExerciseRest(item.localId, it) },
+                                    onSetRest = { setId, seconds -> onSetRest(item.localId, setId, seconds) }
                                 )
                             } else {
                                 Text(
@@ -455,7 +477,9 @@ private fun ExerciseCard(
     onMinutes: (Long, String) -> Unit,
     onSeconds: (Long, String) -> Unit,
     onDistance: (Long, String) -> Unit,
-    onDistanceUnit: (Long, DistanceUnit) -> Unit
+    onDistanceUnit: (Long, DistanceUnit) -> Unit,
+    onExerciseRest: (Int?) -> Unit,
+    onSetRest: (Long, Int?) -> Unit
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -513,6 +537,13 @@ private fun ExerciseCard(
                 )
             }
             if (item.expanded) {
+                RestChoiceRow(
+                    label = stringResource(R.string.rest_between_sets),
+                    selected = item.restSeconds,
+                    includeDefault = false,
+                    onSelect = onExerciseRest
+                )
+                Spacer(Modifier.height(8.dp))
                 if (exercise.measurementType != MeasurementType.COMPLETION_ONLY) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.field_set_count), modifier = Modifier.weight(1f))
@@ -550,7 +581,8 @@ private fun ExerciseCard(
                         onMinutes = { onMinutes(set.localId, it) },
                         onSeconds = { onSeconds(set.localId, it) },
                         onDistance = { onDistance(set.localId, it) },
-                        onDistanceUnit = { onDistanceUnit(set.localId, it) }
+                        onDistanceUnit = { onDistanceUnit(set.localId, it) },
+                        onRestSeconds = { onSetRest(set.localId, it) }
                     )
                 }
                 if (exercise.measurementType != MeasurementType.COMPLETION_ONLY) {
@@ -590,7 +622,8 @@ private fun SetCard(
     onMinutes: (String) -> Unit,
     onSeconds: (String) -> Unit,
     onDistance: (String) -> Unit,
-    onDistanceUnit: (DistanceUnit) -> Unit
+    onDistanceUnit: (DistanceUnit) -> Unit,
+    onRestSeconds: (Int?) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -721,6 +754,10 @@ private fun SetCard(
                 onApplyRemaining = onApplyRemaining,
                 onApplyAll = onApplyAll
             )
+            SetRestOverride(
+                seconds = set.restSeconds,
+                onSelect = onRestSeconds
+            )
         }
     }
 }
@@ -763,5 +800,153 @@ private fun SetApplyActionButton(
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Start
         )
+    }
+}
+
+@Composable
+private fun RestProgressionRow(
+    strict: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    var showInfo by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.rest_auto_advance),
+                style = MaterialTheme.typography.titleSmall
+            )
+        }
+        IconButton(
+            onClick = { showInfo = true },
+            modifier = Modifier.testTag("rest_info")
+        ) {
+            Icon(
+                Icons.Filled.Info,
+                contentDescription = stringResource(R.string.rest_auto_advance_info)
+            )
+        }
+        Switch(
+            checked = strict,
+            onCheckedChange = onChange,
+            modifier = Modifier.testTag("rest_auto_advance")
+        )
+    }
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            title = { Text(stringResource(R.string.rest_auto_advance)) },
+            text = { Text(stringResource(R.string.rest_auto_advance_explanation)) },
+            confirmButton = {
+                TextButton(onClick = { showInfo = false }) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun SetRestOverride(
+    seconds: Int?,
+    onSelect: (Int?) -> Unit
+) {
+    var open by remember { mutableStateOf(seconds != null) }
+    TextButton(
+        onClick = { open = !open },
+        modifier = Modifier.testTag("set_rest_override")
+    ) {
+        Text(
+            text = stringResource(
+                R.string.rest_set_override,
+                restChoiceLabel(seconds, includeDefault = true)
+            )
+        )
+    }
+    if (open) {
+        RestChoiceRow(
+            label = stringResource(R.string.rest_set_override_label),
+            selected = seconds,
+            includeDefault = true,
+            onSelect = onSelect
+        )
+    }
+}
+
+@Composable
+private fun RestChoiceRow(
+    label: String,
+    selected: Int?,
+    includeDefault: Boolean,
+    onSelect: (Int?) -> Unit
+) {
+    val custom = selected != null && selected != 0 && selected !in RestDuration.PRESETS_SECONDS
+    var customText by remember(selected) {
+        mutableStateOf(if (custom) selected.toString() else "")
+    }
+    Column {
+        Text(text = label, style = MaterialTheme.typography.labelLarge)
+        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (includeDefault) {
+                FilterChip(
+                    selected = selected == null,
+                    onClick = { onSelect(null) },
+                    label = { Text(stringResource(R.string.rest_default)) }
+                )
+            }
+            FilterChip(
+                selected = if (includeDefault) selected == 0 else selected == null,
+                onClick = { onSelect(if (includeDefault) 0 else null) },
+                label = { Text(stringResource(R.string.rest_off)) },
+                modifier = Modifier.testTag("rest_off")
+            )
+            RestDuration.PRESETS_SECONDS.forEach { seconds ->
+                FilterChip(
+                    selected = selected == seconds,
+                    onClick = { onSelect(seconds) },
+                    label = { Text(stringResource(R.string.rest_seconds, seconds)) },
+                    modifier = Modifier.testTag("rest_preset_$seconds")
+                )
+            }
+            FilterChip(
+                selected = custom,
+                onClick = {
+                    val parsed = customText.toIntOrNull()
+                    if (parsed != null && parsed > 0) onSelect(parsed.coerceAtMost(RestDuration.MAX_SECONDS))
+                },
+                label = { Text(stringResource(R.string.rest_custom)) },
+                modifier = Modifier.testTag("rest_custom")
+            )
+        }
+        if (custom || customText.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = customText,
+                onValueChange = { raw ->
+                    val digits = raw.filter { it.isDigit() }.take(4)
+                    customText = digits
+                    val parsed = digits.toIntOrNull()
+                    if (parsed != null && parsed > 0) {
+                        onSelect(parsed.coerceAtMost(RestDuration.MAX_SECONDS))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.rest_custom_seconds)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+        }
+    }
+}
+
+@Composable
+private fun restChoiceLabel(seconds: Int?, includeDefault: Boolean): String {
+    return when {
+        seconds == null && includeDefault -> stringResource(R.string.rest_default)
+        seconds == null || seconds == 0 -> stringResource(R.string.rest_off)
+        else -> stringResource(R.string.rest_seconds, seconds)
     }
 }

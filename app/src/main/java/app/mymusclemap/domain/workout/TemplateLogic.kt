@@ -182,13 +182,13 @@ object PlannedSetLogic {
             if (index <= fromIndex) {
                 set
             } else {
-                source.copy(localId = set.localId)
+                source.copy(localId = set.localId, restSeconds = set.restSeconds)
             }
         }
     }
 
     fun applyToAll(sets: List<PlannedSetDraft>, source: PlannedSetDraft): List<PlannedSetDraft> {
-        return sets.map { set -> source.copy(localId = set.localId) }
+        return sets.map { set -> source.copy(localId = set.localId, restSeconds = set.restSeconds) }
     }
 
     fun copyPrevious(sets: List<PlannedSetDraft>, newLocalId: Long): List<PlannedSetDraft> {
@@ -456,5 +456,5 @@ fun WorkoutTemplateSet.toSetDraft(localId: Long): PlannedSetDraft {
             durationSeconds = durationSeconds,
             distanceMeters = distanceMeters
         )
-    )
+    ).copy(restSeconds = restSeconds)
 }

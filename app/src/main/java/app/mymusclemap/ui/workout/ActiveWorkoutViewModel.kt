@@ -18,6 +18,13 @@ import app.mymusclemap.domain.workout.InWorkoutExerciseHistory
 import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
+import app.mymusclemap.domain.workout.RestClockSample
+import app.mymusclemap.domain.workout.RestExpiryResult
+import app.mymusclemap.domain.workout.RestPhase
+import app.mymusclemap.domain.workout.RestRemaining
+import app.mymusclemap.domain.workout.RestTimerLogic
+import app.mymusclemap.domain.workout.restNextSet
+import app.mymusclemap.domain.workout.toRestSnapshot
 import app.mymusclemap.domain.workout.SessionFocusLogic
 import app.mymusclemap.domain.workout.SessionMutationResult
 import app.mymusclemap.domain.workout.SessionProgress
@@ -55,6 +62,16 @@ data class WorkoutFocusEvent(
     val target: WorkoutFocusTarget
 )
 
+data class RestTimerUi(
+    val phase: RestPhase,
+    val countdown: String,
+    val progress: Float,
+    val nextExerciseName: String,
+    val nextSetNumber: Int,
+    val nextSetCount: Int,
+    val awaitingNext: Boolean
+)
+
 data class ActiveWorkoutUiState(
     val loading: Boolean = true,
     val missing: Boolean = false,
@@ -80,7 +97,8 @@ data class ActiveWorkoutUiState(
     val finishing: Boolean = false,
     val completionSummary: WorkoutCompletionSummary? = null,
     val exerciseHistory: InWorkoutExerciseHistory = InWorkoutExerciseHistory.Loading,
-    val catalog: List<Exercise> = emptyList()
+    val catalog: List<Exercise> = emptyList(),
+    val rest: RestTimerUi? = null
 ) {
     val progress: SessionProgress
         get() = aggregate?.let(SessionProgressLogic::fromAggregate) ?: SessionProgress(0, 0, 0, 0)
@@ -110,7 +128,14 @@ class ActiveWorkoutViewModel(
     private val clock: Clock = Clock.systemUTC(),
     private val observeCatalog: Flow<List<Exercise>> = flowOf(emptyList()),
     private val loadExerciseHistory: suspend (WorkoutSessionAggregate, SessionExercise) -> ExerciseHistorySelection? =
-        { aggregate, exercise -> sessionRepository.loadPreviousExerciseHistory(aggregate, exercise) }
+        { aggregate, exercise -> sessionRepository.loadPreviousExerciseHistory(aggregate, exercise) },
+    private val restClock: () -> RestClockSample = {
+        RestClockSample(
+            elapsedRealtimeMillis = android.os.SystemClock.elapsedRealtime(),
+            wallClockMillis = clock.millis()
+        )
+    },
+    private val restEffects: RestTimerEffects = RestTimerEffects.None
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(SESSION_ID) ?: -1L
     private val selectedIndex = savedStateHandle.getStateFlow(SELECTED_INDEX, 0)
@@ -119,6 +144,7 @@ class ActiveWorkoutViewModel(
     private val completingIds = MutableStateFlow<Set<Long>>(emptySet())
     private val setErrors = MutableStateFlow<Map<Long, List<TemplateFieldError>>>(emptyMap())
     private val nowMillis = MutableStateFlow(clock.millis())
+    private val elapsedRealtime = MutableStateFlow(restClock().elapsedRealtimeMillis)
     private val pendingFinishCount = MutableStateFlow<Int?>(null)
     private val confirmAbandon = MutableStateFlow(false)
     private val finished = MutableStateFlow(false)
@@ -144,9 +170,14 @@ class ActiveWorkoutViewModel(
     private val locallyResolving = mutableSetOf<Long>()
     private var statusesInitialized = false
     private var knownStatuses = emptyMap<Long, SessionSetStatus>()
+    private var latestAggregate: WorkoutSessionAggregate? = null
+    private var expiryJob: Job? = null
+    private var expiryGeneration: Long? = null
+    private var scheduledRest: Pair<Long, Long>? = null
 
     private data class Dialogs(
         val now: Long,
+        val elapsedRealtime: Long,
         val pendingFinish: Int?,
         val confirmAbandon: Boolean,
         val finished: Boolean,
@@ -194,15 +225,24 @@ class ActiveWorkoutViewModel(
             )
         },
         combine(
-            nowMillis,
+            combine(nowMillis, elapsedRealtime) { wall, elapsed -> wall to elapsed },
             pendingFinishCount,
             confirmAbandon,
             finished,
             combine(abandoned, discarding, finishing) { left, discardingNow, finishingNow ->
                 Triple(left, discardingNow, finishingNow)
             }
-        ) { now, pending, abandon, done, triple ->
-            Dialogs(now, pending, abandon, done, triple.first, triple.second, triple.third)
+        ) { clock, pending, abandon, done, triple ->
+            Dialogs(
+                clock.first,
+                clock.second,
+                pending,
+                abandon,
+                done,
+                triple.first,
+                triple.second,
+                triple.third
+            )
         },
         combine(focusEvent, focusedSetId, expandedIds) { focus, focused, expanded ->
             FocusChrome(focus, focused, expanded)
@@ -240,7 +280,11 @@ class ActiveWorkoutViewModel(
             aggregate = aggregate,
             selectedIndex = bounded,
             currentExerciseId = SessionFocusLogic.currentPendingExercise(aggregate)?.exercise?.id,
-            currentSetId = SessionFocusLogic.currentPendingSet(aggregate)?.id,
+            currentSetId = if (aggregate.session.restPhase != null) {
+                null
+            } else {
+                SessionFocusLogic.currentPendingSet(aggregate)?.id
+            },
             drafts = mergeDrafts(aggregate, signals.drafts, signals.dirty),
             dirtySetIds = signals.dirty,
             completingSetIds = signals.completing,
@@ -257,7 +301,8 @@ class ActiveWorkoutViewModel(
             expandedExerciseIds = chrome.expanded,
             editingSetIds = signals.editingSetIds,
             finishing = dialogs.finishing,
-            completionSummary = signals.completionSummary
+            completionSummary = signals.completionSummary,
+            rest = restUi(aggregate, dialogs.elapsedRealtime, dialogs.now)
         )
     }.stateIn(
         scope = viewModelScope,
@@ -310,9 +355,12 @@ class ActiveWorkoutViewModel(
                 }
             }
         }
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch {
             while (isActive) {
-                nowMillis.value = clock.millis()
+                val sample = restClock()
+                nowMillis.value = sample.wallClockMillis
+                elapsedRealtime.value = sample.elapsedRealtimeMillis
+                considerExpiry()
                 delay(1_000)
             }
         }
@@ -335,7 +383,10 @@ class ActiveWorkoutViewModel(
         }
         viewModelScope.launch {
             sessionRepository.observeAggregate(sessionId).collect { aggregate ->
+                latestAggregate = aggregate
+                syncRestAlarm(aggregate)
                 if (aggregate != null) {
+                    considerExpiry()
                     reconcileAuthoritativeSets(aggregate)
                 }
             }
@@ -361,6 +412,7 @@ class ActiveWorkoutViewModel(
 
     fun selectExercise(index: Int) {
         val max = uiState.value.aggregate?.exercises?.lastIndex ?: return
+        dismissRest()
         savedStateHandle[SELECTED_INDEX] = index.coerceIn(0, max)
     }
 
@@ -454,7 +506,12 @@ class ActiveWorkoutViewModel(
                         dirtyIds.value = dirtyIds.value - setId
                         setErrors.value = setErrors.value - setId
                         if (currentStatus == SessionSetStatus.PENDING) {
-                            advanceAfterResolved(setId)
+                            val resting = sessionRepository.getAggregate(sessionId)?.session
+                            val started = resting?.restPhase == RestPhase.COUNTING &&
+                                resting.restOriginSetId == setId
+                            if (!started) {
+                                advanceAfterResolved(setId)
+                            }
                         } else {
                             locallyResolving.remove(setId)
                             if (currentStatus == SessionSetStatus.COMPLETED) {
@@ -785,6 +842,103 @@ class ActiveWorkoutViewModel(
         focusedSetId.value = pending.id
         val exerciseId = aggregate.exercises.getOrNull(index)?.exercise?.id ?: return
         emitFocus(WorkoutFocusTarget.Set(pending.id, exerciseId))
+    }
+
+    fun addRestTenSeconds() {
+        val generation = uiState.value.aggregate?.session?.restGeneration ?: return
+        viewModelScope.launch {
+            sessionRepository.extendRest(sessionId, generation)
+        }
+    }
+
+    fun skipRest() {
+        val generation = uiState.value.aggregate?.session?.restGeneration ?: return
+        viewModelScope.launch {
+            val origin = sessionRepository.skipRest(sessionId, generation) ?: return@launch
+            advanceAfterResolved(origin)
+        }
+    }
+
+    fun continueAfterRest() {
+        val generation = uiState.value.aggregate?.session?.restGeneration ?: return
+        viewModelScope.launch {
+            val origin = sessionRepository.acknowledgeRest(sessionId, generation) ?: return@launch
+            advanceAfterResolved(origin)
+        }
+    }
+
+    private fun dismissRest() {
+        val session = uiState.value.aggregate?.session ?: return
+        if (session.restPhase == null) return
+        val generation = session.restGeneration
+        viewModelScope.launch {
+            sessionRepository.clearRest(sessionId, generation)
+        }
+    }
+
+    private fun syncRestAlarm(aggregate: WorkoutSessionAggregate?) {
+        val session = aggregate?.session
+        if (session?.restPhase == RestPhase.COUNTING) {
+            val key = session.restGeneration to (session.restDeadlineWallClockMillis ?: 0L)
+            if (scheduledRest != key) {
+                scheduledRest = key
+                val next = aggregate.restNextSet()
+                restEffects.schedule(
+                    sessionId = sessionId,
+                    deadlineWallClockMillis = key.second,
+                    generation = key.first,
+                    nextLabel = next?.let { "${it.exerciseName} ${it.setNumber}/${it.setCount}" }.orEmpty()
+                )
+            }
+        } else if (scheduledRest != null) {
+            scheduledRest = null
+            restEffects.cancel(sessionId)
+        }
+    }
+
+    private fun considerExpiry() {
+        val session = latestAggregate?.session ?: return
+        if (session.restPhase != RestPhase.COUNTING) return
+        val sample = restClock()
+        if (RestTimerLogic.remaining(session.toRestSnapshot(), sample) !is RestRemaining.Expired) return
+        val generation = session.restGeneration
+        if (expiryJob?.isActive == true && expiryGeneration == generation) return
+        expiryGeneration = generation
+        expiryJob = viewModelScope.launch {
+            when (val result = sessionRepository.expireRest(sessionId, generation)) {
+                is RestExpiryResult.Advanced -> {
+                    restEffects.onRestFinished()
+                    advanceAfterResolved(result.originSetId)
+                }
+                RestExpiryResult.Waiting -> restEffects.onRestFinished()
+                RestExpiryResult.Ignored -> {
+                    if (expiryGeneration == generation) expiryGeneration = null
+                }
+            }
+        }
+    }
+
+    private fun restUi(
+        aggregate: WorkoutSessionAggregate,
+        elapsedRealtimeMillis: Long,
+        wallClockMillis: Long
+    ): RestTimerUi? {
+        val phase = aggregate.session.restPhase ?: return null
+        val next = aggregate.restNextSet()
+        val remaining = RestTimerLogic.remaining(
+            aggregate.session.toRestSnapshot(),
+            RestClockSample(elapsedRealtimeMillis, wallClockMillis)
+        )
+        val active = remaining as? RestRemaining.Active
+        return RestTimerUi(
+            phase = phase,
+            countdown = RestTimerLogic.formatCountdown(active?.remainingMillis ?: 0L),
+            progress = RestTimerLogic.progress(remaining),
+            nextExerciseName = next?.exerciseName.orEmpty(),
+            nextSetNumber = next?.setNumber ?: 0,
+            nextSetCount = next?.setCount ?: 0,
+            awaitingNext = phase == RestPhase.AWAITING_NEXT
+        )
     }
 
     private fun advanceAfterResolved(setId: Long) {

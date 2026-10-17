@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -49,6 +50,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -246,7 +248,10 @@ fun ActiveWorkoutScreen(
     onFinished: (WorkoutCompletionSummary) -> Unit,
     onAbandoned: () -> Unit,
     onMessageConsumed: () -> Unit,
-    onFocusConsumed: () -> Unit
+    onFocusConsumed: () -> Unit,
+    onAddRest: () -> Unit = {},
+    onSkipRest: () -> Unit = {},
+    onContinueAfterRest: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -410,6 +415,14 @@ fun ActiveWorkoutScreen(
                 return@Column
             }
             WorkoutProgressHeader(state = state)
+            state.rest?.let { rest ->
+                RestTimerCard(
+                    rest = rest,
+                    onAddRest = onAddRest,
+                    onSkipRest = onSkipRest,
+                    onContinueAfterRest = onContinueAfterRest
+                )
+            }
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -783,6 +796,91 @@ private fun WorkoutProgressHeader(state: ActiveWorkoutUiState) {
         }
         Spacer(Modifier.height(AppDimens.headerStackGap))
         ThinProgressBar(fraction = state.progress.fraction)
+    }
+}
+
+@Composable
+private fun RestTimerCard(
+    rest: RestTimerUi,
+    onAddRest: () -> Unit,
+    onSkipRest: () -> Unit,
+    onContinueAfterRest: () -> Unit
+) {
+    val accent = StrictBrand.restAccent()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppDimens.screenPadding)
+            .padding(bottom = AppDimens.itemGap)
+            .testTag("rest_timer")
+    ) {
+        Text(
+            text = stringResource(
+                if (rest.awaitingNext) R.string.rest_complete else R.string.rest_status
+            ),
+            style = AppTypeTokens.statCaption,
+            color = accent
+        )
+        if (!rest.awaitingNext) {
+            Text(
+                text = rest.countdown,
+                style = AppTypeTokens.statHero,
+                color = accent
+            )
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            LinearProgressIndicator(
+                progress = { rest.progress },
+                modifier = Modifier.fillMaxWidth(),
+                color = accent,
+                trackColor = accent.copy(alpha = 0.24f)
+            )
+            Spacer(Modifier.height(AppDimens.itemGap))
+            Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+                OutlinedButton(
+                    onClick = onAddRest,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("rest_add_ten")
+                ) {
+                    Text(stringResource(R.string.rest_add_ten))
+                }
+                OutlinedButton(
+                    onClick = onSkipRest,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("rest_skip")
+                ) {
+                    Text(stringResource(R.string.rest_skip))
+                }
+            }
+        } else {
+            Spacer(Modifier.height(AppDimens.itemGap))
+            Button(
+                onClick = onContinueAfterRest,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("rest_next"),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accent,
+                    contentColor = MaterialTheme.colorScheme.background
+                )
+            ) {
+                Text(stringResource(R.string.rest_next_set))
+            }
+        }
+        if (rest.nextExerciseName.isNotEmpty()) {
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            Text(
+                text = stringResource(
+                    R.string.rest_next,
+                    rest.nextExerciseName,
+                    rest.nextSetNumber,
+                    rest.nextSetCount
+                ),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 

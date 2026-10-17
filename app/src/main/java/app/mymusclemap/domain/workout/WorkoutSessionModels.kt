@@ -30,7 +30,16 @@ data class WorkoutSession(
      * True after this completed workout's approved plan update was committed.
      * A later visit must not apply that workout's progression again.
      */
-    val planProgressionApplied: Boolean = false
+    val planProgressionApplied: Boolean = false,
+    val restProgressionMode: RestProgressionMode = RestProgressionMode.STRICT,
+    val restPhase: RestPhase? = null,
+    val restOriginSetId: Long? = null,
+    val restNextSetId: Long? = null,
+    val restAnchorElapsedRealtimeMillis: Long? = null,
+    val restDeadlineElapsedRealtimeMillis: Long? = null,
+    val restDeadlineWallClockMillis: Long? = null,
+    val restDurationMillis: Long? = null,
+    val restGeneration: Long = 0L
 )
 
 data class SessionExercise(
@@ -56,7 +65,8 @@ data class SessionExercise(
      * from before that id was stored. Do not infer one.
      */
     val addedDuringWorkout: Boolean = false,
-    val sourceTemplateExerciseId: Long? = null
+    val sourceTemplateExerciseId: Long? = null,
+    val restSeconds: Int? = null
 )
 
 data class SessionSet(
@@ -79,7 +89,9 @@ data class SessionSet(
     val addedDuringWorkout: Boolean,
     val draft: ActualSetDraft? = null,
     /** Plan-set row copied at start. Null when this set has no reliable plan source. */
-    val sourceTemplateSetId: Long? = null
+    val sourceTemplateSetId: Long? = null,
+    /** Null inherits the exercise rest. Zero disables rest. A positive value is seconds. */
+    val restSeconds: Int? = null
 )
 
 data class SessionExerciseItem(

@@ -1,8 +1,12 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.data.local.ExerciseEntity
 import app.mymusclemap.data.local.ExerciseMuscleEntity
 import app.mymusclemap.data.local.WeightMeasurementEntity
 import app.mymusclemap.data.local.WorkoutSessionEntity
+import app.mymusclemap.data.local.WorkoutTemplateEntity
+import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
+import app.mymusclemap.data.local.WorkoutTemplateSetEntity
 import app.mymusclemap.domain.theme.AppearanceCodec
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.workout.BodyWeightSource
@@ -34,6 +38,89 @@ class AppBackupJsonTest {
         assertEquals(snapshot.source, parsed.snapshot.source)
         assertEquals(snapshot.tables, parsed.snapshot.tables)
         assertEquals(snapshot.settings, parsed.snapshot.settings)
+    }
+
+    @Test
+    fun restConfigurationRoundTripsAndLegacyFilesStayOff() {
+        val snapshot = emptySnapshot().copy(
+            schemaVersion = AppBackupFormat.ARCHIVE_REST_SCHEMA_VERSION,
+            tables = emptyTables().copy(
+                exercises = listOf(
+                    ExerciseEntity(
+                        id = 3L,
+                        name = "Dip",
+                        normalizedName = "dip",
+                        category = "STRENGTH",
+                        movementPattern = "VERTICAL_PUSH",
+                        measurementType = "REPETITIONS",
+                        resistanceBasis = "BODYWEIGHT",
+                        weightInterpretation = "NOT_APPLICABLE",
+                        notes = null,
+                        archived = false,
+                        createdAt = 1L,
+                        updatedAt = 1L
+                    )
+                ),
+                exerciseMuscles = listOf(ExerciseMuscleEntity(3L, "TRICEPS", "PRIMARY")),
+                workoutTemplates = listOf(
+                    WorkoutTemplateEntity(
+                        id = 1L,
+                        name = "Push",
+                        normalizedName = "push",
+                        notes = null,
+                        archived = false,
+                        createdAt = 1L,
+                        updatedAt = 1L,
+                        restProgressionMode = "FLEXIBLE"
+                    )
+                ),
+                workoutTemplateExercises = listOf(
+                    WorkoutTemplateExerciseEntity(
+                        id = 2L,
+                        templateId = 1L,
+                        exerciseId = 3L,
+                        position = 0,
+                        notes = null,
+                        createdAt = 1L,
+                        restSeconds = 90
+                    )
+                ),
+                workoutTemplateSets = listOf(
+                    WorkoutTemplateSetEntity(
+                        id = 4L,
+                        templateExerciseId = 2L,
+                        position = 0,
+                        minReps = 8,
+                        maxReps = 8,
+                        loadKind = "NONE",
+                        weightKg = null,
+                        durationSeconds = null,
+                        distanceMeters = null,
+                        restSeconds = 0
+                    )
+                )
+            )
+        )
+        val parsed = AppBackupJson.parse(
+            AppBackupJson.encode(snapshot),
+            maxSchemaVersion = AppBackupFormat.ARCHIVE_REST_SCHEMA_VERSION
+        ) as AppBackupParseResult.Success
+        assertEquals("FLEXIBLE", parsed.snapshot.tables.workoutTemplates.single().restProgressionMode)
+        assertEquals(90, parsed.snapshot.tables.workoutTemplateExercises.single().restSeconds)
+        assertEquals(0, parsed.snapshot.tables.workoutTemplateSets.single().restSeconds)
+
+        val legacy = JSONObject(AppBackupJson.encode(snapshot))
+        legacy.put("schemaVersion", AppBackupFormat.SCHEMA_VERSION)
+        legacy.getJSONObject("tables").getJSONArray("workout_templates").getJSONObject(0)
+            .remove("restProgressionMode")
+        legacy.getJSONObject("tables").getJSONArray("workout_template_exercises").getJSONObject(0)
+            .remove("restSeconds")
+        legacy.getJSONObject("tables").getJSONArray("workout_template_sets").getJSONObject(0)
+            .remove("restSeconds")
+        val old = AppBackupJson.parse(legacy.toString()) as AppBackupParseResult.Success
+        assertEquals("STRICT", old.snapshot.tables.workoutTemplates.single().restProgressionMode)
+        assertNull(old.snapshot.tables.workoutTemplateExercises.single().restSeconds)
+        assertNull(old.snapshot.tables.workoutTemplateSets.single().restSeconds)
     }
 
     @Test

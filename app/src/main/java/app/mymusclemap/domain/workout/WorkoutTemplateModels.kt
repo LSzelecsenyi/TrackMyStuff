@@ -11,7 +11,8 @@ data class WorkoutTemplate(
     val notes: String?,
     val archived: Boolean,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val restProgressionMode: RestProgressionMode = RestProgressionMode.STRICT
 )
 
 data class WorkoutTemplateExercise(
@@ -20,7 +21,8 @@ data class WorkoutTemplateExercise(
     val exerciseId: Long,
     val position: Int,
     val notes: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    val restSeconds: Int? = null
 )
 
 data class WorkoutTemplateSet(
@@ -32,7 +34,8 @@ data class WorkoutTemplateSet(
     val loadKind: PlannedLoadKind,
     val weightKg: Double?,
     val durationSeconds: Int?,
-    val distanceMeters: Double?
+    val distanceMeters: Double?,
+    val restSeconds: Int? = null
 )
 
 data class WorkoutTemplateAggregate(
@@ -71,7 +74,8 @@ data class TemplateDraft(
     val notes: String = "",
     val createdAt: Long? = null,
     val exercises: List<TemplateExerciseDraft> = emptyList(),
-    val baselineUpdatedAt: Long? = null
+    val baselineUpdatedAt: Long? = null,
+    val restProgressionMode: RestProgressionMode = RestProgressionMode.STRICT
 )
 
 data class TemplateExerciseDraft(
@@ -79,7 +83,8 @@ data class TemplateExerciseDraft(
     val exerciseId: Long,
     val notes: String = "",
     val sets: List<PlannedSetDraft> = emptyList(),
-    val expanded: Boolean = true
+    val expanded: Boolean = true,
+    val restSeconds: Int? = null
 )
 
 data class PlannedSetDraft(
@@ -91,7 +96,8 @@ data class PlannedSetDraft(
     val minutesText: String = "0",
     val secondsText: String = "0",
     val distanceText: String = "",
-    val distanceUnit: DistanceUnit = DistanceUnit.METERS
+    val distanceUnit: DistanceUnit = DistanceUnit.METERS,
+    val restSeconds: Int? = null
 )
 
 data class PlannedSetValues(

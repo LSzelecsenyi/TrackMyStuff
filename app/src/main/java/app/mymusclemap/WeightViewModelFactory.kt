@@ -11,6 +11,7 @@ import app.mymusclemap.data.founder.FounderProgramCoordinator
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgementStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
+import app.mymusclemap.data.preferences.TimerSoundStore
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AchievementRepository
 import app.mymusclemap.data.repository.AppBackupRepository
@@ -51,6 +52,7 @@ import app.mymusclemap.ui.statistics.StatisticsViewModel
 import app.mymusclemap.ui.templates.TemplateEditorViewModel
 import app.mymusclemap.ui.templates.TemplateListViewModel
 import app.mymusclemap.ui.workout.ActiveWorkoutViewModel
+import app.mymusclemap.ui.workout.AndroidRestTimerEffects
 import app.mymusclemap.ui.workout.WorkoutCompletionViewModel
 import app.mymusclemap.ui.workout.WorkoutHubViewModel
 import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
@@ -79,6 +81,7 @@ class WeightViewModelFactory(
     private val founderMilestoneAcknowledgements: FounderMilestoneAcknowledgementStore? = null,
     private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open,
     private val lockScreenSetCompletion: LockScreenSetCompletionStore = LockScreenSetCompletionStore.Off,
+    private val timerSounds: TimerSoundStore = TimerSoundStore.On,
     private val founderJoin: suspend () -> FounderJoinResult = { FounderJoinResult.Rejected },
     private val founderSessionRevision: Flow<Int> = flowOf(0),
     private val founderSessionPresent: () -> Boolean = { true },
@@ -137,7 +140,8 @@ class WeightViewModelFactory(
                     dateProvider,
                     appBackupRepository,
                     weeklyGoalRepository,
-                    lockScreenSetCompletion = lockScreenSetCompletion
+                    lockScreenSetCompletion = lockScreenSetCompletion,
+                    timerSounds = timerSounds
                 )
             }
             modelClass.isAssignableFrom(OnboardingViewModel::class.java) -> {
@@ -178,10 +182,13 @@ class WeightViewModelFactory(
                 )
             }
             modelClass.isAssignableFrom(ActiveWorkoutViewModel::class.java) -> {
+                val application = extras[APPLICATION_KEY]
+                    ?: throw IllegalStateException("Application is required")
                 ActiveWorkoutViewModel(
                     extras.createSavedStateHandle(),
                     workoutSessionRepository,
-                    observeCatalog = exerciseRepository.observeActive()
+                    observeCatalog = exerciseRepository.observeActive(),
+                    restEffects = AndroidRestTimerEffects(application)
                 )
             }
             modelClass.isAssignableFrom(WorkoutDetailViewModel::class.java) -> {

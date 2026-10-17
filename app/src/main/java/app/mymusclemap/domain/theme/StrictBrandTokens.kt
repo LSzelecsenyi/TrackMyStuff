@@ -13,6 +13,8 @@ object StrictBrandTokens {
     const val LIME = 0xFFE2FD6D.toInt()
     const val DARK = 0xFF0C121C.toInt()
     const val LIGHT = 0xFFF4F7FB.toInt()
+    const val REST_PURPLE_DARK = 0xFFC9A6FF.toInt()
+    const val REST_PURPLE_LIGHT = 0xFF6D28D9.toInt()
 
     fun ink(isDark: Boolean): Int = if (isDark) LIME else BLUE
 
@@ -40,6 +42,14 @@ object StrictBrandTokens {
      * Prominent summary result. Default Strict dark uses lime; default Strict
      * light uses readable blue ink. Custom palettes keep their own primary.
      */
+    fun restAccent(background: Int, primary: Int, tertiary: Int): Int {
+        return if (usesStrictPalette(background, primary)) {
+            if (background == DARK) REST_PURPLE_DARK else REST_PURPLE_LIGHT
+        } else {
+            tertiary
+        }
+    }
+
     fun result(background: Int, primary: Int): Int {
         return if (usesStrictPalette(background, primary)) {
             ink(isDark = background == DARK)

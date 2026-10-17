@@ -99,7 +99,18 @@ data class WorkoutSessionEntity(
     val clientWorkoutId: String = java.util.UUID.randomUUID().toString(),
     /** Set in the same transaction as an approved plan update from this workout. */
     @ColumnInfo(defaultValue = "0")
-    val planProgressionApplied: Boolean = false
+    val planProgressionApplied: Boolean = false,
+    @ColumnInfo(defaultValue = "STRICT")
+    val restProgressionMode: String = "STRICT",
+    val restPhase: String? = null,
+    val restOriginSetId: Long? = null,
+    val restNextSetId: Long? = null,
+    val restAnchorElapsedRealtimeMillis: Long? = null,
+    val restDeadlineElapsedRealtimeMillis: Long? = null,
+    val restDeadlineWallClockMillis: Long? = null,
+    val restDurationMillis: Long? = null,
+    @ColumnInfo(defaultValue = "0")
+    val restGeneration: Long = 0L
 )
 
 @Entity(
@@ -151,7 +162,8 @@ data class WorkoutSessionExerciseEntity(
      */
     @ColumnInfo(defaultValue = "0")
     val addedDuringWorkout: Boolean = false,
-    val sourceTemplateExerciseId: Long? = null
+    val sourceTemplateExerciseId: Long? = null,
+    val restSeconds: Int? = null
 )
 
 @Entity(
@@ -214,5 +226,6 @@ data class WorkoutSessionSetEntity(
     val addedDuringWorkout: Boolean,
     val draftPayload: String? = null,
     /** Plan-set row copied at start. Null when this set has no reliable plan source. */
-    val sourceTemplateSetId: Long? = null
+    val sourceTemplateSetId: Long? = null,
+    val restSeconds: Int? = null
 )

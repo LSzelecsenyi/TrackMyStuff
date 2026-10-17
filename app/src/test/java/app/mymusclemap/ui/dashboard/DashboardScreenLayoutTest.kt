@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -741,8 +742,8 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun collapsedWeekFitsWithSummaryAndHeatmapOnAShortPhone() {
-        assertCollapsedCalendarFits(width = 360.dp, viewportHeight = 696.dp)
+    fun collapsedWeekScrollsFullyIntoViewWithSummaryAndHeatmapOnAShortPhone() {
+        assertCollapsedCalendarIsReachableByScrolling(width = 360.dp, viewportHeight = 696.dp)
     }
 
     @Test
@@ -751,12 +752,87 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun collapsedWeekFitsWhenTheHeatmapIsEmptyOnAShortPhone() {
-        assertCollapsedCalendarFits(
+    fun collapsedWeekScrollsFullyIntoViewWhenTheHeatmapIsEmptyOnAShortPhone() {
+        assertCollapsedCalendarIsReachableByScrolling(
             width = 360.dp,
             viewportHeight = 696.dp,
             heatmap = MuscleHeatmapAssembler.assemble(emptyList(), today)
         )
+    }
+
+    private fun assertCollapsedCalendarIsReachableByScrolling(
+        width: Dp,
+        viewportHeight: Dp,
+        heatmap: MuscleHeatmapState = MuscleHeatmapAssembler.assemble(
+            listOf(
+                MuscleTrainingExercise(
+                    status = SessionStatus.COMPLETED,
+                    workoutDate = today,
+                    primaryMuscle = MuscleGroup.CHEST,
+                    secondaryMuscles = emptyList(),
+                    completedSetCount = 3
+                )
+            ),
+            today
+        )
+    ) {
+        val selected = AtomicReference<LocalDate?>(null)
+        render(
+            width = width,
+            viewportHeight = viewportHeight,
+            heatmap = heatmap,
+            onDaySelected = { selected.set(it) }
+        )
+        val summary = composeRule.onNodeWithTag("dashboard_weekly_overview")
+        summary.assertIsDisplayed()
+        val summaryBounds = summary.getUnclippedBoundsInRoot()
+        val legendBounds = composeRule.onNodeWithTag("heatmap_legend").getUnclippedBoundsInRoot()
+        val calendarBounds = composeRule.onNodeWithTag("dashboard_calendar").getUnclippedBoundsInRoot()
+        assertTrue(summaryBounds.bottom < legendBounds.top)
+        assertTrue(legendBounds.bottom < calendarBounds.top)
+
+        val legend = composeRule.onNodeWithTag("heatmap_legend").performScrollTo()
+        legend.assertIsDisplayed()
+        assertFullyInsideViewport(legend, viewportHeight, "heatmap legend")
+
+        val calendar = composeRule.onNodeWithTag("dashboard_calendar").performScrollTo()
+        composeRule.waitForIdle()
+        calendar.assertIsDisplayed()
+        assertFullyInsideViewport(calendar, viewportHeight, "calendar")
+        composeRule.onNodeWithTag("calendar-week-row").assertIsDisplayed()
+        composeRule.onNode(hasContentDescription("March 11, 2026", substring = true))
+            .assertIsDisplayed()
+            .performClick()
+        assertEquals(today, selected.get())
+
+        summary.performScrollTo().assertIsDisplayed()
+    }
+
+    private fun assertFullyInsideViewport(
+        node: SemanticsNodeInteraction,
+        viewportHeight: Dp,
+        label: String
+    ) {
+        val unclipped = node.getUnclippedBoundsInRoot()
+        val clipped = node.getBoundsInRoot()
+        assertEquals(
+            "$label stays clipped after scrolling: unclipped=$unclipped clipped=$clipped",
+            unclipped.bottom.value,
+            clipped.bottom.value,
+            1.5f
+        )
+        assertEquals(
+            "$label top stays clipped after scrolling: unclipped=$unclipped clipped=$clipped",
+            unclipped.top.value,
+            clipped.top.value,
+            1.5f
+        )
+        assertTrue("$label top ${unclipped.top} is outside the viewport", unclipped.top >= 0.dp)
+        assertTrue(
+            "$label bottom ${unclipped.bottom} exceeds $viewportHeight",
+            unclipped.bottom <= viewportHeight + 1.dp
+        )
+        assertTrue("$label has no height", unclipped.bottom - unclipped.top > 1.dp)
     }
 
     private fun assertCollapsedCalendarFits(

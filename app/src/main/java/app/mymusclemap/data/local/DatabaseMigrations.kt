@@ -778,6 +778,53 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
     }
 }
 
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE `workout_templates` ADD COLUMN `restProgressionMode` TEXT NOT NULL DEFAULT 'STRICT'"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_template_exercises` ADD COLUMN `restSeconds` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_template_sets` ADD COLUMN `restSeconds` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restProgressionMode` TEXT NOT NULL DEFAULT 'STRICT'"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restPhase` TEXT"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restOriginSetId` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restNextSetId` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restAnchorElapsedRealtimeMillis` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restDeadlineElapsedRealtimeMillis` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restDeadlineWallClockMillis` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restDurationMillis` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `restGeneration` INTEGER NOT NULL DEFAULT 0"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_session_exercises` ADD COLUMN `restSeconds` INTEGER"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_session_sets` ADD COLUMN `restSeconds` INTEGER"
+        )
+    }
+}
+
 val MIGRATION_13_14 = object : Migration(13, 14) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

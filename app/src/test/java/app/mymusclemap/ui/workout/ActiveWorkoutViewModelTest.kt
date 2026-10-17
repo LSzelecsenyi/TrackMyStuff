@@ -5,13 +5,16 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import app.mymusclemap.MainDispatcherRule
+import app.mymusclemap.ConfinedMainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.FixedDateProvider
+import app.mymusclemap.domain.workout.RestClockSample
+import app.mymusclemap.domain.workout.RestPhase
+import app.mymusclemap.domain.workout.RestProgressionMode
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.ExerciseDraft
 import app.mymusclemap.domain.exercise.ExerciseSaveResult
@@ -44,9 +47,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,7 +70,7 @@ import java.time.ZoneOffset
 @RunWith(RobolectricTestRunner::class)
 class ActiveWorkoutViewModelTest {
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRule()
+    val mainDispatcherRule = ConfinedMainDispatcherRule()
 
     private lateinit var database: WeightDatabase
     private lateinit var exercises: ExerciseRepository
@@ -74,6 +79,8 @@ class ActiveWorkoutViewModelTest {
     private val viewModelStore = ViewModelStore()
     private var viewModelKey = 0
     private val today = LocalDate.parse("2026-09-16")
+    private val restElapsed = java.util.concurrent.atomic.AtomicLong(60_000L)
+    private val restWall = java.util.concurrent.atomic.AtomicLong(1_700_000_000_000L)
 
     @Before
     fun setUp() {
@@ -107,14 +114,18 @@ class ActiveWorkoutViewModelTest {
     @After
     fun tearDown() {
         viewModelStore.clear()
-        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        runBlocking {
+            withContext(Dispatchers.Default) {
+                withContext(Dispatchers.Main) { }
+            }
+        }
         database.close()
     }
 
     private var sessionId = 0L
 
     @Test
-    fun keszPersistsEditedValuesAndCompletesWithoutSecondSave() = runTest {
+    fun keszPersistsEditedValuesAndCompletesWithoutSecondSave() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         val exerciseId = viewModel.loaded().aggregate!!.exercises[0].exercise.id
@@ -142,7 +153,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun plusIncreasesRepsByOneInDraft() = runTest {
+    fun plusIncreasesRepsByOneInDraft() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         viewModel.stepReps(first.id, 1)
@@ -153,7 +164,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun minusDecreasesRepsByOneInDraft() = runTest {
+    fun minusDecreasesRepsByOneInDraft() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         viewModel.stepReps(first.id, -1)
@@ -164,7 +175,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun minusAtMinimumKeepsValidCompletedReps() = runTest {
+    fun minusAtMinimumKeepsValidCompletedReps() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         viewModel.onReps(first.id, "1")
@@ -184,7 +195,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun plusOnEmptyRepsUsesMinimumValidValue() = runTest {
+    fun plusOnEmptyRepsUsesMinimumValidValue() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         viewModel.onReps(first.id, "")
@@ -197,7 +208,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun steppedRepsPersistThroughExistingCompleteFlow() = runTest {
+    fun steppedRepsPersistThroughExistingCompleteFlow() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         val next = viewModel.loaded().aggregate!!.exercises[0].sets[1]
@@ -215,7 +226,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun completeSetSavesCompletedWithoutImeAction() = runTest {
+    fun completeSetSavesCompletedWithoutImeAction() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         val next = viewModel.loaded().aggregate!!.exercises[0].sets[1]
@@ -234,7 +245,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun skipDoesNotRequireImeAndAdvancesWithoutFinishingWorkout() = runTest {
+    fun skipDoesNotRequireImeAndAdvancesWithoutFinishingWorkout() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         val next = viewModel.loaded().aggregate!!.exercises[0].sets[1]
@@ -251,7 +262,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun invalidValuesDoNotComplete() = runTest {
+    fun invalidValuesDoNotComplete() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         viewModel.onReps(first.id, "0")
@@ -266,7 +277,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun doubleTapDoesNotDuplicateCompletion() = runTest {
+    fun doubleTapDoesNotDuplicateCompletion() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         viewModel.onReps(first.id, "6")
@@ -286,7 +297,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun lastSetOfExerciseMovesHighlightToNextPendingExercise() = runTest {
+    fun lastSetOfExerciseMovesHighlightToNextPendingExercise() = runOnMain {
         val viewModel = startTwoExercises()
         val loaded = viewModel.loaded().aggregate!!
         val firstExerciseId = loaded.exercises[0].exercise.id
@@ -316,7 +327,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun skippedExerciseIsBypassed() = runTest {
+    fun skippedExerciseIsBypassed() = runOnMain {
         val viewModel = startTwoExercises()
         val loaded = viewModel.loaded().aggregate!!
         loaded.exercises[1].sets.forEach { set ->
@@ -349,7 +360,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun finalPendingSetFocusesFinishAndClearsHighlight() = runTest {
+    fun finalPendingSetFocusesFinishAndClearsHighlight() = runOnMain {
         val viewModel = startSingleSet()
         val set = viewModel.loaded().aggregate!!.exercises[0].sets.single()
         viewModel.completeSet(set.id)
@@ -373,7 +384,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun skipAdvancesToNextPendingSetInSameExercise() = runTest {
+    fun skipAdvancesToNextPendingSetInSameExercise() = runOnMain {
         val viewModel = startTwoExercises()
         val loaded = viewModel.loaded().aggregate!!
         val first = loaded.exercises[0].sets[0]
@@ -398,7 +409,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun repositoryErrorKeepsCurrentSetActive() = runTest {
+    fun repositoryErrorKeepsCurrentSetActive() = runOnMain {
         val viewModel = startSingleSet()
         val set = viewModel.loaded().aggregate!!.exercises[0].sets.single()
         viewModel.confirmFinish(true)
@@ -416,7 +427,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun successfulFinishExposesCompletionSummaryOnce() = runTest {
+    fun successfulFinishExposesCompletionSummaryOnce() = runOnMain {
         val viewModel = startSingleSet()
         val set = viewModel.loaded().aggregate!!.exercises[0].sets.single()
         viewModel.onReps(set.id, "8")
@@ -442,7 +453,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun failedFinishDoesNotExposeCompletionSummary() = runTest {
+    fun failedFinishDoesNotExposeCompletionSummary() = runOnMain {
         val viewModel = startTwoExercises()
         viewModel.loaded()
         viewModel.confirmFinish(false)
@@ -456,7 +467,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun restoredViewModelReopensCompletionWithoutFinishingAgain() = runTest {
+    fun restoredViewModelReopensCompletionWithoutFinishingAgain() = runOnMain {
         val viewModel = startSingleSet()
         viewModel.loaded()
         viewModel.confirmFinish(true)
@@ -473,7 +484,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun confirmAbandonDeletesSessionWithoutAbandonedJournalEntry() = runTest {
+    fun confirmAbandonDeletesSessionWithoutAbandonedJournalEntry() = runOnMain {
         val viewModel = startSingleSet()
         viewModel.loaded()
         viewModel.confirmAbandon()
@@ -485,7 +496,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun dismissAbandonLeavesActiveSessionUnchanged() = runTest {
+    fun dismissAbandonLeavesActiveSessionUnchanged() = runOnMain {
         val viewModel = startSingleSet()
         viewModel.loaded()
         viewModel.requestAbandon()
@@ -498,7 +509,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun doubleConfirmAbandonDoesNotRestartDelete() = runTest {
+    fun doubleConfirmAbandonDoesNotRestartDelete() = runOnMain {
         val viewModel = startSingleSet()
         viewModel.loaded()
         viewModel.confirmAbandon()
@@ -509,7 +520,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun consumeFocusEventDoesNotReplay() = runTest {
+    fun consumeFocusEventDoesNotReplay() = runOnMain {
         val viewModel = startSingleSet()
         val set = viewModel.loaded().aggregate!!.exercises[0].sets.single()
         viewModel.completeSet(set.id)
@@ -521,13 +532,11 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun debouncedEditsKeepTheNewestDraft() = runTest {
+    fun debouncedEditsKeepTheNewestDraft() = runOnMain {
         val viewModel = startSingleSet()
         val setId = viewModel.loaded().aggregate!!.exercises.single().sets.single().id
         viewModel.onReps(setId, "6")
         viewModel.onReps(setId, "11")
-        mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
-        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
         val payload = awaitDraft(setId)
         assertTrue(payload.contains("\"reps\":\"11\""))
         assertFalse(payload.contains("\"reps\":\"6\""))
@@ -536,7 +545,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun flushBeforeStopPersistsTheNewestDraftForNotificationCompletion() = runTest {
+    fun flushBeforeStopPersistsTheNewestDraftForNotificationCompletion() = runOnMain {
         val viewModel = startSingleSet()
         val setId = viewModel.loaded().aggregate!!.exercises.single().sets.single().id
         viewModel.onReps(setId, "11")
@@ -548,8 +557,7 @@ class ActiveWorkoutViewModelTest {
             sessions.completeCurrentPendingSetFromNotification(sessionId, setId)
         )
         assertEquals(11, sessions.getAggregate(sessionId)!!.exercises.single().sets.single().actualReps)
-        mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
-        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        mainDispatcherRule.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
         val row = database.workoutSessionDao().getSet(setId)!!
         assertEquals(SessionSetStatus.COMPLETED.name, row.status)
         assertNull(row.draftPayload)
@@ -557,7 +565,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun externalCompletionClearsDirtyStateAndFocusesTheNextSet() = runTest {
+    fun externalCompletionClearsDirtyStateAndFocusesTheNextSet() = runOnMain {
         val viewModel = startTwoExercises()
         val loaded = viewModel.loaded()
         val exerciseId = loaded.aggregate!!.exercises[0].exercise.id
@@ -581,18 +589,18 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun inAppCompletionEmitsOneFocusEvent() = runTest {
+    fun inAppCompletionEmitsOneFocusEvent() = runOnMain {
         val viewModel = startTwoExercises()
         val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
         viewModel.completeSet(first.id)
         val state = awaitReal { viewModel.uiState.first { it.focusEvent != null } }
         assertEquals(1L, state.focusEvent!!.generation)
-        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        mainDispatcherRule.advanceUntilIdle()
         assertEquals(1L, viewModel.uiState.value.focusEvent?.generation)
     }
 
     @Test
-    fun editingRepsDoesNotReloadOrCopyPreviousHistory() = runTest {
+    fun editingRepsDoesNotReloadOrCopyPreviousHistory() = runOnMain {
         val pull = savePull()
         val templateId = saveTemplate(
             "Push A",
@@ -617,8 +625,6 @@ class ActiveWorkoutViewModelTest {
         val setId = loaded.aggregate!!.exercises.single().sets.single().id
         assertEquals(1, viewModel.historyLoadCount)
         viewModel.onReps(setId, "11")
-        mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
-        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
         awaitReal { awaitDraft(setId) }
         awaitReal { delay(150) }
         val state = viewModel.uiState.value
@@ -630,7 +636,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun lateHistoryForThePreviousExerciseIsIgnored() = runTest {
+    fun lateHistoryForThePreviousExerciseIsIgnored() = runOnMain {
         val pull = savePull()
         val dip = saveDip()
         val templateId = saveTemplate("Push A", listOf(pull to twoSets(), dip to twoSets()))
@@ -685,7 +691,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun completingDuringAPendingDraftWriteDoesNotRestoreTheDraft() = runTest {
+    fun completingDuringAPendingDraftWriteDoesNotRestoreTheDraft() = runOnMain {
         val viewModel = startSingleSet()
         val setId = viewModel.loaded().aggregate!!.exercises.single().sets.single().id
         viewModel.onReps(setId, "9")
@@ -693,8 +699,7 @@ class ActiveWorkoutViewModelTest {
         viewModel.uiState.first {
             it.aggregate?.exercises?.single()?.sets?.single()?.status == SessionSetStatus.COMPLETED
         }
-        mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
-        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        mainDispatcherRule.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
         val row = database.workoutSessionDao().getSet(setId)!!
         assertEquals(SessionSetStatus.COMPLETED.name, row.status)
         assertNull(row.draftPayload)
@@ -702,7 +707,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun reopeningACompletedSetExpandsOnlyThatSet() = runTest {
+    fun reopeningACompletedSetExpandsOnlyThatSet() = runOnMain {
         val viewModel = startPullSets(4)
         val sets = viewModel.loaded().aggregate!!.exercises.single().sets
         sets.take(3).forEach { viewModel.finishPending(it.id) }
@@ -731,7 +736,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun savingAnEditedCompletedSetCollapsesItAndKeepsTheActiveSet() = runTest {
+    fun savingAnEditedCompletedSetCollapsesItAndKeepsTheActiveSet() = runOnMain {
         val viewModel = startPullSets(4)
         val exerciseId = viewModel.loaded().aggregate!!.exercises.single().exercise.id
         val sets = viewModel.uiState.value.aggregate!!.exercises.single().sets
@@ -793,7 +798,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun failedEditOfACompletedSetKeepsTheEditorAndUnsavedValues() = runTest {
+    fun failedEditOfACompletedSetKeepsTheEditorAndUnsavedValues() = runOnMain {
         val viewModel = startPullSets(4)
         val sets = viewModel.loaded().aggregate!!.exercises.single().sets
         sets.take(3).forEach { viewModel.finishPending(it.id) }
@@ -827,7 +832,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun completingAPendingSetStillCollapsesItAndAdvances() = runTest {
+    fun completingAPendingSetStillCollapsesItAndAdvances() = runOnMain {
         val viewModel = startPullSets(2)
         val sets = viewModel.loaded().aggregate!!.exercises.single().sets
         val first = sets[0]
@@ -865,18 +870,18 @@ class ActiveWorkoutViewModelTest {
     }
 
     private suspend fun awaitDraft(setId: Long): String {
+        mainDispatcherRule.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
         lateinit var payload: String
         withContext(Dispatchers.Default.limitedParallelism(1)) {
             withTimeout(5_000) {
                 while (true) {
-                    mainDispatcherRule.dispatcher.scheduler.advanceTimeBy(ActiveWorkoutViewModel.DRAFT_PERSIST_DELAY_MS)
-                    mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+                    withContext(Dispatchers.Main) { }
                     val stored = database.workoutSessionDao().getSet(setId)?.draftPayload
                     if (stored != null) {
                         payload = stored
                         return@withTimeout
                     }
-                    kotlinx.coroutines.delay(20)
+                    yield()
                 }
             }
         }
@@ -884,7 +889,184 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun extraExerciseBeforeThePlanIsDoneDoesNotStealTheCurrentSet() = runTest {
+    fun completingASetStartsInheritedRestWithoutAdvancingOrCompletingTheNextSet() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 60)
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        val second = viewModel.loaded().aggregate!!.exercises[0].sets[1]
+        viewModel.completeSet(first.id)
+        val resting = awaitReal {
+            viewModel.uiState.first { it.rest?.phase == RestPhase.COUNTING }
+        }
+        assertEquals("01:00", resting.rest!!.countdown)
+        assertNull(resting.focusEvent)
+        assertNull(resting.currentSetId)
+        assertEquals(SessionSetStatus.PENDING, resting.aggregate!!.exercises[0].sets[1].status)
+        assertEquals(second.id, resting.aggregate!!.session.restNextSetId)
+        assertEquals(RestProgressionMode.STRICT, resting.aggregate!!.session.restProgressionMode)
+    }
+
+    @Test
+    fun strictExpirySelectsTheNextSetOnceAndDoesNotCompleteIt() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 60)
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.completeSet(sets[0].id)
+        awaitReal { viewModel.uiState.first { it.rest?.phase == RestPhase.COUNTING } }
+        restElapsed.addAndGet(60_000L)
+        restWall.addAndGet(60_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        val next = awaitReal {
+            viewModel.uiState.first { it.rest == null && it.focusedSetId == sets[1].id }
+        }
+        assertEquals(sets[1].id, next.currentSetId)
+        assertEquals(SessionSetStatus.PENDING, next.aggregate!!.exercises[0].sets[1].status)
+        restElapsed.addAndGet(60_000L)
+        restWall.addAndGet(60_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        val still = viewModel.uiState.value
+        assertEquals(sets[1].id, still.focusedSetId)
+        assertEquals(SessionSetStatus.PENDING, still.aggregate!!.exercises[0].sets[1].status)
+    }
+
+    @Test
+    fun flexibleExpiryWaitsForNextSet() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 45, mode = RestProgressionMode.FLEXIBLE)
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.completeSet(sets[0].id)
+        awaitReal { viewModel.uiState.first { it.rest?.phase == RestPhase.COUNTING } }
+        restElapsed.addAndGet(45_000L)
+        restWall.addAndGet(45_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        val waiting = awaitReal {
+            viewModel.uiState.first { it.rest?.awaitingNext == true }
+        }
+        assertNull(waiting.focusEvent)
+        assertEquals(SessionSetStatus.PENDING, waiting.aggregate!!.exercises[0].sets[1].status)
+        viewModel.continueAfterRest()
+        val moved = awaitReal { viewModel.uiState.first { it.focusedSetId == sets[1].id && it.rest == null } }
+        assertEquals(SessionSetStatus.PENDING, moved.aggregate!!.exercises[0].sets[1].status)
+    }
+
+    @Test
+    fun skipRestAdvancesInStrictModeWithoutCompletingTheNextSet() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 30)
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.completeSet(sets[0].id)
+        awaitReal { viewModel.uiState.first { it.rest != null } }
+        viewModel.skipRest()
+        val next = awaitReal { viewModel.uiState.first { it.focusedSetId == sets[1].id && it.rest == null } }
+        assertEquals(SessionSetStatus.PENDING, next.aggregate!!.exercises[0].sets[1].status)
+    }
+
+    @Test
+    fun skipRestAdvancesInFlexibleModeWithoutCompletingTheNextSet() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 30, mode = RestProgressionMode.FLEXIBLE)
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.completeSet(sets[0].id)
+        awaitReal { viewModel.uiState.first { it.rest != null } }
+        viewModel.skipRest()
+        val next = awaitReal { viewModel.uiState.first { it.focusedSetId == sets[1].id && it.rest == null } }
+        assertEquals(SessionSetStatus.PENDING, next.aggregate!!.exercises[0].sets[1].status)
+    }
+
+    @Test
+    fun addingTenSecondsExtendsTheCurrentIntervalWithoutChangingThePlan() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 60)
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.completeSet(first.id)
+        awaitReal { viewModel.uiState.first { it.rest?.countdown == "01:00" } }
+        viewModel.addRestTenSeconds()
+        awaitReal { viewModel.uiState.first { it.rest?.countdown == "01:10" } }
+        viewModel.addRestTenSeconds()
+        val extended = awaitReal { viewModel.uiState.first { it.rest?.countdown == "01:20" } }
+        assertEquals(60, extended.aggregate!!.exercises[0].exercise.restSeconds)
+        assertEquals(80_000L, extended.aggregate!!.session.restDurationMillis)
+    }
+
+    @Test
+    fun theFinalSetDoesNotStartRest() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 60, setCount = 1)
+        val only = viewModel.loaded().aggregate!!.exercises[0].sets.single()
+        viewModel.completeSet(only.id)
+        val done = awaitReal { viewModel.uiState.first { only.id !in it.completingSetIds && it.aggregate != null } }
+        assertNull(done.rest)
+        assertEquals(SessionSetStatus.COMPLETED, done.aggregate!!.exercises[0].sets.single().status)
+    }
+
+    @Test
+    fun anExplicitOffSetDoesNotStartRest() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 60, setRest = listOf(0, null))
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.completeSet(sets[0].id)
+        val advanced = awaitReal { viewModel.uiState.first { it.focusedSetId == sets[1].id } }
+        assertNull(advanced.rest)
+        assertEquals(SessionSetStatus.PENDING, advanced.aggregate!!.exercises[0].sets[1].status)
+    }
+
+    @Test
+    fun manualExerciseSelectionCancelsRestAndAStaleExpiryDoesNotMoveBack() = runOnMain {
+        val pull = savePull()
+        val dip = saveDip()
+        useRestClock()
+        val templateId = saveTemplate(
+            "Both",
+            listOf(pull to twoSets(), dip to twoSets()),
+            exerciseRest = 90
+        )
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        val viewModel = active(started.sessionId, restClock = ::restSample)
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.completeSet(first.id)
+        awaitReal { viewModel.uiState.first { it.rest?.phase == RestPhase.COUNTING } }
+        viewModel.selectExercise(1)
+        val cancelled = awaitReal { viewModel.uiState.first { it.rest == null && it.selectedIndex == 1 } }
+        assertEquals(1, cancelled.selectedIndex)
+        restElapsed.addAndGet(90_000L)
+        restWall.addAndGet(90_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        assertEquals(1, viewModel.uiState.value.selectedIndex)
+        assertNull(viewModel.uiState.value.rest)
+    }
+
+    @Test
+    fun abandonClearsRest() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 30)
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.completeSet(first.id)
+        awaitReal { viewModel.uiState.first { it.rest != null } }
+        viewModel.requestAbandon()
+        viewModel.confirmAbandon()
+        val left = awaitReal { viewModel.uiState.first { it.abandoned && it.rest == null } }
+        assertNull(sessions.getAggregate(sessionId))
+    }
+
+    @Test
+    fun aNewViewModelResumesTheStoredDeadlineAndARebootUsesTheWallClock() = runOnMain {
+        val viewModel = startRestWorkout(exerciseRest = 60)
+        val first = viewModel.loaded().aggregate!!.exercises[0].sets[0]
+        viewModel.completeSet(first.id)
+        awaitReal { viewModel.uiState.first { it.rest?.countdown == "01:00" } }
+        restElapsed.addAndGet(20_000L)
+        restWall.addAndGet(20_000L)
+        val resumed = active(sessionId, restClock = ::restSample)
+        val recovered = awaitReal { resumed.uiState.first { it.rest?.countdown == "00:40" } }
+        assertEquals(RestPhase.COUNTING, recovered.rest!!.phase)
+        val anchor = recovered.aggregate!!.session.restAnchorElapsedRealtimeMillis!!
+        restElapsed.set(anchor - 10_000L)
+        restWall.addAndGet(15_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        val afterReboot = awaitReal { resumed.uiState.first { it.rest?.countdown == "00:25" } }
+        assertEquals(RestPhase.COUNTING, afterReboot.rest!!.phase)
+    }
+
+    private fun runOnMain(block: suspend () -> Unit) = runTest {
+        withContext(Dispatchers.Main) {
+            block()
+        }
+    }
+
+    @Test
+    fun extraExerciseBeforeThePlanIsDoneDoesNotStealTheCurrentSet() = runOnMain {
         val dip = saveDip()
         val viewModel = startSingleSet()
         val initial = viewModel.loaded()
@@ -905,7 +1087,7 @@ class ActiveWorkoutViewModelTest {
     }
 
     @Test
-    fun extraExerciseReopensAFinishedPlanUntilItsOwnSetsAreDone() = runTest {
+    fun extraExerciseReopensAFinishedPlanUntilItsOwnSetsAreDone() = runOnMain {
         val dip = saveDip()
         val viewModel = startSingleSet()
         val initial = viewModel.loaded()
@@ -967,18 +1149,31 @@ class ActiveWorkoutViewModelTest {
 
     private fun active(
         sessionId: Long,
+        restClock: (() -> RestClockSample)? = null,
         loadExerciseHistory: (suspend (WorkoutSessionAggregate, SessionExercise) -> ExerciseHistorySelection?)? = null
     ): ActiveWorkoutViewModel {
         val viewModel = if (loadExerciseHistory == null) {
             ActiveWorkoutViewModel(
                 SavedStateHandle(mapOf(ActiveWorkoutViewModel.SESSION_ID to sessionId)),
-                sessions
+                sessions,
+                restClock = restClock ?: {
+                    RestClockSample(
+                        elapsedRealtimeMillis = android.os.SystemClock.elapsedRealtime(),
+                        wallClockMillis = java.time.Clock.systemUTC().millis()
+                    )
+                }
             )
         } else {
             ActiveWorkoutViewModel(
                 SavedStateHandle(mapOf(ActiveWorkoutViewModel.SESSION_ID to sessionId)),
                 sessions,
-                loadExerciseHistory = loadExerciseHistory
+                loadExerciseHistory = loadExerciseHistory,
+                restClock = restClock ?: {
+                    RestClockSample(
+                        elapsedRealtimeMillis = android.os.SystemClock.elapsedRealtime(),
+                        wallClockMillis = java.time.Clock.systemUTC().millis()
+                    )
+                }
             )
         }
         viewModelStore.put("active-${viewModelKey++}", viewModel)
@@ -1104,18 +1299,62 @@ class ActiveWorkoutViewModelTest {
 
     private suspend fun saveTemplate(
         name: String,
-        items: List<Pair<Long, List<PlannedSetDraft>>>
+        items: List<Pair<Long, List<PlannedSetDraft>>>,
+        exerciseRest: Int? = null,
+        mode: RestProgressionMode = RestProgressionMode.STRICT
     ): Long {
         val draft = TemplateDraft(
             name = name,
+            restProgressionMode = mode,
             exercises = items.mapIndexed { index, item ->
                 TemplateExerciseDraft(
                     localId = -(index + 1L),
                     exerciseId = item.first,
-                    sets = item.second
+                    sets = item.second,
+                    restSeconds = exerciseRest
                 )
             }
         )
         return (templates.save(draft) as TemplateSaveResult.Created).id
+    }
+
+    private fun restSample(): RestClockSample {
+        return RestClockSample(restElapsed.get(), restWall.get())
+    }
+
+    private fun useRestClock() {
+        val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
+        sessions = WorkoutSessionRepository(
+            database.workoutSessionDao(),
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            WeightRepository(database.weightMeasurementDao(), clock),
+            clock,
+            FixedDateProvider(today),
+            restClock = ::restSample
+        )
+    }
+
+    private suspend fun startRestWorkout(
+        exerciseRest: Int?,
+        setCount: Int = 2,
+        setRest: List<Int?> = emptyList(),
+        mode: RestProgressionMode = RestProgressionMode.STRICT,
+        name: String = "Push A"
+    ): ActiveWorkoutViewModel {
+        val pull = savePull()
+        useRestClock()
+        val planned = List(setCount) { index ->
+            PlannedSetDraft(
+                localId = -(index + 1L),
+                minRepsText = "8",
+                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
+                restSeconds = setRest.getOrNull(index)
+            )
+        }
+        val templateId = saveTemplate(name, listOf(pull to planned), exerciseRest, mode)
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        return active(started.sessionId, restClock = ::restSample)
     }
 }

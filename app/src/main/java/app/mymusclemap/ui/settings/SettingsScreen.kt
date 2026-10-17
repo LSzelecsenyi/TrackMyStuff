@@ -197,6 +197,7 @@ fun SettingsScreen(
     lockScreenSetCompletion: Boolean = false,
     lockScreenAccessNote: LockScreenAccessNote? = null,
     onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
+    onTimerSoundsChange: (Boolean) -> Unit = {},
     onOpenLockScreenAccessSettings: () -> Unit = {},
     lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
     onConfirmLockScreenEnable: () -> Unit = {},
@@ -310,7 +311,9 @@ fun SettingsScreen(
                     lockScreenSetCompletion = lockScreenSetCompletion,
                     lockScreenAccessNote = lockScreenAccessNote,
                     onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
-                    onOpenLockScreenAccessSettings = onOpenLockScreenAccessSettings
+                    onOpenLockScreenAccessSettings = onOpenLockScreenAccessSettings,
+                    timerSounds = state.timerSoundsEnabled,
+                    onTimerSoundsChange = onTimerSoundsChange
                 )
                 CompactEditorDivider()
                 HealthConnectSettingsSection(
@@ -942,7 +945,9 @@ private fun TrainingSection(
     lockScreenSetCompletion: Boolean,
     lockScreenAccessNote: LockScreenAccessNote?,
     onLockScreenSetCompletionChange: (Boolean) -> Unit,
-    onOpenLockScreenAccessSettings: () -> Unit
+    onOpenLockScreenAccessSettings: () -> Unit,
+    timerSounds: Boolean,
+    onTimerSoundsChange: (Boolean) -> Unit
 ) {
     val subtitle = when (val pending = state.weeklyGoal.pending) {
         is PendingWeeklyGoal.Update -> stringResource(
@@ -967,6 +972,45 @@ private fun TrainingSection(
             note = lockScreenAccessNote,
             onCheckedChange = onLockScreenSetCompletionChange,
             onOpenSettings = onOpenLockScreenAccessSettings
+        )
+        TimerSoundsRow(
+            enabled = timerSounds,
+            onCheckedChange = onTimerSoundsChange
+        )
+    }
+}
+
+@Composable
+private fun TimerSoundsRow(
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag("settings_timer_sounds"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = AppDimens.itemGap)
+        ) {
+            Text(
+                text = stringResource(R.string.settings_timer_sounds_title),
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = stringResource(R.string.settings_timer_sounds_body),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onCheckedChange
         )
     }
 }

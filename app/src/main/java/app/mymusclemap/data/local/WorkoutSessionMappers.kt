@@ -4,6 +4,8 @@ import app.mymusclemap.domain.exercise.ExerciseEnumCodec
 import app.mymusclemap.domain.exercise.MuscleRole
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.PlannedLoadKind
+import app.mymusclemap.domain.workout.RestPhase
+import app.mymusclemap.domain.workout.RestProgressionMode
 import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionSetStatus
@@ -32,7 +34,16 @@ fun WorkoutSessionEntity.toModel(): WorkoutSession {
         importFingerprint = importFingerprint,
         scheduledWorkoutId = scheduledWorkoutId,
         clientWorkoutId = clientWorkoutId,
-        planProgressionApplied = planProgressionApplied
+        planProgressionApplied = planProgressionApplied,
+        restProgressionMode = RestProgressionMode.fromStored(restProgressionMode),
+        restPhase = RestPhase.fromStored(restPhase),
+        restOriginSetId = restOriginSetId,
+        restNextSetId = restNextSetId,
+        restAnchorElapsedRealtimeMillis = restAnchorElapsedRealtimeMillis,
+        restDeadlineElapsedRealtimeMillis = restDeadlineElapsedRealtimeMillis,
+        restDeadlineWallClockMillis = restDeadlineWallClockMillis,
+        restDurationMillis = restDurationMillis,
+        restGeneration = restGeneration
     )
 }
 
@@ -58,7 +69,8 @@ fun WorkoutSessionExerciseEntity.toModel(
         secondaryMuscles = secondary,
         notes = notes,
         addedDuringWorkout = addedDuringWorkout,
-        sourceTemplateExerciseId = sourceTemplateExerciseId
+        sourceTemplateExerciseId = sourceTemplateExerciseId,
+        restSeconds = restSeconds
     )
 }
 
@@ -83,7 +95,8 @@ fun WorkoutSessionSetEntity.toModel(): SessionSet {
         completedAt = completedAt,
         addedDuringWorkout = addedDuringWorkout,
         draft = SetDraftCodec.decode(draftPayload),
-        sourceTemplateSetId = sourceTemplateSetId
+        sourceTemplateSetId = sourceTemplateSetId,
+        restSeconds = restSeconds
     )
 }
 

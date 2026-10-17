@@ -1273,6 +1273,9 @@ fun WeightTrackerNavHost(
                     onSeconds = viewModel::onSeconds,
                     onDistance = viewModel::onDistance,
                     onDistanceUnit = viewModel::onDistanceUnit,
+                    onRestMode = viewModel::onRestMode,
+                    onExerciseRest = viewModel::onExerciseRest,
+                    onSetRest = viewModel::onSetRest,
                     onSave = viewModel::save,
                     onReload = viewModel::reload,
                     onDismissDiscard = viewModel::dismissDiscard,
@@ -1344,7 +1347,10 @@ fun WeightTrackerNavHost(
                         workoutHubViewModel.showAbandoned()
                         navController.popBackStack()
                     },
-                    onMessageConsumed = viewModel::consumeMessage
+                    onMessageConsumed = viewModel::consumeMessage,
+                    onAddRest = viewModel::addRestTenSeconds,
+                    onSkipRest = viewModel::skipRest,
+                    onContinueAfterRest = viewModel::continueAfterRest
                 )
             }
             composable(AppRoutes.ACHIEVEMENTS) {
@@ -1811,6 +1817,7 @@ private fun SettingsRoute(
         onDisableWeeklyGoal = viewModel::disableWeeklyGoal,
         onBack = onBack,
         lockScreenSetCompletion = state.lockScreenSetCompletionEnabled,
+        onTimerSoundsChange = viewModel::setTimerSounds,
         lockScreenAccessNote = lockScreenAccessNote,
         onLockScreenSetCompletionChange = { enabled ->
             if (!enabled) {

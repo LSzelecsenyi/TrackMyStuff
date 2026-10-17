@@ -21,6 +21,8 @@ import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
 import app.mymusclemap.domain.workout.PlannedSetLogic
+import app.mymusclemap.domain.workout.RestDuration
+import app.mymusclemap.domain.workout.RestProgressionMode
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateDraftLogic
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
@@ -385,6 +387,38 @@ class TemplateEditorViewModel(
         )
     }
 
+    fun onRestMode(enabled: Boolean) = updateDraft { current ->
+        current.copy(
+            restProgressionMode = if (enabled) {
+                RestProgressionMode.STRICT
+            } else {
+                RestProgressionMode.FLEXIBLE
+            }
+        )
+    }
+
+    fun onExerciseRest(exerciseLocalId: Long, seconds: Int?) = updateDraft { current ->
+        current.copy(
+            exercises = current.exercises.map { item ->
+                if (item.localId == exerciseLocalId) {
+                    item.copy(restSeconds = seconds?.takeIf { it > 0 }?.coerceAtMost(RestDuration.MAX_SECONDS))
+                } else {
+                    item
+                }
+            }
+        )
+    }
+
+    fun onSetRest(exerciseLocalId: Long, setLocalId: Long, seconds: Int?) {
+        updateSet(exerciseLocalId, setLocalId) { set ->
+            set.copy(
+                restSeconds = seconds?.let { value ->
+                    if (value <= 0) 0 else value.coerceAtMost(RestDuration.MAX_SECONDS)
+                }
+            )
+        }
+    }
+
     fun onMinReps(exerciseLocalId: Long, setLocalId: Long, value: String) {
         updateSet(exerciseLocalId, setLocalId) { it.copy(minRepsText = value) }
     }
@@ -508,11 +542,13 @@ class TemplateEditorViewModel(
             notes = aggregate.template.notes.orEmpty(),
             createdAt = aggregate.template.createdAt,
             baselineUpdatedAt = aggregate.template.updatedAt,
+            restProgressionMode = aggregate.template.restProgressionMode,
             exercises = aggregate.exercises.map { item ->
                 TemplateExerciseDraft(
                     localId = item.relation.id,
                     exerciseId = item.exercise.id,
                     notes = item.relation.notes.orEmpty(),
+                    restSeconds = item.relation.restSeconds,
                     sets = item.sets.map { set -> set.toSetDraft(set.id) }
                 )
             }
@@ -525,6 +561,7 @@ class TemplateEditorViewModel(
         return TemplateNaming.displayName(draft.value.name) !=
             TemplateNaming.displayName(original.value.name) ||
             draft.value.notes.trim() != original.value.notes.trim() ||
+            draft.value.restProgressionMode != original.value.restProgressionMode ||
             draft.value.exercises != original.value.exercises
     }
 

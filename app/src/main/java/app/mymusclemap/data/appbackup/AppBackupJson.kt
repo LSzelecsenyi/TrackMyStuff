@@ -152,6 +152,11 @@ object AppBackupJson {
                             .put("archived", row.archived)
                             .put("createdAt", row.createdAt)
                             .put("updatedAt", row.updatedAt)
+                            .apply {
+                                if (row.restProgressionMode != "STRICT") {
+                                    put("restProgressionMode", row.restProgressionMode)
+                                }
+                            }
                     )
                 }
             }
@@ -168,6 +173,9 @@ object AppBackupJson {
                             .put("position", row.position)
                             .put("notes", nullable(row.notes))
                             .put("createdAt", row.createdAt)
+                            .apply {
+                                if (row.restSeconds != null) put("restSeconds", row.restSeconds)
+                            }
                     )
                 }
             }
@@ -187,6 +195,9 @@ object AppBackupJson {
                             .put("weightKg", nullable(row.weightKg))
                             .put("durationSeconds", nullable(row.durationSeconds))
                             .put("distanceMeters", nullable(row.distanceMeters))
+                            .apply {
+                                if (row.restSeconds != null) put("restSeconds", row.restSeconds)
+                            }
                     )
                 }
             }
@@ -233,6 +244,25 @@ object AppBackupJson {
                             .put("scheduledWorkoutId", nullable(row.scheduledWorkoutId))
                             .put("clientWorkoutId", row.clientWorkoutId)
                             .put("planProgressionApplied", row.planProgressionApplied)
+                            .apply {
+                                if (row.restProgressionMode != "STRICT") {
+                                    put("restProgressionMode", row.restProgressionMode)
+                                }
+                                if (row.restPhase != null) put("restPhase", row.restPhase)
+                                if (row.restOriginSetId != null) put("restOriginSetId", row.restOriginSetId)
+                                if (row.restNextSetId != null) put("restNextSetId", row.restNextSetId)
+                                if (row.restAnchorElapsedRealtimeMillis != null) {
+                                    put("restAnchorElapsedRealtimeMillis", row.restAnchorElapsedRealtimeMillis)
+                                }
+                                if (row.restDeadlineElapsedRealtimeMillis != null) {
+                                    put("restDeadlineElapsedRealtimeMillis", row.restDeadlineElapsedRealtimeMillis)
+                                }
+                                if (row.restDeadlineWallClockMillis != null) {
+                                    put("restDeadlineWallClockMillis", row.restDeadlineWallClockMillis)
+                                }
+                                if (row.restDurationMillis != null) put("restDurationMillis", row.restDurationMillis)
+                                if (row.restGeneration != 0L) put("restGeneration", row.restGeneration)
+                            }
                     )
                 }
             }
@@ -257,6 +287,9 @@ object AppBackupJson {
                             .put("notes", nullable(row.notes))
                             .put("addedDuringWorkout", row.addedDuringWorkout)
                             .put("sourceTemplateExerciseId", nullable(row.sourceTemplateExerciseId))
+                            .apply {
+                                if (row.restSeconds != null) put("restSeconds", row.restSeconds)
+                            }
                     )
                 }
             }
@@ -305,6 +338,9 @@ object AppBackupJson {
                             .put("completedAt", nullable(row.completedAt))
                             .put("addedDuringWorkout", row.addedDuringWorkout)
                             .put("sourceTemplateSetId", nullable(row.sourceTemplateSetId))
+                            .apply {
+                                if (row.restSeconds != null) put("restSeconds", row.restSeconds)
+                            }
                     )
                 }
             }
@@ -904,7 +940,17 @@ object AppBackupJson {
         val archived = obj.requiredBoolean("archived", errors) ?: return null
         val createdAt = obj.requiredLong("createdAt", errors) ?: return null
         val updatedAt = obj.requiredLong("updatedAt", errors) ?: return null
-        return WorkoutTemplateEntity(id, name, normalizedName, notes, archived, createdAt, updatedAt)
+        val restProgressionMode = obj.optionalString("restProgressionMode") ?: "STRICT"
+        return WorkoutTemplateEntity(
+            id,
+            name,
+            normalizedName,
+            notes,
+            archived,
+            createdAt,
+            updatedAt,
+            restProgressionMode = restProgressionMode
+        )
     }
 
     private fun parseTemplateExercise(
@@ -917,7 +963,16 @@ object AppBackupJson {
         val position = obj.requiredInt("position", errors) ?: return null
         val notes = obj.optionalNullableString("notes", errors)
         val createdAt = obj.requiredLong("createdAt", errors) ?: return null
-        return WorkoutTemplateExerciseEntity(id, templateId, exerciseId, position, notes, createdAt)
+        val restSeconds = obj.optionalNullableInt("restSeconds", errors)
+        return WorkoutTemplateExerciseEntity(
+            id,
+            templateId,
+            exerciseId,
+            position,
+            notes,
+            createdAt,
+            restSeconds = restSeconds
+        )
     }
 
     private fun parseTemplateSet(
@@ -933,6 +988,7 @@ object AppBackupJson {
         val weightKg = obj.optionalNullableDouble("weightKg", errors)
         val durationSeconds = obj.optionalNullableInt("durationSeconds", errors)
         val distanceMeters = obj.optionalNullableDouble("distanceMeters", errors)
+        val restSeconds = obj.optionalNullableInt("restSeconds", errors)
         return WorkoutTemplateSetEntity(
             id,
             templateExerciseId,
@@ -942,7 +998,8 @@ object AppBackupJson {
             loadKind,
             weightKg,
             durationSeconds,
-            distanceMeters
+            distanceMeters,
+            restSeconds = restSeconds
         )
     }
 
@@ -1063,7 +1120,19 @@ object AppBackupJson {
             importFingerprint,
             scheduledWorkoutId,
             clientWorkoutId,
-            planProgressionApplied
+            planProgressionApplied,
+            restProgressionMode = obj.optionalString("restProgressionMode") ?: "STRICT",
+            restPhase = obj.optionalNullableString("restPhase", errors),
+            restOriginSetId = obj.optionalNullableId("restOriginSetId", errors),
+            restNextSetId = obj.optionalNullableId("restNextSetId", errors),
+            restAnchorElapsedRealtimeMillis = obj.optionalNullableLong("restAnchorElapsedRealtimeMillis", errors),
+            restDeadlineElapsedRealtimeMillis = obj.optionalNullableLong(
+                "restDeadlineElapsedRealtimeMillis",
+                errors
+            ),
+            restDeadlineWallClockMillis = obj.optionalNullableLong("restDeadlineWallClockMillis", errors),
+            restDurationMillis = obj.optionalNullableLong("restDurationMillis", errors),
+            restGeneration = obj.optionalNullableLong("restGeneration", errors) ?: 0L
         )
     }
 
@@ -1104,7 +1173,8 @@ object AppBackupJson {
             primaryMuscle,
             notes,
             addedDuringWorkout,
-            sourceTemplateExerciseId
+            sourceTemplateExerciseId,
+            restSeconds = obj.optionalNullableInt("restSeconds", errors)
         )
     }
 
@@ -1159,7 +1229,8 @@ object AppBackupJson {
             status,
             completedAt,
             addedDuringWorkout,
-            sourceTemplateSetId = sourceTemplateSetId
+            sourceTemplateSetId = sourceTemplateSetId,
+            restSeconds = obj.optionalNullableInt("restSeconds", errors)
         )
     }
 

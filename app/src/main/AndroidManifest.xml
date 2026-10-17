@@ -84,6 +84,9 @@
             android:name=".ui.workout.ActiveWorkoutSetReceiver"
             android:exported="false" />
         <receiver
+            android:name=".ui.workout.RestTimerAlarmReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".ui.widget.HeatmapDateChangeReceiver"
             android:exported="true">
             <intent-filter>

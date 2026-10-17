@@ -62,7 +62,7 @@ class AppBackupRepository(
         }
         val snapshot = AppBackupSnapshot(
             formatVersion = AppBackupFormat.FORMAT_VERSION,
-            schemaVersion = AppBackupFormat.ARCHIVE_PLAN_SOURCE_SCHEMA_VERSION,
+            schemaVersion = AppBackupFormat.ARCHIVE_REST_SCHEMA_VERSION,
             exportedAt = instantSource(),
             source = source,
             tables = loaded.copy(
