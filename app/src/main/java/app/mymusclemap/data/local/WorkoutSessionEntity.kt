@@ -47,7 +47,8 @@ data class PreviousExerciseSetRow(
     val actualLoadKind: String?,
     val actualWeightKg: Double?,
     val actualDurationSeconds: Int?,
-    val actualDistanceMeters: Double?
+    val actualDistanceMeters: Double?,
+    val timedWork: Boolean
 )
 
 @Entity(
@@ -110,7 +111,16 @@ data class WorkoutSessionEntity(
     val restDeadlineWallClockMillis: Long? = null,
     val restDurationMillis: Long? = null,
     @ColumnInfo(defaultValue = "0")
-    val restGeneration: Long = 0L
+    val restGeneration: Long = 0L,
+    val workPhase: String? = null,
+    val workSetId: Long? = null,
+    val workTargetMillis: Long? = null,
+    val workElapsedActiveMillis: Long? = null,
+    val workAnchorElapsedRealtimeMillis: Long? = null,
+    val workDeadlineElapsedRealtimeMillis: Long? = null,
+    val workDeadlineWallClockMillis: Long? = null,
+    @ColumnInfo(defaultValue = "0")
+    val workGeneration: Long = 0L
 )
 
 @Entity(
@@ -227,5 +237,7 @@ data class WorkoutSessionSetEntity(
     val draftPayload: String? = null,
     /** Plan-set row copied at start. Null when this set has no reliable plan source. */
     val sourceTemplateSetId: Long? = null,
-    val restSeconds: Int? = null
+    val restSeconds: Int? = null,
+    @ColumnInfo(defaultValue = "0")
+    val timedWork: Boolean = false
 )

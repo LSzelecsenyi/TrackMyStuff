@@ -13,6 +13,7 @@ import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.domain.theme.resolvedBuiltInAppearance
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -130,8 +131,27 @@ class ThemePreferences(context: Context) {
         }
     }
 
+    suspend fun persistResolvedAppearance() {
+        val preferences = dataStore.data.first()
+        val resolved = AppearanceCodec.decode(
+            themeMode = preferences[KEY_THEME],
+            paletteType = preferences[KEY_PALETTE_TYPE],
+            lightBackground = preferences[KEY_LIGHT_BACKGROUND],
+            lightPrimary = preferences[KEY_LIGHT_PRIMARY],
+            lightSecondary = preferences[KEY_LIGHT_SECONDARY],
+            lightTertiary = preferences[KEY_LIGHT_TERTIARY],
+            darkBackground = preferences[KEY_DARK_BACKGROUND],
+            darkPrimary = preferences[KEY_DARK_PRIMARY],
+            darkSecondary = preferences[KEY_DARK_SECONDARY],
+            darkTertiary = preferences[KEY_DARK_TERTIARY]
+        )
+        if (preferences[KEY_THEME] != resolved.mode.name) {
+            dataStore.edit { it[KEY_THEME] = resolved.mode.name }
+        }
+    }
+
     suspend fun replaceAppearance(settings: AppearanceSettings) {
-        val encoded = AppearanceCodec.encode(settings)
+        val encoded = AppearanceCodec.encode(settings.resolvedBuiltInAppearance())
         dataStore.edit { prefs ->
             val preserved = ONBOARDING_KEYS.associateWith { key -> prefs[key] }
             prefs.clear()
@@ -154,7 +174,8 @@ class ThemePreferences(context: Context) {
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
-        dataStore.edit { it[KEY_THEME] = mode.name }
+        val resolved = appearance.first().copy(mode = mode).resolvedBuiltInAppearance()
+        dataStore.edit { it[KEY_THEME] = resolved.mode.name }
     }
 
     suspend fun setPaletteType(type: PaletteType) {

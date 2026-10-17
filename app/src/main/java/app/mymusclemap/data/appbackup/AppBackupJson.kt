@@ -197,6 +197,7 @@ object AppBackupJson {
                             .put("distanceMeters", nullable(row.distanceMeters))
                             .apply {
                                 if (row.restSeconds != null) put("restSeconds", row.restSeconds)
+                                if (row.timedWork) put("timedWork", true)
                             }
                     )
                 }
@@ -262,6 +263,22 @@ object AppBackupJson {
                                 }
                                 if (row.restDurationMillis != null) put("restDurationMillis", row.restDurationMillis)
                                 if (row.restGeneration != 0L) put("restGeneration", row.restGeneration)
+                                if (row.workPhase != null) put("workPhase", row.workPhase)
+                                if (row.workSetId != null) put("workSetId", row.workSetId)
+                                if (row.workTargetMillis != null) put("workTargetMillis", row.workTargetMillis)
+                                if (row.workElapsedActiveMillis != null) {
+                                    put("workElapsedActiveMillis", row.workElapsedActiveMillis)
+                                }
+                                if (row.workAnchorElapsedRealtimeMillis != null) {
+                                    put("workAnchorElapsedRealtimeMillis", row.workAnchorElapsedRealtimeMillis)
+                                }
+                                if (row.workDeadlineElapsedRealtimeMillis != null) {
+                                    put("workDeadlineElapsedRealtimeMillis", row.workDeadlineElapsedRealtimeMillis)
+                                }
+                                if (row.workDeadlineWallClockMillis != null) {
+                                    put("workDeadlineWallClockMillis", row.workDeadlineWallClockMillis)
+                                }
+                                if (row.workGeneration != 0L) put("workGeneration", row.workGeneration)
                             }
                     )
                 }
@@ -340,6 +357,7 @@ object AppBackupJson {
                             .put("sourceTemplateSetId", nullable(row.sourceTemplateSetId))
                             .apply {
                                 if (row.restSeconds != null) put("restSeconds", row.restSeconds)
+                                if (row.timedWork) put("timedWork", true)
                             }
                     )
                 }
@@ -999,7 +1017,8 @@ object AppBackupJson {
             weightKg,
             durationSeconds,
             distanceMeters,
-            restSeconds = restSeconds
+            restSeconds = restSeconds,
+            timedWork = obj.optionalBoolean("timedWork") ?: false
         )
     }
 
@@ -1132,7 +1151,18 @@ object AppBackupJson {
             ),
             restDeadlineWallClockMillis = obj.optionalNullableLong("restDeadlineWallClockMillis", errors),
             restDurationMillis = obj.optionalNullableLong("restDurationMillis", errors),
-            restGeneration = obj.optionalNullableLong("restGeneration", errors) ?: 0L
+            restGeneration = obj.optionalNullableLong("restGeneration", errors) ?: 0L,
+            workPhase = obj.optionalNullableString("workPhase", errors),
+            workSetId = obj.optionalNullableId("workSetId", errors),
+            workTargetMillis = obj.optionalNullableLong("workTargetMillis", errors),
+            workElapsedActiveMillis = obj.optionalNullableLong("workElapsedActiveMillis", errors),
+            workAnchorElapsedRealtimeMillis = obj.optionalNullableLong("workAnchorElapsedRealtimeMillis", errors),
+            workDeadlineElapsedRealtimeMillis = obj.optionalNullableLong(
+                "workDeadlineElapsedRealtimeMillis",
+                errors
+            ),
+            workDeadlineWallClockMillis = obj.optionalNullableLong("workDeadlineWallClockMillis", errors),
+            workGeneration = obj.optionalNullableLong("workGeneration", errors) ?: 0L
         )
     }
 
@@ -1230,7 +1260,8 @@ object AppBackupJson {
             completedAt,
             addedDuringWorkout,
             sourceTemplateSetId = sourceTemplateSetId,
-            restSeconds = obj.optionalNullableInt("restSeconds", errors)
+            restSeconds = obj.optionalNullableInt("restSeconds", errors),
+            timedWork = obj.optionalBoolean("timedWork") ?: false
         )
     }
 
@@ -1248,6 +1279,14 @@ object AppBackupJson {
         } catch (_: CharacterCodingException) {
             null
         }
+    }
+}
+
+private fun JSONObject.optionalBoolean(key: String): Boolean? {
+    if (!has(key) || isNull(key)) return null
+    return when (val value = opt(key)) {
+        is Boolean -> value
+        else -> null
     }
 }
 

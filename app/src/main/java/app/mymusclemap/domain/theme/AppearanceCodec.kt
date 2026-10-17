@@ -49,7 +49,7 @@ object AppearanceCodec {
                 darkTertiary,
                 ThemeSeeds.copyOfFactoryDark()
             )
-        )
+        ).resolvedBuiltInAppearance()
     }
 
     fun decodeFrom(prefs: Map<String, String?>): AppearanceSettings {

@@ -62,6 +62,11 @@ import app.mymusclemap.data.local.PlanSetTargetWrite
 import app.mymusclemap.domain.workout.ApplyPlanProgressionResult
 import app.mymusclemap.domain.workout.PlanProgressionProposal
 import app.mymusclemap.domain.workout.PlannedLoadKind
+import app.mymusclemap.domain.workout.PlannedSetLogic
+import app.mymusclemap.domain.workout.WorkDuration
+import app.mymusclemap.domain.workout.WorkPhase
+import app.mymusclemap.domain.workout.WorkTimerLogic
+import app.mymusclemap.domain.workout.WorkTimerSnapshot
 import app.mymusclemap.domain.workout.WorkoutPlanProgressionEvaluator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -93,7 +98,8 @@ class WorkoutSessionRepository(
             elapsedRealtimeMillis = android.os.SystemClock.elapsedRealtime(),
             wallClockMillis = clock.millis()
         )
-    }
+    },
+    private val timersAllowed: () -> Boolean = { true }
 ) {
     private val mutex = Mutex()
 
@@ -442,7 +448,8 @@ class WorkoutSessionRepository(
                                 },
                                 weightKg = set.actualWeightKg,
                                 durationSeconds = set.actualDurationSeconds,
-                                distanceMeters = set.actualDistanceMeters
+                                distanceMeters = set.actualDistanceMeters,
+                                timedWork = set.timedWork
                             )
                         }
                     )
@@ -648,7 +655,7 @@ class WorkoutSessionRepository(
                     plannedWeightKg = planned.weightKg,
                     plannedDurationSeconds = planned.durationSeconds,
                     plannedDistanceMeters = planned.distanceMeters,
-                    actualReps = planned.minReps,
+                    actualReps = if (planned.timedWork) null else planned.minReps,
                     actualLoadKind = planned.loadKind,
                     actualWeightKg = planned.weightKg,
                     actualDurationSeconds = planned.durationSeconds,
@@ -657,7 +664,8 @@ class WorkoutSessionRepository(
                     completedAt = null,
                     addedDuringWorkout = false,
                     sourceTemplateSetId = planned.id,
-                    restSeconds = planned.restSeconds
+                    restSeconds = planned.restSeconds,
+                    timedWork = planned.timedWork
                 )
             }
             Triple(snapshot, muscleSnapshots, setSnapshots)
@@ -725,6 +733,12 @@ class WorkoutSessionRepository(
 
     suspend fun completeSet(setId: Long, draft: ActualSetDraft): SessionMutationResult = mutex.withLock {
         val before = sessionDao.getSet(setId)
+        if (before?.status == SessionSetStatus.PENDING.name && before.timedWork) {
+            val exercise = sessionDao.getExercise(before.sessionExerciseId)
+            val session = exercise?.let { sessionDao.getById(it.sessionId) }
+            val awaiting = session?.workPhase == WorkPhase.AWAITING.name && session.workSetId == setId
+            if (!awaiting) return@withLock SessionMutationResult.NotActive
+        }
         val result = mutateActiveSet(setId) { set, exercise, now ->
             writeCompletedSet(set, exercise, draft, now)
         }
@@ -765,6 +779,11 @@ class WorkoutSessionRepository(
         val exercise = sessionDao.getExercise(set.sessionExerciseId)
             ?: return@withLock NotificationSetCompletion.NotFound
         if (exercise.sessionId != sessionId) {
+            return@withLock NotificationSetCompletion.Stale
+        }
+        val sessionRow = sessionDao.getById(sessionId)
+            ?: return@withLock NotificationSetCompletion.NotFound
+        if (set.timedWork || sessionRow.workPhase != null) {
             return@withLock NotificationSetCompletion.Stale
         }
         val now = clock.millis()
@@ -854,7 +873,9 @@ class WorkoutSessionRepository(
         } else {
             ActualSetLogic.extraSetDefaults(measurement, resistance)
         }
-        val parsed = ActualSetLogic.parse(actual, measurement, resistance).first
+        val previousEntity = existing.maxByOrNull { it.position }
+        val timed = previousEntity?.timedWork == true
+        val parsed = ActualSetLogic.parse(actual, measurement, resistance, timedWork = timed).first
         sessionDao.insertSet(
             WorkoutSessionSetEntity(
                 sessionExerciseId = sessionExerciseId,
@@ -865,7 +886,7 @@ class WorkoutSessionRepository(
                 plannedWeightKg = planned.weightKg,
                 plannedDurationSeconds = planned.durationSeconds,
                 plannedDistanceMeters = planned.distanceMeters,
-                actualReps = parsed?.reps ?: planned.minReps,
+                actualReps = if (timed) null else parsed?.reps ?: planned.minReps,
                 actualLoadKind = (parsed?.loadKind ?: planned.loadKind).name,
                 actualWeightKg = parsed?.weightKg ?: planned.weightKg,
                 actualDurationSeconds = parsed?.durationSeconds ?: planned.durationSeconds,
@@ -873,7 +894,8 @@ class WorkoutSessionRepository(
                 status = SessionSetStatus.PENDING.name,
                 completedAt = null,
                 addedDuringWorkout = true,
-                restSeconds = existing.maxByOrNull { it.position }?.restSeconds
+                restSeconds = previousEntity?.restSeconds,
+                timedWork = timed
             )
         )
         touchSession(session)
@@ -1116,7 +1138,8 @@ class WorkoutSessionRepository(
         val (values, errors) = ActualSetLogic.parse(
             draft,
             ExerciseEnumCodec.measurement(exercise.measurementType),
-            ExerciseEnumCodec.resistance(exercise.resistanceBasis)
+            ExerciseEnumCodec.resistance(exercise.resistanceBasis),
+            timedWork = set.timedWork
         )
         if (values == null) {
             return SessionMutationResult.Invalid(errors)
@@ -1239,6 +1262,7 @@ class WorkoutSessionRepository(
     }
 
     private suspend fun startRestAfterPendingCompletion(setId: Long): Boolean {
+        if (!timersAllowed()) return false
         val set = sessionDao.getSet(setId) ?: return false
         val exercise = sessionDao.getExercise(set.sessionExerciseId) ?: return false
         val aggregate = getAggregate(exercise.sessionId) ?: return false
@@ -1251,8 +1275,119 @@ class WorkoutSessionRepository(
 
     private suspend fun clearRestOnSession(sessionId: Long) {
         val session = sessionDao.getById(sessionId) ?: return
-        if (session.restPhase == null) return
+        if (session.restPhase == null && session.workPhase == null) return
         sessionDao.updateSession(session.clearedRest(clock.millis()))
+    }
+
+    suspend fun startWork(sessionId: Long, setId: Long): Boolean = mutex.withLock {
+        if (!timersAllowed()) return@withLock false
+        val set = sessionDao.getSet(setId) ?: return@withLock false
+        val exercise = sessionDao.getExercise(set.sessionExerciseId) ?: return@withLock false
+        if (exercise.sessionId != sessionId) return@withLock false
+        if (set.status != SessionSetStatus.PENDING.name) return@withLock false
+        val measurement = ExerciseEnumCodec.measurement(exercise.measurementType)
+        val target = set.plannedDurationSeconds ?: 0
+        val eligible = set.timedWork || (PlannedSetLogic.requiresDuration(measurement) && target > 0)
+        if (!eligible || target <= 0 || target > WorkDuration.MAX_SECONDS) return@withLock false
+        val session = sessionDao.getById(sessionId) ?: return@withLock false
+        if (session.status != SessionStatus.IN_PROGRESS.name) return@withLock false
+        if (session.restPhase != null || session.workPhase != null) return@withLock false
+        val started = WorkTimerLogic.started(
+            setId = setId,
+            targetMillis = target * 1000L,
+            clock = restClock(),
+            generation = session.workGeneration + 1
+        )
+        sessionDao.updateSession(session.withWork(started, clock.millis()))
+        true
+    }
+
+    suspend fun pauseWork(sessionId: Long, generation: Long): Boolean = mutex.withLock {
+        updateWork(sessionId, generation) { snapshot ->
+            WorkTimerLogic.pause(snapshot, restClock())
+        }
+    }
+
+    suspend fun resumeWork(sessionId: Long, generation: Long): Boolean = mutex.withLock {
+        updateWork(sessionId, generation) { snapshot ->
+            WorkTimerLogic.resume(snapshot, restClock())
+        }
+    }
+
+    suspend fun finishWorkEarly(sessionId: Long, generation: Long): Boolean = mutex.withLock {
+        updateWork(sessionId, generation) { snapshot ->
+            WorkTimerLogic.finishEarly(snapshot, restClock())
+        }
+    }
+
+    suspend fun expireWork(sessionId: Long, generation: Long): Boolean = mutex.withLock {
+        updateWork(sessionId, generation) { snapshot ->
+            WorkTimerLogic.expire(snapshot)
+        }
+    }
+
+    suspend fun discardWork(sessionId: Long, generation: Long): Boolean = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return@withLock false
+        if (session.workPhase == null || session.workGeneration != generation) return@withLock false
+        sessionDao.updateSession(
+            session.copy(
+                workPhase = null,
+                workSetId = null,
+                workTargetMillis = null,
+                workElapsedActiveMillis = null,
+                workAnchorElapsedRealtimeMillis = null,
+                workDeadlineElapsedRealtimeMillis = null,
+                workDeadlineWallClockMillis = null,
+                workGeneration = session.workGeneration + 1,
+                updatedAt = clock.millis()
+            )
+        )
+        true
+    }
+
+    suspend fun reanchorWork(sessionId: Long, generation: Long): Boolean = mutex.withLock {
+        updateWork(sessionId, generation) { snapshot ->
+            WorkTimerLogic.reanchorAfterReboot(snapshot, restClock())
+        }
+    }
+
+    /**
+     * Drops a rest countdown and stops a running or paused work interval without completing a set.
+     * Measured work is kept as an unconfirmed result. Returns the rest origin when a rest
+     * countdown was cancelled, so the caller can restore normal set focus.
+     */
+    suspend fun releaseProTimers(sessionId: Long): Long? = mutex.withLock {
+        val session = sessionDao.getById(sessionId) ?: return@withLock null
+        if (session.status != SessionStatus.IN_PROGRESS.name) return@withLock null
+        val origin = if (session.restPhase != null) session.restOriginSetId else null
+        val clockSample = restClock()
+        val frozen = if (session.workPhase == WorkPhase.RUNNING.name || session.workPhase == WorkPhase.PAUSED.name) {
+            WorkTimerLogic.finishEarly(session.toWorkSnapshot(), clockSample)
+        } else {
+            null
+        }
+        val cleared = if (session.restPhase != null) session.clearedRest(clock.millis()) else session
+        val next = if (frozen != null) {
+            cleared.withWork(frozen, clock.millis())
+        } else if (session.restPhase != null) {
+            cleared
+        } else {
+            return@withLock null
+        }
+        sessionDao.updateSession(next)
+        origin
+    }
+
+    private suspend fun updateWork(
+        sessionId: Long,
+        generation: Long,
+        transform: (WorkTimerSnapshot) -> WorkTimerSnapshot?
+    ): Boolean {
+        val session = sessionDao.getById(sessionId) ?: return false
+        if (session.workGeneration != generation || session.workPhase == null) return false
+        val updated = transform(session.toWorkSnapshot()) ?: return false
+        sessionDao.updateSession(session.withWork(updated, clock.millis()))
+        return true
     }
 
     private fun toSummary(
@@ -1428,6 +1563,36 @@ private fun WorkoutSessionEntity.withRest(snapshot: RestTimerSnapshot, updatedAt
         restDurationMillis = snapshot.durationMillis,
         restGeneration = snapshot.generation,
         restProgressionMode = snapshot.mode.name,
+        workPhase = null,
+        workSetId = null,
+        workTargetMillis = null,
+        workElapsedActiveMillis = null,
+        workAnchorElapsedRealtimeMillis = null,
+        workDeadlineElapsedRealtimeMillis = null,
+        workDeadlineWallClockMillis = null,
+        workGeneration = workGeneration + 1,
+        updatedAt = updatedAt
+    )
+}
+
+private fun WorkoutSessionEntity.withWork(snapshot: WorkTimerSnapshot, updatedAt: Long): WorkoutSessionEntity {
+    return copy(
+        workPhase = snapshot.phase?.name,
+        workSetId = snapshot.setId,
+        workTargetMillis = snapshot.targetMillis,
+        workElapsedActiveMillis = snapshot.elapsedActiveMillis,
+        workAnchorElapsedRealtimeMillis = snapshot.anchorElapsedRealtimeMillis,
+        workDeadlineElapsedRealtimeMillis = snapshot.deadlineElapsedRealtimeMillis,
+        workDeadlineWallClockMillis = snapshot.deadlineWallClockMillis,
+        workGeneration = snapshot.generation,
+        restPhase = null,
+        restOriginSetId = null,
+        restNextSetId = null,
+        restAnchorElapsedRealtimeMillis = null,
+        restDeadlineElapsedRealtimeMillis = null,
+        restDeadlineWallClockMillis = null,
+        restDurationMillis = null,
+        restGeneration = restGeneration + 1,
         updatedAt = updatedAt
     )
 }
@@ -1442,6 +1607,27 @@ private fun WorkoutSessionEntity.clearedRest(updatedAt: Long): WorkoutSessionEnt
         restDeadlineWallClockMillis = null,
         restDurationMillis = null,
         restGeneration = restGeneration + 1,
+        workPhase = null,
+        workSetId = null,
+        workTargetMillis = null,
+        workElapsedActiveMillis = null,
+        workAnchorElapsedRealtimeMillis = null,
+        workDeadlineElapsedRealtimeMillis = null,
+        workDeadlineWallClockMillis = null,
+        workGeneration = workGeneration + 1,
         updatedAt = updatedAt
+    )
+}
+
+private fun WorkoutSessionEntity.toWorkSnapshot(): WorkTimerSnapshot {
+    return WorkTimerSnapshot(
+        phase = WorkPhase.fromStored(workPhase),
+        setId = workSetId,
+        targetMillis = workTargetMillis,
+        elapsedActiveMillis = workElapsedActiveMillis,
+        anchorElapsedRealtimeMillis = workAnchorElapsedRealtimeMillis,
+        deadlineElapsedRealtimeMillis = workDeadlineElapsedRealtimeMillis,
+        deadlineWallClockMillis = workDeadlineWallClockMillis,
+        generation = workGeneration
     )
 }

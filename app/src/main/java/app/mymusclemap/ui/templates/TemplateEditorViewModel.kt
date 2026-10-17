@@ -21,8 +21,11 @@ import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
 import app.mymusclemap.domain.workout.PlannedSetLogic
+import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.domain.workout.RestDuration
 import app.mymusclemap.domain.workout.RestProgressionMode
+import app.mymusclemap.domain.workout.WorkDuration
+import app.mymusclemap.domain.workout.WorkoutTimerAccess
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateDraftLogic
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
@@ -387,34 +390,97 @@ class TemplateEditorViewModel(
         )
     }
 
-    fun onRestMode(enabled: Boolean) = updateDraft { current ->
-        current.copy(
-            restProgressionMode = if (enabled) {
-                RestProgressionMode.STRICT
-            } else {
-                RestProgressionMode.FLEXIBLE
-            }
-        )
+    fun onRestMode(enabled: Boolean) {
+        if (!requireTimers()) return
+        updateDraft { current ->
+            current.copy(
+                restProgressionMode = if (enabled) {
+                    RestProgressionMode.STRICT
+                } else {
+                    RestProgressionMode.FLEXIBLE
+                }
+            )
+        }
     }
 
-    fun onExerciseRest(exerciseLocalId: Long, seconds: Int?) = updateDraft { current ->
-        current.copy(
-            exercises = current.exercises.map { item ->
-                if (item.localId == exerciseLocalId) {
-                    item.copy(restSeconds = seconds?.takeIf { it > 0 }?.coerceAtMost(RestDuration.MAX_SECONDS))
-                } else {
-                    item
+    fun onExerciseRest(exerciseLocalId: Long, seconds: Int?) {
+        if (!WorkoutTimerAccess.allowsRestChange(seconds, WorkoutTimerAccess.allowed(entitlements))) {
+            requireTimers()
+            return
+        }
+        updateDraft { current ->
+            current.copy(
+                exercises = current.exercises.map { item ->
+                    if (item.localId == exerciseLocalId) {
+                        item.copy(restSeconds = seconds?.takeIf { it > 0 }?.coerceAtMost(RestDuration.MAX_SECONDS))
+                    } else {
+                        item
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 
     fun onSetRest(exerciseLocalId: Long, setLocalId: Long, seconds: Int?) {
+        if (!WorkoutTimerAccess.allowsRestChange(seconds, WorkoutTimerAccess.allowed(entitlements))) {
+            requireTimers()
+            return
+        }
         updateSet(exerciseLocalId, setLocalId) { set ->
             set.copy(
                 restSeconds = seconds?.let { value ->
                     if (value <= 0) 0 else value.coerceAtMost(RestDuration.MAX_SECONDS)
                 }
+            )
+        }
+    }
+
+    fun onTimedMode(exerciseLocalId: Long, timed: Boolean) {
+        val exercise = draft.value.exercises.firstOrNull { it.localId == exerciseLocalId } ?: return
+        val already = exercise.sets.isNotEmpty() && exercise.sets.all { it.timedWork }
+        if (timed == already) return
+        if (timed && !requireTimers()) return
+        updateDraft { current ->
+            current.copy(
+                exercises = current.exercises.map { item ->
+                    if (item.localId != exerciseLocalId) {
+                        item
+                    } else {
+                        item.copy(
+                            sets = item.sets.map { set ->
+                                if (!timed) {
+                                    set.copy(timedWork = false)
+                                } else {
+                                    val existing = QuantityParser.toSeconds(
+                                        set.minutesText.toIntOrNull() ?: 0,
+                                        set.secondsText.toIntOrNull() ?: 0
+                                    )
+                                    val (minutes, seconds) = QuantityParser.fromSeconds(
+                                        if (existing > 0) existing else 30
+                                    )
+                                    set.copy(
+                                        timedWork = true,
+                                        minutesText = minutes.toString(),
+                                        secondsText = seconds.toString()
+                                    )
+                                }
+                            }
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun onWorkDuration(exerciseLocalId: Long, setLocalId: Long, seconds: Int) {
+        if (!requireTimers()) return
+        val bounded = seconds.coerceIn(1, WorkDuration.MAX_SECONDS)
+        val (minutes, remainder) = QuantityParser.fromSeconds(bounded)
+        updateSet(exerciseLocalId, setLocalId) { set ->
+            set.copy(
+                timedWork = true,
+                minutesText = minutes.toString(),
+                secondsText = remainder.toString()
             )
         }
     }
@@ -441,10 +507,12 @@ class TemplateEditorViewModel(
     }
 
     fun onMinutes(exerciseLocalId: Long, setLocalId: Long, value: String) {
+        if (timedSet(exerciseLocalId, setLocalId) && !requireTimers()) return
         updateSet(exerciseLocalId, setLocalId) { it.copy(minutesText = value) }
     }
 
     fun onSeconds(exerciseLocalId: Long, setLocalId: Long, value: String) {
+        if (timedSet(exerciseLocalId, setLocalId) && !requireTimers()) return
         updateSet(exerciseLocalId, setLocalId) { it.copy(secondsText = value) }
     }
 
@@ -563,6 +631,21 @@ class TemplateEditorViewModel(
             draft.value.notes.trim() != original.value.notes.trim() ||
             draft.value.restProgressionMode != original.value.restProgressionMode ||
             draft.value.exercises != original.value.exercises
+    }
+
+    private fun requireTimers(): Boolean {
+        if (WorkoutTimerAccess.allowed(entitlements)) return true
+        chrome.update { current ->
+            if (current.lockedFeature != null) current else current.copy(lockedFeature = AppFeature.WorkoutTimers)
+        }
+        return false
+    }
+
+    private fun timedSet(exerciseLocalId: Long, setLocalId: Long): Boolean {
+        return draft.value.exercises.firstOrNull { it.localId == exerciseLocalId }
+            ?.sets
+            ?.firstOrNull { it.localId == setLocalId }
+            ?.timedWork == true
     }
 
     private fun catalogExercise(exerciseLocalId: Long): Exercise? {

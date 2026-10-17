@@ -164,7 +164,8 @@ class AppContainer(context: Context, val accountUserId: String) {
         dateProvider = dateProvider,
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
         onNativeWorkoutCompleted = { clientWorkoutId -> nativeWorkoutCompleted.get().invoke(clientWorkoutId) },
-        onTrainingHistoryChanged = { clientWorkoutId -> achievementRepository.reconcile(clientWorkoutId) }
+        onTrainingHistoryChanged = { clientWorkoutId -> achievementRepository.reconcile(clientWorkoutId) },
+        timersAllowed = { featureEntitlements.hasAccess(app.mymusclemap.domain.entitlement.AppFeature.WorkoutTimers) }
     )
     val lockScreenSetCompletion = LockScreenSetCompletionPreferences(appContext)
     val timerSounds = TimerSoundPreferences(appContext)

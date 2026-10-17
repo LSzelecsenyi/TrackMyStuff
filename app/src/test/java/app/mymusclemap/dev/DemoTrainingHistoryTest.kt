@@ -134,7 +134,7 @@ class DemoTrainingHistoryTest {
             val result = AppBackupRepository(database, preferences).restoreJson(json)
             assertEquals(AppBackupRestoreResult.Success, result)
             assertEquals(snapshot.tables, database.appBackupDao().loadTables())
-            assertEquals(ThemeMode.System, preferences.current().mode)
+            assertEquals(ThemeMode.Dark, preferences.current().mode)
         } finally {
             database.close()
         }

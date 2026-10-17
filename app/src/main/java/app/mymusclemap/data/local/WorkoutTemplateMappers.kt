@@ -43,6 +43,7 @@ fun WorkoutTemplateSetEntity.toModel(): WorkoutTemplateSet {
         weightKg = weightKg,
         durationSeconds = durationSeconds,
         distanceMeters = distanceMeters,
-        restSeconds = restSeconds
+        restSeconds = restSeconds,
+        timedWork = timedWork
     )
 }

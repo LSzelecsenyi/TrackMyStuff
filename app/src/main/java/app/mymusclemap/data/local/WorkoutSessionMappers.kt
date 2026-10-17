@@ -43,7 +43,15 @@ fun WorkoutSessionEntity.toModel(): WorkoutSession {
         restDeadlineElapsedRealtimeMillis = restDeadlineElapsedRealtimeMillis,
         restDeadlineWallClockMillis = restDeadlineWallClockMillis,
         restDurationMillis = restDurationMillis,
-        restGeneration = restGeneration
+        restGeneration = restGeneration,
+        workPhase = workPhase,
+        workSetId = workSetId,
+        workTargetMillis = workTargetMillis,
+        workElapsedActiveMillis = workElapsedActiveMillis,
+        workAnchorElapsedRealtimeMillis = workAnchorElapsedRealtimeMillis,
+        workDeadlineElapsedRealtimeMillis = workDeadlineElapsedRealtimeMillis,
+        workDeadlineWallClockMillis = workDeadlineWallClockMillis,
+        workGeneration = workGeneration
     )
 }
 
@@ -96,7 +104,8 @@ fun WorkoutSessionSetEntity.toModel(): SessionSet {
         addedDuringWorkout = addedDuringWorkout,
         draft = SetDraftCodec.decode(draftPayload),
         sourceTemplateSetId = sourceTemplateSetId,
-        restSeconds = restSeconds
+        restSeconds = restSeconds,
+        timedWork = timedWork
     )
 }
 

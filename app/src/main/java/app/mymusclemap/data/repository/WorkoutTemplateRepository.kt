@@ -175,7 +175,8 @@ class WorkoutTemplateRepository(
                     distanceMeters = values.distanceMeters,
                     restSeconds = setDraft.restSeconds?.let { seconds ->
                         if (seconds <= 0) 0 else seconds.coerceAtMost(RestDuration.MAX_SECONDS)
-                    }
+                    },
+                    timedWork = setDraft.timedWork
                 )
             }
             relation to sets

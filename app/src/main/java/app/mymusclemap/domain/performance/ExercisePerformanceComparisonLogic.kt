@@ -8,6 +8,7 @@ import app.mymusclemap.domain.muscleinsights.MuscleInsightsPeriod
 import app.mymusclemap.domain.statistics.WorkoutSetVolume
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
+import app.mymusclemap.domain.workout.PlannedSetLogic
 import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.SessionSet
 import app.mymusclemap.domain.workout.SessionSetStatus
@@ -418,6 +419,9 @@ object ExercisePerformanceComparisonLogic {
 
     private fun readSet(exercise: SessionExercise, set: SessionSet): Reading {
         if (set.status != SessionSetStatus.COMPLETED) return Reading.Ineligible
+        if (set.timedWork && PlannedSetLogic.requiresReps(exercise.measurementType)) {
+            return Reading.UnsupportedType
+        }
         val measurement = exercise.measurementType
         val resistance = exercise.resistanceBasis
         val kind = set.actualLoadKind ?: return Reading.Invalid

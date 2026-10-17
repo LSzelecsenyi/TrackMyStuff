@@ -18,7 +18,24 @@ import app.mymusclemap.domain.workout.InWorkoutExerciseHistory
 import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.domain.workout.RestClockSample
+import app.mymusclemap.data.preferences.TimerSoundStore
+import app.mymusclemap.domain.workout.TimerAudioMode
+import app.mymusclemap.domain.workout.TimerAudioPhase
+import app.mymusclemap.domain.workout.TimerCueKind
+import app.mymusclemap.domain.workout.TimerIntervalId
+import app.mymusclemap.domain.workout.TimerIntervalSlot
+import app.mymusclemap.domain.workout.TimerSpokenWord
+import app.mymusclemap.domain.workout.WorkCompletionCue
+import app.mymusclemap.domain.workout.WorkPhase
+import app.mymusclemap.domain.workout.WorkPreparationLogic
+import app.mymusclemap.domain.workout.WorkPreparationSnapshot
+import app.mymusclemap.domain.workout.WorkTimerLogic
+import app.mymusclemap.domain.workout.WorkoutTimerAccess
+import app.mymusclemap.domain.workout.toWorkSnapshot
 import app.mymusclemap.domain.workout.RestExpiryResult
 import app.mymusclemap.domain.workout.RestPhase
 import app.mymusclemap.domain.workout.RestRemaining
@@ -72,6 +89,22 @@ data class RestTimerUi(
     val awaitingNext: Boolean
 )
 
+data class WorkTimerUi(
+    val phase: WorkPhase,
+    val setId: Long,
+    val countdown: String,
+    val progress: Float,
+    val actualSeconds: Int,
+    val targetSeconds: Int,
+    val awaiting: Boolean,
+    val finishedEarly: Boolean = false
+)
+
+data class WorkPreparationUi(
+    val setId: Long,
+    val countdown: String
+)
+
 data class ActiveWorkoutUiState(
     val loading: Boolean = true,
     val missing: Boolean = false,
@@ -98,7 +131,11 @@ data class ActiveWorkoutUiState(
     val completionSummary: WorkoutCompletionSummary? = null,
     val exerciseHistory: InWorkoutExerciseHistory = InWorkoutExerciseHistory.Loading,
     val catalog: List<Exercise> = emptyList(),
-    val rest: RestTimerUi? = null
+    val rest: RestTimerUi? = null,
+    val work: WorkTimerUi? = null,
+    val timersEnabled: Boolean = true,
+    val confirmCancelWork: Boolean = false,
+    val preparation: WorkPreparationUi? = null
 ) {
     val progress: SessionProgress
         get() = aggregate?.let(SessionProgressLogic::fromAggregate) ?: SessionProgress(0, 0, 0, 0)
@@ -135,7 +172,14 @@ class ActiveWorkoutViewModel(
             wallClockMillis = clock.millis()
         )
     },
-    private val restEffects: RestTimerEffects = RestTimerEffects.None
+    private val restEffects: RestTimerEffects = RestTimerEffects.None,
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
+    private val timerSounds: TimerSoundStore = TimerSoundStore.On,
+    private val timerCuePlayer: TimerCuePlayer = TimerCuePlayer.None,
+    private val completionLedger: TimerCompletionLedger = TimerCompletionLedger.process,
+    private val speechLanguage: () -> app.mymusclemap.domain.workout.TimerSpeechLanguage = {
+        currentTimerSpeechLanguage()
+    }
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(SESSION_ID) ?: -1L
     private val selectedIndex = savedStateHandle.getStateFlow(SELECTED_INDEX, 0)
@@ -174,6 +218,42 @@ class ActiveWorkoutViewModel(
     private var expiryJob: Job? = null
     private var expiryGeneration: Long? = null
     private var scheduledRest: Pair<Long, Long>? = null
+    private var scheduledWork: Pair<Long, Long>? = null
+    private val timerAccess = MutableStateFlow(WorkoutTimerAccess.allowed(entitlements))
+    private val confirmCancelWork = MutableStateFlow(false)
+    private var pendingExerciseIndex: Int? = null
+    private var workExpiryJob: Job? = null
+    private var workExpiryGeneration: Long? = null
+    private val audioMode = MutableStateFlow(TimerAudioMode.BEEPS)
+    private val preparation = MutableStateFlow<WorkPreparationSnapshot?>(null)
+    private var preparationGeneration = 0L
+    private val audioCoordinator = TimerAudioCoordinator(
+        scope = viewModelScope,
+        elapsedNow = { restClock().elapsedRealtimeMillis },
+        player = timerCuePlayer,
+        ledger = completionLedger,
+        language = speechLanguage,
+        onPreparationFinished = { setId ->
+            if (preparation.value?.setId == setId) {
+                preparation.value = null
+                viewModelScope.launch { beginMeasuredWork(setId) }
+            }
+        }
+    )
+
+    private data class ClockSample(
+        val wall: Long,
+        val elapsed: Long,
+        val timersEnabled: Boolean,
+        val preparation: WorkPreparationSnapshot?
+    )
+
+    private data class DialogFlags(
+        val abandoned: Boolean,
+        val discarding: Boolean,
+        val finishing: Boolean,
+        val confirmCancelWork: Boolean
+    )
 
     private data class Dialogs(
         val now: Long,
@@ -183,7 +263,10 @@ class ActiveWorkoutViewModel(
         val finished: Boolean,
         val abandoned: Boolean,
         val discarding: Boolean,
-        val finishing: Boolean
+        val finishing: Boolean,
+        val confirmCancelWork: Boolean,
+        val timersEnabled: Boolean,
+        val preparation: WorkPreparationSnapshot?
     )
 
     private data class EditorSignals(
@@ -225,23 +308,28 @@ class ActiveWorkoutViewModel(
             )
         },
         combine(
-            combine(nowMillis, elapsedRealtime) { wall, elapsed -> wall to elapsed },
+            combine(nowMillis, elapsedRealtime, timerAccess, preparation) { wall, elapsed, access, prep ->
+                ClockSample(wall, elapsed, access, prep)
+            },
             pendingFinishCount,
             confirmAbandon,
             finished,
-            combine(abandoned, discarding, finishing) { left, discardingNow, finishingNow ->
-                Triple(left, discardingNow, finishingNow)
+            combine(abandoned, discarding, finishing, confirmCancelWork) { left, discardingNow, finishingNow, cancelWork ->
+                DialogFlags(left, discardingNow, finishingNow, cancelWork)
             }
-        ) { clock, pending, abandon, done, triple ->
+        ) { clock, pending, abandon, done, flags ->
             Dialogs(
-                clock.first,
-                clock.second,
+                clock.wall,
+                clock.elapsed,
                 pending,
                 abandon,
                 done,
-                triple.first,
-                triple.second,
-                triple.third
+                flags.abandoned,
+                flags.discarding,
+                flags.finishing,
+                flags.confirmCancelWork,
+                clock.timersEnabled,
+                clock.preparation
             )
         },
         combine(focusEvent, focusedSetId, expandedIds) { focus, focused, expanded ->
@@ -302,7 +390,11 @@ class ActiveWorkoutViewModel(
             editingSetIds = signals.editingSetIds,
             finishing = dialogs.finishing,
             completionSummary = signals.completionSummary,
-            rest = restUi(aggregate, dialogs.elapsedRealtime, dialogs.now)
+            rest = restUi(aggregate, dialogs.elapsedRealtime, dialogs.now),
+            work = workUi(aggregate, dialogs.elapsedRealtime, dialogs.now),
+            timersEnabled = dialogs.timersEnabled,
+            confirmCancelWork = dialogs.confirmCancelWork,
+            preparation = preparationUi(dialogs.preparation, dialogs.elapsedRealtime)
         )
     }.stateIn(
         scope = viewModelScope,
@@ -323,6 +415,20 @@ class ActiveWorkoutViewModel(
     )
 
     init {
+        viewModelScope.launch {
+            entitlements.changes().collect {
+                val allowed = WorkoutTimerAccess.allowed(entitlements)
+                timerAccess.value = allowed
+                if (!allowed) {
+                    val origin = sessionRepository.releaseProTimers(sessionId)
+                    preparation.value = null
+                    audioCoordinator.stop()
+                    restEffects.cancel(sessionId)
+                    restEffects.cancelWork(sessionId)
+                    if (origin != null) advanceAfterResolved(origin)
+                }
+            }
+        }
         viewModelScope.launch {
             sessionRepository.observeAggregate(sessionId).collect { aggregate ->
                 if (aggregate == null) return@collect
@@ -361,6 +467,8 @@ class ActiveWorkoutViewModel(
                 nowMillis.value = sample.wallClockMillis
                 elapsedRealtime.value = sample.elapsedRealtimeMillis
                 considerExpiry()
+                considerWorkExpiry()
+                syncTimerAudio()
                 delay(1_000)
             }
         }
@@ -385,10 +493,20 @@ class ActiveWorkoutViewModel(
             sessionRepository.observeAggregate(sessionId).collect { aggregate ->
                 latestAggregate = aggregate
                 syncRestAlarm(aggregate)
+                syncWorkAlarm(aggregate)
                 if (aggregate != null) {
                     considerExpiry()
+                    considerWorkExpiry()
                     reconcileAuthoritativeSets(aggregate)
                 }
+                syncTimerAudio()
+            }
+        }
+        viewModelScope.launch {
+            timerSounds.migrate()
+            timerSounds.mode.collect {
+                audioMode.value = it
+                syncTimerAudio()
             }
         }
     }
@@ -411,9 +529,43 @@ class ActiveWorkoutViewModel(
     }
 
     fun selectExercise(index: Int) {
-        val max = uiState.value.aggregate?.exercises?.lastIndex ?: return
+        val aggregate = uiState.value.aggregate ?: return
+        val max = aggregate.exercises.lastIndex
+        val bounded = index.coerceIn(0, max)
+        val workSet = aggregate.session.workSetId
+        val phase = aggregate.session.workPhase
+        if (phase != null && workSet != null) {
+            val stays = aggregate.exercises.getOrNull(bounded)?.sets?.any { it.id == workSet } == true
+            if (!stays) {
+                pendingExerciseIndex = bounded
+                confirmCancelWork.value = true
+                return
+            }
+        }
         dismissRest()
-        savedStateHandle[SELECTED_INDEX] = index.coerceIn(0, max)
+        savedStateHandle[SELECTED_INDEX] = bounded
+    }
+
+    fun confirmCancelWorkNavigation() {
+        val index = pendingExerciseIndex
+        confirmCancelWork.value = false
+        pendingExerciseIndex = null
+        viewModelScope.launch {
+            val generation = uiState.value.aggregate?.session?.workGeneration
+            if (generation != null) {
+                sessionRepository.discardWork(sessionId, generation)
+                restEffects.cancelWork(sessionId)
+            }
+            if (index != null) {
+                val max = uiState.value.aggregate?.exercises?.lastIndex ?: return@launch
+                savedStateHandle[SELECTED_INDEX] = index.coerceIn(0, max)
+            }
+        }
+    }
+
+    fun dismissCancelWorkNavigation() {
+        confirmCancelWork.value = false
+        pendingExerciseIndex = null
     }
 
     fun previousExercise() {
@@ -486,9 +638,25 @@ class ActiveWorkoutViewModel(
         if (discarding.value || setId in completingIds.value) {
             return
         }
-        cancelDraftPersist(setId)
         val snapshot = uiState.value
-        val draft = snapshot.drafts[setId] ?: return
+        val running = snapshot.aggregate?.session
+        val pendingSet = snapshot.aggregate
+            ?.exercises
+            ?.flatMap { it.sets }
+            ?.firstOrNull { it.id == setId }
+        if (pendingSet?.status == SessionSetStatus.PENDING && pendingSet.timedWork) {
+            val awaiting = running?.workSetId == setId &&
+                running.workPhase == WorkPhase.AWAITING.name
+            if (!awaiting) return
+        }
+        if (running?.workSetId == setId &&
+            running.workPhase != null &&
+            running.workPhase != WorkPhase.AWAITING.name
+        ) {
+            return
+        }
+        cancelDraftPersist(setId)
+        val draft = drafts.value[setId] ?: snapshot.drafts[setId] ?: return
         val currentStatus = snapshot.aggregate
             ?.exercises
             ?.flatMap { it.sets }
@@ -545,6 +713,14 @@ class ActiveWorkoutViewModel(
 
     fun skipSet(setId: Long) {
         if (discarding.value || setId in completingIds.value) {
+            return
+        }
+        if (preparation.value?.setId == setId) {
+            preparation.value = null
+            syncTimerAudio()
+        }
+        val running = uiState.value.aggregate?.session
+        if (running?.workSetId == setId && running.workPhase != null) {
             return
         }
         cancelDraftPersist(setId)
@@ -867,6 +1043,70 @@ class ActiveWorkoutViewModel(
         }
     }
 
+    fun startWork(setId: Long) {
+        if (!WorkoutTimerAccess.allowed(entitlements)) return
+        if (preparation.value != null) return
+        val session = uiState.value.aggregate?.session
+        if (session?.workPhase != null || session?.restPhase != null) return
+        viewModelScope.launch {
+            if (audioMode.value == TimerAudioMode.VOICE &&
+                timerCuePlayer.prepareVoice(VOICE_READY_WAIT_MILLIS) == VoiceReadiness.READY
+            ) {
+                val sample = restClock()
+                preparationGeneration += 1L
+                preparation.value = WorkPreparationLogic.started(
+                    setId = setId,
+                    elapsedRealtimeMillis = sample.elapsedRealtimeMillis,
+                    generation = preparationGeneration
+                )
+                elapsedRealtime.value = sample.elapsedRealtimeMillis
+                syncTimerAudio()
+            } else {
+                beginMeasuredWork(setId)
+            }
+        }
+    }
+
+    private suspend fun beginMeasuredWork(setId: Long) {
+        val exerciseId = uiState.value.aggregate
+            ?.exercises
+            ?.firstOrNull { exercise -> exercise.sets.any { it.id == setId } }
+            ?.exercise
+            ?.id
+        if (sessionRepository.startWork(sessionId, setId) && exerciseId != null) {
+            emitFocus(WorkoutFocusTarget.Set(setId, exerciseId))
+        }
+    }
+
+    fun pauseWork() {
+        val generation = uiState.value.aggregate?.session?.workGeneration ?: return
+        viewModelScope.launch { sessionRepository.pauseWork(sessionId, generation) }
+    }
+
+    fun resumeWork() {
+        val generation = uiState.value.aggregate?.session?.workGeneration ?: return
+        viewModelScope.launch { sessionRepository.resumeWork(sessionId, generation) }
+    }
+
+    fun finishWorkEarly() {
+        val generation = uiState.value.aggregate?.session?.workGeneration ?: return
+        viewModelScope.launch { sessionRepository.finishWorkEarly(sessionId, generation) }
+    }
+
+    fun confirmTimedSet() {
+        val session = uiState.value.aggregate?.session ?: return
+        if (session.workPhase != WorkPhase.AWAITING.name) return
+        val setId = session.workSetId ?: return
+        val seconds = WorkTimerLogic.actualSeconds(session.toWorkSnapshot(), restClock())
+        val (minutes, remainder) = QuantityParser.fromSeconds(seconds)
+        val current = drafts.value[setId] ?: uiState.value.drafts[setId] ?: return
+        drafts.value = drafts.value + (setId to current.copy(
+            minutesText = minutes.toString(),
+            secondsText = remainder.toString()
+        ))
+        completeSet(setId)
+    }
+
     private fun dismissRest() {
         val session = uiState.value.aggregate?.session ?: return
         if (session.restPhase == null) return
@@ -894,6 +1134,75 @@ class ActiveWorkoutViewModel(
             scheduledRest = null
             restEffects.cancel(sessionId)
         }
+    }
+
+    private fun syncWorkAlarm(aggregate: WorkoutSessionAggregate?) {
+        val session = aggregate?.session
+        if (session?.workPhase == WorkPhase.RUNNING.name) {
+            val key = session.workGeneration to (session.workDeadlineWallClockMillis ?: 0L)
+            if (scheduledWork != key) {
+                scheduledWork = key
+                restEffects.scheduleWork(
+                    sessionId = sessionId,
+                    deadlineWallClockMillis = key.second,
+                    generation = key.first
+                )
+            }
+        } else if (scheduledWork != null) {
+            scheduledWork = null
+            restEffects.cancelWork(sessionId)
+        }
+    }
+
+    private fun considerWorkExpiry() {
+        val session = latestAggregate?.session ?: return
+        if (session.workPhase != WorkPhase.RUNNING.name) return
+        val sample = restClock()
+        val snapshot = session.toWorkSnapshot()
+        if (sample.elapsedRealtimeMillis < (snapshot.anchorElapsedRealtimeMillis ?: 0L)) {
+            val generation = session.workGeneration
+            viewModelScope.launch { sessionRepository.reanchorWork(sessionId, generation) }
+        }
+        if (WorkTimerLogic.remaining(snapshot, sample) !is RestRemaining.Expired) return
+        val generation = session.workGeneration
+        if (workExpiryJob?.isActive == true && workExpiryGeneration == generation) return
+        workExpiryGeneration = generation
+        workExpiryJob = viewModelScope.launch {
+            val expired = sessionRepository.expireWork(sessionId, generation)
+            if (expired) restEffects.onRestFinished()
+            if (!expired && workExpiryGeneration == generation) workExpiryGeneration = null
+        }
+    }
+
+    private fun workUi(
+        aggregate: WorkoutSessionAggregate,
+        elapsedRealtimeMillis: Long,
+        wallClockMillis: Long
+    ): WorkTimerUi? {
+        val phase = WorkPhase.fromStored(aggregate.session.workPhase) ?: return null
+        val setId = aggregate.session.workSetId ?: return null
+        val sample = RestClockSample(elapsedRealtimeMillis, wallClockMillis)
+        val snapshot = aggregate.session.toWorkSnapshot()
+        val remaining = WorkTimerLogic.remaining(snapshot, sample)
+        val active = remaining as? RestRemaining.Active
+        val targetMillis = snapshot.targetMillis ?: 0L
+        val target = (targetMillis / 1000L).toInt()
+        val elapsedMillis = snapshot.elapsedActiveMillis ?: 0L
+        val countdownMillis = if (phase == WorkPhase.AWAITING) elapsedMillis else active?.remainingMillis ?: 0L
+        return WorkTimerUi(
+            phase = phase,
+            setId = setId,
+            countdown = RestTimerLogic.formatCountdown(countdownMillis),
+            progress = if (phase == WorkPhase.AWAITING) {
+                1f
+            } else {
+                RestTimerLogic.progress(remaining)
+            },
+            actualSeconds = WorkTimerLogic.actualSeconds(snapshot, sample),
+            targetSeconds = target,
+            awaiting = phase == WorkPhase.AWAITING,
+            finishedEarly = phase == WorkPhase.AWAITING && elapsedMillis < targetMillis
+        )
     }
 
     private fun considerExpiry() {
@@ -1010,9 +1319,110 @@ class ActiveWorkoutViewModel(
         return result
     }
 
+    private fun preparationUi(
+        snapshot: WorkPreparationSnapshot?,
+        elapsedRealtimeMillis: Long
+    ): WorkPreparationUi? {
+        snapshot ?: return null
+        val remaining = snapshot.deadlineElapsed - elapsedRealtimeMillis
+        val count = WorkPreparationLogic.displayCount(remaining)
+        if (count <= 0) return null
+        return WorkPreparationUi(setId = snapshot.setId, countdown = count.toString())
+    }
+
+    private fun syncTimerAudio() {
+        val aggregate = latestAggregate
+        if (aggregate != null && aggregate.session.status != SessionStatus.IN_PROGRESS) {
+            preparation.value = null
+            audioCoordinator.stop()
+            return
+        }
+        audioCoordinator.sync(currentAudioSlot(), audioMode.value)
+    }
+
+    private fun currentAudioSlot(): TimerIntervalSlot? {
+        val sample = restClock()
+        val prep = preparation.value
+        if (prep != null) {
+            val remaining = prep.deadlineElapsed - sample.elapsedRealtimeMillis
+            return TimerIntervalSlot(
+                id = TimerIntervalId(TimerCueKind.PREPARATION, prep.generation),
+                deadlineElapsed = prep.deadlineElapsed,
+                phase = if (remaining <= 0L) TimerAudioPhase.FINISHED_NATURALLY else TimerAudioPhase.RUNNING,
+                remainingMillis = remaining,
+                durationMillis = WorkPreparationLogic.DURATION_MILLIS,
+                completion = TimerSpokenWord.GO,
+                sessionId = sessionId,
+                ledgerGeneration = prep.generation,
+                setId = prep.setId
+            )
+        }
+        val aggregate = latestAggregate ?: return null
+        val session = aggregate.session
+        val workPhase = WorkPhase.fromStored(session.workPhase)
+        if (workPhase != null && session.workSetId != null) {
+            val snapshot = session.toWorkSnapshot()
+            val remaining = WorkTimerLogic.remaining(snapshot, sample)
+            val phase = when (workPhase) {
+                WorkPhase.PAUSED -> TimerAudioPhase.PAUSED
+                WorkPhase.RUNNING -> if (remaining is RestRemaining.Expired) {
+                    TimerAudioPhase.FINISHED_NATURALLY
+                } else {
+                    TimerAudioPhase.RUNNING
+                }
+                WorkPhase.AWAITING -> if (snapshot.elapsedActiveMillis == snapshot.targetMillis) {
+                    TimerAudioPhase.FINISHED_NATURALLY
+                } else {
+                    TimerAudioPhase.CANCELLED
+                }
+            }
+            return TimerIntervalSlot(
+                id = TimerIntervalId(TimerCueKind.WORK, session.workGeneration),
+                deadlineElapsed = snapshot.deadlineElapsedRealtimeMillis,
+                phase = phase,
+                remainingMillis = (remaining as? RestRemaining.Active)?.remainingMillis,
+                durationMillis = snapshot.targetMillis,
+                completion = WorkCompletionCue.word(
+                    aggregate.exercises,
+                    session.workSetId,
+                    WorkoutTimerAccess.allowed(entitlements)
+                ),
+                sessionId = sessionId,
+                ledgerGeneration = session.workGeneration,
+                setId = session.workSetId
+            )
+        }
+        if (session.restPhase == RestPhase.COUNTING) {
+            val snapshot = session.toRestSnapshot()
+            val remaining = RestTimerLogic.remaining(snapshot, sample)
+            return TimerIntervalSlot(
+                id = TimerIntervalId(TimerCueKind.REST, session.restGeneration),
+                deadlineElapsed = snapshot.deadlineElapsedRealtimeMillis,
+                phase = if (remaining is RestRemaining.Expired) {
+                    TimerAudioPhase.FINISHED_NATURALLY
+                } else {
+                    TimerAudioPhase.RUNNING
+                },
+                remainingMillis = (remaining as? RestRemaining.Active)?.remainingMillis,
+                durationMillis = snapshot.durationMillis,
+                completion = TimerSpokenWord.GO,
+                sessionId = sessionId,
+                ledgerGeneration = session.restGeneration,
+                setId = snapshot.nextSetId
+            )
+        }
+        return null
+    }
+
+    override fun onCleared() {
+        audioCoordinator.release()
+        super.onCleared()
+    }
+
     companion object {
         const val SESSION_ID = "sessionId"
         const val SELECTED_INDEX = "selectedIndex"
         const val DRAFT_PERSIST_DELAY_MS = 400L
+        private const val VOICE_READY_WAIT_MILLIS = 400L
     }
 }

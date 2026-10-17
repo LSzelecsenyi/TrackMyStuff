@@ -825,6 +825,27 @@ val MIGRATION_18_19 = object : Migration(18, 19) {
     }
 }
 
+val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE `workout_template_sets` ADD COLUMN `timedWork` INTEGER NOT NULL DEFAULT 0"
+        )
+        db.execSQL(
+            "ALTER TABLE `workout_session_sets` ADD COLUMN `timedWork` INTEGER NOT NULL DEFAULT 0"
+        )
+        db.execSQL("ALTER TABLE `workout_sessions` ADD COLUMN `workPhase` TEXT")
+        db.execSQL("ALTER TABLE `workout_sessions` ADD COLUMN `workSetId` INTEGER")
+        db.execSQL("ALTER TABLE `workout_sessions` ADD COLUMN `workTargetMillis` INTEGER")
+        db.execSQL("ALTER TABLE `workout_sessions` ADD COLUMN `workElapsedActiveMillis` INTEGER")
+        db.execSQL("ALTER TABLE `workout_sessions` ADD COLUMN `workAnchorElapsedRealtimeMillis` INTEGER")
+        db.execSQL("ALTER TABLE `workout_sessions` ADD COLUMN `workDeadlineElapsedRealtimeMillis` INTEGER")
+        db.execSQL("ALTER TABLE `workout_sessions` ADD COLUMN `workDeadlineWallClockMillis` INTEGER")
+        db.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `workGeneration` INTEGER NOT NULL DEFAULT 0"
+        )
+    }
+}
+
 val MIGRATION_13_14 = object : Migration(13, 14) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

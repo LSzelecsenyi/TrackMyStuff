@@ -3,6 +3,7 @@ package app.mymusclemap.ui.workout
 import app.mymusclemap.ui.exercises.starterExerciseLabel
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
@@ -100,6 +101,8 @@ import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
 import app.mymusclemap.domain.workout.PlannedSetLogic
+import app.mymusclemap.domain.workout.RestTimerLogic
+import app.mymusclemap.domain.workout.WorkPhase
 import app.mymusclemap.domain.workout.PlannedTargetDisplay
 import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.domain.workout.SessionExerciseItem
@@ -251,7 +254,14 @@ fun ActiveWorkoutScreen(
     onFocusConsumed: () -> Unit,
     onAddRest: () -> Unit = {},
     onSkipRest: () -> Unit = {},
-    onContinueAfterRest: () -> Unit = {}
+    onContinueAfterRest: () -> Unit = {},
+    onStartWork: (Long) -> Unit = {},
+    onPauseWork: () -> Unit = {},
+    onResumeWork: () -> Unit = {},
+    onFinishWorkEarly: () -> Unit = {},
+    onConfirmTimedSet: () -> Unit = {},
+    onConfirmCancelWork: () -> Unit = {},
+    onDismissCancelWork: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -471,7 +481,12 @@ fun ActiveWorkoutScreen(
                         onAddExtra = { onAddExtra(item.exercise.id) },
                         onRemoveExtra = onRemoveExtra,
                         onRemoveExercise = { pendingRemoveExerciseId = item.exercise.id },
-                        onOpenHistory = { historyOpen = true }
+                        onOpenHistory = { historyOpen = true },
+                        onStartWork = onStartWork,
+                        onPauseWork = onPauseWork,
+                        onResumeWork = onResumeWork,
+                        onFinishWorkEarly = onFinishWorkEarly,
+                        onConfirmTimedSet = onConfirmTimedSet
                     )
                 }
                 item(key = WORKOUT_FINISH_KEY) {
@@ -603,6 +618,23 @@ fun ActiveWorkoutScreen(
             selection = historySelection,
             comparisonPosition = historySet.position,
             onDismiss = { historyOpen = false }
+        )
+    }
+    if (state.confirmCancelWork) {
+        AlertDialog(
+            onDismissRequest = onDismissCancelWork,
+            title = { Text(stringResource(R.string.work_cancel_title)) },
+            text = { Text(stringResource(R.string.work_cancel_body)) },
+            confirmButton = {
+                TextButton(onClick = onConfirmCancelWork) {
+                    Text(stringResource(R.string.work_cancel_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissCancelWork) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
         )
     }
     if (state.confirmAbandon) {
@@ -800,6 +832,115 @@ private fun WorkoutProgressHeader(state: ActiveWorkoutUiState) {
 }
 
 @Composable
+private fun WorkTimerSection(
+    work: WorkTimerUi,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onFinishEarly: () -> Unit
+) {
+    val accent = StrictBrand.actionContainer()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("work_timer")
+    ) {
+        Text(
+            text = stringResource(
+                when {
+                    work.finishedEarly -> R.string.work_stopped_early
+                    work.awaiting -> R.string.work_time_up
+                    work.phase == WorkPhase.PAUSED -> R.string.work_paused
+                    else -> R.string.work_status
+                }
+            ),
+            style = AppTypeTokens.statCaption,
+            color = accent
+        )
+        Text(
+            text = work.countdown,
+            style = AppTypeTokens.statHero,
+            color = accent
+        )
+        if (work.awaiting) {
+            Text(
+                text = stringResource(R.string.work_completed_duration),
+                style = AppTypeTokens.statCaption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(AppDimens.headerStackGap))
+        LinearProgressIndicator(
+            progress = { work.progress },
+            modifier = Modifier.fillMaxWidth(),
+            color = accent,
+            trackColor = accent.copy(alpha = 0.24f)
+        )
+        if (!work.awaiting) {
+        Spacer(Modifier.height(AppDimens.itemGap))
+        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+            when {
+                work.phase == WorkPhase.PAUSED -> {
+                    TimerOutlineButton(
+                        label = stringResource(R.string.work_resume),
+                        accent = accent,
+                        testTag = "work_resume",
+                        onClick = onResume
+                    )
+                    TimerOutlineButton(
+                        label = stringResource(R.string.work_finish_early),
+                        accent = accent,
+                        testTag = "work_finish_early",
+                        onClick = onFinishEarly
+                    )
+                }
+                else -> {
+                    TimerOutlineButton(
+                        label = stringResource(R.string.work_pause),
+                        accent = accent,
+                        testTag = "work_pause",
+                        onClick = onPause
+                    )
+                    TimerOutlineButton(
+                        label = stringResource(R.string.work_finish_early),
+                        accent = accent,
+                        testTag = "work_finish_early",
+                        onClick = onFinishEarly
+                    )
+                }
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun TimerOutlineButton(
+    label: String,
+    accent: Color,
+    testTag: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = true,
+        shape = AppShapeTokens.chip,
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.Transparent,
+            contentColor = accent,
+            disabledContainerColor = Color.Transparent,
+            disabledContentColor = accent.copy(alpha = 0.38f)
+        ),
+        border = BorderStroke(AppDimens.strokeThin, accent),
+        modifier = modifier
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag(testTag)
+    ) {
+        Text(label)
+    }
+}
+
+@Composable
 private fun RestTimerCard(
     rest: RestTimerUi,
     onAddRest: () -> Unit,
@@ -836,22 +977,20 @@ private fun RestTimerCard(
             )
             Spacer(Modifier.height(AppDimens.itemGap))
             Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
-                OutlinedButton(
-                    onClick = onAddRest,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("rest_add_ten")
-                ) {
-                    Text(stringResource(R.string.rest_add_ten))
-                }
-                OutlinedButton(
-                    onClick = onSkipRest,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("rest_skip")
-                ) {
-                    Text(stringResource(R.string.rest_skip))
-                }
+                TimerOutlineButton(
+                    label = stringResource(R.string.rest_add_ten),
+                    accent = accent,
+                    testTag = "rest_add_ten",
+                    modifier = Modifier.weight(1f),
+                    onClick = onAddRest
+                )
+                TimerOutlineButton(
+                    label = stringResource(R.string.rest_skip),
+                    accent = accent,
+                    testTag = "rest_skip",
+                    modifier = Modifier.weight(1f),
+                    onClick = onSkipRest
+                )
             }
         } else {
             Spacer(Modifier.height(AppDimens.itemGap))
@@ -859,7 +998,9 @@ private fun RestTimerCard(
                 onClick = onContinueAfterRest,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .defaultMinSize(minHeight = AppDimens.minTouch)
                     .testTag("rest_next"),
+                shape = AppShapeTokens.chip,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = accent,
                     contentColor = MaterialTheme.colorScheme.background
@@ -929,7 +1070,12 @@ private fun ExerciseBlock(
     onAddExtra: () -> Unit,
     onRemoveExtra: (Long) -> Unit,
     onRemoveExercise: () -> Unit,
-    onOpenHistory: () -> Unit
+    onOpenHistory: () -> Unit,
+    onStartWork: (Long) -> Unit = {},
+    onPauseWork: () -> Unit = {},
+    onResumeWork: () -> Unit = {},
+    onFinishWorkEarly: () -> Unit = {},
+    onConfirmTimedSet: () -> Unit = {}
 ) {
     val done = item.sets.isNotEmpty() && item.sets.none { it.status == SessionSetStatus.PENDING }
     val completedCount = item.sets.count { it.status == SessionSetStatus.COMPLETED }
@@ -1043,7 +1189,15 @@ private fun ExerciseBlock(
                     } else {
                         CurrentSetHistoryLine.Hidden
                     },
-                    onOpenHistory = onOpenHistory
+                    onOpenHistory = onOpenHistory,
+                    work = state.work,
+                    preparation = state.preparation?.takeIf { it.setId == set.id },
+                    timersEnabled = state.timersEnabled,
+                    onStartWork = { onStartWork(set.id) },
+                    onPauseWork = onPauseWork,
+                    onResumeWork = onResumeWork,
+                    onFinishWorkEarly = onFinishWorkEarly,
+                    onConfirmTimedSet = onConfirmTimedSet
                 )
                 if (index != item.sets.lastIndex) {
                     HorizontalDivider(
@@ -1108,7 +1262,15 @@ private fun SetRow(
     onRemoveExtra: () -> Unit,
     onEdit: () -> Unit,
     historyLine: CurrentSetHistoryLine,
-    onOpenHistory: () -> Unit
+    onOpenHistory: () -> Unit,
+    work: WorkTimerUi? = null,
+    preparation: WorkPreparationUi? = null,
+    timersEnabled: Boolean = true,
+    onStartWork: () -> Unit = {},
+    onPauseWork: () -> Unit = {},
+    onResumeWork: () -> Unit = {},
+    onFinishWorkEarly: () -> Unit = {},
+    onConfirmTimedSet: () -> Unit = {}
 ) {
     val planned = buildPlannedLabel(set, stringResource(R.string.set_copy_bodyweight))
     val currentBadge = stringResource(R.string.active_exercise_badge)
@@ -1259,6 +1421,15 @@ private fun SetRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        if (work != null && work.setId == set.id) {
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            WorkTimerSection(
+                work = work,
+                onPause = onPauseWork,
+                onResume = onResumeWork,
+                onFinishEarly = onFinishWorkEarly
+            )
+        }
         if (showFields) {
             Spacer(Modifier.height(AppDimens.headerStackGap))
             ActualFields(
@@ -1266,6 +1437,7 @@ private fun SetRow(
                 draft = draft,
                 errors = errors,
                 steppersEnabled = !completing,
+                timedWork = set.timedWork,
                 onReps = onReps,
                 onStepReps = onStepReps,
                 onLoadKind = onLoadKind,
@@ -1276,11 +1448,48 @@ private fun SetRow(
                 onDistanceUnit = onDistanceUnit
             )
         }
+        if (work != null && work.setId == set.id && work.awaiting) {
+            Spacer(Modifier.height(AppDimens.headerStackGap))
+            Button(
+                onClick = onConfirmTimedSet,
+                enabled = !completing,
+                shape = AppShapeTokens.button,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = StrictBrand.lime,
+                    contentColor = StrictBrand.onAction()
+                ),
+                modifier = Modifier.testTag("work_complete")
+            ) {
+                Text(stringResource(R.string.work_complete_set))
+            }
+        }
         }
         Spacer(Modifier.height(AppDimens.headerStackGap))
         when (set.status) {
             SessionSetStatus.PENDING -> {
-                if (current) {
+                val timerOnThisSet = work?.setId == set.id
+                val preparing = preparation
+                if (preparing != null) {
+                    Text(
+                        text = stringResource(R.string.work_preparation),
+                        style = AppTypeTokens.statCaption,
+                        color = StrictBrand.actionContainer()
+                    )
+                    Text(
+                        text = preparing.countdown,
+                        style = AppTypeTokens.statHero,
+                        color = StrictBrand.actionContainer(),
+                        modifier = Modifier.testTag("work_preparation")
+                    )
+                }
+                if (current && set.timedWork && !timersEnabled && !timerOnThisSet && preparing == null) {
+                    Text(
+                        text = stringResource(R.string.work_requires_pro),
+                        style = AppTypeTokens.statSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (current && !timerOnThisSet && preparing == null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1293,12 +1502,27 @@ private fun SetRow(
                             traversalIndex = 5f,
                             onClick = onSkip
                         )
-                        CompleteSetAction(
-                            completing = completing,
-                            accent = StrictBrand.lime,
-                            traversalIndex = 6f,
-                            onClick = onComplete
-                        )
+                        if (set.timedWork && timersEnabled) {
+                            Button(
+                                onClick = onStartWork,
+                                enabled = !completing,
+                                shape = AppShapeTokens.button,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = StrictBrand.lime,
+                                    contentColor = StrictBrand.onAction()
+                                ),
+                                modifier = Modifier.testTag("work_start")
+                            ) {
+                                Text(stringResource(R.string.work_start))
+                            }
+                        } else if (!set.timedWork) {
+                            CompleteSetAction(
+                                completing = completing,
+                                accent = StrictBrand.lime,
+                                traversalIndex = 6f,
+                                onClick = onComplete
+                            )
+                        }
                     }
                     if (ActualSetLogic.canRemove(set)) {
                         TextButton(
@@ -1553,6 +1777,7 @@ private fun ActualFields(
     draft: ActualSetDraft,
     errors: List<TemplateFieldError>,
     steppersEnabled: Boolean,
+    timedWork: Boolean,
     onReps: (String) -> Unit,
     onStepReps: (Int) -> Unit,
     onLoadKind: (PlannedLoadKind) -> Unit,
@@ -1564,7 +1789,7 @@ private fun ActualFields(
 ) {
     val measurement = item.exercise.measurementType
     val resistance = item.exercise.resistanceBasis
-    if (PlannedSetLogic.requiresReps(measurement)) {
+    if (PlannedSetLogic.requiresReps(measurement) && !timedWork) {
         val parsedReps = draft.repsText.trim().toIntOrNull()
         val minusEnabled = steppersEnabled &&
             parsedReps != null &&
@@ -1750,7 +1975,9 @@ private fun shortLoadInfo(item: SessionExerciseItem, bodyweightLabel: String): S
 
 private fun buildPlannedLabel(set: SessionSet, bodyweightLabel: String): String {
     val parts = mutableListOf<String>()
-    PlannedTargetDisplay.reps(set.plannedMinReps, set.plannedMaxReps)?.let { parts += it }
+    if (!set.timedWork) {
+        PlannedTargetDisplay.reps(set.plannedMinReps, set.plannedMaxReps)?.let { parts += it }
+    }
     val load = PlannedTargetDisplay.load(set.plannedLoadKind, set.plannedWeightKg)
     if (load.isNotBlank() && load != "BW") {
         parts += load
@@ -1770,7 +1997,7 @@ private fun buildPlannedLabel(set: SessionSet, bodyweightLabel: String): String 
 
 private fun actualSummary(set: SessionSet, draft: ActualSetDraft): String {
     val parts = mutableListOf<String>()
-    if (draft.repsText.isNotBlank()) {
+    if (!set.timedWork && draft.repsText.isNotBlank()) {
         parts += draft.repsText
     }
     val load = PlannedTargetDisplay.load(draft.loadKind, set.actualWeightKg)

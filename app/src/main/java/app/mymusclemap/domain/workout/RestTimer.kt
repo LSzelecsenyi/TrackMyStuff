@@ -175,7 +175,24 @@ object RestTimerLogic {
             return RestRemaining.Inactive
         }
         if (left <= 0L) return RestRemaining.Expired
-        return RestRemaining.Active(left, duration)
+        val segment = if (anchor != null && elapsedDeadline != null && elapsedDeadline >= anchor) {
+            elapsedDeadline - anchor
+        } else {
+            duration
+        }
+        return RestRemaining.Active(displayedRemainingMillis(left, segment, duration), duration)
+    }
+
+    /**
+     * Ceiling keeps the last partial second visible, but a sample taken before
+     * the interval anchor must not display one second more than that interval.
+     * [segmentMillis] is the current running piece, including a +10 extension.
+     */
+    fun displayedRemainingMillis(rawLeft: Long, segmentMillis: Long, durationMillis: Long): Long {
+        var left = rawLeft.coerceAtLeast(0L)
+        if (segmentMillis > 0L) left = left.coerceAtMost(segmentMillis)
+        if (durationMillis > 0L) left = left.coerceAtMost(durationMillis)
+        return left
     }
 
     fun formatCountdown(remainingMillis: Long): String {

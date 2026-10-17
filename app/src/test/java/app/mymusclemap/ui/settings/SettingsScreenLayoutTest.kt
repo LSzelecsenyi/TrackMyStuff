@@ -74,6 +74,18 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
+    fun timerAudioOffersVoiceBeepsAndSilent() {
+        var selected: app.mymusclemap.domain.workout.TimerAudioMode? = null
+        render(onTimerAudioChange = { selected = it })
+        composeRule.onNodeWithTag("settings_timer_audio").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.settings_timer_audio_beeps_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_timer_audio_voice").performClick()
+        assertEquals(app.mymusclemap.domain.workout.TimerAudioMode.VOICE, selected)
+        composeRule.onNodeWithTag("settings_timer_audio_silent").performClick()
+        assertEquals(app.mymusclemap.domain.workout.TimerAudioMode.SILENT, selected)
+    }
+
+    @Test
     fun lockScreenEnableExplanationCanBeDismissedWithoutConfirming() {
         var confirmed = false
         var dismissed = false
@@ -130,31 +142,34 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
-    fun givenSystemThemeWhenScreenAppearsThenSystemRowIsSelected() {
+    fun appearanceSectionIsAbsentAndColorPaletteRemains() {
         render()
-        composeRule.onNodeWithTag(SETTINGS_THEME_SYSTEM).assertIsSelected()
-        composeRule.onNodeWithTag(SETTINGS_THEME_LIGHT).assertIsNotSelected()
-        composeRule.onNodeWithTag(SETTINGS_THEME_DARK).assertIsNotSelected()
-        composeRule.onNodeWithText(testString(R.string.theme_title).uppercase()).assertIsDisplayed()
+        composeRule.onAllNodesWithTag(SETTINGS_THEME_DARK).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(SETTINGS_THEME_SYSTEM).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(SETTINGS_THEME_LIGHT).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.theme_title).uppercase()).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.theme_dark)).assertCountEquals(0)
+        composeRule.onNodeWithText(testString(R.string.palette_title).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_PALETTE_DEFAULT).assertIsSelected()
+        composeRule.onNodeWithTag(SETTINGS_PALETTE_CUSTOM).assertIsNotSelected()
     }
 
     @Test
-    fun givenAnotherAppearanceModeWhenRowTappedThenExactlyOneModeIsSelected() {
+    fun strictDefaultAndCustomPalettesStaySelectable() {
         renderInteractive()
-        composeRule.onNodeWithTag(SETTINGS_THEME_LIGHT).performClick()
-        composeRule.onNodeWithTag(SETTINGS_THEME_LIGHT).assertIsSelected()
-        composeRule.onNodeWithTag(SETTINGS_THEME_SYSTEM).assertIsNotSelected()
-        composeRule.onNodeWithTag(SETTINGS_THEME_DARK).assertIsNotSelected()
-        composeRule.onNodeWithTag(SETTINGS_THEME_DARK).performClick()
-        composeRule.onNodeWithTag(SETTINGS_THEME_DARK).assertIsSelected()
-        composeRule.onNodeWithTag(SETTINGS_THEME_SYSTEM).assertIsNotSelected()
-        composeRule.onNodeWithTag(SETTINGS_THEME_LIGHT).assertIsNotSelected()
+        composeRule.onNodeWithTag(SETTINGS_PALETTE_DEFAULT).assertIsSelected()
+        composeRule.onNodeWithTag(SETTINGS_PALETTE_CUSTOM).performClick()
+        composeRule.onNodeWithTag(SETTINGS_PALETTE_CUSTOM).assertIsSelected()
+        composeRule.onNodeWithTag(SETTINGS_PALETTE_DEFAULT).assertIsNotSelected()
+        composeRule.onNodeWithTag(SETTINGS_PALETTE_DEFAULT).performClick()
+        composeRule.onNodeWithTag(SETTINGS_PALETTE_DEFAULT).assertIsSelected()
     }
 
     @Test
     fun givenDefaultPaletteThenCustomEditorIsHidden() {
         render()
-        composeRule.onNodeWithText(testString(R.string.theme_system)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.theme_title).uppercase()).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.theme_dark)).assertCountEquals(0)
         composeRule.onNodeWithText(testString(R.string.palette_default)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.palette_default_body)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.palette_custom_body)).assertIsDisplayed()
@@ -298,9 +313,6 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithTag(SETTINGS_SAVE).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_CANCEL).assertIsDisplayed()
         val interactive = listOf(
-            SETTINGS_THEME_SYSTEM,
-            SETTINGS_THEME_LIGHT,
-            SETTINGS_THEME_DARK,
             SETTINGS_PALETTE_DEFAULT,
             SETTINGS_PALETTE_CUSTOM,
             SETTINGS_EDITOR_LIGHT,
@@ -329,7 +341,7 @@ class SettingsScreenLayoutTest {
     @Test
     fun givenVisibleScreenThenLegacyMaterialChromeIsGone() {
         render(state = customState())
-        composeRule.onNodeWithText(testString(R.string.theme_title).uppercase()).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.theme_title).uppercase()).assertCountEquals(0)
         composeRule.onNodeWithText(testString(R.string.palette_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.theme_preview_title).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_PREVIEW).assertIsDisplayed()
@@ -517,7 +529,7 @@ class SettingsScreenLayoutTest {
         val dark = ThemeSeeds.copyOfFactoryDark()
         return SettingsUiState(
             appearance = AppearanceSettings(
-                mode = ThemeMode.System,
+                mode = ThemeMode.Dark,
                 paletteType = PaletteType.Custom,
                 customLight = light,
                 customDark = dark
@@ -543,7 +555,6 @@ class SettingsScreenLayoutTest {
                     Box(modifier = Modifier.width(360.dp).fillMaxSize()) {
                         SettingsScreen(
                             state = SettingsUiState(appearance = appearance, draft = draft),
-                            onThemeSelected = { appearance = appearance.copy(mode = it) },
                             onSelectDefaultPalette = {
                                 val next = PaletteSessionLogic.selectDefault(
                                     PaletteSession(appearance, draft)
@@ -629,6 +640,7 @@ class SettingsScreenLayoutTest {
         darkTheme: Boolean = false,
         onBack: () -> Unit = {},
         onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
+        onTimerAudioChange: (app.mymusclemap.domain.workout.TimerAudioMode) -> Unit = {},
         lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
         onConfirmLockScreenEnable: () -> Unit = {},
         onDismissLockScreenEnable: () -> Unit = {},
@@ -653,7 +665,6 @@ class SettingsScreenLayoutTest {
                     ) {
                         SettingsScreen(
                             state = state,
-                            onThemeSelected = {},
                             onSelectDefaultPalette = {},
                             onSelectCustomPalette = {},
                             onEditingDarkChange = {},
@@ -678,6 +689,7 @@ class SettingsScreenLayoutTest {
                             onMessageConsumed = {},
                             onBack = onBack,
                             onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
+                            onTimerAudioChange = onTimerAudioChange,
                             lockScreenEnablePrompt = lockScreenEnablePrompt,
                             onConfirmLockScreenEnable = onConfirmLockScreenEnable,
                             onDismissLockScreenEnable = onDismissLockScreenEnable,

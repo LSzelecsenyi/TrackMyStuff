@@ -39,7 +39,15 @@ data class WorkoutSession(
     val restDeadlineElapsedRealtimeMillis: Long? = null,
     val restDeadlineWallClockMillis: Long? = null,
     val restDurationMillis: Long? = null,
-    val restGeneration: Long = 0L
+    val restGeneration: Long = 0L,
+    val workPhase: String? = null,
+    val workSetId: Long? = null,
+    val workTargetMillis: Long? = null,
+    val workElapsedActiveMillis: Long? = null,
+    val workAnchorElapsedRealtimeMillis: Long? = null,
+    val workDeadlineElapsedRealtimeMillis: Long? = null,
+    val workDeadlineWallClockMillis: Long? = null,
+    val workGeneration: Long = 0L
 )
 
 data class SessionExercise(
@@ -91,7 +99,9 @@ data class SessionSet(
     /** Plan-set row copied at start. Null when this set has no reliable plan source. */
     val sourceTemplateSetId: Long? = null,
     /** Null inherits the exercise rest. Zero disables rest. A positive value is seconds. */
-    val restSeconds: Int? = null
+    val restSeconds: Int? = null,
+    /** True when this set's target is a work duration. Repetitions stay optional. */
+    val timedWork: Boolean = false
 )
 
 data class SessionExerciseItem(

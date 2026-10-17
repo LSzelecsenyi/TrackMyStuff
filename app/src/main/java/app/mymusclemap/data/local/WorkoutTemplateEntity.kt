@@ -85,5 +85,7 @@ data class WorkoutTemplateSetEntity(
     val weightKg: Double?,
     val durationSeconds: Int?,
     val distanceMeters: Double?,
-    val restSeconds: Int? = null
+    val restSeconds: Int? = null,
+    @ColumnInfo(defaultValue = "0")
+    val timedWork: Boolean = false
 )

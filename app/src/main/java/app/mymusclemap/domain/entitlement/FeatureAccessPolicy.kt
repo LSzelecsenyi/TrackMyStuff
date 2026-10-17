@@ -70,6 +70,9 @@ class FeatureAccessPolicy(
 
     fun backup(): BackupPermissions = BackupPermissions()
 
+    /** Rest countdown and timed working sets. Founder, trial, and subscription Pro all qualify. */
+    fun workoutTimers(): Boolean = pro
+
     private val pro: Boolean get() = entitlement.grantsPro
 
     companion object {

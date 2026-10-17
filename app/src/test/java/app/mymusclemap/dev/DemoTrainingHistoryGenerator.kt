@@ -33,6 +33,7 @@ import app.mymusclemap.domain.statistics.TrainingStatisticsLogic
 import app.mymusclemap.domain.statistics.WorkoutSetVolume
 import app.mymusclemap.domain.theme.AppearanceCodec
 import app.mymusclemap.domain.theme.AppearanceSettings
+import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.ScheduledWorkout
@@ -155,7 +156,9 @@ object DemoTrainingHistoryGenerator {
                 bodyMeasurements = bodyMeasurements.sortedBy { it.id },
                 weeklyWorkoutGoals = training.goals.sortedBy { it.effectiveWeekStart }
             ),
-            settings = AppearanceCodec.encode(AppearanceSettings.Default)
+            settings = AppearanceCodec.encode(
+                AppearanceSettings.Default.copy(mode = ThemeMode.System)
+            )
         )
         val errors = AppBackupValidator.validate(snapshot)
         check(errors.isEmpty()) {

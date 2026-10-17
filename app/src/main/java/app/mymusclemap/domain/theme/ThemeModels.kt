@@ -69,12 +69,23 @@ data class AppearanceSettings(
 
     companion object {
         val Default = AppearanceSettings(
-            mode = ThemeMode.System,
+            mode = ThemeMode.Dark,
             paletteType = PaletteType.Default,
             customLight = ThemeSeeds.copyOfFactoryLight(),
             customDark = ThemeSeeds.copyOfFactoryDark()
         )
     }
+}
+
+/**
+ * Built-in Light and Follow system resolve to STRICT Dark.
+ * A custom palette keeps an explicit Light or Dark choice and its stored colors.
+ */
+fun AppearanceSettings.resolvedBuiltInAppearance(): AppearanceSettings {
+    if (paletteType == PaletteType.Custom) {
+        return if (mode == ThemeMode.System) copy(mode = ThemeMode.Dark) else this
+    }
+    return if (mode == ThemeMode.Dark) this else copy(mode = ThemeMode.Dark)
 }
 
 enum class ThemeMode {

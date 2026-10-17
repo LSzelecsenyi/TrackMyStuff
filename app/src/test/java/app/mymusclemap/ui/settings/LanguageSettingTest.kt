@@ -28,7 +28,6 @@ class LanguageSettingTest {
             WeightTrackerThemeForPreview {
                 SettingsScreen(
                     state = SettingsUiState(),
-                    onThemeSelected = {},
                     onSelectDefaultPalette = {},
                     onSelectCustomPalette = {},
                     onEditingDarkChange = {},
@@ -67,7 +66,6 @@ class LanguageSettingTest {
             WeightTrackerThemeForPreview {
                 SettingsScreen(
                     state = SettingsUiState(),
-                    onThemeSelected = {},
                     onSelectDefaultPalette = {},
                     onSelectCustomPalette = {},
                     onEditingDarkChange = {},

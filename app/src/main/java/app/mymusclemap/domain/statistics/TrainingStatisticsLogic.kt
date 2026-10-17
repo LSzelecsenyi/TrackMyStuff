@@ -305,6 +305,7 @@ object TrainingStatisticsLogic {
     ): ExerciseProgressSummary? {
         val weighted = appearances.flatMap { (date, sets) ->
             sets.mapNotNull { set ->
+                if (set.timedWork) return@mapNotNull null
                 val load = WorkoutSetVolume.effectiveLoadKg(set, exercise.weightInterpretation)
                     ?: return@mapNotNull null
                 val reps = set.actualReps ?: return@mapNotNull null

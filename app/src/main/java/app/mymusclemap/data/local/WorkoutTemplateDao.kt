@@ -84,7 +84,7 @@ abstract class WorkoutTemplateDao {
     @Query(
         """
         UPDATE workout_template_exercises
-        SET exerciseId = :exerciseId, position = :position, notes = :notes
+        SET exerciseId = :exerciseId, position = :position, notes = :notes, restSeconds = :restSeconds
         WHERE id = :id AND templateId = :templateId
         """
     )
@@ -93,7 +93,8 @@ abstract class WorkoutTemplateDao {
         templateId: Long,
         exerciseId: Long,
         position: Int,
-        notes: String?
+        notes: String?,
+        restSeconds: Int?
     ): Int
 
     @Query(
@@ -105,7 +106,9 @@ abstract class WorkoutTemplateDao {
             loadKind = :loadKind,
             weightKg = :weightKg,
             durationSeconds = :durationSeconds,
-            distanceMeters = :distanceMeters
+            distanceMeters = :distanceMeters,
+            restSeconds = :restSeconds,
+            timedWork = :timedWork
         WHERE id = :id AND templateExerciseId = :templateExerciseId
         """
     )
@@ -118,7 +121,9 @@ abstract class WorkoutTemplateDao {
         loadKind: String,
         weightKg: Double?,
         durationSeconds: Int?,
-        distanceMeters: Double?
+        distanceMeters: Double?,
+        restSeconds: Int?,
+        timedWork: Boolean
     ): Int
 
     @Query("DELETE FROM workout_template_exercises WHERE id = :id")
@@ -199,7 +204,9 @@ abstract class WorkoutTemplateDao {
                             loadKind = set.loadKind,
                             weightKg = set.weightKg,
                             durationSeconds = set.durationSeconds,
-                            distanceMeters = set.distanceMeters
+                            distanceMeters = set.distanceMeters,
+                            restSeconds = set.restSeconds,
+                            timedWork = set.timedWork
                         )
                     )
                 } else {
@@ -218,7 +225,8 @@ abstract class WorkoutTemplateDao {
                     templateId = template.id,
                     exerciseId = exercise.exerciseId,
                     position = exercisePosition,
-                    notes = exercise.notes
+                    notes = exercise.notes,
+                    restSeconds = exercise.restSeconds
                 )
             )
         }

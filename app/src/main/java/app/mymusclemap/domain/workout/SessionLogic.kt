@@ -187,7 +187,7 @@ object ActualSetLogic {
             return set.draft
         }
         val sourceKind = set.actualLoadKind ?: set.plannedLoadKind
-        val sourceReps = set.actualReps ?: set.plannedMinReps
+        val sourceReps = if (set.timedWork) set.actualReps else set.actualReps ?: set.plannedMinReps
         val sourceWeight = set.actualWeightKg ?: set.plannedWeightKg
         val sourceDuration = set.actualDurationSeconds ?: set.plannedDurationSeconds
         val sourceDistance = set.actualDistanceMeters ?: set.plannedDistanceMeters
@@ -206,7 +206,8 @@ object ActualSetLogic {
     fun parse(
         draft: ActualSetDraft,
         measurement: MeasurementType,
-        resistance: ResistanceBasis
+        resistance: ResistanceBasis,
+        timedWork: Boolean = false
     ): Pair<ActualSetValues?, List<TemplateFieldError>> {
         val plannedDraft = PlannedSetDraft(
             localId = 0L,
@@ -217,14 +218,19 @@ object ActualSetLogic {
             minutesText = draft.minutesText,
             secondsText = draft.secondsText,
             distanceText = draft.distanceText,
-            distanceUnit = draft.distanceUnit
+            distanceUnit = draft.distanceUnit,
+            timedWork = timedWork
         )
         val snapshot = exerciseSnapshot(measurement, resistance)
-        val (values, errors) = PlannedSetLogic.parseValues(plannedDraft, snapshot)
+        val (values, errors) = PlannedSetLogic.parseValues(
+            plannedDraft,
+            snapshot,
+            allowZeroDuration = timedWork
+        )
         if (values == null) {
             return null to errors
         }
-        val reps = if (PlannedSetLogic.requiresReps(measurement)) values.minReps else null
+        val reps = if (timedWork || PlannedSetLogic.requiresReps(measurement)) values.minReps else null
         return ActualSetValues(
             reps = reps,
             loadKind = values.loadKind,

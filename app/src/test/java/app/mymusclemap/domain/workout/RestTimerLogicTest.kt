@@ -79,6 +79,31 @@ class RestTimerLogicTest {
     }
 
     @Test
+    fun restCountdownStartsAtTheIntervalAndExtensionsRaiseThatCap() {
+        val clock = RestClockSample(5_000L, 20_000L)
+        val started = RestTimerLogic.started(
+            RestStartPlan(1L, 2L, 30_000L, RestProgressionMode.STRICT),
+            clock,
+            generation = 1L
+        )
+        val stale = RestClockSample(4_100L, 19_100L)
+        val initial = RestTimerLogic.remaining(started, stale) as RestRemaining.Active
+        assertEquals(30_000L, initial.remainingMillis)
+        assertEquals("00:30", RestTimerLogic.formatCountdown(initial.remainingMillis))
+        val once = RestTimerLogic.extend(started, clock)!!
+        val extended = RestTimerLogic.remaining(once, stale) as RestRemaining.Active
+        assertEquals(40_000L, extended.remainingMillis)
+        assertEquals("00:40", RestTimerLogic.formatCountdown(extended.remainingMillis))
+        val later = RestClockSample(15_000L, 30_000L)
+        val twice = RestTimerLogic.extend(once, later)!!
+        val beforeSecondSample = RestClockSample(14_200L, 29_200L)
+        val doubled = RestTimerLogic.remaining(twice, beforeSecondSample) as RestRemaining.Active
+        assertEquals(40_000L, doubled.remainingMillis)
+        assertEquals("00:40", RestTimerLogic.formatCountdown(doubled.remainingMillis))
+        assertTrue(RestTimerLogic.remaining(started, RestClockSample(35_000L, 50_000L)) is RestRemaining.Expired)
+    }
+
+    @Test
     fun deadlineExpiryIsExactAndDoesNotGoNegative() {
         val started = RestTimerLogic.started(
             RestStartPlan(1L, 2L, 1_500L, RestProgressionMode.STRICT),

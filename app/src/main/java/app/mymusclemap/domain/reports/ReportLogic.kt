@@ -8,6 +8,7 @@ import app.mymusclemap.domain.model.WeightMeasurement
 import app.mymusclemap.domain.statistics.VolumeTrendResolution
 import app.mymusclemap.domain.statistics.WorkoutSetVolume
 import app.mymusclemap.domain.workout.ElapsedTime
+import app.mymusclemap.domain.workout.PlannedSetLogic
 import app.mymusclemap.domain.workout.ScheduledWorkout
 import app.mymusclemap.domain.workout.SessionExerciseItem
 import app.mymusclemap.domain.workout.SessionSet
@@ -328,15 +329,18 @@ object ReportLogic {
             date = date,
             name = exercise.name,
             measurementType = types.single(),
-            reps = sets.mapNotNull { it.actualReps }.filter { it > 0 }.maxOrNull(),
+            reps = sets.filter { !it.timedWork }.mapNotNull { it.actualReps }.filter { it > 0 }.maxOrNull(),
             effectiveKg = bestLoad?.kg,
-            durationSeconds = sets.mapNotNull { it.actualDurationSeconds }.filter { it > 0 }.maxOrNull(),
+            durationSeconds = sets.filter { set ->
+                !set.timedWork || PlannedSetLogic.requiresDuration(types.single())
+            }.mapNotNull { it.actualDurationSeconds }.filter { it > 0 }.maxOrNull(),
             distanceMeters = sets.mapNotNull { it.actualDistanceMeters }.filter { it > 0.0 }.maxOrNull(),
             incompatible = false
         )
     }
 
     private fun weightedCandidate(set: SessionSet, interpretation: WeightInterpretation): WeightedLoad? {
+        if (set.timedWork) return null
         val kg = WorkoutSetVolume.effectiveLoadKg(set, interpretation) ?: return null
         val reps = set.actualReps ?: return null
         if (reps <= 0) return null

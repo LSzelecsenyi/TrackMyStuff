@@ -182,13 +182,15 @@ object PlannedSetLogic {
             if (index <= fromIndex) {
                 set
             } else {
-                source.copy(localId = set.localId, restSeconds = set.restSeconds)
+                source.copy(localId = set.localId, restSeconds = set.restSeconds, timedWork = set.timedWork)
             }
         }
     }
 
     fun applyToAll(sets: List<PlannedSetDraft>, source: PlannedSetDraft): List<PlannedSetDraft> {
-        return sets.map { set -> source.copy(localId = set.localId, restSeconds = set.restSeconds) }
+        return sets.map { set ->
+            source.copy(localId = set.localId, restSeconds = set.restSeconds, timedWork = set.timedWork)
+        }
     }
 
     fun copyPrevious(sets: List<PlannedSetDraft>, newLocalId: Long): List<PlannedSetDraft> {
@@ -198,14 +200,24 @@ object PlannedSetLogic {
 
     fun parseValues(
         draft: PlannedSetDraft,
-        exercise: Exercise
+        exercise: Exercise,
+        allowZeroDuration: Boolean = false
     ): Pair<PlannedSetValues?, List<TemplateFieldError>> {
         val errors = mutableListOf<TemplateFieldError>()
         val measurement = exercise.measurementType
         val resistance = exercise.resistanceBasis
         var minReps: Int? = null
         var maxReps: Int? = null
-        if (requiresReps(measurement)) {
+        if (draft.timedWork) {
+            val raw = draft.minRepsText.trim()
+            if (raw.isNotEmpty()) {
+                when (val parsed = QuantityParser.parseInt(raw, 0, QuantityParser.MAX_REPS)) {
+                    is IntParseResult.Invalid -> errors += TemplateFieldError.RepsMalformed
+                    is IntParseResult.Valid -> minReps = parsed.value
+                }
+            }
+            maxReps = minReps
+        } else if (requiresReps(measurement)) {
             when (val parsedMin = QuantityParser.parseInt(draft.minRepsText, 1, QuantityParser.MAX_REPS)) {
                 is IntParseResult.Invalid -> errors += when (parsedMin.error) {
                     QuantityParseError.Empty -> TemplateFieldError.RepsRequired
@@ -277,7 +289,7 @@ object PlannedSetLogic {
             weightKg = null
         }
         var durationSeconds: Int? = null
-        if (requiresDuration(measurement)) {
+        if (requiresDuration(measurement) || draft.timedWork) {
             val minutes = QuantityParser.parseInt(draft.minutesText.ifBlank { "0" }, 0, QuantityParser.MAX_MINUTES)
             val seconds = QuantityParser.parseInt(draft.secondsText.ifBlank { "0" }, 0, QuantityParser.MAX_SECONDS_COMPONENT)
             if (minutes is IntParseResult.Invalid || seconds is IntParseResult.Invalid) {
@@ -287,7 +299,7 @@ object PlannedSetLogic {
                     (minutes as IntParseResult.Valid).value,
                     (seconds as IntParseResult.Valid).value
                 )
-                if (total <= 0) {
+                if (total < 0 || (total == 0 && !allowZeroDuration)) {
                     errors += TemplateFieldError.DurationNotPositive
                 } else {
                     durationSeconds = total
@@ -456,5 +468,5 @@ fun WorkoutTemplateSet.toSetDraft(localId: Long): PlannedSetDraft {
             durationSeconds = durationSeconds,
             distanceMeters = distanceMeters
         )
-    ).copy(restSeconds = restSeconds)
+    ).copy(restSeconds = restSeconds, timedWork = timedWork)
 }

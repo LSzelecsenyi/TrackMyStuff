@@ -33,6 +33,7 @@ import app.mymusclemap.ui.auth.WelcomeSignInScreen
 import app.mymusclemap.ui.settings.DeleteAccountResult
 import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.theme.StrictBrand
+import app.mymusclemap.ui.workout.AppForeground
 import app.mymusclemap.domain.billing.manageSubscriptionUrl
 import app.mymusclemap.domain.locale.AppLanguageApplicator
 import app.mymusclemap.domain.locale.AppLanguagePolicy
@@ -126,6 +127,7 @@ class MainActivity : AppCompatActivity() {
             var openNewTemplate by rememberSaveable { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 try {
+                    container.themePreferences.persistResolvedAppearance()
                     val firstRun = container.firstRunCoordinator.prepare()
                     stage = if (firstRun == FirstRunDecision.ShowOnboarding) {
                         AppLaunchStage.Onboarding
@@ -294,6 +296,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        AppForeground.enter()
         val app = application as WeightTrackerApplication
         app.signIn.bind(this)
         val container = app.container ?: return
@@ -309,6 +312,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        AppForeground.exit()
         (application as WeightTrackerApplication).signIn.unbind(this)
         (application as WeightTrackerApplication).container?.unbindStrictSignIn(this)
         super.onStop()

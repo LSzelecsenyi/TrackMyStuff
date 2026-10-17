@@ -30,6 +30,8 @@ interface RestTimerEffects {
     fun schedule(sessionId: Long, deadlineWallClockMillis: Long, generation: Long, nextLabel: String)
     fun cancel(sessionId: Long)
     fun onRestFinished()
+    fun scheduleWork(sessionId: Long, deadlineWallClockMillis: Long, generation: Long) = Unit
+    fun cancelWork(sessionId: Long) = Unit
 
     object None : RestTimerEffects {
         override fun schedule(
@@ -46,7 +48,6 @@ interface RestTimerEffects {
 
 class AndroidRestTimerEffects(context: Context) : RestTimerEffects {
     private val appContext = context.applicationContext
-    private val sounds = TimerSoundPreferences(appContext)
 
     override fun schedule(
         sessionId: Long,
@@ -75,9 +76,29 @@ class AndroidRestTimerEffects(context: Context) : RestTimerEffects {
     }
 
     override fun onRestFinished() {
-        val enabled = runBlocking { sounds.enabled.first() }
-        if (!enabled || RestTimerAlarm.canPost(appContext)) return
-        RestTimerAlarm.playTone()
+        // Completion audio is owned by TimerAudioCoordinator while this process is alive.
+        // The alarm plays a beep only when the app is not in the foreground and Beeps is selected.
+    }
+
+    override fun scheduleWork(sessionId: Long, deadlineWallClockMillis: Long, generation: Long) {
+        val alarm = appContext.getSystemService(AlarmManager::class.java) ?: return
+        val pending = RestTimerAlarm.workPendingIntent(appContext, sessionId, generation)
+        try {
+            val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
+            if (exactAllowed) {
+                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, deadlineWallClockMillis, pending)
+            } else {
+                alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, deadlineWallClockMillis, pending)
+            }
+        } catch (_: SecurityException) {
+            alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, deadlineWallClockMillis, pending)
+        }
+    }
+
+    override fun cancelWork(sessionId: Long) {
+        val alarm = appContext.getSystemService(AlarmManager::class.java) ?: return
+        alarm.cancel(RestTimerAlarm.workPendingIntent(appContext, sessionId, generation = 0L))
+        NotificationManagerCompat.from(appContext).cancel(RestTimerAlarm.WORK_NOTIFICATION_ID)
     }
 }
 
@@ -85,6 +106,9 @@ internal object RestTimerAlarm {
     const val ACTION = "app.mymusclemap.action.REST_COMPLETE"
     const val CHANNEL_ID = "rest_timer"
     const val NOTIFICATION_ID = 41002
+    const val WORK_NOTIFICATION_ID = 41003
+    const val EXTRA_KIND = "kind"
+    const val KIND_WORK = "work"
     const val EXTRA_SESSION_ID = "sessionId"
     const val EXTRA_GENERATION = "generation"
     const val EXTRA_NEXT = "nextLabel"
@@ -109,6 +133,21 @@ internal object RestTimerAlarm {
         )
     }
 
+    fun workPendingIntent(context: Context, sessionId: Long, generation: Long): PendingIntent {
+        val intent = Intent(context, RestTimerAlarmReceiver::class.java).apply {
+            action = ACTION
+            putExtra(EXTRA_SESSION_ID, sessionId)
+            putExtra(EXTRA_GENERATION, generation)
+            putExtra(EXTRA_KIND, KIND_WORK)
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            sessionId.toInt() xor 0x40000000,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
     fun canPost(context: Context): Boolean {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -122,9 +161,21 @@ internal object RestTimerAlarm {
 
     private var tone: ToneGenerator? = null
 
-    fun playTone() {
-        val generator = tone ?: ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80).also { tone = it }
-        generator.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
+    fun playCountdownTone() {
+        generator().startTone(ToneGenerator.TONE_PROP_BEEP, 100)
+    }
+
+    fun playCompletionTone() {
+        generator().startTone(ToneGenerator.TONE_PROP_ACK, 220)
+    }
+
+    fun releaseTone() {
+        tone?.release()
+        tone = null
+    }
+
+    private fun generator(): ToneGenerator {
+        return tone ?: ToneGenerator(AudioManager.STREAM_NOTIFICATION, 64).also { tone = it }
     }
 
     fun show(context: Context, nextLabel: String, playSound: Boolean) {
@@ -157,13 +208,60 @@ internal object RestTimerAlarm {
             .build()
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
     }
+
+    fun showWork(context: Context, playSound: Boolean) {
+        if (!canPost(context)) return
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            context.getString(R.string.notification_channel_rest),
+            if (playSound) NotificationManager.IMPORTANCE_HIGH else NotificationManager.IMPORTANCE_DEFAULT
+        )
+        manager.createNotificationChannel(channel)
+        val open = PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_workout)
+            .setContentTitle(context.getString(R.string.notification_work_complete))
+            .setContentText(context.getString(R.string.notification_work_complete_body))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .setSilent(!playSound)
+            .build()
+        NotificationManagerCompat.from(context).notify(WORK_NOTIFICATION_ID, notification)
+    }
 }
 
 class RestTimerAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != RestTimerAlarm.ACTION) return
+        val mode = runBlocking { TimerSoundPreferences(context).mode.first() }
+        val sessionId = intent.getLongExtra(RestTimerAlarm.EXTRA_SESSION_ID, -1L)
+        val generation = intent.getLongExtra(RestTimerAlarm.EXTRA_GENERATION, -1L)
+        val work = intent.getStringExtra(RestTimerAlarm.EXTRA_KIND) == RestTimerAlarm.KIND_WORK
+        val kind = if (work) {
+            app.mymusclemap.domain.workout.TimerCueKind.WORK
+        } else {
+            app.mymusclemap.domain.workout.TimerCueKind.REST
+        }
+        val key = app.mymusclemap.domain.workout.TimerCompletionKeys.key(kind, sessionId, generation)
+        val playSound = app.mymusclemap.domain.workout.TimerNotificationAudio.shouldPlay(
+            mode = mode,
+            appInForeground = AppForeground.inForeground(),
+            completionAlreadyClaimed = TimerCompletionLedger.process.claimed(key)
+        )
+        if (playSound) {
+            TimerCompletionLedger.process.tryClaim(key)
+        }
+        if (work) {
+            RestTimerAlarm.showWork(context, playSound = playSound)
+            return
+        }
         val next = intent.getStringExtra(RestTimerAlarm.EXTRA_NEXT).orEmpty()
-        val sounds = runBlocking { TimerSoundPreferences(context).enabled.first() }
-        RestTimerAlarm.show(context, next, playSound = sounds)
+        RestTimerAlarm.show(context, next, playSound = playSound)
     }
 }

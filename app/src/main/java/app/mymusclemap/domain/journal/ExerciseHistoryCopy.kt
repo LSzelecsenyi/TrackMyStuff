@@ -54,7 +54,15 @@ object ExerciseHistoryCopy {
         selection: ExerciseHistorySelection,
         comparisonPosition: Int
     ): HistoryTable {
-        val columns = columns(selection.measurementType, selection.resistanceBasis)
+        val columns = columns(selection.measurementType, selection.resistanceBasis).toMutableList().also { list ->
+            if (selection.sets.any { it.timedWork } && HistoryColumn.DURATION !in list) {
+                val insertAt = list.indexOf(HistoryColumn.REPS).let { if (it >= 0) it else 1 }
+                list.add(insertAt.coerceIn(0, list.size), HistoryColumn.DURATION)
+            }
+            if (selection.sets.isNotEmpty() && selection.sets.all { it.timedWork }) {
+                list.remove(HistoryColumn.REPS)
+            }
+        }
         val empty = resources.getString(R.string.active_set_history_empty_value)
         val rows = selection.sets.map { set ->
             val parts = recordedParts(resources, selection, set)
@@ -90,9 +98,12 @@ object ExerciseHistoryCopy {
         set: ExerciseHistorySet
     ): RecordedParts {
         val measurement = selection.measurementType
-        val reps = set.reps?.toString()?.takeIf { PlannedSetLogic.requiresReps(measurement) }
-        val duration = set.durationSeconds?.takeIf { PlannedSetLogic.requiresDuration(measurement) }
-            ?.let { WorkoutSetCopy.durationText(resources, it) }
+        val reps = set.reps?.toString()?.takeIf {
+            !set.timedWork && PlannedSetLogic.requiresReps(measurement)
+        }
+        val duration = set.durationSeconds?.takeIf {
+            set.timedWork || PlannedSetLogic.requiresDuration(measurement)
+        }?.let { WorkoutSetCopy.durationText(resources, it) }
         val distance = set.distanceMeters?.takeIf { PlannedSetLogic.requiresDistance(measurement) }
             ?.let { WorkoutSetCopy.distanceText(resources, it) }
         val load = compatibleLoad(selection, set)?.let { (kind, weight) ->

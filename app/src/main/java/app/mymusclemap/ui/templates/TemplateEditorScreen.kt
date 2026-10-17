@@ -1,7 +1,9 @@
 package app.mymusclemap.ui.templates
 
+import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.domain.workout.RestDuration
 import app.mymusclemap.domain.workout.RestProgressionMode
+import app.mymusclemap.domain.workout.WorkDuration
 import app.mymusclemap.ui.exercises.starterExerciseLabel
 
 import androidx.activity.compose.BackHandler
@@ -119,6 +121,8 @@ fun TemplateEditorScreen(
     onRestMode: (Boolean) -> Unit = {},
     onExerciseRest: (Long, Int?) -> Unit = { _, _ -> },
     onSetRest: (Long, Long, Int?) -> Unit = { _, _, _ -> },
+    onTimedMode: (Long, Boolean) -> Unit = { _, _ -> },
+    onWorkDuration: (Long, Long, Int) -> Unit = { _, _, _ -> },
     onSave: () -> Unit,
     onReload: () -> Unit = {},
     onDismissDiscard: () -> Unit,
@@ -298,7 +302,9 @@ fun TemplateEditorScreen(
                                     onDistance = { setId, value -> onDistance(item.localId, setId, value) },
                                     onDistanceUnit = { setId, unit -> onDistanceUnit(item.localId, setId, unit) },
                                     onExerciseRest = { onExerciseRest(item.localId, it) },
-                                    onSetRest = { setId, seconds -> onSetRest(item.localId, setId, seconds) }
+                                    onSetRest = { setId, seconds -> onSetRest(item.localId, setId, seconds) },
+                                    onTimedMode = { onTimedMode(item.localId, it) },
+                                    onWorkDuration = { setId, seconds -> onWorkDuration(item.localId, setId, seconds) }
                                 )
                             } else {
                                 Text(
@@ -479,7 +485,9 @@ private fun ExerciseCard(
     onDistance: (Long, String) -> Unit,
     onDistanceUnit: (Long, DistanceUnit) -> Unit,
     onExerciseRest: (Int?) -> Unit,
-    onSetRest: (Long, Int?) -> Unit
+    onSetRest: (Long, Int?) -> Unit,
+    onTimedMode: (Boolean) -> Unit = {},
+    onWorkDuration: (Long, Int) -> Unit = { _, _ -> }
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -537,11 +545,29 @@ private fun ExerciseCard(
                 )
             }
             if (item.expanded) {
+                if (PlannedSetLogic.requiresReps(exercise.measurementType)) {
+                    val timed = item.sets.isNotEmpty() && item.sets.all { it.timedWork }
+                    SegmentedControl(
+                        options = listOf(
+                            stringResource(R.string.work_mode_reps),
+                            stringResource(R.string.work_mode_timed)
+                        ),
+                        selectedIndex = if (timed) 1 else 0,
+                        onSelected = { onTimedMode(it == 1) },
+                        modifier = Modifier.testTag("work_mode")
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
                 RestChoiceRow(
-                    label = stringResource(R.string.rest_between_sets),
+                    label = stringResource(R.string.rest_between_sets) + "  " + stringResource(R.string.pro_badge),
                     selected = item.restSeconds,
                     includeDefault = false,
                     onSelect = onExerciseRest
+                )
+                Text(
+                    text = stringResource(R.string.rest_requires_pro),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 if (exercise.measurementType != MeasurementType.COMPLETION_ONLY) {
@@ -582,7 +608,8 @@ private fun ExerciseCard(
                         onSeconds = { onSeconds(set.localId, it) },
                         onDistance = { onDistance(set.localId, it) },
                         onDistanceUnit = { onDistanceUnit(set.localId, it) },
-                        onRestSeconds = { onSetRest(set.localId, it) }
+                        onRestSeconds = { onSetRest(set.localId, it) },
+                        onWorkDuration = { onWorkDuration(set.localId, it) }
                     )
                 }
                 if (exercise.measurementType != MeasurementType.COMPLETION_ONLY) {
@@ -623,7 +650,8 @@ private fun SetCard(
     onSeconds: (String) -> Unit,
     onDistance: (String) -> Unit,
     onDistanceUnit: (DistanceUnit) -> Unit,
-    onRestSeconds: (Int?) -> Unit
+    onRestSeconds: (Int?) -> Unit,
+    onWorkDuration: (Int) -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -659,7 +687,7 @@ private fun SetCard(
                     )
                 }
             }
-            if (PlannedSetLogic.requiresReps(exercise.measurementType)) {
+            if (PlannedSetLogic.requiresReps(exercise.measurementType) && !set.timedWork) {
                 OutlinedTextField(
                     value = set.minRepsText,
                     onValueChange = onMinReps,
@@ -705,7 +733,7 @@ private fun SetCard(
                     singleLine = true
                 )
             }
-            if (PlannedSetLogic.requiresDuration(exercise.measurementType)) {
+            if (PlannedSetLogic.requiresDuration(exercise.measurementType) || set.timedWork) {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -722,6 +750,25 @@ private fun SetCard(
                         label = { Text(stringResource(R.string.field_seconds)) },
                         singleLine = true
                     )
+                }
+                if (set.timedWork) {
+                    val selected = QuantityParser.toSeconds(
+                        set.minutesText.toIntOrNull() ?: 0,
+                        set.secondsText.toIntOrNull() ?: 0
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        WorkDuration.PRESETS_SECONDS.forEach { seconds ->
+                            FilterChip(
+                                selected = selected == seconds,
+                                onClick = { onWorkDuration(seconds) },
+                                label = { Text(stringResource(R.string.rest_seconds, seconds)) }
+                            )
+                        }
+                    }
                 }
             }
             if (PlannedSetLogic.requiresDistance(exercise.measurementType)) {
@@ -812,7 +859,7 @@ private fun RestProgressionRow(
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.rest_auto_advance),
+                text = stringResource(R.string.rest_auto_advance) + "  " + stringResource(R.string.pro_badge),
                 style = MaterialTheme.typography.titleSmall
             )
         }

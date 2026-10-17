@@ -31,12 +31,56 @@ class AppearancePaletteContractTest {
     }
 
     @Test
-    fun systemDefaultFollowsResolvedAppearanceWithTheCurrentFactory() {
-        val settings = AppearanceSettings.Default.copy(mode = ThemeMode.System)
-        assertEquals(ThemeSeeds.DefaultLight.canonical(), settings.activeSeeds(settings.mode.isDark(false)).canonical())
-        assertEquals(ThemeSeeds.DefaultDark.canonical(), settings.activeSeeds(settings.mode.isDark(true)).canonical())
-        assertEquals(false, ThemeMode.Light.isDark(systemInDarkTheme = true))
-        assertEquals(true, ThemeMode.Dark.isDark(systemInDarkTheme = false))
+    fun strictDarkIsTheBuiltInDefaultAndFormerLightOrSystemResolveToIt() {
+        val settings = AppearanceSettings.Default
+        assertEquals(ThemeMode.Dark, settings.mode)
+        assertEquals(ThemeSeeds.DefaultDark.canonical(), settings.activeSeeds(true).canonical())
+        assertEquals("#E2FD6D", settings.activeSeeds(true).canonical().primary)
+        assertEquals(StrictBrandTokens.LIME, settings.activeSeeds(true).primary)
+        val light = AppearanceCodec.decode(
+            themeMode = "Light",
+            paletteType = null,
+            lightBackground = null,
+            lightPrimary = null,
+            lightSecondary = null,
+            lightTertiary = null,
+            darkBackground = null,
+            darkPrimary = null,
+            darkSecondary = null,
+            darkTertiary = null
+        )
+        val system = AppearanceCodec.decode(
+            themeMode = "System",
+            paletteType = null,
+            lightBackground = null,
+            lightPrimary = null,
+            lightSecondary = null,
+            lightTertiary = null,
+            darkBackground = null,
+            darkPrimary = null,
+            darkSecondary = null,
+            darkTertiary = null
+        )
+        assertEquals(ThemeMode.Dark, light.mode)
+        assertEquals(ThemeMode.Dark, system.mode)
+        assertEquals(ThemeSeeds.DefaultDark.canonical(), light.activeSeeds(true).canonical())
+        val custom = AppearanceCodec.decode(
+            themeMode = "Light",
+            paletteType = AppearanceCodec.VALUE_CUSTOM,
+            lightBackground = "#F4F7FB",
+            lightPrimary = "#2457C5",
+            lightSecondary = "#DCE7FA",
+            lightTertiary = "#E8754F",
+            darkBackground = "#101820",
+            darkPrimary = "#BA81EE",
+            darkSecondary = "#1C2D4A",
+            darkTertiary = "#FF9A78"
+        )
+        assertEquals(ThemeMode.Light, custom.mode)
+        assertEquals(PaletteType.Custom, custom.paletteType)
+        assertEquals("#2457C5", custom.customLight.canonical().primary)
+        assertEquals("#BA81EE", custom.customDark.canonical().primary)
+        assertEquals("#E8754F", custom.customLight.canonical().tertiary)
     }
 
     @Test

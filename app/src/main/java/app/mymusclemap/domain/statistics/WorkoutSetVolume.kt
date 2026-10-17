@@ -42,6 +42,7 @@ object WorkoutSetVolume {
     }
 
     fun isVolumeEligible(exercise: SessionExercise, set: SessionSet): Boolean {
+        if (set.timedWork) return false
         if (exercise.measurementType != MeasurementType.REPETITIONS_AND_WEIGHT) return false
         val reps = set.actualReps ?: return false
         if (reps <= 0) return false

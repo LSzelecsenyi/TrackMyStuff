@@ -30,6 +30,7 @@ class PolicyBackedEntitlements(
             AppFeature.ProgressPhotos -> policy.progressPhotos().canAdd
             AppFeature.UnlimitedCustomExercises -> policy.customExercises(Int.MAX_VALUE).canCreate
             AppFeature.ExternalWorkoutImport -> policy.healthConnect().canImportExternalWorkouts
+            AppFeature.WorkoutTimers -> policy.workoutTimers()
         }
     }
 }

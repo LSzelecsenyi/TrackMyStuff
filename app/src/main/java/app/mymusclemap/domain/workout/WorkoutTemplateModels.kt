@@ -35,7 +35,8 @@ data class WorkoutTemplateSet(
     val weightKg: Double?,
     val durationSeconds: Int?,
     val distanceMeters: Double?,
-    val restSeconds: Int? = null
+    val restSeconds: Int? = null,
+    val timedWork: Boolean = false
 )
 
 data class WorkoutTemplateAggregate(
@@ -97,7 +98,8 @@ data class PlannedSetDraft(
     val secondsText: String = "0",
     val distanceText: String = "",
     val distanceUnit: DistanceUnit = DistanceUnit.METERS,
-    val restSeconds: Int? = null
+    val restSeconds: Int? = null,
+    val timedWork: Boolean = false
 )
 
 data class PlannedSetValues(

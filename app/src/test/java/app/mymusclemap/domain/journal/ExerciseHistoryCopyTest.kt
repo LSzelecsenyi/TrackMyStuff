@@ -155,6 +155,29 @@ class ExerciseHistoryCopyTest {
         )
     }
 
+    @Test
+    fun timedHistoryShowsDurationAndLoadWithoutRepetitions() {
+        val timed = selection(
+            sets = listOf(
+                recorded(
+                    position = 0,
+                    reps = 12,
+                    weight = 15.0,
+                    durationSeconds = 24
+                ).copy(timedWork = true)
+            )
+        )
+        val summary = ExerciseHistoryCopy.inlineValue(resources, timed, timed.sets.single())
+        assertFalse(summary.contains("12"))
+        assertTrue(summary.contains("24"))
+        assertTrue(summary.contains("15"))
+        val table = ExerciseHistoryCopy.table(resources, timed, comparisonPosition = 0)
+        assertTrue(table.columns.contains(HistoryColumn.DURATION))
+        assertFalse(table.columns.contains(HistoryColumn.REPS))
+        val reps = selection(sets = listOf(recorded(position = 0, reps = 8, weight = 12.0)))
+        assertEquals("8 · 12 kg", ExerciseHistoryCopy.inlineValue(resources, reps, reps.sets.single()))
+    }
+
     private fun selection(
         measurement: MeasurementType = MeasurementType.REPETITIONS_AND_WEIGHT,
         resistance: ResistanceBasis = ResistanceBasis.EXTERNAL,

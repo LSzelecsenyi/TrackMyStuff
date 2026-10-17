@@ -54,6 +54,11 @@ object AppBackupFormat {
      * Missing rest stays off, and missing progression is strict, so those plans do not start a timer.
      */
     const val ARCHIVE_REST_SCHEMA_VERSION = 15
+    /**
+     * Optional timed-work sets and an in-progress work interval.
+     * Older files omit the keys. Missing timed work stays off, so existing plans stay repetition sets.
+     */
+    const val ARCHIVE_WORK_SCHEMA_VERSION = 16
     const val CONTAINER_VERSION = 1
     const val MIN_SUPPORTED_SCHEMA_VERSION = 6
     const val MAX_UTF8_BYTES = 16 * 1024 * 1024

@@ -1276,6 +1276,8 @@ fun WeightTrackerNavHost(
                     onRestMode = viewModel::onRestMode,
                     onExerciseRest = viewModel::onExerciseRest,
                     onSetRest = viewModel::onSetRest,
+                    onTimedMode = viewModel::onTimedMode,
+                    onWorkDuration = viewModel::onWorkDuration,
                     onSave = viewModel::save,
                     onReload = viewModel::reload,
                     onDismissDiscard = viewModel::dismissDiscard,
@@ -1350,7 +1352,14 @@ fun WeightTrackerNavHost(
                     onMessageConsumed = viewModel::consumeMessage,
                     onAddRest = viewModel::addRestTenSeconds,
                     onSkipRest = viewModel::skipRest,
-                    onContinueAfterRest = viewModel::continueAfterRest
+                    onContinueAfterRest = viewModel::continueAfterRest,
+                    onStartWork = viewModel::startWork,
+                    onPauseWork = viewModel::pauseWork,
+                    onResumeWork = viewModel::resumeWork,
+                    onFinishWorkEarly = viewModel::finishWorkEarly,
+                    onConfirmTimedSet = viewModel::confirmTimedSet,
+                    onConfirmCancelWork = viewModel::confirmCancelWorkNavigation,
+                    onDismissCancelWork = viewModel::dismissCancelWorkNavigation
                 )
             }
             composable(AppRoutes.ACHIEVEMENTS) {
@@ -1747,7 +1756,6 @@ private fun SettingsRoute(
     }
     SettingsScreen(
         state = state,
-        onThemeSelected = viewModel::setThemeMode,
         onSelectDefaultPalette = viewModel::selectDefaultPalette,
         onSelectCustomPalette = viewModel::selectCustomPalette,
         onEditingDarkChange = viewModel::setEditingDark,
@@ -1817,7 +1825,7 @@ private fun SettingsRoute(
         onDisableWeeklyGoal = viewModel::disableWeeklyGoal,
         onBack = onBack,
         lockScreenSetCompletion = state.lockScreenSetCompletionEnabled,
-        onTimerSoundsChange = viewModel::setTimerSounds,
+        onTimerAudioChange = viewModel::setTimerAudio,
         lockScreenAccessNote = lockScreenAccessNote,
         onLockScreenSetCompletionChange = { enabled ->
             if (!enabled) {

@@ -21,6 +21,7 @@ fun AppFeature.titleRes(): Int {
         AppFeature.ProgressPhotos -> R.string.pro_feature_progress_photos
         AppFeature.UnlimitedCustomExercises -> R.string.pro_feature_unlimited_custom_exercises
         AppFeature.ExternalWorkoutImport -> R.string.pro_feature_external_workouts
+        AppFeature.WorkoutTimers -> R.string.pro_feature_workout_timers
     }
 }
 
@@ -88,6 +89,15 @@ fun AppFeature?.proInfoCopy(): ProInfoCopy {
                 R.string.pro_info_external_workouts_steps,
                 R.string.pro_info_external_workouts_import,
                 R.string.pro_info_external_workouts_existing
+            )
+        )
+        AppFeature.WorkoutTimers -> ProInfoCopy(
+            titleRes = R.string.pro_info_timers_title,
+            bodyRes = R.string.pro_info_timers_body,
+            highlights = listOf(
+                R.string.pro_info_timers_rest,
+                R.string.pro_info_timers_work,
+                R.string.pro_info_timers_history_stays
             )
         )
         AppFeature.AdvancedPlanning -> ProInfoCopy(

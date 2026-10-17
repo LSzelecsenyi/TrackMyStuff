@@ -53,6 +53,7 @@ import app.mymusclemap.ui.templates.TemplateEditorViewModel
 import app.mymusclemap.ui.templates.TemplateListViewModel
 import app.mymusclemap.ui.workout.ActiveWorkoutViewModel
 import app.mymusclemap.ui.workout.AndroidRestTimerEffects
+import app.mymusclemap.ui.workout.AndroidTimerCuePlayer
 import app.mymusclemap.ui.workout.WorkoutCompletionViewModel
 import app.mymusclemap.ui.workout.WorkoutHubViewModel
 import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
@@ -188,7 +189,10 @@ class WeightViewModelFactory(
                     extras.createSavedStateHandle(),
                     workoutSessionRepository,
                     observeCatalog = exerciseRepository.observeActive(),
-                    restEffects = AndroidRestTimerEffects(application)
+                    restEffects = AndroidRestTimerEffects(application),
+                    entitlements = featureEntitlements,
+                    timerSounds = timerSounds,
+                    timerCuePlayer = AndroidTimerCuePlayer(application)
                 )
             }
             modelClass.isAssignableFrom(WorkoutDetailViewModel::class.java) -> {

@@ -12,7 +12,9 @@ import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.FixedDateProvider
+import app.mymusclemap.domain.entitlement.SelectiveFeatureEntitlements
 import app.mymusclemap.domain.workout.RestClockSample
+import app.mymusclemap.domain.workout.WorkPhase
 import app.mymusclemap.domain.workout.RestPhase
 import app.mymusclemap.domain.workout.RestProgressionMode
 import app.mymusclemap.domain.exercise.ExerciseCategory
@@ -1150,6 +1152,8 @@ class ActiveWorkoutViewModelTest {
     private fun active(
         sessionId: Long,
         restClock: (() -> RestClockSample)? = null,
+        entitlements: app.mymusclemap.domain.entitlement.FeatureEntitlements =
+            app.mymusclemap.domain.entitlement.OpenFeatureEntitlements,
         loadExerciseHistory: (suspend (WorkoutSessionAggregate, SessionExercise) -> ExerciseHistorySelection?)? = null
     ): ActiveWorkoutViewModel {
         val viewModel = if (loadExerciseHistory == null) {
@@ -1161,7 +1165,8 @@ class ActiveWorkoutViewModelTest {
                         elapsedRealtimeMillis = android.os.SystemClock.elapsedRealtime(),
                         wallClockMillis = java.time.Clock.systemUTC().millis()
                     )
-                }
+                },
+                entitlements = entitlements
             )
         } else {
             ActiveWorkoutViewModel(
@@ -1173,7 +1178,8 @@ class ActiveWorkoutViewModelTest {
                         elapsedRealtimeMillis = android.os.SystemClock.elapsedRealtime(),
                         wallClockMillis = java.time.Clock.systemUTC().millis()
                     )
-                }
+                },
+                entitlements = entitlements
             )
         }
         viewModelStore.put("active-${viewModelKey++}", viewModel)
@@ -1353,6 +1359,153 @@ class ActiveWorkoutViewModelTest {
             )
         }
         val templateId = saveTemplate(name, listOf(pull to planned), exerciseRest, mode)
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        return active(started.sessionId, restClock = ::restSample)
+    }
+
+    @Test
+    fun finishEarlyKeepsTheSetPendingUntilConfirmThenStartsRest() = runOnMain {
+        val viewModel = startTimedWorkout()
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.startWork(sets[0].id)
+        val running = awaitReal { viewModel.uiState.first { it.work?.phase == WorkPhase.RUNNING } }
+        assertEquals(SessionSetStatus.PENDING, running.aggregate!!.exercises[0].sets[0].status)
+        assertNull(running.rest)
+        restElapsed.addAndGet(10_000L)
+        viewModel.pauseWork()
+        val paused = awaitReal { viewModel.uiState.first { it.work?.phase == WorkPhase.PAUSED } }
+        assertEquals(10, paused.work?.actualSeconds)
+        assertEquals("00:20", paused.work?.countdown)
+        val pausedProgress = paused.work?.progress
+        restElapsed.addAndGet(25_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        val stillPaused = viewModel.uiState.value
+        assertEquals(WorkPhase.PAUSED, stillPaused.work?.phase)
+        assertEquals(10, stillPaused.work?.actualSeconds)
+        assertEquals("00:20", stillPaused.work?.countdown)
+        assertEquals(pausedProgress, stillPaused.work?.progress)
+        viewModel.pauseWork()
+        assertEquals(WorkPhase.PAUSED, viewModel.uiState.value.work?.phase)
+        viewModel.resumeWork()
+        awaitReal { viewModel.uiState.first { it.work?.phase == WorkPhase.RUNNING } }
+        viewModel.finishWorkEarly()
+        val awaiting = awaitReal { viewModel.uiState.first { it.work?.awaiting == true } }
+        assertEquals(SessionSetStatus.PENDING, awaiting.aggregate!!.exercises[0].sets[0].status)
+        assertEquals(10, awaiting.work?.actualSeconds)
+        viewModel.confirmTimedSet()
+        val resting = awaitReal { viewModel.uiState.first { it.rest?.phase == RestPhase.COUNTING } }
+        val completed = resting.aggregate!!.exercises[0].sets[0]
+        assertEquals(SessionSetStatus.COMPLETED, completed.status)
+        assertEquals(10, completed.actualDurationSeconds)
+        assertNull(completed.actualReps)
+        assertEquals(30, completed.plannedDurationSeconds)
+        assertNull(resting.work)
+        viewModel.confirmTimedSet()
+        assertNull(viewModel.uiState.value.work)
+    }
+
+    @Test
+    fun pausedWorkSurvivesANewViewModelAndCannotBeCompletedEarly() = runOnMain {
+        val viewModel = startTimedWorkout()
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.completeSet(sets[0].id)
+        mainDispatcherRule.advanceTimeBy(400L)
+        assertEquals(SessionSetStatus.PENDING, viewModel.uiState.value.aggregate!!.exercises[0].sets[0].status)
+        viewModel.startWork(sets[0].id)
+        awaitReal { viewModel.uiState.first { it.work?.phase == WorkPhase.RUNNING } }
+        viewModel.completeSet(sets[0].id)
+        restElapsed.addAndGet(12_000L)
+        viewModel.pauseWork()
+        val paused = awaitReal { viewModel.uiState.first { it.work?.countdown == "00:18" } }
+        assertEquals(WorkPhase.PAUSED, paused.work?.phase)
+        val progress = paused.work!!.progress
+        viewModel.completeSet(sets[0].id)
+        viewModel.skipSet(sets[0].id)
+        restElapsed.addAndGet(10_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        assertEquals(SessionSetStatus.PENDING, viewModel.uiState.value.aggregate!!.exercises[0].sets[0].status)
+        assertEquals("00:18", viewModel.uiState.value.work?.countdown)
+        assertEquals(progress, viewModel.uiState.value.work?.progress)
+        val recreated = active(sessionId, restClock = ::restSample)
+        val recovered = awaitReal {
+            recreated.uiState.first { it.work?.phase == WorkPhase.PAUSED && it.work?.countdown == "00:18" }
+        }
+        assertEquals(progress, recovered.work?.progress)
+        recreated.pauseWork()
+        val pausedAgain = awaitReal { recreated.uiState.first { it.work?.phase == WorkPhase.PAUSED } }
+        assertEquals("00:18", pausedAgain.work?.countdown)
+        recreated.pauseWork()
+        assertEquals(WorkPhase.PAUSED, recreated.uiState.value.work?.phase)
+        recreated.resumeWork()
+        val running = awaitReal { recreated.uiState.first { it.work?.phase == WorkPhase.RUNNING } }
+        assertEquals("00:18", running.work?.countdown)
+    }
+
+    @Test
+    fun workExpiryWaitsForConfirmAndDoesNotStartTheNextInterval() = runOnMain {
+        val viewModel = startTimedWorkout()
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.startWork(sets[0].id)
+        awaitReal { viewModel.uiState.first { it.work?.phase == WorkPhase.RUNNING } }
+        restElapsed.addAndGet(30_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        val awaiting = awaitReal { viewModel.uiState.first { it.work?.awaiting == true } }
+        assertEquals(SessionSetStatus.PENDING, awaiting.aggregate!!.exercises[0].sets[0].status)
+        assertNull(awaiting.rest)
+        restElapsed.addAndGet(5_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        assertEquals(WorkPhase.AWAITING, viewModel.uiState.value.work?.phase)
+        viewModel.confirmTimedSet()
+        val resting = awaitReal { viewModel.uiState.first { it.rest?.phase == RestPhase.COUNTING } }
+        assertEquals(30, resting.aggregate!!.exercises[0].sets[0].actualDurationSeconds)
+        assertNull(resting.aggregate!!.exercises[0].sets[0].actualReps)
+        assertNull(resting.work)
+        assertEquals(SessionSetStatus.PENDING, resting.aggregate!!.exercises[0].sets[1].status)
+    }
+
+    @Test
+    fun freeUserCompletesASetWithoutStartingRest() = runOnMain {
+        val pull = savePull()
+        val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
+        sessions = WorkoutSessionRepository(
+            database.workoutSessionDao(),
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            WeightRepository(database.weightMeasurementDao(), clock),
+            clock,
+            FixedDateProvider(today),
+            timersAllowed = { false }
+        )
+        val templateId = saveTemplate("Free", listOf(pull to twoSets()), exerciseRest = 60)
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        val viewModel = active(
+            started.sessionId,
+            entitlements = SelectiveFeatureEntitlements(emptySet())
+        )
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.completeSet(sets[0].id)
+        val advanced = awaitReal { viewModel.uiState.first { it.focusedSetId == sets[1].id } }
+        assertNull(advanced.rest)
+        assertFalse(advanced.timersEnabled)
+        assertEquals(SessionSetStatus.COMPLETED, advanced.aggregate!!.exercises[0].sets[0].status)
+    }
+
+    private suspend fun startTimedWorkout(): ActiveWorkoutViewModel {
+        val pull = savePull()
+        useRestClock()
+        val planned = List(2) { index ->
+            PlannedSetDraft(
+                localId = -(index + 1L),
+                minRepsText = "8",
+                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
+                minutesText = "0",
+                secondsText = "30",
+                timedWork = true
+            )
+        }
+        val templateId = saveTemplate("Burpees", listOf(pull to planned), exerciseRest = 45)
         val started = sessions.start(templateId) as StartWorkoutResult.Started
         sessionId = started.sessionId
         return active(started.sessionId, restClock = ::restSample)

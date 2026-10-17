@@ -14,14 +14,16 @@ import androidx.core.view.WindowCompat
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.theme.ColorSchemeFactory
 import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.domain.theme.resolvedBuiltInAppearance
 
 @Composable
 fun WeightTrackerTheme(
     appearance: AppearanceSettings = AppearanceSettings.Default,
     content: @Composable () -> Unit
 ) {
-    val darkTheme = appearance.mode.isDark(isSystemInDarkTheme())
-    val seeds = appearance.activeSeeds(darkTheme)
+    val displayed = appearance.resolvedBuiltInAppearance()
+    val darkTheme = displayed.mode.isDark(isSystemInDarkTheme())
+    val seeds = displayed.activeSeeds(darkTheme)
     val colorScheme = remember(seeds, darkTheme) {
         ColorSchemeFactory.derive(seeds, darkTheme).toComposeColorScheme(darkTheme)
     }

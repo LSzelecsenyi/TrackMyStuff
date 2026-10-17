@@ -274,7 +274,8 @@ abstract class WorkoutSessionDao {
             st.actualLoadKind AS actualLoadKind,
             st.actualWeightKg AS actualWeightKg,
             st.actualDurationSeconds AS actualDurationSeconds,
-            st.actualDistanceMeters AS actualDistanceMeters
+            st.actualDistanceMeters AS actualDistanceMeters,
+            st.timedWork AS timedWork
         FROM workout_session_sets st
         INNER JOIN workout_session_exercises e ON e.id = st.sessionExerciseId
         INNER JOIN workout_sessions s ON s.id = e.sessionId
@@ -428,7 +429,14 @@ abstract class WorkoutSessionDao {
                 restAnchorElapsedRealtimeMillis = null,
                 restDeadlineElapsedRealtimeMillis = null,
                 restDeadlineWallClockMillis = null,
-                restDurationMillis = null
+                restDurationMillis = null,
+                workPhase = null,
+                workSetId = null,
+                workTargetMillis = null,
+                workElapsedActiveMillis = null,
+                workAnchorElapsedRealtimeMillis = null,
+                workDeadlineElapsedRealtimeMillis = null,
+                workDeadlineWallClockMillis = null
             )
         )
         return 1

@@ -93,7 +93,6 @@ import app.mymusclemap.domain.theme.PaletteSaveResult
 import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.PaletteValidationError
 import app.mymusclemap.domain.theme.SeedField
-import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.health.HealthSettingsState
 import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.StrictBrandLockup
@@ -104,6 +103,8 @@ import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.PaletteSwatch
 import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.domain.locale.AppLocale
+import app.mymusclemap.domain.workout.TimerAudioMode
+import app.mymusclemap.ui.components.SegmentedControl
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
@@ -165,7 +166,6 @@ internal fun settingsPreviewPrimaryTag(hex: String): String = "settings-preview-
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    onThemeSelected: (ThemeMode) -> Unit,
     onSelectDefaultPalette: () -> Unit,
     onSelectCustomPalette: () -> Unit,
     onEditingDarkChange: (Boolean) -> Unit,
@@ -197,7 +197,7 @@ fun SettingsScreen(
     lockScreenSetCompletion: Boolean = false,
     lockScreenAccessNote: LockScreenAccessNote? = null,
     onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
-    onTimerSoundsChange: (Boolean) -> Unit = {},
+    onTimerAudioChange: (TimerAudioMode) -> Unit = {},
     onOpenLockScreenAccessSettings: () -> Unit = {},
     lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
     onConfirmLockScreenEnable: () -> Unit = {},
@@ -279,7 +279,6 @@ fun SettingsScreen(
                 AppearanceSection(
                     state = state,
                     customEditorVisible = customEditorVisible,
-                    onThemeSelected = onThemeSelected,
                     onSelectDefaultPalette = onSelectDefaultPalette,
                     onSelectCustomPalette = onSelectCustomPalette,
                     onEditingDarkChange = onEditingDarkChange,
@@ -312,8 +311,8 @@ fun SettingsScreen(
                     lockScreenAccessNote = lockScreenAccessNote,
                     onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
                     onOpenLockScreenAccessSettings = onOpenLockScreenAccessSettings,
-                    timerSounds = state.timerSoundsEnabled,
-                    onTimerSoundsChange = onTimerSoundsChange
+                    timerAudio = state.timerAudio,
+                    onTimerAudioChange = onTimerAudioChange
                 )
                 CompactEditorDivider()
                 HealthConnectSettingsSection(
@@ -537,7 +536,6 @@ private fun LanguageSection(
 private fun AppearanceSection(
     state: SettingsUiState,
     customEditorVisible: Boolean,
-    onThemeSelected: (ThemeMode) -> Unit,
     onSelectDefaultPalette: () -> Unit,
     onSelectCustomPalette: () -> Unit,
     onEditingDarkChange: (Boolean) -> Unit,
@@ -546,29 +544,6 @@ private fun AppearanceSection(
     onGenerateDark: () -> Unit,
     onResetCustomDraft: () -> Unit
 ) {
-    CompactEditorSection(title = settingsKicker(stringResource(R.string.theme_title))) {
-        Column(modifier = Modifier.selectableGroup()) {
-            ChoiceRow(
-                label = stringResource(R.string.theme_system),
-                selected = state.appearance.mode == ThemeMode.System,
-                testTag = SETTINGS_THEME_SYSTEM,
-                onClick = { onThemeSelected(ThemeMode.System) }
-            )
-            ChoiceRow(
-                label = stringResource(R.string.theme_light),
-                selected = state.appearance.mode == ThemeMode.Light,
-                testTag = SETTINGS_THEME_LIGHT,
-                onClick = { onThemeSelected(ThemeMode.Light) }
-            )
-            ChoiceRow(
-                label = stringResource(R.string.theme_dark),
-                selected = state.appearance.mode == ThemeMode.Dark,
-                testTag = SETTINGS_THEME_DARK,
-                onClick = { onThemeSelected(ThemeMode.Dark) }
-            )
-        }
-    }
-    CompactEditorDivider()
     CompactEditorSection(title = settingsKicker(stringResource(R.string.palette_title))) {
         val customSelected = state.appearance.paletteType == PaletteType.Custom
         Column(modifier = Modifier.selectableGroup()) {
@@ -946,8 +921,8 @@ private fun TrainingSection(
     lockScreenAccessNote: LockScreenAccessNote?,
     onLockScreenSetCompletionChange: (Boolean) -> Unit,
     onOpenLockScreenAccessSettings: () -> Unit,
-    timerSounds: Boolean,
-    onTimerSoundsChange: (Boolean) -> Unit
+    timerAudio: TimerAudioMode,
+    onTimerAudioChange: (TimerAudioMode) -> Unit
 ) {
     val subtitle = when (val pending = state.weeklyGoal.pending) {
         is PendingWeeklyGoal.Update -> stringResource(
@@ -973,45 +948,66 @@ private fun TrainingSection(
             onCheckedChange = onLockScreenSetCompletionChange,
             onOpenSettings = onOpenLockScreenAccessSettings
         )
-        TimerSoundsRow(
-            enabled = timerSounds,
-            onCheckedChange = onTimerSoundsChange
+        TimerAudioRow(
+            mode = timerAudio,
+            onModeChange = onTimerAudioChange
         )
     }
 }
 
 @Composable
-private fun TimerSoundsRow(
-    enabled: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+private fun TimerAudioRow(
+    mode: TimerAudioMode,
+    onModeChange: (TimerAudioMode) -> Unit
 ) {
-    Row(
+    val options = TimerAudioMode.entries
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = AppDimens.minTouch)
-            .testTag("settings_timer_sounds"),
-        verticalAlignment = Alignment.CenterVertically
+            .testTag("settings_timer_audio")
     ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = AppDimens.itemGap)
-        ) {
-            Text(
-                text = stringResource(R.string.settings_timer_sounds_title),
-                style = AppTypeTokens.sectionTitle,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = stringResource(R.string.settings_timer_sounds_body),
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Switch(
-            checked = enabled,
-            onCheckedChange = onCheckedChange
+        Text(
+            text = stringResource(R.string.settings_timer_audio_title),
+            style = AppTypeTokens.sectionTitle,
+            color = MaterialTheme.colorScheme.onBackground
         )
+        Spacer(Modifier.height(AppDimens.headerStackGap))
+        SegmentedControl(
+            options = options.map { stringResource(it.labelRes()) },
+            selectedIndex = options.indexOf(mode).coerceAtLeast(0),
+            onSelected = { index -> onModeChange(options[index]) },
+            optionTestTags = options.map { it.testTag() }
+        )
+        Spacer(Modifier.height(AppDimens.statSecondaryGap))
+        Text(
+            text = stringResource(mode.explanationRes()),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun TimerAudioMode.labelRes(): Int {
+    return when (this) {
+        TimerAudioMode.VOICE -> R.string.settings_timer_audio_voice
+        TimerAudioMode.BEEPS -> R.string.settings_timer_audio_beeps
+        TimerAudioMode.SILENT -> R.string.settings_timer_audio_silent
+    }
+}
+
+private fun TimerAudioMode.explanationRes(): Int {
+    return when (this) {
+        TimerAudioMode.VOICE -> R.string.settings_timer_audio_voice_body
+        TimerAudioMode.BEEPS -> R.string.settings_timer_audio_beeps_body
+        TimerAudioMode.SILENT -> R.string.settings_timer_audio_silent_body
+    }
+}
+
+private fun TimerAudioMode.testTag(): String {
+    return when (this) {
+        TimerAudioMode.VOICE -> "settings_timer_audio_voice"
+        TimerAudioMode.BEEPS -> "settings_timer_audio_beeps"
+        TimerAudioMode.SILENT -> "settings_timer_audio_silent"
     }
 }
 
@@ -1426,7 +1422,6 @@ private fun SettingsPreview() {
     WeightTrackerTheme {
         SettingsScreen(
             state = SettingsUiState(appearance = AppearanceSettings.Default),
-            onThemeSelected = {},
             onSelectDefaultPalette = {},
             onSelectCustomPalette = {},
             onEditingDarkChange = {},

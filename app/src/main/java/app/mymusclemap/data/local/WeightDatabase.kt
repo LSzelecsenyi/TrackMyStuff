@@ -27,7 +27,7 @@ import androidx.room.RoomDatabase
         AchievementStateEntity::class,
         TargetWeightGoalEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
@@ -86,7 +86,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_15_16,
                     MIGRATION_16_17,
                     MIGRATION_17_18,
-                    MIGRATION_18_19
+                    MIGRATION_18_19,
+                    MIGRATION_19_20
                 )
                 .build()
         }

@@ -52,7 +52,8 @@ data class ExerciseHistorySet(
     val loadKind: PlannedLoadKind? = null,
     val weightKg: Double? = null,
     val durationSeconds: Int? = null,
-    val distanceMeters: Double? = null
+    val distanceMeters: Double? = null,
+    val timedWork: Boolean = false
 )
 
 data class ExerciseHistorySelection(

@@ -273,12 +273,14 @@ object PerformanceRecordEvaluator {
     }
 
     private fun comparableWeightKg(item: OrderedSet): Double? {
+        if (item.set.timedWork) return null
         if (item.measurement != MeasurementType.REPETITIONS_AND_WEIGHT) return null
         if (!positiveCompletedReps(item.set)) return null
         return WorkoutSetVolume.effectiveLoadKg(item.set, item.interpretation)
     }
 
     private fun comparableReps(item: OrderedSet): Int? {
+        if (item.set.timedWork) return null
         if (item.measurement != MeasurementType.REPETITIONS &&
             item.measurement != MeasurementType.REPETITIONS_AND_WEIGHT
         ) {
