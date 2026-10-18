@@ -104,7 +104,6 @@ import app.mymusclemap.ui.onboarding.OnboardingGuideViewModel
 import app.mymusclemap.ui.onboarding.OnboardingHeatmapSpotlight
 import app.mymusclemap.ui.onboarding.OnboardingWorkoutSpotlight
 import app.mymusclemap.ui.settings.HelpTipsScreen
-import app.mymusclemap.ui.settings.OpenSourceLicensesScreen
 import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.pro.ProBenefitsScreen
 import app.mymusclemap.ui.pro.ProDiscoveryOfferDialog
@@ -697,9 +696,6 @@ fun WeightTrackerNavHost(
                     onBack = { navController.popBackStack() },
                     onOpenHelp = { navController.navigateInternal(AppRoutes.HELP) },
                     onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) },
-                    onOpenOpenSourceLicenses = {
-                        navController.navigateInternal(AppRoutes.OPEN_SOURCE_LICENSES)
-                    },
                     onOpenFounderProgram = {
                         navController.navigateInternal(AppRoutes.FOUNDER_PROGRAM)
                     },
@@ -757,9 +753,6 @@ fun WeightTrackerNavHost(
             }
             composable(AppRoutes.PRIVACY) {
                 PrivacyPolicyScreen(onBack = { navController.popBackStack() })
-            }
-            composable(AppRoutes.OPEN_SOURCE_LICENSES) {
-                OpenSourceLicensesScreen(onBack = { navController.popBackStack() })
             }
             composable(AppRoutes.PRO_INFO) {
                 ProInfoScreen(onBack = { navController.popBackStack() })
@@ -1665,7 +1658,6 @@ private fun SettingsRoute(
     onBack: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenPrivacy: () -> Unit,
-    onOpenOpenSourceLicenses: () -> Unit,
     onOpenFounderProgram: () -> Unit,
     onOpenProPlan: () -> Unit,
     accountName: String?,
@@ -1808,7 +1800,6 @@ private fun SettingsRoute(
             }
         },
         onOpenHelp = onOpenHelp,
-        onOpenOpenSourceLicenses = onOpenOpenSourceLicenses,
         onOpenFounderProgram = onOpenFounderProgram,
         onOpenProPlan = onOpenProPlan,
         accountName = accountName,

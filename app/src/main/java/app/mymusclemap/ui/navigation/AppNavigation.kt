@@ -11,7 +11,6 @@ object AppRoutes {
     const val HEALTH_CONNECT = "health_connect"
     const val HELP = "help"
     const val PRIVACY = "privacy"
-    const val OPEN_SOURCE_LICENSES = "open_source_licenses"
     const val PRO_INFO = "pro_info"
     const val PRO_BENEFITS = "pro_benefits"
     const val STATISTICS_GRAPH = "statistics_graph"
@@ -125,14 +124,6 @@ object AppNavigation {
             targetRoute = AppRoutes.HELP,
             backTarget = AppRoutes.SETTINGS,
             shouldPush = shouldNavigate(currentRoute, AppRoutes.HELP)
-        )
-    }
-
-    fun openOpenSourceLicenses(currentRoute: String?): InternalNavigation {
-        return InternalNavigation(
-            targetRoute = AppRoutes.OPEN_SOURCE_LICENSES,
-            backTarget = AppRoutes.SETTINGS,
-            shouldPush = shouldNavigate(currentRoute, AppRoutes.OPEN_SOURCE_LICENSES)
         )
     }
 

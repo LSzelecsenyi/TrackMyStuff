@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Backup
-import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Policy
@@ -131,7 +130,6 @@ internal const val SETTINGS_APP_BACKUP_RESTORE = "settings-app-backup-restore"
 internal const val SETTINGS_HELP_TIPS = "settings-help-tips"
 internal const val SETTINGS_SEND_FEEDBACK = "settings-send-feedback"
 internal const val SETTINGS_PRIVACY_POLICY = "settings-privacy-policy"
-internal const val SETTINGS_OPEN_SOURCE_LICENSES = "settings-open-source-licenses"
 internal const val SETTINGS_APP_VERSION = "settings-app-version"
 internal const val SETTINGS_PRO_PLAN = "settings-pro-plan"
 internal const val SETTINGS_ACCOUNT = "settings-account"
@@ -183,7 +181,6 @@ fun SettingsScreen(
     onSendFeedback: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
     onOpenHelp: () -> Unit,
-    onOpenOpenSourceLicenses: () -> Unit = {},
     onOpenFounderProgram: () -> Unit = {},
     showFounderProgram: Boolean = true,
     showFounderBadge: Boolean = false,
@@ -331,8 +328,7 @@ fun SettingsScreen(
                     showFounderBadge = showFounderBadge,
                     onSendFeedback = onSendFeedback,
                     onOpenPrivacyPolicy = onOpenPrivacyPolicy,
-                    onOpenHelp = onOpenHelp,
-                    onOpenOpenSourceLicenses = onOpenOpenSourceLicenses
+                    onOpenHelp = onOpenHelp
                 )
             }
         }
@@ -1193,8 +1189,7 @@ private fun AboutSection(
     showFounderBadge: Boolean,
     onSendFeedback: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
-    onOpenHelp: () -> Unit,
-    onOpenOpenSourceLicenses: () -> Unit
+    onOpenHelp: () -> Unit
 ) {
     val usesExternalPrivacyPolicy = !state.privacyPolicyUrl.isNullOrBlank()
     val version = if (showFounderBadge) {
@@ -1237,13 +1232,6 @@ private fun AboutSection(
             subtitle = stringResource(R.string.action_send_feedback_subtitle),
             testTag = SETTINGS_SEND_FEEDBACK,
             onClick = onSendFeedback
-        )
-        DataActionRow(
-            icon = Icons.Outlined.Description,
-            title = stringResource(R.string.action_open_source_licenses),
-            subtitle = stringResource(R.string.action_open_source_licenses_subtitle),
-            testTag = SETTINGS_OPEN_SOURCE_LICENSES,
-            onClick = onOpenOpenSourceLicenses
         )
         DataActionRow(
             icon = Icons.Outlined.Policy,

@@ -9,6 +9,7 @@ import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
 import app.mymusclemap.data.preferences.TimerSoundStore
+import app.mymusclemap.domain.workout.TimerAudioMode
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
@@ -51,7 +52,7 @@ data class SettingsUiState(
     val weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(LocalDate.of(1970, 1, 1)),
     val lockScreenSetCompletionEnabled: Boolean = false,
     val lockScreenPermissionRequested: Boolean = false,
-    val timerSoundsEnabled: Boolean = true
+    val timerAudio: TimerAudioMode = TimerAudioMode.BEEPS
 ) {
     val customEditorVisible: Boolean get() = draft != null
 }
@@ -66,7 +67,7 @@ private data class MessageChrome(
     val message: UserMessage?,
     val lockEnabled: Boolean,
     val lockRequested: Boolean,
-    val timerSounds: Boolean
+    val timerAudio: TimerAudioMode
 )
 
 private data class BackupChrome(
@@ -92,7 +93,7 @@ class SettingsViewModel(
     private val userMessage = MutableStateFlow<UserMessage?>(null)
     private val lockScreenEnabled = MutableStateFlow(false)
     private val lockScreenPermissionRequested = MutableStateFlow(false)
-    private val timerSoundsEnabled = MutableStateFlow(true)
+    private val timerAudio = MutableStateFlow(TimerAudioMode.BEEPS)
 
     private val chrome = combine(appearance, draft, saveError) { current, draftState, error ->
         SettingsChrome(current, draftState, error)
@@ -116,9 +117,9 @@ class SettingsViewModel(
             userMessage,
             lockScreenEnabled,
             lockScreenPermissionRequested,
-            timerSoundsEnabled
-        ) { message, enabled, requested, sounds ->
-            MessageChrome(message, enabled, requested, sounds)
+            timerAudio
+        ) { message, enabled, requested, audio ->
+            MessageChrome(message, enabled, requested, audio)
         },
         combine(backupChrome, weeklyGoalStatus) { backup, goal -> backup to goal }
     ) { chromeState, lockAndMessage, backupAndGoal ->
@@ -138,7 +139,7 @@ class SettingsViewModel(
             weeklyGoal = goal,
             lockScreenSetCompletionEnabled = enabled,
             lockScreenPermissionRequested = requested,
-            timerSoundsEnabled = lockAndMessage.timerSounds
+            timerAudio = lockAndMessage.timerAudio
         )
     }.stateIn(
         scope = viewModelScope,
@@ -149,9 +150,9 @@ class SettingsViewModel(
         )
     )
 
-    fun setTimerSounds(enabled: Boolean) {
+    fun setTimerAudio(mode: TimerAudioMode) {
         viewModelScope.launch {
-            timerSounds.setEnabled(enabled)
+            timerSounds.setMode(mode)
         }
     }
 
@@ -186,7 +187,8 @@ class SettingsViewModel(
             lockScreenSetCompletion.enabled.collect { lockScreenEnabled.value = it }
         }
         viewModelScope.launch {
-            timerSounds.enabled.collect { timerSoundsEnabled.value = it }
+            timerSounds.migrate()
+            timerSounds.mode.collect { timerAudio.value = it }
         }
         viewModelScope.launch {
             lockScreenSetCompletion.runtimePermissionRequested.collect {

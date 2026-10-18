@@ -203,11 +203,6 @@
     <string name="about_version">Verzió: %1$s</string>
     <string name="about_version_status">Verzió: %1$s · %2$s</string>
     <string name="action_help_tips">Súgó és tippek</string>
-    <string name="action_open_source_licenses">Nyílt forráskódú licencek</string>
-    <string name="action_open_source_licenses_subtitle">Az alkalmazásban szereplő harmadik féltől származó közlemények</string>
-    <string name="open_source_licenses_title">Nyílt forráskódú licencek</string>
-    <string name="open_source_body_muscles_summary">Az anatómiai testábrázolás egyes részei Ivan Vulović body-muscles művéből származnak, az Apache License, Version 2.0 licenc alatt. Az útvonalakat ehhez az alkalmazáshoz alakítottuk át. Az összetett hasi útvonalakat külön régiókra bontottuk. Az elülső és az oldalsó vállkontúrok további vonalakat tartalmaznak, amelyek nem az eredeti útvonaladatok szó szerinti másolatai. Az alábbi licenc és közlemény az alkalmazással együtt szállított eredeti szövegek.</string>
-    <string name="open_source_notices_unavailable">A mellékelt licencszöveg nem olvasható.</string>
     <string name="action_help_tips_subtitle">Edzések, hőtérkép, testsúly, naptár és biztonsági mentés</string>
     <string name="help_title">Súgó és tippek</string>
     <string name="help_workout_title">Edzés indítása</string>
