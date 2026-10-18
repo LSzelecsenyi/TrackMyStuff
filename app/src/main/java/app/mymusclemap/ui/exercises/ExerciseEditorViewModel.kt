@@ -17,7 +17,10 @@ import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -34,7 +37,8 @@ data class ExerciseEditorUiState(
     val finished: Boolean = false,
     val created: Boolean = false,
     val saved: Boolean = false,
-    val lockedFeature: AppFeature? = null
+    val lockedFeature: AppFeature? = null,
+    val contentLocked: Boolean = false
 ) {
     val weightInterpretationVisible: Boolean
         get() = ExerciseDraftLogic.isWeightInterpretationVisible(
@@ -50,6 +54,7 @@ data class ExerciseEditorUiState(
 class ExerciseEditorViewModel(
     savedStateHandle: SavedStateHandle,
     private val repository: ExerciseRepository,
+    private val access: Flow<FreeAccessDecision> = emptyFlow(),
     private val muscleLabel: (MuscleGroup) -> String = { it.name }
 ) : ViewModel() {
     private val exerciseId: Long? = savedStateHandle.get<Long>(EXERCISE_ID_KEY)
@@ -65,6 +70,16 @@ class ExerciseEditorViewModel(
     val uiState: StateFlow<ExerciseEditorUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            access.collect { decision ->
+                val id = exerciseId
+                val custom = id != null && repository.getById(id)?.custom == true
+                val locked = custom && decision.loaded && !decision.customExerciseAccessible(id)
+                _uiState.update { state ->
+                    if (state.contentLocked == locked) state else state.copy(contentLocked = locked)
+                }
+            }
+        }
         if (exerciseId != null) {
             viewModelScope.launch {
                 val exercise = repository.getById(exerciseId)
@@ -120,7 +135,7 @@ class ExerciseEditorViewModel(
     fun save() {
         var draftToSave: ExerciseDraft? = null
         _uiState.update { state ->
-            if (state.saving || state.finished || state.loading) {
+            if (state.saving || state.finished || state.loading || state.contentLocked) {
                 return@update state
             }
             val prepared = sortedSecondaries(state.draft)
@@ -186,6 +201,9 @@ class ExerciseEditorViewModel(
                         )
                     }
                 }
+                ExerciseSaveResult.Locked -> {
+                    _uiState.update { it.copy(saving = false, contentLocked = true) }
+                }
             }
         }
     }
@@ -219,7 +237,7 @@ class ExerciseEditorViewModel(
 
     private fun updateDraft(transform: (ExerciseDraft) -> ExerciseDraft) {
         _uiState.update { state ->
-            if (state.saving) {
+            if (state.saving || state.contentLocked) {
                 return@update state
             }
             val next = transform(state.draft)

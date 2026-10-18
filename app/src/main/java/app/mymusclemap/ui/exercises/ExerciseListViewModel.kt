@@ -13,10 +13,14 @@ import app.mymusclemap.domain.exercise.ExerciseCatalogLogic
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.ExerciseDeleteResult
 import app.mymusclemap.domain.exercise.MuscleGroup
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -33,7 +37,9 @@ data class ExerciseListUiState(
     val pendingDelete: Exercise? = null,
     val pendingBlocked: Exercise? = null,
     val referencedIds: Set<Long> = emptySet(),
-    val lockedFeature: AppFeature? = null
+    val lockedFeature: AppFeature? = null,
+    val lockedCustomExerciseIds: Set<Long> = emptySet(),
+    val selectionRequired: Boolean = false
 )
 
 enum class CatalogEmptyKind {
@@ -70,7 +76,8 @@ private data class ListCore(
 
 class ExerciseListViewModel(
     private val repository: ExerciseRepository,
-    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
+    private val access: Flow<FreeAccessDecision> = flowOf(FreeAccessLogic.unknown())
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val category = MutableStateFlow<ExerciseCategory?>(null)
@@ -91,8 +98,9 @@ class ExerciseListViewModel(
             ListCore(exercises, current, currentMessage, delete, blocked)
         },
         lockedFeature,
-        repository.observeReferencedExerciseIds()
-    ) { core, locked, referenced ->
+        repository.observeReferencedExerciseIds(),
+        access
+    ) { core, locked, referenced, decision ->
         val visible = ExerciseCatalogLogic.filter(
             exercises = core.exercises,
             query = core.current.query,
@@ -125,6 +133,8 @@ class ExerciseListViewModel(
             message = core.currentMessage,
             pendingDelete = core.delete,
             pendingBlocked = core.blocked,
+            lockedCustomExerciseIds = decision.lockedCustomExerciseIds,
+            selectionRequired = decision.selectionRequired,
             referencedIds = referenced,
             lockedFeature = locked
         )

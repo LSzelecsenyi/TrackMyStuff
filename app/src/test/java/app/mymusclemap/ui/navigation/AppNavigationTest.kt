@@ -93,6 +93,29 @@ class AppNavigationTest {
     }
 
     @Test
+    fun proBenefitsFromThePlanEditorPushesAndReturnsToThatEditor() {
+        val editor = "${AppRoutes.TEMPLATE_EDITOR}?templateId=4"
+        val navigation = AppNavigation.openProBenefits(editor)
+        assertEquals(AppRoutes.PRO_BENEFITS, navigation.targetRoute)
+        assertEquals(AppRoutes.TEMPLATE_EDITOR, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRO_BENEFITS))
+        assertFalse(AppNavigation.showsBottomBar(editor))
+        assertTrue(AppNavigation.shouldNavigate(editor, AppRoutes.PRO_BENEFITS))
+    }
+
+    @Test
+    fun proBenefitsFromAnActiveWorkoutPushesAndReturnsToThatWorkout() {
+        val navigation = AppNavigation.openProBenefits(AppRoutes.ACTIVE_WORKOUT)
+        assertEquals(AppRoutes.PRO_BENEFITS, navigation.targetRoute)
+        assertEquals(AppRoutes.ACTIVE_WORKOUT, navigation.backTarget)
+        assertTrue(navigation.shouldPush)
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.PRO_BENEFITS))
+        assertFalse(AppNavigation.showsBottomBar(AppRoutes.ACTIVE_WORKOUT))
+        assertTrue(AppNavigation.shouldNavigate(AppRoutes.ACTIVE_WORKOUT, AppRoutes.PRO_BENEFITS))
+    }
+
+    @Test
     fun proBenefitsOpensWithoutDuplicatingAndHidesBottomBar() {
         val fromOverview = AppNavigation.openProBenefits(AppRoutes.OVERVIEW)
         assertEquals(AppRoutes.PRO_BENEFITS, fromOverview.targetRoute)

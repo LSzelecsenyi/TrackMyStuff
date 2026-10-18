@@ -88,6 +88,8 @@ import app.mymusclemap.ui.dashboard.WeightDetailsViewModel
 import app.mymusclemap.ui.progress.ProgressPhotoCompareScreen
 import app.mymusclemap.ui.progress.ProgressPhotoViewerScreen
 import app.mymusclemap.ui.progress.ProgressPhotosScreen
+import app.mymusclemap.ui.entitlement.FreeAccessSelectionScreen
+import app.mymusclemap.ui.entitlement.FreeAccessSelectionViewModel
 import app.mymusclemap.ui.exercises.ExerciseEditorScreen
 import app.mymusclemap.ui.exercises.ExerciseEditorViewModel
 import app.mymusclemap.ui.exercises.ExerciseListScreen
@@ -757,6 +759,23 @@ fun WeightTrackerNavHost(
             composable(AppRoutes.PRO_INFO) {
                 ProInfoScreen(onBack = { navController.popBackStack() })
             }
+            composable(AppRoutes.FREE_ACCESS) {
+                val viewModel: FreeAccessSelectionViewModel = viewModel(factory = factory)
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                LaunchedEffect(state.finished) {
+                    if (state.finished) navController.popBackStack()
+                }
+                FreeAccessSelectionScreen(
+                    state = state,
+                    onBack = { navController.popBackStack() },
+                    onTogglePlan = viewModel::togglePlan,
+                    onToggleExercise = viewModel::toggleExercise,
+                    onRequestConfirm = viewModel::requestConfirm,
+                    onDismissConfirm = viewModel::dismissConfirm,
+                    onConfirm = viewModel::confirm,
+                    onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) }
+                )
+            }
             composable(AppRoutes.PRO_BENEFITS) {
                 val benefits = remember(entitlementRevision) { proBenefitsStatus() }
                 val discovery = remember(entitlementRevision) { proDiscovery() }
@@ -1144,7 +1163,9 @@ fun WeightTrackerNavHost(
                     onDismissDelete = viewModel::dismissDelete,
                     onConfirmDelete = viewModel::confirmDelete,
                     onMessageConsumed = viewModel::consumeMessage,
-                    onDismissLocked = viewModel::consumeLockedFeature
+                    onDismissLocked = viewModel::consumeLockedFeature,
+                    onChooseFreeAccess = { navController.navigateInternal(AppRoutes.FREE_ACCESS) },
+                    onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) }
                 )
             }
             composable(
@@ -1181,7 +1202,8 @@ fun WeightTrackerNavHost(
                         }
                         navController.popBackStack()
                     },
-                    onDismissLocked = viewModel::consumeLockedFeature
+                    onDismissLocked = viewModel::consumeLockedFeature,
+                    onExploreProBenefits = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) }
                 )
             }
             composable(AppRoutes.TEMPLATES) { entry ->
@@ -1222,7 +1244,9 @@ fun WeightTrackerNavHost(
                     onRequestDelete = viewModel::requestDelete,
                     onDismissDelete = viewModel::dismissDelete,
                     onConfirmDelete = viewModel::confirmDelete,
-                    onMessageConsumed = viewModel::consumeMessage
+                    onMessageConsumed = viewModel::consumeMessage,
+                    onChooseFreeAccess = { navController.navigateInternal(AppRoutes.FREE_ACCESS) },
+                    onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) }
                 )
             }
             composable(
@@ -1277,6 +1301,9 @@ fun WeightTrackerNavHost(
                     onConfirmDiscard = viewModel::confirmDiscard,
                     onScrollConsumed = viewModel::consumeScrollEvent,
                     onDismissLocked = viewModel::consumeLockedFeature,
+                    onExploreProBenefits = {
+                        navController.navigateInternal(AppRoutes.PRO_BENEFITS)
+                    },
                     onFinished = { saved, created ->
                         if (saved) {
                             navController.previousBackStackEntry
@@ -1352,7 +1379,10 @@ fun WeightTrackerNavHost(
                     onFinishWorkEarly = viewModel::finishWorkEarly,
                     onConfirmTimedSet = viewModel::confirmTimedSet,
                     onConfirmCancelWork = viewModel::confirmCancelWorkNavigation,
-                    onDismissCancelWork = viewModel::dismissCancelWorkNavigation
+                    onDismissCancelWork = viewModel::dismissCancelWorkNavigation,
+                    onExploreProBenefits = {
+                        navController.navigateInternal(AppRoutes.PRO_BENEFITS)
+                    }
                 )
             }
             composable(AppRoutes.ACHIEVEMENTS) {

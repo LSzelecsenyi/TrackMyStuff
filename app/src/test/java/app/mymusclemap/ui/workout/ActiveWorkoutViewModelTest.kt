@@ -12,7 +12,10 @@ import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.FixedDateProvider
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.SelectiveFeatureEntitlements
+import app.mymusclemap.domain.statistics.WorkoutSetVolume
 import app.mymusclemap.domain.workout.RestClockSample
 import app.mymusclemap.domain.workout.WorkPhase
 import app.mymusclemap.domain.workout.RestPhase
@@ -47,6 +50,8 @@ import app.mymusclemap.domain.workout.WorkoutFocusTarget
 import java.util.UUID
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -1492,7 +1497,174 @@ class ActiveWorkoutViewModelTest {
         assertEquals(SessionSetStatus.COMPLETED, advanced.aggregate!!.exercises[0].sets[0].status)
     }
 
-    private suspend fun startTimedWorkout(): ActiveWorkoutViewModel {
+    @Test
+    fun freeUserCannotStartOrCompleteASavedTimedSetAndCanSkipIt() = runOnMain {
+        val viewModel = startTimedWorkout(SelectiveFeatureEntitlements(emptySet()))
+        val loaded = viewModel.loaded()
+        val first = loaded.aggregate!!.exercises[0].sets[0]
+        assertFalse(loaded.timersEnabled)
+        assertTrue(first.timedWork)
+        assertEquals(30, first.plannedDurationSeconds)
+        assertEquals(SessionSetStatus.PENDING, first.status)
+        viewModel.startWork(first.id)
+        viewModel.confirmTimedSet()
+        viewModel.completeSet(first.id)
+        val stillPending = viewModel.uiState.value.aggregate!!.exercises[0].sets[0]
+        assertNull(viewModel.uiState.value.work)
+        assertEquals(SessionSetStatus.PENDING, stillPending.status)
+        assertEquals(30, stillPending.plannedDurationSeconds)
+        assertNull(stillPending.completedAt)
+        viewModel.skipSet(first.id)
+        val skipped = awaitReal {
+            viewModel.uiState.first { it.aggregate!!.exercises[0].sets[0].status == SessionSetStatus.SKIPPED }
+        }
+        val stored = skipped.aggregate!!.exercises[0].sets[0]
+        assertEquals(SessionSetStatus.SKIPPED, stored.status)
+        assertNull(stored.actualDurationSeconds)
+        assertNull(stored.actualReps)
+        assertNull(stored.completedAt)
+        assertTrue(stored.timedWork)
+        assertEquals(30, stored.plannedDurationSeconds)
+        assertEquals(0, skipped.progress.completed)
+        assertFalse(WorkoutSetVolume.isCompleted(stored))
+        assertEquals(SessionSetStatus.PENDING, skipped.aggregate!!.exercises[0].sets[1].status)
+    }
+
+    @Test
+    fun mixedRepsAndTimedWorkoutStaysUsableWithoutPro() = runOnMain {
+        val pull = savePull()
+        val planned = listOf(
+            PlannedSetDraft(
+                localId = -1L,
+                minRepsText = "8",
+                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
+            ),
+            PlannedSetDraft(
+                localId = -2L,
+                minRepsText = "8",
+                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
+                minutesText = "0",
+                secondsText = "30",
+                timedWork = true
+            )
+        )
+        val templateId = saveTemplate("Mixed", listOf(pull to planned))
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        val viewModel = active(
+            started.sessionId,
+            entitlements = SelectiveFeatureEntitlements(emptySet())
+        )
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.completeSet(sets[0].id)
+        val afterReps = awaitReal {
+            viewModel.uiState.first { it.aggregate!!.exercises[0].sets[0].status == SessionSetStatus.COMPLETED }
+        }
+        assertEquals(1, afterReps.progress.completed)
+        val timed = afterReps.aggregate!!.exercises[0].sets[1]
+        assertTrue(timed.timedWork)
+        assertEquals(30, timed.plannedDurationSeconds)
+        viewModel.startWork(timed.id)
+        viewModel.completeSet(timed.id)
+        assertEquals(SessionSetStatus.PENDING, viewModel.uiState.value.aggregate!!.exercises[0].sets[1].status)
+        viewModel.skipSet(timed.id)
+        val done = awaitReal {
+            viewModel.uiState.first { it.progress.pending == 0 }
+        }
+        assertEquals(SessionSetStatus.SKIPPED, done.aggregate!!.exercises[0].sets[1].status)
+        assertNull(done.aggregate!!.exercises[0].sets[1].actualDurationSeconds)
+        assertEquals(1, done.progress.completed)
+    }
+
+    @Test
+    fun onlyLockedTimedSetsCanBeFinishedWithoutCompletingThem() = runOnMain {
+        val viewModel = startTimedWorkout(SelectiveFeatureEntitlements(emptySet()))
+        viewModel.loaded()
+        viewModel.requestFinish()
+        awaitReal { viewModel.uiState.first { it.pendingFinishCount == 2 } }
+        viewModel.confirmFinish(skipRemaining = true)
+        val finished = awaitReal { viewModel.uiState.first { it.finished && it.completionSummary != null } }
+        assertEquals(0, finished.completionSummary!!.completedSetCount)
+        val stored = sessions.getAggregate(sessionId)!!
+        assertEquals(SessionStatus.COMPLETED, stored.session.status)
+        assertTrue(stored.exercises[0].sets.all { it.status == SessionSetStatus.SKIPPED })
+        assertTrue(stored.exercises[0].sets.all { it.timedWork && it.plannedDurationSeconds == 30 })
+        assertTrue(stored.exercises[0].sets.all { it.actualDurationSeconds == null && it.completedAt == null })
+        assertTrue(stored.exercises[0].sets.none { WorkoutSetVolume.isCompleted(it) })
+    }
+
+    @Test
+    fun regainingProRestoresTimedExecutionWithoutRewritingThePlan() = runOnMain {
+        val access = FlipEntitlements(pro = false)
+        val viewModel = startTimedWorkout(access)
+        val loaded = viewModel.loaded()
+        val setId = loaded.aggregate!!.exercises[0].sets[0].id
+        assertFalse(loaded.timersEnabled)
+        assertEquals(30, loaded.aggregate!!.exercises[0].sets[0].plannedDurationSeconds)
+        viewModel.startWork(setId)
+        assertNull(viewModel.uiState.value.work)
+        access.grantPro()
+        val enabled = awaitReal { viewModel.uiState.first { it.timersEnabled } }
+        assertEquals(30, enabled.aggregate!!.exercises[0].sets[0].plannedDurationSeconds)
+        assertTrue(enabled.aggregate!!.exercises[0].sets[0].timedWork)
+        viewModel.startWork(setId)
+        val running = awaitReal { viewModel.uiState.first { it.work?.phase == WorkPhase.RUNNING } }
+        assertEquals(setId, running.work?.setId)
+        assertEquals(SessionSetStatus.PENDING, running.aggregate!!.exercises[0].sets[0].status)
+    }
+
+    @Test
+    fun anEffectiveTimerGrantCanExecuteATimedSet() = runOnMain {
+        val viewModel = startTimedWorkout(
+            SelectiveFeatureEntitlements(setOf(AppFeature.WorkoutTimers))
+        )
+        val loaded = viewModel.loaded()
+        assertTrue(loaded.timersEnabled)
+        val setId = loaded.aggregate!!.exercises[0].sets[0].id
+        viewModel.startWork(setId)
+        val running = awaitReal { viewModel.uiState.first { it.work?.phase == WorkPhase.RUNNING } }
+        assertEquals(setId, running.work?.setId)
+    }
+
+    @Test
+    fun completedTimedHistorySurvivesLosingPro() = runOnMain {
+        val viewModel = startTimedWorkout()
+        val sets = viewModel.loaded().aggregate!!.exercises[0].sets
+        viewModel.startWork(sets[0].id)
+        awaitReal { viewModel.uiState.first { it.work?.phase == WorkPhase.RUNNING } }
+        restElapsed.addAndGet(30_000L)
+        mainDispatcherRule.advanceTimeBy(1_000L)
+        awaitReal { viewModel.uiState.first { it.work?.awaiting == true } }
+        viewModel.confirmTimedSet()
+        awaitReal {
+            viewModel.uiState.first {
+                it.aggregate!!.exercises[0].sets[0].status == SessionSetStatus.COMPLETED && it.work == null
+            }
+        }
+        val free = active(
+            sessionId,
+            restClock = ::restSample,
+            entitlements = SelectiveFeatureEntitlements(emptySet())
+        )
+        val locked = free.loaded()
+        val completed = locked.aggregate!!.exercises[0].sets[0]
+        val pending = locked.aggregate!!.exercises[0].sets[1]
+        assertEquals(SessionSetStatus.COMPLETED, completed.status)
+        assertEquals(30, completed.actualDurationSeconds)
+        assertEquals(30, completed.plannedDurationSeconds)
+        assertTrue(completed.timedWork)
+        assertEquals(SessionSetStatus.PENDING, pending.status)
+        assertEquals(30, pending.plannedDurationSeconds)
+        assertTrue(pending.timedWork)
+        assertFalse(locked.timersEnabled)
+        free.startWork(pending.id)
+        assertNull(free.uiState.value.work)
+        assertEquals(SessionSetStatus.PENDING, free.uiState.value.aggregate!!.exercises[0].sets[1].status)
+    }
+
+    private suspend fun startTimedWorkout(
+        entitlements: FeatureEntitlements = app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+    ): ActiveWorkoutViewModel {
         val pull = savePull()
         useRestClock()
         val planned = List(2) { index ->
@@ -1508,6 +1680,22 @@ class ActiveWorkoutViewModelTest {
         val templateId = saveTemplate("Burpees", listOf(pull to planned), exerciseRest = 45)
         val started = sessions.start(templateId) as StartWorkoutResult.Started
         sessionId = started.sessionId
-        return active(started.sessionId, restClock = ::restSample)
+        return active(started.sessionId, restClock = ::restSample, entitlements = entitlements)
+    }
+}
+
+private class FlipEntitlements(pro: Boolean) : FeatureEntitlements {
+    private val timers = MutableStateFlow(pro)
+    private val revision = MutableStateFlow(0)
+
+    override fun hasAccess(feature: AppFeature): Boolean {
+        return feature != AppFeature.WorkoutTimers || timers.value
+    }
+
+    override fun changes(): Flow<Int> = revision
+
+    fun grantPro() {
+        timers.value = true
+        revision.value += 1
     }
 }

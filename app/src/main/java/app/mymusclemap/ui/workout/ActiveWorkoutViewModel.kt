@@ -60,10 +60,10 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -135,7 +135,8 @@ data class ActiveWorkoutUiState(
     val work: WorkTimerUi? = null,
     val timersEnabled: Boolean = true,
     val confirmCancelWork: Boolean = false,
-    val preparation: WorkPreparationUi? = null
+    val preparation: WorkPreparationUi? = null,
+    val lockedExerciseIds: Set<Long> = emptySet()
 ) {
     val progress: SessionProgress
         get() = aggregate?.let(SessionProgressLogic::fromAggregate) ?: SessionProgress(0, 0, 0, 0)
@@ -179,7 +180,8 @@ class ActiveWorkoutViewModel(
     private val completionLedger: TimerCompletionLedger = TimerCompletionLedger.process,
     private val speechLanguage: () -> app.mymusclemap.domain.workout.TimerSpeechLanguage = {
         currentTimerSpeechLanguage()
-    }
+    },
+    private val lockedCatalogExerciseIds: Flow<Set<Long>> = flowOf(emptySet())
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(SESSION_ID) ?: -1L
     private val selectedIndex = savedStateHandle.getStateFlow(SELECTED_INDEX, 0)
@@ -224,6 +226,7 @@ class ActiveWorkoutViewModel(
     private var pendingExerciseIndex: Int? = null
     private var workExpiryJob: Job? = null
     private var workExpiryGeneration: Long? = null
+    private val lockedCatalog = MutableStateFlow<Set<Long>>(emptySet())
     private val audioMode = MutableStateFlow(TimerAudioMode.BEEPS)
     private val preparation = MutableStateFlow<WorkPreparationSnapshot?>(null)
     private var preparationGeneration = 0L
@@ -282,7 +285,8 @@ class ActiveWorkoutViewModel(
     private data class FocusChrome(
         val focus: WorkoutFocusEvent?,
         val focusedSetId: Long?,
-        val expanded: Set<Long>
+        val expanded: Set<Long>,
+        val lockedCatalogIds: Set<Long>
     )
 
     private val workoutState: StateFlow<ActiveWorkoutUiState> = combine(
@@ -332,8 +336,8 @@ class ActiveWorkoutViewModel(
                 clock.preparation
             )
         },
-        combine(focusEvent, focusedSetId, expandedIds) { focus, focused, expanded ->
-            FocusChrome(focus, focused, expanded)
+        combine(focusEvent, focusedSetId, expandedIds, lockedCatalog) { focus, focused, expanded, locked ->
+            FocusChrome(focus, focused, expanded, locked)
         }
     ) { aggregate, index, signals, dialogs, chrome ->
         if (aggregate == null) {
@@ -353,7 +357,8 @@ class ActiveWorkoutViewModel(
                 expandedExerciseIds = chrome.expanded,
                 editingSetIds = signals.editingSetIds,
                 finishing = dialogs.finishing,
-                completionSummary = signals.completionSummary
+                completionSummary = signals.completionSummary,
+                lockedExerciseIds = emptySet()
             )
         }
         val notActive = aggregate.session.status != SessionStatus.IN_PROGRESS
@@ -367,11 +372,14 @@ class ActiveWorkoutViewModel(
             missing = notActive && !dialogs.finished && signals.completionSummary == null,
             aggregate = aggregate,
             selectedIndex = bounded,
-            currentExerciseId = SessionFocusLogic.currentPendingExercise(aggregate)?.exercise?.id,
+            currentExerciseId = SessionFocusLogic.currentPendingExercise(
+                aggregate,
+                chrome.lockedCatalogIds
+            )?.exercise?.id,
             currentSetId = if (aggregate.session.restPhase != null) {
                 null
             } else {
-                SessionFocusLogic.currentPendingSet(aggregate)?.id
+                SessionFocusLogic.currentPendingSet(aggregate, chrome.lockedCatalogIds)?.id
             },
             drafts = mergeDrafts(aggregate, signals.drafts, signals.dirty),
             dirtySetIds = signals.dirty,
@@ -394,7 +402,11 @@ class ActiveWorkoutViewModel(
             work = workUi(aggregate, dialogs.elapsedRealtime, dialogs.now),
             timersEnabled = dialogs.timersEnabled,
             confirmCancelWork = dialogs.confirmCancelWork,
-            preparation = preparationUi(dialogs.preparation, dialogs.elapsedRealtime)
+            preparation = preparationUi(dialogs.preparation, dialogs.elapsedRealtime),
+            lockedExerciseIds = aggregate.exercises
+                .filter { it.exercise.exerciseId in chrome.lockedCatalogIds }
+                .map { it.exercise.id }
+                .toSet()
         )
     }.stateIn(
         scope = viewModelScope,
@@ -416,6 +428,20 @@ class ActiveWorkoutViewModel(
 
     init {
         viewModelScope.launch {
+            lockedCatalogExerciseIds.collect { locked ->
+                lockedCatalog.value = locked
+                val aggregate = latestAggregate ?: return@collect
+                val workSetId = aggregate.session.workSetId
+                val workExercise = aggregate.exercises.firstOrNull { item ->
+                    item.sets.any { it.id == workSetId }
+                }
+                if (workSetId != null && workExercise?.exercise?.exerciseId in locked) {
+                    sessionRepository.discardWork(sessionId, aggregate.session.workGeneration)
+                }
+                focusAuthoritative(aggregate)
+            }
+        }
+        viewModelScope.launch {
             entitlements.changes().collect {
                 val allowed = WorkoutTimerAccess.allowed(entitlements)
                 timerAccess.value = allowed
@@ -432,7 +458,10 @@ class ActiveWorkoutViewModel(
         viewModelScope.launch {
             sessionRepository.observeAggregate(sessionId).collect { aggregate ->
                 if (aggregate == null) return@collect
-                val exercise = SessionFocusLogic.currentPendingExercise(aggregate)?.exercise
+                val exercise = SessionFocusLogic.currentPendingExercise(
+                    aggregate,
+                    lockedCatalog.value
+                )?.exercise
                 val key = exercise?.id
                 if (historyInitialized && key == loadedHistoryExerciseId) return@collect
                 historyInitialized = true
@@ -635,7 +664,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun completeSet(setId: Long) {
-        if (discarding.value || setId in completingIds.value) {
+        if (discarding.value || setId in completingIds.value || exerciseLocked(setId)) {
             return
         }
         val snapshot = uiState.value
@@ -645,6 +674,7 @@ class ActiveWorkoutViewModel(
             ?.flatMap { it.sets }
             ?.firstOrNull { it.id == setId }
         if (pendingSet?.status == SessionSetStatus.PENDING && pendingSet.timedWork) {
+            if (!WorkoutTimerAccess.allowed(entitlements)) return
             val awaiting = running?.workSetId == setId &&
                 running.workPhase == WorkPhase.AWAITING.name
             if (!awaiting) return
@@ -712,7 +742,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun skipSet(setId: Long) {
-        if (discarding.value || setId in completingIds.value) {
+        if (discarding.value || setId in completingIds.value || exerciseLocked(setId)) {
             return
         }
         if (preparation.value?.setId == setId) {
@@ -720,7 +750,9 @@ class ActiveWorkoutViewModel(
             syncTimerAudio()
         }
         val running = uiState.value.aggregate?.session
-        if (running?.workSetId == setId && running.workPhase != null) {
+        if (running?.workSetId == setId && running.workPhase != null &&
+            WorkoutTimerAccess.allowed(entitlements)
+        ) {
             return
         }
         cancelDraftPersist(setId)
@@ -792,7 +824,8 @@ class ActiveWorkoutViewModel(
                 AddExtraExerciseResult.SessionNotFound,
                 AddExtraExerciseResult.NotActive,
                 AddExtraExerciseResult.ExerciseNotFound,
-                AddExtraExerciseResult.ExerciseArchived -> message.value = ActiveWorkoutMessage.SaveFailed
+                AddExtraExerciseResult.ExerciseArchived,
+                AddExtraExerciseResult.ExerciseLocked -> message.value = ActiveWorkoutMessage.SaveFailed
             }
         }
     }
@@ -1001,8 +1034,15 @@ class ActiveWorkoutViewModel(
         }
     }
 
+    private fun exerciseLocked(setId: Long): Boolean {
+        val owner = uiState.value.aggregate?.exercises?.firstOrNull { item ->
+            item.sets.any { it.id == setId }
+        } ?: return false
+        return owner.exercise.exerciseId in lockedCatalog.value
+    }
+
     private fun focusAuthoritative(aggregate: WorkoutSessionAggregate) {
-        val pending = SessionFocusLogic.currentPendingSet(aggregate)
+        val pending = SessionFocusLogic.currentPendingSet(aggregate, lockedCatalog.value)
         if (pending == null) {
             focusedSetId.value = null
             emitFocus(WorkoutFocusTarget.Finish)
@@ -1044,7 +1084,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun startWork(setId: Long) {
-        if (!WorkoutTimerAccess.allowed(entitlements)) return
+        if (!WorkoutTimerAccess.allowed(entitlements) || exerciseLocked(setId)) return
         if (preparation.value != null) return
         val session = uiState.value.aggregate?.session
         if (session?.workPhase != null || session?.restPhase != null) return
@@ -1094,6 +1134,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun confirmTimedSet() {
+        if (!WorkoutTimerAccess.allowed(entitlements)) return
         val session = uiState.value.aggregate?.session ?: return
         if (session.workPhase != WorkPhase.AWAITING.name) return
         val setId = session.workSetId ?: return
@@ -1252,7 +1293,11 @@ class ActiveWorkoutViewModel(
 
     private fun advanceAfterResolved(setId: Long) {
         val aggregate = uiState.value.aggregate ?: return
-        val target = SessionFocusLogic.focusAfterResolving(aggregate.exercises, setId)
+        val target = SessionFocusLogic.focusAfterResolving(
+            aggregate.exercises,
+            setId,
+            lockedCatalog.value
+        )
         if (target is WorkoutFocusTarget.Set) {
             val index = aggregate.exercises.indexOfFirst { it.exercise.id == target.exerciseId }
             if (index >= 0) {

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +43,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -80,9 +84,17 @@ import app.mymusclemap.ui.components.musclemap.TemplateMuscleMapCard
 import app.mymusclemap.ui.exercises.CatalogDropdown
 import app.mymusclemap.ui.exercises.labelRes
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.AppShapeTokens
+import app.mymusclemap.ui.theme.AppTypeTokens
 
 internal const val TEMPLATE_HEADER_KEY = "template-header"
 internal const val TEMPLATE_ADD_KEY = "template-add"
+internal const val WORK_MODE_REPS = "work-mode-reps"
+internal const val WORK_MODE_TIMED = "work-mode-timed"
+internal const val TIMED_EDITOR_PRO_NOTE = "timed-editor-pro"
+internal const val TIMED_EDITOR_EXPLORE_PRO = "timed-editor-explore-pro"
+internal const val TIMED_MINUTES_FIELD = "timed-minutes"
+internal const val TIMED_SECONDS_FIELD = "timed-seconds"
 
 internal fun templateExerciseKey(localId: Long): String = "template-exercise-$localId"
 
@@ -129,7 +141,8 @@ fun TemplateEditorScreen(
     onConfirmDiscard: () -> Unit,
     onFinished: (Boolean, Boolean) -> Unit,
     onScrollConsumed: () -> Unit,
-    onDismissLocked: () -> Unit = {}
+    onDismissLocked: () -> Unit = {},
+    onExploreProBenefits: () -> Unit = {}
 ) {
     BackHandler {
         if (state.pane == TemplateEditorPane.Picker) onClosePicker() else onBack()
@@ -212,6 +225,12 @@ fun TemplateEditorScreen(
                                 it.error == TemplateFieldError.NameTooLong
                         }
                         Column {
+                            if (state.contentLocked) {
+                                app.mymusclemap.ui.entitlement.FreeAccessLockNote(
+                                    onExplorePro = onExploreProBenefits
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
                             OutlinedTextField(
                                 value = state.draft.name,
                                 onValueChange = onNameChange,
@@ -304,7 +323,10 @@ fun TemplateEditorScreen(
                                     onExerciseRest = { onExerciseRest(item.localId, it) },
                                     onSetRest = { setId, seconds -> onSetRest(item.localId, setId, seconds) },
                                     onTimedMode = { onTimedMode(item.localId, it) },
-                                    onWorkDuration = { setId, seconds -> onWorkDuration(item.localId, setId, seconds) }
+                                    onWorkDuration = { setId, seconds -> onWorkDuration(item.localId, setId, seconds) },
+                                    timersEnabled = state.timersEnabled,
+                                    timedTabPreview = state.timedTabPreview[item.localId],
+                                    onExploreProBenefits = onExploreProBenefits
                                 )
                             } else {
                                 Text(
@@ -487,7 +509,10 @@ private fun ExerciseCard(
     onExerciseRest: (Int?) -> Unit,
     onSetRest: (Long, Int?) -> Unit,
     onTimedMode: (Boolean) -> Unit = {},
-    onWorkDuration: (Long, Int) -> Unit = { _, _ -> }
+    onWorkDuration: (Long, Int) -> Unit = { _, _ -> },
+    timersEnabled: Boolean = true,
+    timedTabPreview: Boolean? = null,
+    onExploreProBenefits: () -> Unit = {}
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -545,18 +570,30 @@ private fun ExerciseCard(
                 )
             }
             if (item.expanded) {
+                val persistedTimed = item.sets.isNotEmpty() && item.sets.all { it.timedWork }
+                val showingTimed = if (PlannedSetLogic.requiresReps(exercise.measurementType)) {
+                    timedTabPreview ?: persistedTimed
+                } else {
+                    false
+                }
+                val timedFieldsLocked = showingTimed && !timersEnabled
+                val timedStructureLocked = persistedTimed && !timersEnabled
                 if (PlannedSetLogic.requiresReps(exercise.measurementType)) {
-                    val timed = item.sets.isNotEmpty() && item.sets.all { it.timedWork }
                     SegmentedControl(
                         options = listOf(
                             stringResource(R.string.work_mode_reps),
                             stringResource(R.string.work_mode_timed)
                         ),
-                        selectedIndex = if (timed) 1 else 0,
+                        selectedIndex = if (showingTimed) 1 else 0,
                         onSelected = { onTimedMode(it == 1) },
-                        modifier = Modifier.testTag("work_mode")
+                        modifier = Modifier.testTag("work_mode"),
+                        optionTestTags = listOf(WORK_MODE_REPS, WORK_MODE_TIMED)
                     )
                     Spacer(Modifier.height(8.dp))
+                    if (timedFieldsLocked) {
+                        TimedSetProNote(onExplore = onExploreProBenefits)
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
                 RestChoiceRow(
                     label = stringResource(R.string.rest_between_sets) + "  " + stringResource(R.string.pro_badge),
@@ -575,14 +612,15 @@ private fun ExerciseCard(
                         Text(stringResource(R.string.field_set_count), modifier = Modifier.weight(1f))
                         IconButton(
                             onClick = { onSetCount(item.sets.size - 1) },
-                            enabled = item.sets.size > 1
+                            enabled = item.sets.size > 1 && !timedStructureLocked
                         ) {
                             Text("−")
                         }
                         Text("${item.sets.size}")
                         IconButton(
                             onClick = { onSetCount(item.sets.size + 1) },
-                            enabled = item.sets.size < PlannedSetLogic.maxSetCount(exercise.measurementType)
+                            enabled = item.sets.size < PlannedSetLogic.maxSetCount(exercise.measurementType) &&
+                                !timedStructureLocked
                         ) {
                             Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_set))
                         }
@@ -609,12 +647,19 @@ private fun ExerciseCard(
                         onDistance = { onDistance(set.localId, it) },
                         onDistanceUnit = { onDistanceUnit(set.localId, it) },
                         onRestSeconds = { onSetRest(set.localId, it) },
-                        onWorkDuration = { onWorkDuration(set.localId, it) }
+                        onWorkDuration = { onWorkDuration(set.localId, it) },
+                        displayTimed = if (PlannedSetLogic.requiresReps(exercise.measurementType)) {
+                            showingTimed
+                        } else {
+                            set.timedWork
+                        },
+                        fieldsLocked = !timersEnabled && (showingTimed || set.timedWork)
                     )
                 }
                 if (exercise.measurementType != MeasurementType.COMPLETION_ONLY) {
                     TextButton(
                         onClick = onAddSet,
+                        enabled = !timedStructureLocked,
                         modifier = Modifier
                             .fillMaxWidth()
                             .defaultMinSize(minHeight = AppDimens.minTouch)
@@ -651,7 +696,9 @@ private fun SetCard(
     onDistance: (String) -> Unit,
     onDistanceUnit: (DistanceUnit) -> Unit,
     onRestSeconds: (Int?) -> Unit,
-    onWorkDuration: (Int) -> Unit = {}
+    onWorkDuration: (Int) -> Unit = {},
+    displayTimed: Boolean = set.timedWork,
+    fieldsLocked: Boolean = false
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -680,22 +727,27 @@ private fun SetCard(
                         contentDescription = stringResource(R.string.action_move_set_down)
                     )
                 }
-                IconButton(onClick = onRemove, enabled = total > 1) {
+                IconButton(onClick = onRemove, enabled = total > 1 && !fieldsLocked) {
                     Icon(
                         Icons.Filled.Delete,
                         contentDescription = stringResource(R.string.action_remove_set)
                     )
                 }
             }
-            if (PlannedSetLogic.requiresReps(exercise.measurementType) && !set.timedWork) {
+            if (PlannedSetLogic.requiresReps(exercise.measurementType) && !displayTimed) {
                 OutlinedTextField(
                     value = set.minRepsText,
                     onValueChange = onMinReps,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("reps-min"),
                     label = { Text(stringResource(R.string.field_reps_min)) },
                     isError = issues.any {
                         it.error.name.startsWith("Reps")
                     },
+                    enabled = !fieldsLocked,
+                    readOnly = fieldsLocked,
+                    colors = lockedFieldColors(fieldsLocked),
                     singleLine = true
                 )
                 Spacer(Modifier.height(8.dp))
@@ -704,6 +756,9 @@ private fun SetCard(
                     onValueChange = onMaxReps,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.field_reps_max)) },
+                    enabled = !fieldsLocked,
+                    readOnly = fieldsLocked,
+                    colors = lockedFieldColors(fieldsLocked),
                     singleLine = true
                 )
             }
@@ -719,7 +774,9 @@ private fun SetCard(
                     selected = set.loadKind,
                     options = kinds,
                     optionLabel = { stringResource(it.labelRes()) },
-                    onSelected = { selected -> selected?.let(onLoadKind) }
+                    onSelected = { selected ->
+                        if (!fieldsLocked) selected?.let(onLoadKind)
+                    }
                 )
             }
             if (PlannedLoadLogic.requiresPositiveWeight(set.loadKind)) {
@@ -730,31 +787,49 @@ private fun SetCard(
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.field_weight_kg)) },
                     isError = issues.any { it.error.name.startsWith("Weight") },
+                    enabled = !fieldsLocked,
+                    readOnly = fieldsLocked,
+                    colors = lockedFieldColors(fieldsLocked),
                     singleLine = true
                 )
             }
-            if (PlannedSetLogic.requiresDuration(exercise.measurementType) || set.timedWork) {
+            if (PlannedSetLogic.requiresDuration(exercise.measurementType) || displayTimed) {
+                val (minutesShown, secondsShown) = if (displayTimed && !set.timedWork) {
+                    previewDurationText(set)
+                } else {
+                    set.minutesText to set.secondsText
+                }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = set.minutesText,
+                        value = minutesShown,
                         onValueChange = onMinutes,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(TIMED_MINUTES_FIELD),
                         label = { Text(stringResource(R.string.field_minutes)) },
+                        enabled = !fieldsLocked,
+                        readOnly = fieldsLocked,
+                        colors = lockedFieldColors(fieldsLocked),
                         singleLine = true
                     )
                     OutlinedTextField(
-                        value = set.secondsText,
+                        value = secondsShown,
                         onValueChange = onSeconds,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(TIMED_SECONDS_FIELD),
                         label = { Text(stringResource(R.string.field_seconds)) },
+                        enabled = !fieldsLocked,
+                        readOnly = fieldsLocked,
+                        colors = lockedFieldColors(fieldsLocked),
                         singleLine = true
                     )
                 }
-                if (set.timedWork) {
+                if (displayTimed) {
                     val selected = QuantityParser.toSeconds(
-                        set.minutesText.toIntOrNull() ?: 0,
-                        set.secondsText.toIntOrNull() ?: 0
+                        minutesShown.toIntOrNull() ?: 0,
+                        secondsShown.toIntOrNull() ?: 0
                     )
                     Spacer(Modifier.height(8.dp))
                     Row(
@@ -764,8 +839,18 @@ private fun SetCard(
                         WorkDuration.PRESETS_SECONDS.forEach { seconds ->
                             FilterChip(
                                 selected = selected == seconds,
-                                onClick = { onWorkDuration(seconds) },
-                                label = { Text(stringResource(R.string.rest_seconds, seconds)) }
+                                onClick = { if (!fieldsLocked) onWorkDuration(seconds) },
+                                enabled = !fieldsLocked,
+                                label = { Text(stringResource(R.string.rest_seconds, seconds)) },
+                                colors = if (fieldsLocked) {
+                                    FilterChipDefaults.filterChipColors(
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledContainerColor = MaterialTheme.colorScheme.surface,
+                                        disabledSelectedContainerColor = MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                } else {
+                                    FilterChipDefaults.filterChipColors()
+                                }
                             )
                         }
                     }
@@ -778,6 +863,9 @@ private fun SetCard(
                     onValueChange = onDistance,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.field_distance)) },
+                    enabled = !fieldsLocked,
+                    readOnly = fieldsLocked,
+                    colors = lockedFieldColors(fieldsLocked),
                     singleLine = true
                 )
                 Spacer(Modifier.height(8.dp))
@@ -807,6 +895,66 @@ private fun SetCard(
             )
         }
     }
+}
+
+@Composable
+private fun TimedSetProNote(onExplore: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().testTag(TIMED_EDITOR_PRO_NOTE)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.headerStackGap)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Lock,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = stringResource(R.string.timed_editor_pro_title),
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Spacer(Modifier.height(AppDimens.headerStackGap))
+        Text(
+            text = stringResource(R.string.timed_editor_pro_body),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        OutlinedButton(
+            onClick = onExplore,
+            shape = AppShapeTokens.button,
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = AppDimens.minTouch)
+                .testTag(TIMED_EDITOR_EXPLORE_PRO)
+        ) {
+            Text(stringResource(R.string.timed_set_explore_pro))
+        }
+    }
+}
+
+@Composable
+private fun lockedFieldColors(locked: Boolean) = if (locked) {
+    OutlinedTextFieldDefaults.colors(
+        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        disabledBorderColor = MaterialTheme.colorScheme.outline
+    )
+} else {
+    OutlinedTextFieldDefaults.colors()
+}
+
+private fun previewDurationText(set: PlannedSetDraft): Pair<String, String> {
+    val existing = QuantityParser.toSeconds(
+        set.minutesText.toIntOrNull() ?: 0,
+        set.secondsText.toIntOrNull() ?: 0
+    )
+    if (existing > 0) return set.minutesText to set.secondsText
+    val (minutes, seconds) = QuantityParser.fromSeconds(30)
+    return minutes.toString() to seconds.toString()
 }
 
 @Composable

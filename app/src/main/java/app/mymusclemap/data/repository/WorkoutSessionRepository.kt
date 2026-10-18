@@ -99,7 +99,9 @@ class WorkoutSessionRepository(
             wallClockMillis = clock.millis()
         )
     },
-    private val timersAllowed: () -> Boolean = { true }
+    private val timersAllowed: () -> Boolean = { true },
+    private val planMayStart: suspend (Long) -> Boolean = { true },
+    private val exerciseMayExecute: suspend (Long) -> Boolean = { true }
 ) {
     private val mutex = Mutex()
 
@@ -570,6 +572,9 @@ class WorkoutSessionRepository(
         if (template.archived) {
             return StartWorkoutResult.TemplateArchived
         }
+        if (!planMayStart(templateId)) {
+            return StartWorkoutResult.PlanLocked
+        }
         if (scheduledWorkoutId != null) {
             val scheduled = sessionDao.getScheduledWorkout(scheduledWorkoutId)
                 ?: return StartWorkoutResult.ScheduleNotFound
@@ -719,6 +724,7 @@ class WorkoutSessionRepository(
     ): SessionMutationResult = mutex.withLock {
         val draft = resolveDraft() ?: return SessionMutationResult.NotActive
         val set = sessionDao.getSet(setId) ?: return SessionMutationResult.NotFound
+        if (!setExecutable(set)) return SessionMutationResult.NotActive
         if (set.status != SessionSetStatus.PENDING.name) {
             return SessionMutationResult.NotActive
         }
@@ -733,6 +739,9 @@ class WorkoutSessionRepository(
 
     suspend fun completeSet(setId: Long, draft: ActualSetDraft): SessionMutationResult = mutex.withLock {
         val before = sessionDao.getSet(setId)
+        if (before != null && !setExecutable(before)) {
+            return@withLock SessionMutationResult.NotActive
+        }
         if (before?.status == SessionSetStatus.PENDING.name && before.timedWork) {
             val exercise = sessionDao.getExercise(before.sessionExerciseId)
             val session = exercise?.let { sessionDao.getById(it.sessionId) }
@@ -767,7 +776,8 @@ class WorkoutSessionRepository(
         if (aggregate.session.status != SessionStatus.IN_PROGRESS) {
             return@withLock NotificationSetCompletion.Stale
         }
-        val current = SessionFocusLogic.currentPendingSet(aggregate)
+        val locked = lockedCatalogIds(aggregate.exercises.map { it.exercise.exerciseId })
+        val current = SessionFocusLogic.currentPendingSet(aggregate, locked)
             ?: return@withLock NotificationSetCompletion.Stale
         if (current.id != setId || current.status != SessionSetStatus.PENDING) {
             return@withLock NotificationSetCompletion.Stale
@@ -809,6 +819,9 @@ class WorkoutSessionRepository(
 
     suspend fun skipSet(setId: Long): SessionMutationResult = mutex.withLock {
         val before = sessionDao.getSet(setId)
+        if (before != null && !setExecutable(before)) {
+            return@withLock SessionMutationResult.NotActive
+        }
         val result = mutateActiveSet(setId) { set, _, _ ->
             sessionDao.updateSet(
                 set.copy(
@@ -833,6 +846,9 @@ class WorkoutSessionRepository(
 
     suspend fun undoSkip(setId: Long): SessionMutationResult = mutex.withLock {
         val before = sessionDao.getSet(setId)
+        if (before != null && !setExecutable(before)) {
+            return@withLock SessionMutationResult.NotActive
+        }
         val result = mutateActiveSet(setId) { set, _, _ ->
             if (set.status != SessionSetStatus.SKIPPED.name) {
                 return@mutateActiveSet SessionMutationResult.Updated
@@ -916,6 +932,9 @@ class WorkoutSessionRepository(
         val exercise = exerciseDao.getById(exerciseId) ?: return AddExtraExerciseResult.ExerciseNotFound
         if (exercise.archived) {
             return AddExtraExerciseResult.ExerciseArchived
+        }
+        if (!exerciseMayExecute(exercise.id)) {
+            return AddExtraExerciseResult.ExerciseLocked
         }
         val catalogMuscles = exerciseDao.getMuscles(exerciseId)
         val existing = sessionDao.getExercises(sessionId)
@@ -1039,6 +1058,7 @@ class WorkoutSessionRepository(
 
     suspend fun finish(sessionId: Long, skipRemaining: Boolean): FinishWorkoutResult = mutex.withLock {
         withContext(NonCancellable) {
+            releaseLockedPending(sessionId)
             val outcome = sessionDao.finishActiveSession(sessionId, clock.millis(), skipRemaining)
             when (outcome) {
                 1 -> {
@@ -1273,6 +1293,56 @@ class WorkoutSessionRepository(
         return true
     }
 
+    private suspend fun setExecutable(set: WorkoutSessionSetEntity): Boolean {
+        val exercise = sessionDao.getExercise(set.sessionExerciseId) ?: return false
+        return exerciseMayExecute(exercise.exerciseId)
+    }
+
+    private suspend fun lockedCatalogIds(catalogIds: List<Long>): Set<Long> {
+        return catalogIds.distinct().filter { !exerciseMayExecute(it) }.toSet()
+    }
+
+    private suspend fun releaseLockedPending(sessionId: Long) {
+        val session = sessionDao.getById(sessionId) ?: return
+        val workSetId = session.workSetId
+        if (workSetId != null) {
+            val workSet = sessionDao.getSet(workSetId)
+            if (workSet != null && !setExecutable(workSet)) {
+                sessionDao.updateSession(
+                    session.copy(
+                        workPhase = null,
+                        workSetId = null,
+                        workTargetMillis = null,
+                        workElapsedActiveMillis = null,
+                        workAnchorElapsedRealtimeMillis = null,
+                        workDeadlineElapsedRealtimeMillis = null,
+                        workDeadlineWallClockMillis = null,
+                        workGeneration = session.workGeneration + 1,
+                        updatedAt = clock.millis()
+                    )
+                )
+            }
+        }
+        sessionDao.getExercises(sessionId).forEach { exercise ->
+            if (exerciseMayExecute(exercise.exerciseId)) return@forEach
+            sessionDao.getSets(exercise.id).forEach { set ->
+                if (set.status != SessionSetStatus.PENDING.name) return@forEach
+                sessionDao.updateSet(
+                    set.copy(
+                        actualReps = null,
+                        actualLoadKind = null,
+                        actualWeightKg = null,
+                        actualDurationSeconds = null,
+                        actualDistanceMeters = null,
+                        status = SessionSetStatus.SKIPPED.name,
+                        completedAt = null,
+                        draftPayload = null
+                    )
+                )
+            }
+        }
+    }
+
     private suspend fun clearRestOnSession(sessionId: Long) {
         val session = sessionDao.getById(sessionId) ?: return
         if (session.restPhase == null && session.workPhase == null) return
@@ -1282,6 +1352,7 @@ class WorkoutSessionRepository(
     suspend fun startWork(sessionId: Long, setId: Long): Boolean = mutex.withLock {
         if (!timersAllowed()) return@withLock false
         val set = sessionDao.getSet(setId) ?: return@withLock false
+        if (!setExecutable(set)) return@withLock false
         val exercise = sessionDao.getExercise(set.sessionExerciseId) ?: return@withLock false
         if (exercise.sessionId != sessionId) return@withLock false
         if (set.status != SessionSetStatus.PENDING.name) return@withLock false

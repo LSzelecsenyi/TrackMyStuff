@@ -5,16 +5,20 @@ import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.exercise.ArchiveFilter
 import app.mymusclemap.domain.workout.TemplateCatalogLogic
 import app.mymusclemap.domain.workout.TemplateDeleteResult
 import app.mymusclemap.domain.workout.TemplateListItem
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -30,7 +34,9 @@ data class TemplateListUiState(
     val referencedIds: Set<Long> = emptySet(),
     val planCount: Int = 0,
     val canCreatePlan: Boolean = true,
-    val lockedFeature: AppFeature? = null
+    val lockedFeature: AppFeature? = null,
+    val lockedPlanIds: Set<Long> = emptySet(),
+    val selectionRequired: Boolean = false
 )
 
 enum class TemplateEmptyKind {
@@ -51,7 +57,8 @@ sealed interface TemplateMessage {
 
 class TemplateListViewModel(
     private val repository: WorkoutTemplateRepository,
-    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
+    private val access: Flow<FreeAccessDecision> = flowOf(FreeAccessLogic.unknown())
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val archiveFilter = MutableStateFlow(ArchiveFilter.ACTIVE)
@@ -76,8 +83,11 @@ class TemplateListViewModel(
                 text, filter, currentMessage, delete, blocked ->
             Controls(text, filter, currentMessage, delete, blocked)
         },
-        combine(lockedFeature, entitlements.changes()) { locked, _ -> locked }
-    ) { items, referenced, planCount, controls, locked ->
+        combine(lockedFeature, entitlements.changes(), access) { locked, _, decision ->
+            locked to decision
+        }
+    ) { items, referenced, planCount, controls, extra ->
+        val (locked, decision) = extra
         val visible = TemplateCatalogLogic.filter(
             items = items,
             query = controls.query,
@@ -100,7 +110,9 @@ class TemplateListViewModel(
             referencedIds = referenced,
             planCount = planCount,
             canCreatePlan = WorkoutPlanAccess.canCreateAnother(planCount, entitlements),
-            lockedFeature = locked
+            lockedFeature = locked,
+            lockedPlanIds = decision.lockedPlanIds,
+            selectionRequired = decision.selectionRequired
         )
     }.stateIn(
         scope = viewModelScope,

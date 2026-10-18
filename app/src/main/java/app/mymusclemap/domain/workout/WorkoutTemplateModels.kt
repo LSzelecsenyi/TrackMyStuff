@@ -124,6 +124,7 @@ sealed class TemplateSaveResult {
     data object DuplicateName : TemplateSaveResult()
     data object NotFound : TemplateSaveResult()
     data object Stale : TemplateSaveResult()
+    data object Locked : TemplateSaveResult()
 }
 
 sealed class TemplateDeleteResult {

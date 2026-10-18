@@ -43,4 +43,5 @@ sealed interface UserMessage {
     data object WorkoutTemplateArchived : UserMessage
     data object FeedbackEmailUnavailable : UserMessage
     data object HealthConnectOpenFailed : UserMessage
+    data object FreePlanLocked : UserMessage
 }

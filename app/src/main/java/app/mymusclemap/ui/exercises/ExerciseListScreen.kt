@@ -108,7 +108,9 @@ fun ExerciseListScreen(
     onDismissDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
     onMessageConsumed: () -> Unit,
-    onDismissLocked: () -> Unit = {}
+    onDismissLocked: () -> Unit = {},
+    onChooseFreeAccess: () -> Unit = {},
+    onExplorePro: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -246,6 +248,14 @@ fun ExerciseListScreen(
             } else {
                 Spacer(Modifier.height(AppDimens.headerStackGap))
             }
+            if (state.selectionRequired) {
+                TextButton(
+                    onClick = { navigateOnce(onChooseFreeAccess) },
+                    modifier = Modifier.testTag("free-access-choose")
+                ) {
+                    Text(stringResource(R.string.free_access_banner))
+                }
+            }
             when {
                 state.loading -> {
                     Box(
@@ -264,6 +274,8 @@ fun ExerciseListScreen(
                 else -> ExerciseList(
                     exercises = state.visibleExercises,
                     listState = listState,
+                    lockedCustomExerciseIds = state.lockedCustomExerciseIds,
+                    onExplorePro = onExplorePro,
                     onEdit = { id -> navigateOnce { onEdit(id) } },
                     onArchive = onArchive,
                     onRestore = onRestore,
@@ -384,6 +396,8 @@ private fun EmptyCatalog(
 private fun ExerciseList(
     exercises: List<Exercise>,
     listState: androidx.compose.foundation.lazy.LazyListState,
+    lockedCustomExerciseIds: Set<Long>,
+    onExplorePro: () -> Unit,
     onEdit: (Long) -> Unit,
     onArchive: (Long) -> Unit,
     onRestore: (Long) -> Unit,
@@ -406,6 +420,8 @@ private fun ExerciseList(
         items(ordered, key = { it.id }) { exercise ->
             ExerciseRow(
                 exercise = exercise,
+                locked = exercise.custom && exercise.id in lockedCustomExerciseIds,
+                onExplorePro = onExplorePro,
                 onEdit = { onEdit(exercise.id) },
                 onArchive = { onArchive(exercise.id) },
                 onRestore = { onRestore(exercise.id) },
@@ -423,6 +439,8 @@ private fun ExerciseList(
 @Composable
 private fun ExerciseRow(
     exercise: Exercise,
+    locked: Boolean,
+    onExplorePro: () -> Unit,
     onEdit: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
@@ -477,6 +495,9 @@ private fun ExerciseRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+            if (locked) {
+                app.mymusclemap.ui.entitlement.FreeAccessLockNote(onExplorePro = onExplorePro)
+            }
             Spacer(Modifier.height(AppDimens.headerStackGap))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),

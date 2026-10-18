@@ -825,6 +825,40 @@ val MIGRATION_18_19 = object : Migration(18, 19) {
     }
 }
 
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `free_access_state` (
+                `id` INTEGER NOT NULL,
+                `periodId` INTEGER NOT NULL,
+                `lastKnownPro` INTEGER,
+                `phase` TEXT NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `free_access_plans` (
+                `periodId` INTEGER NOT NULL,
+                `planId` INTEGER NOT NULL,
+                PRIMARY KEY(`periodId`, `planId`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `free_access_exercises` (
+                `periodId` INTEGER NOT NULL,
+                `exerciseId` INTEGER NOT NULL,
+                PRIMARY KEY(`periodId`, `exerciseId`)
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 val MIGRATION_19_20 = object : Migration(19, 20) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

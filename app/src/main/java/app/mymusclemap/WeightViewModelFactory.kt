@@ -17,6 +17,7 @@ import app.mymusclemap.data.repository.AchievementRepository
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.data.repository.BodyMeasurementRepository
 import app.mymusclemap.data.repository.ExerciseRepository
+import app.mymusclemap.data.repository.FreeAccessRepository
 import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.OnboardingRepository
 import app.mymusclemap.data.repository.ProgressPhotoRepository
@@ -57,8 +58,10 @@ import app.mymusclemap.ui.workout.AndroidTimerCuePlayer
 import app.mymusclemap.ui.workout.WorkoutCompletionViewModel
 import app.mymusclemap.ui.workout.WorkoutHubViewModel
 import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
+import app.mymusclemap.ui.entitlement.FreeAccessSelectionViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 class WeightViewModelFactory(
     private val weightRepository: WeightRepository,
@@ -90,8 +93,12 @@ class WeightViewModelFactory(
         { _, _, _ -> FounderReportSubmission.Unavailable },
     private val founderRefreshAuthority: suspend () -> Unit = {},
     private val achievementRepository: AchievementRepository? = null,
-    private val targetWeightGoalRepository: TargetWeightGoalRepository? = null
+    private val targetWeightGoalRepository: TargetWeightGoalRepository? = null,
+    private val freeAccessRepository: FreeAccessRepository? = null
 ) : ViewModelProvider.Factory {
+    private val accessDecisions = freeAccessRepository?.decisions()
+        ?: flowOf(app.mymusclemap.domain.entitlement.FreeAccessLogic.unknown())
+
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
         return when {
@@ -160,26 +167,33 @@ class WeightViewModelFactory(
                 OnboardingGuideViewModel(onboardingRepository)
             }
             modelClass.isAssignableFrom(ExerciseListViewModel::class.java) -> {
-                ExerciseListViewModel(exerciseRepository, featureEntitlements)
+                ExerciseListViewModel(exerciseRepository, featureEntitlements, accessDecisions)
             }
             modelClass.isAssignableFrom(ExerciseEditorViewModel::class.java) -> {
                 val application = extras[APPLICATION_KEY]
                 ExerciseEditorViewModel(
                     extras.createSavedStateHandle(),
-                    exerciseRepository
-                ) { group: MuscleGroup ->
-                    application?.getString(group.labelRes()) ?: group.name
-                }
+                    exerciseRepository,
+                    muscleLabel = { group: MuscleGroup ->
+                        application?.getString(group.labelRes()) ?: group.name
+                    },
+                    access = accessDecisions
+                )
             }
             modelClass.isAssignableFrom(TemplateListViewModel::class.java) -> {
-                TemplateListViewModel(workoutTemplateRepository, featureEntitlements)
+                TemplateListViewModel(
+                    workoutTemplateRepository,
+                    featureEntitlements,
+                    accessDecisions
+                )
             }
             modelClass.isAssignableFrom(TemplateEditorViewModel::class.java) -> {
                 TemplateEditorViewModel(
                     extras.createSavedStateHandle(),
                     workoutTemplateRepository,
                     exerciseRepository,
-                    featureEntitlements
+                    featureEntitlements,
+                    accessDecisions
                 )
             }
             modelClass.isAssignableFrom(ActiveWorkoutViewModel::class.java) -> {
@@ -192,7 +206,8 @@ class WeightViewModelFactory(
                     restEffects = AndroidRestTimerEffects(application),
                     entitlements = featureEntitlements,
                     timerSounds = timerSounds,
-                    timerCuePlayer = AndroidTimerCuePlayer(application)
+                    timerCuePlayer = AndroidTimerCuePlayer(application),
+                    lockedCatalogExerciseIds = accessDecisions.map { it.lockedCustomExerciseIds }
                 )
             }
             modelClass.isAssignableFrom(WorkoutDetailViewModel::class.java) -> {
@@ -267,6 +282,13 @@ class WeightViewModelFactory(
                     onMonthlyReportGenerated = {
                         checkNotNull(achievementRepository).recordMonthlyReportGenerated()
                     }
+                )
+            }
+            modelClass.isAssignableFrom(FreeAccessSelectionViewModel::class.java) -> {
+                FreeAccessSelectionViewModel(
+                    templates = workoutTemplateRepository,
+                    exercises = exerciseRepository,
+                    access = checkNotNull(freeAccessRepository)
                 )
             }
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")

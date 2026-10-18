@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -129,6 +130,8 @@ internal const val SET_SKIP_ACTION = "skip-set"
 internal const val SET_COMPLETE_PROGRESS = "complete-set-progress"
 internal const val SET_COMPLETE_CIRCLE = "complete-set-circle"
 internal const val SET_CURRENT_ACTIONS = "current-set-actions"
+internal const val TIMED_SET_LOCKED = "timed-set-locked"
+internal const val TIMED_SET_EXPLORE_PRO = "timed-set-explore-pro"
 internal const val SET_REPS_MINUS = "set-reps-minus"
 internal const val SET_REPS_PLUS = "set-reps-plus"
 internal const val SET_REPS_MINUS_CIRCLE = "set-reps-minus-circle"
@@ -261,7 +264,8 @@ fun ActiveWorkoutScreen(
     onFinishWorkEarly: () -> Unit = {},
     onConfirmTimedSet: () -> Unit = {},
     onConfirmCancelWork: () -> Unit = {},
-    onDismissCancelWork: () -> Unit = {}
+    onDismissCancelWork: () -> Unit = {},
+    onExploreProBenefits: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -450,6 +454,7 @@ fun ActiveWorkoutScreen(
                     val expanded = item.exercise.id in state.expandedExerciseIds
                     ExerciseBlock(
                         item = item,
+                        locked = item.exercise.id in state.lockedExerciseIds,
                         expanded = expanded,
                         state = state,
                         currentSetId = state.currentSetId,
@@ -485,9 +490,10 @@ fun ActiveWorkoutScreen(
                         onStartWork = onStartWork,
                         onPauseWork = onPauseWork,
                         onResumeWork = onResumeWork,
-                        onFinishWorkEarly = onFinishWorkEarly,
-                        onConfirmTimedSet = onConfirmTimedSet
-                    )
+                    onFinishWorkEarly = onFinishWorkEarly,
+                    onConfirmTimedSet = onConfirmTimedSet,
+                    onExploreProBenefits = onExploreProBenefits
+                )
                 }
                 item(key = WORKOUT_FINISH_KEY) {
                     val ready = state.progress.pending == 0
@@ -1049,6 +1055,7 @@ private fun ThinProgressBar(fraction: Float) {
 @Composable
 private fun ExerciseBlock(
     item: SessionExerciseItem,
+    locked: Boolean = false,
     expanded: Boolean,
     state: ActiveWorkoutUiState,
     currentSetId: Long?,
@@ -1075,7 +1082,8 @@ private fun ExerciseBlock(
     onPauseWork: () -> Unit = {},
     onResumeWork: () -> Unit = {},
     onFinishWorkEarly: () -> Unit = {},
-    onConfirmTimedSet: () -> Unit = {}
+    onConfirmTimedSet: () -> Unit = {},
+    onExploreProBenefits: () -> Unit = {}
 ) {
     val done = item.sets.isNotEmpty() && item.sets.none { it.status == SessionSetStatus.PENDING }
     val completedCount = item.sets.count { it.status == SessionSetStatus.COMPLETED }
@@ -1119,7 +1127,14 @@ private fun ExerciseBlock(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (done) {
+                    if (locked) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = stringResource(R.string.free_locked_title),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    if (done && !locked) {
                         Text(
                             text = stringResource(R.string.set_status_completed_label),
                             style = AppTypeTokens.statSecondary,
@@ -1153,7 +1168,11 @@ private fun ExerciseBlock(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (expanded) {
+        if (expanded && locked) {
+            Spacer(Modifier.height(AppDimens.itemGap))
+            app.mymusclemap.ui.entitlement.FreeAccessLockNote(onExplorePro = onExploreProBenefits)
+        }
+        if (expanded && !locked) {
             Spacer(Modifier.height(AppDimens.itemGap))
             item.sets.forEachIndexed { index, set ->
                 SetRow(
@@ -1197,7 +1216,8 @@ private fun ExerciseBlock(
                     onPauseWork = onPauseWork,
                     onResumeWork = onResumeWork,
                     onFinishWorkEarly = onFinishWorkEarly,
-                    onConfirmTimedSet = onConfirmTimedSet
+                    onConfirmTimedSet = onConfirmTimedSet,
+                    onExploreProBenefits = onExploreProBenefits
                 )
                 if (index != item.sets.lastIndex) {
                     HorizontalDivider(
@@ -1270,9 +1290,13 @@ private fun SetRow(
     onPauseWork: () -> Unit = {},
     onResumeWork: () -> Unit = {},
     onFinishWorkEarly: () -> Unit = {},
-    onConfirmTimedSet: () -> Unit = {}
+    onConfirmTimedSet: () -> Unit = {},
+    onExploreProBenefits: () -> Unit = {}
 ) {
     val planned = buildPlannedLabel(set, stringResource(R.string.set_copy_bodyweight))
+    val lockedTimed = set.timedWork &&
+        set.status == SessionSetStatus.PENDING &&
+        !timersEnabled
     val currentBadge = stringResource(R.string.active_exercise_badge)
     val statusLabel = when {
         current -> currentBadge
@@ -1302,19 +1326,38 @@ private fun SetRow(
             .then(
                 if (current) {
                     Modifier
-                        .shadow(
-                            elevation = 2.dp,
-                            shape = AppShapeTokens.compact,
-                            clip = false,
-                            ambientColor = glow,
-                            spotColor = glow
+                        .then(
+                            if (lockedTimed) {
+                                Modifier
+                            } else {
+                                Modifier.shadow(
+                                    elevation = 2.dp,
+                                    shape = AppShapeTokens.compact,
+                                    clip = false,
+                                    ambientColor = glow,
+                                    spotColor = glow
+                                )
+                            }
                         )
                         .border(
                             AppDimens.strokeThin,
-                            if (dark) StrictBrand.lime else StrictBrand.blue,
+                            when {
+                                lockedTimed -> MaterialTheme.colorScheme.outline
+                                dark -> StrictBrand.lime
+                                else -> StrictBrand.blue
+                            },
                             AppShapeTokens.compact
                         )
                         .clip(AppShapeTokens.compact)
+                        .then(
+                            if (lockedTimed) {
+                                Modifier.background(
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
                 } else {
                     Modifier
                 }
@@ -1421,7 +1464,7 @@ private fun SetRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (work != null && work.setId == set.id) {
+        if (!lockedTimed && work != null && work.setId == set.id) {
             Spacer(Modifier.height(AppDimens.headerStackGap))
             WorkTimerSection(
                 work = work,
@@ -1430,7 +1473,7 @@ private fun SetRow(
                 onFinishEarly = onFinishWorkEarly
             )
         }
-        if (showFields) {
+        if (showFields && !lockedTimed) {
             Spacer(Modifier.height(AppDimens.headerStackGap))
             ActualFields(
                 item = item,
@@ -1448,7 +1491,7 @@ private fun SetRow(
                 onDistanceUnit = onDistanceUnit
             )
         }
-        if (work != null && work.setId == set.id && work.awaiting) {
+        if (!lockedTimed && work != null && work.setId == set.id && work.awaiting) {
             Spacer(Modifier.height(AppDimens.headerStackGap))
             Button(
                 onClick = onConfirmTimedSet,
@@ -1467,9 +1510,9 @@ private fun SetRow(
         Spacer(Modifier.height(AppDimens.headerStackGap))
         when (set.status) {
             SessionSetStatus.PENDING -> {
-                val timerOnThisSet = work?.setId == set.id
+                val timerOnThisSet = !lockedTimed && work?.setId == set.id
                 val preparing = preparation
-                if (preparing != null) {
+                if (!lockedTimed && preparing != null) {
                     Text(
                         text = stringResource(R.string.work_preparation),
                         style = AppTypeTokens.statCaption,
@@ -1482,14 +1525,24 @@ private fun SetRow(
                         modifier = Modifier.testTag("work_preparation")
                     )
                 }
-                if (current && set.timedWork && !timersEnabled && !timerOnThisSet && preparing == null) {
-                    Text(
-                        text = stringResource(R.string.work_requires_pro),
-                        style = AppTypeTokens.statSecondary,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                if (current && lockedTimed) {
+                    LockedTimedSetActions(
+                        completing = completing,
+                        onSkip = onSkip,
+                        onExplorePro = onExploreProBenefits
                     )
-                }
-                if (current && !timerOnThisSet && preparing == null) {
+                    if (ActualSetLogic.canRemove(set)) {
+                        TextButton(
+                            onClick = onRemoveExtra,
+                            modifier = Modifier.defaultMinSize(minHeight = AppDimens.minTouch)
+                        ) {
+                            Text(
+                                stringResource(R.string.action_remove_extra_set),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                } else if (current && !timerOnThisSet && preparing == null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1696,6 +1749,66 @@ private fun CompleteSetAction(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LockedTimedSetActions(
+    completing: Boolean,
+    onSkip: () -> Unit,
+    onExplorePro: () -> Unit
+) {
+    Text(
+        text = stringResource(R.string.work_requires_pro),
+        style = AppTypeTokens.statSecondary,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.testTag(TIMED_SET_LOCKED)
+    )
+    Spacer(Modifier.height(AppDimens.headerStackGap))
+    OutlinedButton(
+        onClick = onExplorePro,
+        enabled = !completing,
+        shape = AppShapeTokens.button,
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag(TIMED_SET_EXPLORE_PRO)
+    ) {
+        Text(stringResource(R.string.timed_set_explore_pro))
+    }
+    Spacer(Modifier.height(AppDimens.itemGap))
+    LockedSkipAction(enabled = !completing, onClick = onSkip)
+}
+
+@Composable
+private fun LockedSkipAction(
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val label = stringResource(R.string.action_skip_set_a11y)
+    Row(
+        modifier = Modifier
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag(SET_SKIP_ACTION)
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Close,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = label,
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

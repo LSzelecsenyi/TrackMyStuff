@@ -24,7 +24,9 @@ class ExerciseRepository(
     private val clock: Clock,
     private val templateDao: WorkoutTemplateDao? = null,
     private val sessionDao: WorkoutSessionDao? = null,
-    private val allowCustomCreate: (activeCustomCount: Int) -> Boolean = { true }
+    private val allowCustomCreate: (activeCustomCount: Int) -> Boolean = { true },
+    private val mayUpdate: suspend (Long) -> Boolean = { true },
+    private val onCustomCreated: suspend (Long) -> Unit = {}
 ) {
     fun observeAll(): Flow<List<Exercise>> {
         return combine(dao.observeAll(), dao.observeMuscles()) { exercises, muscles ->
@@ -86,6 +88,9 @@ class ExerciseRepository(
         if (prepared.id != null && existing == null) {
             return ExerciseSaveResult.NotFound
         }
+        if (existing != null && existing.custom && !mayUpdate(existing.id)) {
+            return ExerciseSaveResult.Locked
+        }
         val creatingCustom = existing == null && !asStarter
         if (creatingCustom && !allowCustomCreate(dao.countActiveCustom())) {
             return ExerciseSaveResult.CreationLimited
@@ -126,6 +131,9 @@ class ExerciseRepository(
         return try {
             val id = dao.saveWithMuscles(entity, muscles)
             if (existing == null) {
+                if (creatingCustom) {
+                    onCustomCreated(id)
+                }
                 ExerciseSaveResult.Created(id)
             } else {
                 ExerciseSaveResult.Updated(id)
@@ -156,12 +164,14 @@ class ExerciseRepository(
 
     suspend fun archive(id: Long): Boolean {
         val existing = dao.getById(id) ?: return false
+        if (existing.custom && !mayUpdate(id)) return false
         dao.update(existing.copy(archived = true, updatedAt = clock.millis()))
         return true
     }
 
     suspend fun restore(id: Long): Boolean {
         val existing = dao.getById(id) ?: return false
+        if (existing.custom && !mayUpdate(id)) return false
         dao.update(existing.copy(archived = false, updatedAt = clock.millis()))
         return true
     }

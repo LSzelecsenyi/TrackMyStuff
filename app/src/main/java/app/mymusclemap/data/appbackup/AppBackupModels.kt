@@ -1,5 +1,6 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.domain.entitlement.FreeAccessState
 import app.mymusclemap.data.local.AchievementStateEntity
 import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
@@ -90,6 +91,7 @@ object AppBackupFormat {
     const val TABLE_PROGRESS_EVENTS = "progress_events"
     const val TABLE_ACHIEVEMENT_STATE = "achievement_state"
     const val TABLE_TARGET_WEIGHT_GOALS = "target_weight_goals"
+    const val TABLE_FREE_ACCESS = "free_access"
 
     val TABLE_NAMES: List<String> = listOf(
         TABLE_WEIGHT_MEASUREMENTS,
@@ -132,7 +134,8 @@ data class AppBackupTables(
     val achievementState: List<AchievementStateEntity> = emptyList(),
     val replacesAchievements: Boolean = false,
     val targetWeightGoals: List<TargetWeightGoalEntity> = emptyList(),
-    val replacesTargetWeightGoals: Boolean = false
+    val replacesTargetWeightGoals: Boolean = false,
+    val freeAccess: FreeAccessState? = null
 )
 
 data class AppBackupSnapshot(

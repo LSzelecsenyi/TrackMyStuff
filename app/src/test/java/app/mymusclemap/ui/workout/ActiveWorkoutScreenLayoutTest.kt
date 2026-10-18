@@ -791,6 +791,9 @@ class ActiveWorkoutScreenLayoutTest {
         onRequestAbandon: () -> Unit = {},
         onComplete: (Long) -> Unit = {},
         onSkip: (Long) -> Unit = {},
+        onStartWork: (Long) -> Unit = {},
+        onExploreProBenefits: () -> Unit = {},
+        onRequestFinish: () -> Unit = {},
         onReps: (Long, String) -> Unit = { _, _ -> },
         onFinished: (WorkoutCompletionSummary) -> Unit = {},
         backDispatcher: AtomicReference<OnBackPressedDispatcher?>? = null
@@ -825,13 +828,15 @@ class ActiveWorkoutScreenLayoutTest {
                             onComplete = onComplete,
                             onEditSet = {},
                             onSkip = onSkip,
+                            onStartWork = onStartWork,
+                            onExploreProBenefits = onExploreProBenefits,
                             onUndoSkip = {},
                             onAddExtra = {},
                             onAddExtraExercise = {},
                             onRemoveExtra = {},
                             onRemoveExtraExercise = {},
                             onToggleExercise = {},
-                            onRequestFinish = {},
+                            onRequestFinish = onRequestFinish,
                             onDismissFinish = {},
                             onConfirmFinish = {},
                             onRequestAbandon = onRequestAbandon,
@@ -1209,26 +1214,236 @@ class ActiveWorkoutScreenLayoutTest {
         id: Long,
         exerciseId: Long,
         position: Int,
-        status: SessionSetStatus
+        status: SessionSetStatus,
+        timedWork: Boolean = false,
+        plannedDurationSeconds: Int? = null,
+        actualDurationSeconds: Int? = null
     ): SessionSet {
         return SessionSet(
             id = id,
             sessionExerciseId = exerciseId,
             position = position,
-            plannedMinReps = 8,
-            plannedMaxReps = 8,
+            plannedMinReps = if (timedWork) null else 8,
+            plannedMaxReps = if (timedWork) null else 8,
             plannedLoadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
             plannedWeightKg = null,
-            plannedDurationSeconds = null,
+            plannedDurationSeconds = plannedDurationSeconds,
             plannedDistanceMeters = null,
-            actualReps = 8,
+            actualReps = if (timedWork) null else 8,
             actualLoadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
             actualWeightKg = null,
-            actualDurationSeconds = null,
+            actualDurationSeconds = actualDurationSeconds,
             actualDistanceMeters = null,
             status = status,
             completedAt = if (status == SessionSetStatus.COMPLETED) 2_000L else null,
-            addedDuringWorkout = false
+            addedDuringWorkout = false,
+            timedWork = timedWork
+        )
+    }
+
+    @Test
+    fun freeUserSeesALockedTimedSetAndCanOpenProBenefitsWithoutExecutingIt() {
+        val opens = AtomicInteger(0)
+        val skips = AtomicInteger(0)
+        val completes = AtomicInteger(0)
+        val starts = AtomicInteger(0)
+        val displayed = render(
+            state = timedWorkoutState(timersEnabled = false),
+            width = 360.dp,
+            fontScale = 1f,
+            onSkip = { skips.incrementAndGet() },
+            onComplete = { completes.incrementAndGet() },
+            onStartWork = { starts.incrementAndGet() },
+            onExploreProBenefits = { opens.incrementAndGet() }
+        )
+        composeRule.onNodeWithTag("set-2").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Húzódzkodás", substring = true)[0].assertIsDisplayed()
+        composeRule.onNodeWithText("1 / 2", substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText("0:30", substring = true)[0].assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.work_requires_pro)).assertIsDisplayed()
+        composeRule.onNodeWithTag(TIMED_SET_EXPLORE_PRO).assertIsDisplayed().assertHasClickAction()
+        composeRule.onNodeWithText(testString(R.string.timed_set_explore_pro)).performClick()
+        assertEquals(1, opens.get())
+        composeRule.onAllNodesWithTag("work_start").assertCountEquals(0)
+        composeRule.onAllNodesWithTag(SET_COMPLETE_ACTION).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.work_start)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.work_pause)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.work_resume)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.work_finish_early)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.work_complete_set)).assertCountEquals(0)
+        composeRule.onNodeWithTag(SET_SKIP_ACTION).performClick()
+        assertEquals(1, skips.get())
+        assertEquals(0, completes.get())
+        assertEquals(0, starts.get())
+        assertEquals(2L, displayed.value.currentSetId)
+        assertEquals(1L, displayed.value.aggregate!!.session.id)
+    }
+
+    @Test
+    fun proUserCanStartATimedSet() {
+        val starts = AtomicInteger(0)
+        render(
+            state = timedWorkoutState(timersEnabled = true),
+            width = 360.dp,
+            fontScale = 1f,
+            onStartWork = { starts.incrementAndGet() }
+        )
+        composeRule.onAllNodesWithText("0:30", substring = true)[0].assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.work_requires_pro)).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(TIMED_SET_EXPLORE_PRO).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(SET_COMPLETE_ACTION).assertCountEquals(0)
+        composeRule.onNodeWithTag("work_start").performClick()
+        assertEquals(1, starts.get())
+    }
+
+    @Test
+    fun mixedWorkoutKeepsRepsExecutableAndTimedSetsLocked() {
+        render(
+            state = mixedRepsAndTimedState(),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_COMPLETE_ACTION).assertIsDisplayed()
+        composeRule.onAllNodesWithTag("work_start").assertCountEquals(0)
+        composeRule.onNodeWithText("0:45", substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.work_requires_pro)).assertCountEquals(0)
+    }
+
+    @Test
+    fun aWorkoutOfOnlyLockedTimedSetsStillOffersFinishAndSkip() {
+        val finishes = AtomicInteger(0)
+        render(
+            state = timedWorkoutState(timersEnabled = false),
+            width = 360.dp,
+            fontScale = 1f,
+            onRequestFinish = { finishes.incrementAndGet() }
+        )
+        composeRule.onNodeWithTag(WORKOUT_FINISH_CTA).assertIsDisplayed()
+        composeRule.onNodeWithTag(WORKOUT_FINISH_CTA).performClick()
+        assertEquals(1, finishes.get())
+        composeRule.onNodeWithTag(SET_SKIP_ACTION).assertIsDisplayed()
+        composeRule.onAllNodesWithTag(SET_COMPLETE_ACTION).assertCountEquals(0)
+    }
+
+    @Test
+    fun completedTimedHistoryStaysReadableWhenTimersAreLocked() {
+        val completed = set(
+            id = 1L,
+            exerciseId = 10L,
+            position = 0,
+            status = SessionSetStatus.COMPLETED,
+            timedWork = true,
+            plannedDurationSeconds = 30,
+            actualDurationSeconds = 30
+        )
+        val current = set(
+            id = 2L,
+            exerciseId = 10L,
+            position = 1,
+            status = SessionSetStatus.PENDING,
+            timedWork = true,
+            plannedDurationSeconds = 45
+        )
+        val state = workoutState(
+            sets = listOf(completed, current),
+            currentSetId = current.id,
+            timersEnabled = false,
+            drafts = mapOf(
+                completed.id to ActualSetDraft(
+                    loadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
+                    minutesText = "0",
+                    secondsText = "30"
+                ),
+                current.id to ActualSetLogic.draftFromSet(current)
+            )
+        )
+        render(state = state, width = 360.dp, fontScale = 1f)
+        composeRule.onAllNodesWithText("0:30", substring = true)[0].assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.work_requires_pro)).assertIsDisplayed()
+        composeRule.onAllNodesWithTag(SET_COMPLETE_ACTION).assertCountEquals(0)
+    }
+
+    @Test
+    fun regainingProReplacesTheLockedCardWithTheWorkTimer() {
+        val displayed = render(
+            state = timedWorkoutState(timersEnabled = false),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(TIMED_SET_EXPLORE_PRO).assertIsDisplayed()
+        composeRule.onAllNodesWithTag("work_start").assertCountEquals(0)
+        displayed.value = displayed.value.copy(timersEnabled = true)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("work_start").assertIsDisplayed()
+        composeRule.onAllNodesWithTag(TIMED_SET_EXPLORE_PRO).assertCountEquals(0)
+        composeRule.onAllNodesWithText(testString(R.string.work_requires_pro)).assertCountEquals(0)
+    }
+
+    private fun timedWorkoutState(timersEnabled: Boolean): ActiveWorkoutUiState {
+        val current = set(
+            id = 2L,
+            exerciseId = 10L,
+            position = 0,
+            status = SessionSetStatus.PENDING,
+            timedWork = true,
+            plannedDurationSeconds = 30
+        )
+        val later = set(
+            id = 3L,
+            exerciseId = 10L,
+            position = 1,
+            status = SessionSetStatus.PENDING,
+            timedWork = true,
+            plannedDurationSeconds = 40
+        )
+        return workoutState(
+            sets = listOf(current, later),
+            currentSetId = current.id,
+            timersEnabled = timersEnabled,
+            drafts = mapOf(
+                current.id to ActualSetLogic.draftFromSet(current),
+                later.id to ActualSetLogic.draftFromSet(later)
+            )
+        )
+    }
+
+    private fun mixedRepsAndTimedState(): ActiveWorkoutUiState {
+        val reps = set(2L, 10L, 0, SessionSetStatus.PENDING)
+        val timed = set(
+            id = 3L,
+            exerciseId = 10L,
+            position = 1,
+            status = SessionSetStatus.PENDING,
+            timedWork = true,
+            plannedDurationSeconds = 45
+        )
+        return workoutState(
+            sets = listOf(reps, timed),
+            currentSetId = reps.id,
+            timersEnabled = false,
+            drafts = mapOf(
+                reps.id to ActualSetLogic.draftFromSet(reps),
+                timed.id to ActualSetLogic.draftFromSet(timed)
+            )
+        )
+    }
+
+    private fun workoutState(
+        sets: List<SessionSet>,
+        currentSetId: Long,
+        timersEnabled: Boolean,
+        drafts: Map<Long, ActualSetDraft>
+    ): ActiveWorkoutUiState {
+        val first = item(10L, "Húzódzkodás", 0, sets)
+        return ActiveWorkoutUiState(
+            loading = false,
+            aggregate = WorkoutSessionAggregate(session(), listOf(first)),
+            currentExerciseId = 10L,
+            currentSetId = currentSetId,
+            focusedSetId = currentSetId,
+            expandedExerciseIds = setOf(10L),
+            timersEnabled = timersEnabled,
+            drafts = drafts
         )
     }
 }

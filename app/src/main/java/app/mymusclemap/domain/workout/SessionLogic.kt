@@ -68,43 +68,54 @@ sealed interface WorkoutFocusTarget {
 }
 
 object SessionFocusLogic {
-    fun currentPendingExercise(aggregate: WorkoutSessionAggregate): SessionExerciseItem? {
+    fun currentPendingExercise(
+        aggregate: WorkoutSessionAggregate,
+        lockedExerciseIds: Set<Long> = emptySet()
+    ): SessionExerciseItem? {
         return aggregate.exercises.firstOrNull { item ->
-            item.sets.any { it.status == SessionSetStatus.PENDING }
+            item.exercise.exerciseId !in lockedExerciseIds &&
+                item.sets.any { it.status == SessionSetStatus.PENDING }
         }
     }
 
-    fun currentPendingSet(aggregate: WorkoutSessionAggregate): SessionSet? {
-        return currentPendingExercise(aggregate)?.sets?.firstOrNull { set ->
+    fun currentPendingSet(
+        aggregate: WorkoutSessionAggregate,
+        lockedExerciseIds: Set<Long> = emptySet()
+    ): SessionSet? {
+        return currentPendingExercise(aggregate, lockedExerciseIds)?.sets?.firstOrNull { set ->
             set.status == SessionSetStatus.PENDING
         }
     }
 
     fun focusAfterResolving(
         exercises: List<SessionExerciseItem>,
-        resolvedSetId: Long
+        resolvedSetId: Long,
+        lockedExerciseIds: Set<Long> = emptySet()
     ): WorkoutFocusTarget {
         val currentIndex = exercises.indexOfFirst { item ->
             item.sets.any { it.id == resolvedSetId }
         }
         if (currentIndex < 0) {
-            return nextPending(exercises) ?: WorkoutFocusTarget.Finish
+            return nextPending(exercises, lockedExerciseIds) ?: WorkoutFocusTarget.Finish
         }
-        val remainingHere = exercises[currentIndex].sets.firstOrNull { set ->
-            set.id != resolvedSetId && set.status == SessionSetStatus.PENDING
-        }
-        if (remainingHere != null) {
-            return WorkoutFocusTarget.Set(remainingHere.id, exercises[currentIndex].exercise.id)
+        val current = exercises[currentIndex]
+        if (current.exercise.exerciseId !in lockedExerciseIds) {
+            val remainingHere = current.sets.firstOrNull { set ->
+                set.id != resolvedSetId && set.status == SessionSetStatus.PENDING
+            }
+            if (remainingHere != null) {
+                return WorkoutFocusTarget.Set(remainingHere.id, current.exercise.id)
+            }
         }
         val later = exercises.drop(currentIndex + 1).firstOrNull { item ->
-            item.sets.any { it.status == SessionSetStatus.PENDING }
+            accessiblePending(item, lockedExerciseIds)
         }
         if (later != null) {
             val pending = later.sets.first { it.status == SessionSetStatus.PENDING }
             return WorkoutFocusTarget.Set(pending.id, later.exercise.id)
         }
         val earlier = exercises.take(currentIndex).firstOrNull { item ->
-            item.sets.any { it.status == SessionSetStatus.PENDING }
+            accessiblePending(item, lockedExerciseIds)
         }
         if (earlier != null) {
             val pending = earlier.sets.first { it.status == SessionSetStatus.PENDING }
@@ -113,12 +124,18 @@ object SessionFocusLogic {
         return WorkoutFocusTarget.Finish
     }
 
-    private fun nextPending(exercises: List<SessionExerciseItem>): WorkoutFocusTarget.Set? {
-        val item = exercises.firstOrNull { exercise ->
-            exercise.sets.any { it.status == SessionSetStatus.PENDING }
-        } ?: return null
+    private fun nextPending(
+        exercises: List<SessionExerciseItem>,
+        lockedExerciseIds: Set<Long>
+    ): WorkoutFocusTarget.Set? {
+        val item = exercises.firstOrNull { accessiblePending(it, lockedExerciseIds) } ?: return null
         val pending = item.sets.first { it.status == SessionSetStatus.PENDING }
         return WorkoutFocusTarget.Set(pending.id, item.exercise.id)
+    }
+
+    private fun accessiblePending(item: SessionExerciseItem, lockedExerciseIds: Set<Long>): Boolean {
+        return item.exercise.exerciseId !in lockedExerciseIds &&
+            item.sets.any { it.status == SessionSetStatus.PENDING }
     }
 }
 

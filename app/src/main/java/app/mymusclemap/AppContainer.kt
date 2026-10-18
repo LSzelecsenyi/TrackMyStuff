@@ -66,6 +66,7 @@ import app.mymusclemap.data.repository.TargetWeightGoalRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WeeklyGoalRepository
+import app.mymusclemap.data.repository.FreeAccessRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.ContentWorkoutImportFileReader
 import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
@@ -118,6 +119,14 @@ class AppContainer(context: Context, val accountUserId: String) {
     private val weightChanged = AtomicReference<suspend () -> Unit> { }
     private val plansChanged = AtomicReference<suspend () -> Unit> { }
     private val grantsPro = AtomicReference<() -> Boolean> { false }
+    private val afterBackupRestore = AtomicReference<suspend () -> Unit> { }
+    private val freeAccessEntitlementReady = AtomicReference(false)
+    private val onPlanCreated = AtomicReference<suspend (Long) -> Unit> { }
+    private val onExerciseCreated = AtomicReference<suspend (Long) -> Unit> { }
+    private val planMayStart = AtomicReference<suspend (Long) -> Boolean> { true }
+    private val exerciseMayExecute = AtomicReference<suspend (Long) -> Boolean> { true }
+    private val planMayUpdate = AtomicReference<suspend (Long) -> Boolean> { true }
+    private val exerciseMayUpdate = AtomicReference<suspend (Long) -> Boolean> { true }
     private val founderLifetime = AtomicReference<() -> Boolean> { false }
     private val accountAuthorityState = AtomicReference(AccountAchievementAuthority())
     private val authenticatedUserId = AtomicReference<String?>(null)
@@ -126,7 +135,9 @@ class AppContainer(context: Context, val accountUserId: String) {
         clock = clock,
         templateDao = database.workoutTemplateDao(),
         sessionDao = database.workoutSessionDao(),
-        allowCustomCreate = { count -> customExerciseCreate.get().invoke(count) }
+        allowCustomCreate = { count -> customExerciseCreate.get().invoke(count) },
+        mayUpdate = { id -> exerciseMayUpdate.get().invoke(id) },
+        onCustomCreated = { id -> onExerciseCreated.get().invoke(id) }
     )
     val workoutTemplateRepository = WorkoutTemplateRepository(
         templateDao = database.workoutTemplateDao(),
@@ -134,7 +145,9 @@ class AppContainer(context: Context, val accountUserId: String) {
         clock = clock,
         sessionDao = database.workoutSessionDao(),
         scheduledWorkoutDao = database.scheduledWorkoutDao(),
-        onPlansChanged = { plansChanged.get().invoke() }
+        onPlansChanged = { plansChanged.get().invoke() },
+        mayUpdate = { id -> planMayUpdate.get().invoke(id) },
+        onPlanCreated = { id -> onPlanCreated.get().invoke(id) }
     )
     val scheduledWorkoutRepository = ScheduledWorkoutRepository(
         scheduledWorkoutDao = database.scheduledWorkoutDao(),
@@ -165,7 +178,9 @@ class AppContainer(context: Context, val accountUserId: String) {
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
         onNativeWorkoutCompleted = { clientWorkoutId -> nativeWorkoutCompleted.get().invoke(clientWorkoutId) },
         onTrainingHistoryChanged = { clientWorkoutId -> achievementRepository.reconcile(clientWorkoutId) },
-        timersAllowed = { featureEntitlements.hasAccess(app.mymusclemap.domain.entitlement.AppFeature.WorkoutTimers) }
+        timersAllowed = { featureEntitlements.hasAccess(app.mymusclemap.domain.entitlement.AppFeature.WorkoutTimers) },
+        planMayStart = { id -> planMayStart.get().invoke(id) },
+        exerciseMayExecute = { id -> exerciseMayExecute.get().invoke(id) }
     )
     val lockScreenSetCompletion = LockScreenSetCompletionPreferences(appContext)
     val timerSounds = TimerSoundPreferences(appContext)
@@ -192,7 +207,10 @@ class AppContainer(context: Context, val accountUserId: String) {
         themePreferences,
         progressPhotoStore = progressPhotoStore,
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
-        onAfterRestore = { achievementRepository.reconcile() }
+        onAfterRestore = {
+            afterBackupRestore.get().invoke()
+            achievementRepository.reconcile()
+        }
     )
     val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
     val founderProgramRules: FounderProgramRules = FounderProgramRuleSelection.rules
@@ -360,6 +378,13 @@ class AppContainer(context: Context, val accountUserId: String) {
         policySource = { entitlementComposer.policy() },
         revisions = entitlementRevision
     )
+    val freeAccessRepository = FreeAccessRepository(
+        dao = database.freeAccessDao(),
+        templateDao = database.workoutTemplateDao(),
+        exerciseDao = database.exerciseDao(),
+        grantsPro = { grantsPro.get().invoke() },
+        entitlementReady = { freeAccessEntitlementReady.get() }
+    )
 
     init {
         customExerciseCreate.set { count ->
@@ -367,6 +392,46 @@ class AppContainer(context: Context, val accountUserId: String) {
         }
         grantsPro.set { entitlementComposer.resolve().grantsPro }
         founderLifetime.set { entitlementComposer.resolve().founderRecognized }
+        planMayStart.set { id ->
+            freeAccessRepository.refresh()
+            freeAccessRepository.current().planAccessible(id)
+        }
+        planMayUpdate.set { id ->
+            freeAccessRepository.refresh()
+            freeAccessRepository.current().planAccessible(id)
+        }
+        exerciseMayUpdate.set { id ->
+            val exercise = database.exerciseDao().getById(id)
+            if (exercise == null || !exercise.custom) {
+                true
+            } else {
+                freeAccessRepository.refresh()
+                freeAccessRepository.current().customExerciseAccessible(id)
+            }
+        }
+        exerciseMayExecute.set { id ->
+            val exercise = database.exerciseDao().getById(id)
+            if (exercise == null || !exercise.custom) {
+                true
+            } else {
+                freeAccessRepository.refresh()
+                freeAccessRepository.current().customExerciseAccessible(id)
+            }
+        }
+        onPlanCreated.set { id -> freeAccessRepository.notePlanCreated(id) }
+        onExerciseCreated.set { id -> freeAccessRepository.noteCustomExerciseCreated(id) }
+        afterBackupRestore.set {
+            freeAccessRepository.refresh(legacyRestoreWithoutSelection = true)
+        }
+        founderCacheScope.launch {
+            entitlementRevision.collect { freeAccessRepository.refresh() }
+        }
+        founderCacheScope.launch {
+            kotlinx.coroutines.flow.combine(
+                database.workoutTemplateDao().observeAll(),
+                database.exerciseDao().observeAll()
+            ) { _, _ -> Unit }.collect { freeAccessRepository.refresh() }
+        }
         refreshAccountAuthority()
         weightChanged.set { achievementRepository.reconcile() }
         plansChanged.set { achievementRepository.reconcile() }
@@ -750,6 +815,8 @@ class AppContainer(context: Context, val accountUserId: String) {
 
     suspend fun refreshBilling() {
         verifiedSubscriptions.load()
+        freeAccessEntitlementReady.set(true)
+        freeAccessRepository.refresh()
         billing.refresh()
     }
 
@@ -823,6 +890,7 @@ class AppContainer(context: Context, val accountUserId: String) {
             submitFounderTesterReport(submissionId, feedback, appVersion)
         },
         founderRefreshAuthority = { refreshAccountAuthorityFromBackend() },
+        freeAccessRepository = freeAccessRepository,
         achievementRepository = achievementRepository,
         targetWeightGoalRepository = targetWeightGoalRepository
     )

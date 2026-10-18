@@ -13,6 +13,7 @@ object AppRoutes {
     const val PRIVACY = "privacy"
     const val PRO_INFO = "pro_info"
     const val PRO_BENEFITS = "pro_benefits"
+    const val FREE_ACCESS = "free_access"
     const val STATISTICS_GRAPH = "statistics_graph"
     const val STATISTICS = "statistics"
     const val STATISTICS_MUSCLES = "statistics_muscles"

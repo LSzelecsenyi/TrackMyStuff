@@ -8,6 +8,14 @@ import app.mymusclemap.MainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
+import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.EffectiveEntitlement
+import app.mymusclemap.domain.entitlement.EntitlementTier
+import app.mymusclemap.domain.entitlement.FeatureAccessPolicy
+import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.entitlement.PolicyBackedEntitlements
+import app.mymusclemap.domain.entitlement.SelectiveFeatureEntitlements
 import app.mymusclemap.domain.exercise.Exercise
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.ExerciseDraft
@@ -18,6 +26,8 @@ import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -322,19 +332,225 @@ class TemplateEditorViewModelTest {
         assertEquals(45, stored.exercises.single().relation.restSeconds)
     }
 
+    @Test
+    fun freePreviewDoesNotConvertRepsOrAcceptTimedEdits() = runTest {
+        val pull = savePull()
+        val created = saveRepsPlan(pull, "Free plan")
+        val viewModel = editor(created, SelectiveFeatureEntitlements(emptySet()))
+        val loaded = awaitLoaded(viewModel, pull)
+        val exercise = loaded.draft.exercises.single()
+        val set = exercise.sets.single()
+        assertFalse(loaded.timersEnabled)
+        assertTrue(loaded.timedTabPreview.isEmpty())
+        assertNull(loaded.lockedFeature)
+        viewModel.onTimedMode(exercise.localId, true)
+        val preview = viewModel.uiState.value
+        val previewSet = preview.draft.exercises.single().sets.single()
+        assertEquals(true, preview.timedTabPreview[exercise.localId])
+        assertFalse(previewSet.timedWork)
+        assertEquals("8", previewSet.minRepsText)
+        assertEquals("0", previewSet.minutesText)
+        assertEquals("0", previewSet.secondsText)
+        assertNull(preview.lockedFeature)
+        viewModel.onMinutes(exercise.localId, set.localId, "2")
+        viewModel.onSeconds(exercise.localId, set.localId, "15")
+        viewModel.onWorkDuration(exercise.localId, set.localId, 45)
+        val rejected = viewModel.uiState.value.draft.exercises.single().sets.single()
+        assertEquals("0", rejected.minutesText)
+        assertEquals("0", rejected.secondsText)
+        assertFalse(rejected.timedWork)
+        viewModel.onTimedMode(exercise.localId, false)
+        val reps = viewModel.uiState.value
+        assertEquals(false, reps.timedTabPreview[exercise.localId])
+        assertEquals("8", reps.draft.exercises.single().sets.single().minRepsText)
+        assertFalse(reps.draft.exercises.single().sets.single().timedWork)
+        viewModel.onTimedMode(exercise.localId, true)
+        viewModel.save()
+        awaitEditor { viewModel.uiState.first { it.saved } }
+        val stored = templates.getAggregate(created)!!
+        assertFalse(stored.exercises.single().sets.single().timedWork)
+        assertEquals(8, stored.exercises.single().sets.single().minReps)
+        assertNull(stored.exercises.single().sets.single().durationSeconds)
+    }
+
+    @Test
+    fun existingTimedSetStaysIntactAndRejectsFreeEdits() = runTest {
+        val pull = savePull()
+        val created = saveTimedPlan(pull, minutes = "1", seconds = "15")
+        val viewModel = editor(created, SelectiveFeatureEntitlements(emptySet()))
+        val loaded = awaitLoaded(viewModel, pull)
+        val exercise = loaded.draft.exercises.single()
+        val set = exercise.sets.single()
+        assertTrue(set.timedWork)
+        assertEquals("1", set.minutesText)
+        assertEquals("15", set.secondsText)
+        assertFalse(loaded.timersEnabled)
+        viewModel.onMinutes(exercise.localId, set.localId, "9")
+        viewModel.onWorkDuration(exercise.localId, set.localId, 45)
+        viewModel.onTimedMode(exercise.localId, false)
+        viewModel.addSet(exercise.localId)
+        val after = viewModel.uiState.value.draft.exercises.single()
+        assertEquals(1, after.sets.size)
+        assertTrue(after.sets.single().timedWork)
+        assertEquals("1", after.sets.single().minutesText)
+        assertEquals("15", after.sets.single().secondsText)
+        assertEquals(false, viewModel.uiState.value.timedTabPreview[exercise.localId])
+        viewModel.save()
+        awaitEditor { viewModel.uiState.first { it.saved } }
+        val stored = templates.getAggregate(created)!!.exercises.single().sets.single()
+        assertTrue(stored.timedWork)
+        assertEquals(75, stored.durationSeconds)
+    }
+
+    @Test
+    fun regainingProTurnsTheOpenPreviewIntoAnEditableTimedSet() = runTest {
+        val pull = savePull()
+        val created = saveRepsPlan(pull, "Return")
+        val access = FlipEntitlements(pro = false)
+        val viewModel = editor(created, access)
+        val loaded = awaitLoaded(viewModel, pull)
+        val exerciseId = loaded.draft.exercises.single().localId
+        val setId = loaded.draft.exercises.single().sets.single().localId
+        viewModel.onTimedMode(exerciseId, true)
+        assertFalse(viewModel.uiState.value.draft.exercises.single().sets.single().timedWork)
+        access.grantPro()
+        val enabled = awaitEditor {
+            viewModel.uiState.first {
+                it.timersEnabled && it.draft.exercises.single().sets.single().timedWork
+            }
+        }
+        assertTrue(enabled.timedTabPreview.isEmpty())
+        assertEquals("0", enabled.draft.exercises.single().sets.single().minutesText)
+        assertEquals("30", enabled.draft.exercises.single().sets.single().secondsText)
+        assertEquals("8", enabled.draft.exercises.single().sets.single().minRepsText)
+        viewModel.onSeconds(exerciseId, setId, "40")
+        val edited = viewModel.uiState.value.draft.exercises.single().sets.single()
+        assertEquals("40", edited.secondsText)
+        assertTrue(edited.timedWork)
+    }
+
+    @Test
+    fun founderAndTimerGrantsCanEditTimedSetsAndRecognitionCannot() = runTest {
+        val pull = savePull()
+        val created = saveRepsPlan(pull, "Grants")
+        val founder = editor(
+            created,
+            PolicyBackedEntitlements(
+                FeatureAccessPolicy(
+                    EffectiveEntitlement(
+                        tier = EntitlementTier.Pro,
+                        subscriptionValid = false,
+                        founderLifetime = true,
+                        temporaryTesterPro = false
+                    )
+                )
+            )
+        )
+        val founderLoaded = awaitLoaded(founder, pull)
+        founder.onTimedMode(founderLoaded.draft.exercises.single().localId, true)
+        assertTrue(founder.uiState.value.timersEnabled)
+        assertTrue(founder.uiState.value.draft.exercises.single().sets.single().timedWork)
+        assertEquals("30", founder.uiState.value.draft.exercises.single().sets.single().secondsText)
+
+        val recognition = editor(
+            created,
+            PolicyBackedEntitlements(
+                FeatureAccessPolicy(
+                    EffectiveEntitlement(
+                        tier = EntitlementTier.Free,
+                        subscriptionValid = false,
+                        founderLifetime = false,
+                        temporaryTesterPro = false,
+                        founderRecognized = true
+                    )
+                )
+            )
+        )
+        val recognized = awaitLoaded(recognition, pull)
+        recognition.onTimedMode(recognized.draft.exercises.single().localId, true)
+        assertFalse(recognition.uiState.value.timersEnabled)
+        assertFalse(recognition.uiState.value.draft.exercises.single().sets.single().timedWork)
+        assertEquals(true, recognition.uiState.value.timedTabPreview[recognized.draft.exercises.single().localId])
+
+        val granted = editor(created, SelectiveFeatureEntitlements(setOf(AppFeature.WorkoutTimers)))
+        val grantLoaded = awaitLoaded(granted, pull)
+        granted.onTimedMode(grantLoaded.draft.exercises.single().localId, true)
+        assertTrue(granted.uiState.value.timersEnabled)
+        assertTrue(granted.uiState.value.draft.exercises.single().sets.single().timedWork)
+    }
+
+    private suspend fun awaitLoaded(
+        viewModel: TemplateEditorViewModel,
+        exerciseId: Long
+    ): TemplateEditorUiState {
+        return awaitEditor {
+            viewModel.uiState.first { !it.loading && it.draft.exercises.isNotEmpty() && it.catalog.containsKey(exerciseId) }
+        }
+    }
+
+    private suspend fun saveRepsPlan(exerciseId: Long, name: String): Long {
+        val created = templates.save(
+            TemplateDraft(
+                name = name,
+                exercises = listOf(
+                    TemplateExerciseDraft(
+                        localId = -1L,
+                        exerciseId = exerciseId,
+                        sets = listOf(
+                            PlannedSetDraft(
+                                localId = -2L,
+                                minRepsText = "8",
+                                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY
+                            )
+                        )
+                    )
+                )
+            )
+        ) as TemplateSaveResult.Created
+        return created.id
+    }
+
+    private suspend fun saveTimedPlan(exerciseId: Long, minutes: String, seconds: String): Long {
+        val created = templates.save(
+            TemplateDraft(
+                name = "Timed plan",
+                exercises = listOf(
+                    TemplateExerciseDraft(
+                        localId = -1L,
+                        exerciseId = exerciseId,
+                        sets = listOf(
+                            PlannedSetDraft(
+                                localId = -2L,
+                                minRepsText = "8",
+                                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
+                                minutesText = minutes,
+                                secondsText = seconds,
+                                timedWork = true
+                            )
+                        )
+                    )
+                )
+            )
+        ) as TemplateSaveResult.Created
+        return created.id
+    }
+
     private suspend fun <T> awaitEditor(block: suspend () -> T): T {
         return withContext(Dispatchers.Default.limitedParallelism(1)) {
             withTimeout(5_000) { block() }
         }
     }
 
-    private fun editor(templateId: Long? = null): TemplateEditorViewModel {
+    private fun editor(
+        templateId: Long? = null,
+        entitlements: FeatureEntitlements = OpenFeatureEntitlements
+    ): TemplateEditorViewModel {
         val handle = if (templateId == null) {
             SavedStateHandle()
         } else {
             SavedStateHandle(mapOf(TemplateEditorViewModel.TEMPLATE_ID_KEY to templateId))
         }
-        return TemplateEditorViewModel(handle, templates, exercises)
+        return TemplateEditorViewModel(handle, templates, exercises, entitlements)
     }
 
     private suspend fun catalogExercise(id: Long): Exercise {
@@ -368,5 +584,21 @@ class TemplateEditorViewModelTest {
                 primaryMuscle = MuscleGroup.TRICEPS
             )
         ) as ExerciseSaveResult.Created).id
+    }
+}
+
+private class FlipEntitlements(pro: Boolean) : FeatureEntitlements {
+    private val timers = MutableStateFlow(pro)
+    private val revision = MutableStateFlow(0)
+
+    override fun hasAccess(feature: AppFeature): Boolean {
+        return feature != AppFeature.WorkoutTimers || timers.value
+    }
+
+    override fun changes(): Flow<Int> = revision
+
+    fun grantPro() {
+        timers.value = true
+        revision.value += 1
     }
 }

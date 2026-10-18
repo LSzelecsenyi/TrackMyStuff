@@ -1,5 +1,7 @@
 package app.mymusclemap.data.appbackup
 
+import app.mymusclemap.domain.entitlement.FreeAccessPhase
+import app.mymusclemap.domain.entitlement.FreeAccessState
 import app.mymusclemap.data.local.AchievementStateEntity
 import app.mymusclemap.data.local.BodyMeasurementEntity
 import app.mymusclemap.data.local.ExerciseEntity
@@ -451,6 +453,17 @@ object AppBackupJson {
                 }
             )
         }
+        snapshot.tables.freeAccess?.let { access ->
+            tables.put(
+                AppBackupFormat.TABLE_FREE_ACCESS,
+                JSONObject()
+                    .put("periodId", access.periodId)
+                    .put("lastKnownPro", access.lastKnownPro ?: JSONObject.NULL)
+                    .put("phase", access.phase.name)
+                    .put("planIds", JSONArray(access.selectedPlanIds.sorted()))
+                    .put("exerciseIds", JSONArray(access.selectedCustomExerciseIds.sorted()))
+            )
+        }
         root.put("tables", tables)
         val settings = JSONObject()
         snapshot.settings.toSortedMap().forEach { (key, value) ->
@@ -653,7 +666,8 @@ object AppBackupJson {
             } else {
                 emptyList()
             },
-            replacesTargetWeightGoals = replacesTargetWeightGoals
+            replacesTargetWeightGoals = replacesTargetWeightGoals,
+            freeAccess = parseFreeAccess(tablesObject, errors)
         )
         val tables = parsedTables.copy(
             scheduledWorkouts = hydrateScheduledTemplateNames(
@@ -1263,6 +1277,67 @@ object AppBackupJson {
             restSeconds = obj.optionalNullableInt("restSeconds", errors),
             timedWork = obj.optionalBoolean("timedWork") ?: false
         )
+    }
+
+    private fun parseFreeAccess(
+        tables: JSONObject,
+        errors: MutableList<AppBackupError>
+    ): FreeAccessState? {
+        if (!tables.has(AppBackupFormat.TABLE_FREE_ACCESS) || tables.isNull(AppBackupFormat.TABLE_FREE_ACCESS)) {
+            return null
+        }
+        val obj = tables.optJSONObject(AppBackupFormat.TABLE_FREE_ACCESS) ?: run {
+            errors += AppBackupError(AppBackupErrorCode.InvalidType, AppBackupFormat.TABLE_FREE_ACCESS)
+            return null
+        }
+        val periodId = obj.requiredLong("periodId", errors) ?: return null
+        val phaseName = obj.requiredString("phase", errors) ?: return null
+        val phase = try {
+            FreeAccessPhase.valueOf(phaseName)
+        } catch (_: IllegalArgumentException) {
+            errors += AppBackupError(AppBackupErrorCode.InvalidValue, "phase")
+            return null
+        }
+        val lastKnown = obj.opt("lastKnownPro")
+        val lastKnownPro = when {
+            !obj.has("lastKnownPro") || lastKnown == null || lastKnown == JSONObject.NULL -> null
+            lastKnown is Boolean -> lastKnown
+            else -> {
+                errors += AppBackupError(AppBackupErrorCode.InvalidType, "lastKnownPro")
+                return null
+            }
+        }
+        val planIds = longIdSet(obj, "planIds", errors) ?: return null
+        val exerciseIds = longIdSet(obj, "exerciseIds", errors) ?: return null
+        return FreeAccessState(
+            periodId = periodId,
+            lastKnownPro = lastKnownPro,
+            phase = phase,
+            selectedPlanIds = planIds,
+            selectedCustomExerciseIds = exerciseIds
+        )
+    }
+
+    private fun longIdSet(
+        obj: JSONObject,
+        key: String,
+        errors: MutableList<AppBackupError>
+    ): Set<Long>? {
+        val array = obj.optJSONArray(key) ?: run {
+            errors += AppBackupError(AppBackupErrorCode.MissingField, key)
+            return null
+        }
+        return buildSet {
+            for (index in 0 until array.length()) {
+                val value = array.opt(index)
+                if (value is Number) {
+                    add(value.toLong())
+                } else {
+                    errors += AppBackupError(AppBackupErrorCode.InvalidType, key)
+                    return null
+                }
+            }
+        }
     }
 
     private fun nullable(value: Any?): Any {

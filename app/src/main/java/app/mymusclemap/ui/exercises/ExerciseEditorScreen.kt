@@ -95,7 +95,8 @@ fun ExerciseEditorScreen(
     onDismissDiscard: () -> Unit,
     onConfirmDiscard: () -> Unit,
     onFinished: (saved: Boolean, created: Boolean) -> Unit,
-    onDismissLocked: () -> Unit = {}
+    onDismissLocked: () -> Unit = {},
+    onExploreProBenefits: () -> Unit = {}
 ) {
     BackHandler { onBack() }
     LaunchedEffect(state.finished) {
@@ -188,6 +189,10 @@ fun ExerciseEditorScreen(
                 .padding(horizontal = AppDimens.screenPadding)
                 .padding(top = 8.dp, bottom = AppDimens.scrollEndPadding)
         ) {
+            if (state.contentLocked) {
+                app.mymusclemap.ui.entitlement.FreeAccessLockNote(onExplorePro = onExploreProBenefits)
+                Spacer(Modifier.height(8.dp))
+            }
             CompactEditorSection(title = stringResource(R.string.exercise_section_basics)) {
                 val nameError = state.fieldErrors.firstOrNull {
                     it == ExerciseFieldError.NameBlank || it == ExerciseFieldError.NameTooLong

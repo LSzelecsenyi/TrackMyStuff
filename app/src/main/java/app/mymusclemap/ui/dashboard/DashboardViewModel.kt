@@ -755,6 +755,9 @@ class DashboardViewModel(
                     is StartWorkoutResult.InvalidBodyWeight -> {
                         userMessage.value = UserMessage.WorkoutTemplateEmpty
                     }
+                    StartWorkoutResult.PlanLocked -> {
+                        userMessage.value = UserMessage.FreePlanLocked
+                    }
                 }
             } finally {
                 starting.value = false

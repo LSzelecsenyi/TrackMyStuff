@@ -35,7 +35,10 @@ import app.mymusclemap.domain.workout.TemplateOrdering
 import app.mymusclemap.domain.workout.TemplateSaveResult
 import app.mymusclemap.domain.workout.TemplateValidationIssue
 import app.mymusclemap.domain.workout.toSetDraft
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -73,7 +76,10 @@ data class TemplateEditorUiState(
     val saved: Boolean = false,
     val musclePreview: TemplateMuscleMapState = TemplateMuscleMapAssembler.assemble(emptyList()),
     val scrollEvent: TemplateScrollEvent? = null,
-    val lockedFeature: AppFeature? = null
+    val lockedFeature: AppFeature? = null,
+    val timersEnabled: Boolean = true,
+    val timedTabPreview: Map<Long, Boolean> = emptyMap(),
+    val contentLocked: Boolean = false
 ) {
     val canSave: Boolean
         get() = TemplateDraftLogic.validate(draft, catalog).isEmpty() && !duplicateName
@@ -83,7 +89,8 @@ class TemplateEditorViewModel(
     savedStateHandle: SavedStateHandle,
     private val templateRepository: WorkoutTemplateRepository,
     private val exerciseRepository: ExerciseRepository,
-    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
+    private val access: Flow<FreeAccessDecision> = emptyFlow()
 ) : ViewModel() {
     private val templateId: Long? = savedStateHandle.get<Long>(TEMPLATE_ID_KEY)
         ?.takeIf { it > 0L }
@@ -103,7 +110,9 @@ class TemplateEditorViewModel(
     private val saved = MutableStateFlow(false)
     private val loading = MutableStateFlow(templateId != null)
     private val scrollEvent = MutableStateFlow<TemplateScrollEvent?>(null)
-    private val chrome = MutableStateFlow(TemplateEditorChrome())
+    private val chrome = MutableStateFlow(
+        TemplateEditorChrome(timersEnabled = WorkoutTimerAccess.allowed(entitlements))
+    )
     private var nextLocalId = -1L
     private var scrollGeneration = 0L
 
@@ -156,7 +165,10 @@ class TemplateEditorViewModel(
                 core.draft.exercises.mapNotNull { catalog[it.exerciseId] }
             ),
             scrollEvent = finish.scroll,
-            lockedFeature = currentChrome.lockedFeature
+            lockedFeature = currentChrome.lockedFeature,
+            timersEnabled = currentChrome.timersEnabled,
+            timedTabPreview = currentChrome.timedTabPreview,
+            contentLocked = currentChrome.contentLocked
         )
     }.stateIn(
         scope = viewModelScope,
@@ -189,6 +201,27 @@ class TemplateEditorViewModel(
     )
 
     init {
+        viewModelScope.launch {
+            entitlements.changes().collect {
+                val allowed = WorkoutTimerAccess.allowed(entitlements)
+                if (allowed) {
+                    promoteTimedPreviews()
+                }
+                chrome.update { current ->
+                    if (current.timersEnabled == allowed) current else current.copy(timersEnabled = allowed)
+                }
+            }
+        }
+        viewModelScope.launch {
+            access.collect { decision ->
+                val locked = templateId != null &&
+                    decision.loaded &&
+                    !decision.planAccessible(templateId)
+                chrome.update { current ->
+                    if (current.contentLocked == locked) current else current.copy(contentLocked = locked)
+                }
+            }
+        }
         if (templateId != null) {
             viewModelScope.launch {
                 val aggregate = templateRepository.getAggregate(templateId)
@@ -208,6 +241,7 @@ class TemplateEditorViewModel(
     fun onNotesChange(value: String) = updateDraft { it.copy(notes = value) }
 
     fun openPicker() {
+        if (chrome.value.contentLocked) return
         pane.value = TemplateEditorPane.Picker
     }
 
@@ -245,6 +279,7 @@ class TemplateEditorViewModel(
     }
 
     private fun applyAdd(exercise: Exercise, allowDuplicate: Boolean) {
+        if (chrome.value.contentLocked) return
         when (
             val result = TemplateDraftLogic.addExercise(
                 draft = draft.value,
@@ -291,6 +326,7 @@ class TemplateEditorViewModel(
     }
 
     fun setSetCount(exerciseLocalId: Long, count: Int) {
+        if (blocksPersistedTimedEdit(exerciseLocalId)) return
         val exercise = catalogExercise(exerciseLocalId) ?: return
         updateDraft { current ->
             current.copy(
@@ -313,6 +349,7 @@ class TemplateEditorViewModel(
     }
 
     fun addSet(exerciseLocalId: Long) {
+        if (blocksPersistedTimedEdit(exerciseLocalId)) return
         val exercise = catalogExercise(exerciseLocalId) ?: return
         if (exercise.measurementType == MeasurementType.COMPLETION_ONLY) {
             return
@@ -333,6 +370,7 @@ class TemplateEditorViewModel(
     }
 
     fun removeSet(exerciseLocalId: Long, setLocalId: Long) = updateDraft { current ->
+        if (blocksPersistedTimedEdit(exerciseLocalId)) return@updateDraft current
         current.copy(
             exercises = current.exercises.map { item ->
                 if (item.localId != exerciseLocalId) {
@@ -365,6 +403,7 @@ class TemplateEditorViewModel(
     }
 
     fun applyToRemaining(exerciseLocalId: Long, setLocalId: Long) = updateDraft { current ->
+        if (blocksPersistedTimedEdit(exerciseLocalId)) return@updateDraft current
         current.copy(
             exercises = current.exercises.map { item ->
                 if (item.localId != exerciseLocalId) {
@@ -378,6 +417,7 @@ class TemplateEditorViewModel(
     }
 
     fun applyToAll(exerciseLocalId: Long, setLocalId: Long) = updateDraft { current ->
+        if (blocksPersistedTimedEdit(exerciseLocalId)) return@updateDraft current
         current.copy(
             exercises = current.exercises.map { item ->
                 if (item.localId != exerciseLocalId) {
@@ -437,9 +477,17 @@ class TemplateEditorViewModel(
 
     fun onTimedMode(exerciseLocalId: Long, timed: Boolean) {
         val exercise = draft.value.exercises.firstOrNull { it.localId == exerciseLocalId } ?: return
+        if (!WorkoutTimerAccess.allowed(entitlements)) {
+            chrome.update { current ->
+                current.copy(timedTabPreview = current.timedTabPreview + (exerciseLocalId to timed))
+            }
+            return
+        }
+        chrome.update { current ->
+            current.copy(timedTabPreview = current.timedTabPreview - exerciseLocalId)
+        }
         val already = exercise.sets.isNotEmpty() && exercise.sets.all { it.timedWork }
         if (timed == already) return
-        if (timed && !requireTimers()) return
         updateDraft { current ->
             current.copy(
                 exercises = current.exercises.map { item ->
@@ -448,22 +496,7 @@ class TemplateEditorViewModel(
                     } else {
                         item.copy(
                             sets = item.sets.map { set ->
-                                if (!timed) {
-                                    set.copy(timedWork = false)
-                                } else {
-                                    val existing = QuantityParser.toSeconds(
-                                        set.minutesText.toIntOrNull() ?: 0,
-                                        set.secondsText.toIntOrNull() ?: 0
-                                    )
-                                    val (minutes, seconds) = QuantityParser.fromSeconds(
-                                        if (existing > 0) existing else 30
-                                    )
-                                    set.copy(
-                                        timedWork = true,
-                                        minutesText = minutes.toString(),
-                                        secondsText = seconds.toString()
-                                    )
-                                }
+                                if (timed) asTimedSet(set) else set.copy(timedWork = false)
                             }
                         )
                     }
@@ -473,7 +506,8 @@ class TemplateEditorViewModel(
     }
 
     fun onWorkDuration(exerciseLocalId: Long, setLocalId: Long, seconds: Int) {
-        if (!requireTimers()) return
+        if (durationEditBlocked(exerciseLocalId, setLocalId)) return
+        promoteTimedPreview(exerciseLocalId)
         val bounded = seconds.coerceIn(1, WorkDuration.MAX_SECONDS)
         val (minutes, remainder) = QuantityParser.fromSeconds(bounded)
         updateSet(exerciseLocalId, setLocalId) { set ->
@@ -486,14 +520,17 @@ class TemplateEditorViewModel(
     }
 
     fun onMinReps(exerciseLocalId: Long, setLocalId: Long, value: String) {
+        if (persistedTimedSetBlocked(exerciseLocalId, setLocalId)) return
         updateSet(exerciseLocalId, setLocalId) { it.copy(minRepsText = value) }
     }
 
     fun onMaxReps(exerciseLocalId: Long, setLocalId: Long, value: String) {
+        if (persistedTimedSetBlocked(exerciseLocalId, setLocalId)) return
         updateSet(exerciseLocalId, setLocalId) { it.copy(maxRepsText = value) }
     }
 
     fun onLoadKind(exerciseLocalId: Long, setLocalId: Long, kind: PlannedLoadKind) {
+        if (persistedTimedSetBlocked(exerciseLocalId, setLocalId)) return
         updateSet(exerciseLocalId, setLocalId) { set ->
             set.copy(
                 loadKind = kind,
@@ -503,28 +540,34 @@ class TemplateEditorViewModel(
     }
 
     fun onWeight(exerciseLocalId: Long, setLocalId: Long, value: String) {
+        if (persistedTimedSetBlocked(exerciseLocalId, setLocalId)) return
         updateSet(exerciseLocalId, setLocalId) { it.copy(weightText = value) }
     }
 
     fun onMinutes(exerciseLocalId: Long, setLocalId: Long, value: String) {
-        if (timedSet(exerciseLocalId, setLocalId) && !requireTimers()) return
+        if (durationEditBlocked(exerciseLocalId, setLocalId)) return
+        promoteTimedPreview(exerciseLocalId)
         updateSet(exerciseLocalId, setLocalId) { it.copy(minutesText = value) }
     }
 
     fun onSeconds(exerciseLocalId: Long, setLocalId: Long, value: String) {
-        if (timedSet(exerciseLocalId, setLocalId) && !requireTimers()) return
+        if (durationEditBlocked(exerciseLocalId, setLocalId)) return
+        promoteTimedPreview(exerciseLocalId)
         updateSet(exerciseLocalId, setLocalId) { it.copy(secondsText = value) }
     }
 
     fun onDistance(exerciseLocalId: Long, setLocalId: Long, value: String) {
+        if (persistedTimedSetBlocked(exerciseLocalId, setLocalId)) return
         updateSet(exerciseLocalId, setLocalId) { it.copy(distanceText = value) }
     }
 
     fun onDistanceUnit(exerciseLocalId: Long, setLocalId: Long, unit: DistanceUnit) {
+        if (persistedTimedSetBlocked(exerciseLocalId, setLocalId)) return
         updateSet(exerciseLocalId, setLocalId) { it.copy(distanceUnit = unit) }
     }
 
     fun save() {
+        if (chrome.value.contentLocked) return
         val current = draft.value
         val catalog = uiState.value.catalog
         val currentIssues = TemplateDraftLogic.validate(current, catalog)
@@ -555,6 +598,7 @@ class TemplateEditorViewModel(
                 TemplateSaveResult.DuplicateName -> duplicateName.value = true
                 TemplateSaveResult.NotFound -> finished.value = true
                 TemplateSaveResult.Stale -> chrome.update { it.copy(stalePlan = true) }
+                TemplateSaveResult.Locked -> chrome.update { it.copy(contentLocked = true) }
             }
         }
     }
@@ -648,6 +692,78 @@ class TemplateEditorViewModel(
             ?.timedWork == true
     }
 
+    private fun persistedTimedExercise(exerciseLocalId: Long): Boolean {
+        val sets = draft.value.exercises.firstOrNull { it.localId == exerciseLocalId }?.sets.orEmpty()
+        return sets.isNotEmpty() && sets.all { it.timedWork }
+    }
+
+    private fun blocksPersistedTimedEdit(exerciseLocalId: Long): Boolean {
+        return persistedTimedExercise(exerciseLocalId) && !WorkoutTimerAccess.allowed(entitlements)
+    }
+
+    private fun persistedTimedSetBlocked(exerciseLocalId: Long, setLocalId: Long): Boolean {
+        return timedSet(exerciseLocalId, setLocalId) && !WorkoutTimerAccess.allowed(entitlements)
+    }
+
+    private fun durationEditBlocked(exerciseLocalId: Long, setLocalId: Long): Boolean {
+        if (WorkoutTimerAccess.allowed(entitlements)) return false
+        if (chrome.value.timedTabPreview[exerciseLocalId] == true) return true
+        return timedSet(exerciseLocalId, setLocalId)
+    }
+
+    private fun promoteTimedPreviews() {
+        val exerciseIds = chrome.value.timedTabPreview.filterValues { it }.keys
+        if (exerciseIds.isEmpty()) return
+        updateDraft { current ->
+            current.copy(
+                exercises = current.exercises.map { item ->
+                    if (item.localId !in exerciseIds) {
+                        item
+                    } else if (item.sets.isNotEmpty() && item.sets.all { it.timedWork }) {
+                        item
+                    } else {
+                        item.copy(sets = item.sets.map(::asTimedSet))
+                    }
+                }
+            )
+        }
+        chrome.update { current -> current.copy(timedTabPreview = emptyMap()) }
+    }
+
+    private fun promoteTimedPreview(exerciseLocalId: Long) {
+        if (chrome.value.timedTabPreview[exerciseLocalId] != true) return
+        if (!WorkoutTimerAccess.allowed(entitlements)) return
+        updateDraft { current ->
+            current.copy(
+                exercises = current.exercises.map { item ->
+                    if (item.localId != exerciseLocalId) {
+                        item
+                    } else if (item.sets.isNotEmpty() && item.sets.all { it.timedWork }) {
+                        item
+                    } else {
+                        item.copy(sets = item.sets.map(::asTimedSet))
+                    }
+                }
+            )
+        }
+        chrome.update { current ->
+            current.copy(timedTabPreview = current.timedTabPreview - exerciseLocalId)
+        }
+    }
+
+    private fun asTimedSet(set: app.mymusclemap.domain.workout.PlannedSetDraft): app.mymusclemap.domain.workout.PlannedSetDraft {
+        val existing = QuantityParser.toSeconds(
+            set.minutesText.toIntOrNull() ?: 0,
+            set.secondsText.toIntOrNull() ?: 0
+        )
+        val (minutes, seconds) = QuantityParser.fromSeconds(if (existing > 0) existing else 30)
+        return set.copy(
+            timedWork = true,
+            minutesText = minutes.toString(),
+            secondsText = seconds.toString()
+        )
+    }
+
     private fun catalogExercise(exerciseLocalId: Long): Exercise? {
         val exerciseId = draft.value.exercises.firstOrNull { it.localId == exerciseLocalId }?.exerciseId
             ?: return null
@@ -677,6 +793,7 @@ class TemplateEditorViewModel(
     }
 
     private fun updateDraft(transform: (TemplateDraft) -> TemplateDraft) {
+        if (chrome.value.contentLocked) return
         draft.value = transform(draft.value)
         issues.value = emptyList()
         duplicateName.value = false
@@ -684,7 +801,10 @@ class TemplateEditorViewModel(
 
     private data class TemplateEditorChrome(
         val lockedFeature: AppFeature? = null,
-        val stalePlan: Boolean = false
+        val stalePlan: Boolean = false,
+        val timersEnabled: Boolean = true,
+        val timedTabPreview: Map<Long, Boolean> = emptyMap(),
+        val contentLocked: Boolean = false
     )
 
     companion object {

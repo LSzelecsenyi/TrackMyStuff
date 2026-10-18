@@ -99,7 +99,9 @@ fun TemplateListScreen(
     onDismissDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
     onMessageConsumed: () -> Unit,
-    onDismissLocked: () -> Unit = {}
+    onDismissLocked: () -> Unit = {},
+    onChooseFreeAccess: () -> Unit = {},
+    onExplorePro: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -217,6 +219,14 @@ fun TemplateListScreen(
                 )
             )
             Spacer(Modifier.height(AppDimens.headerStackGap))
+            if (state.selectionRequired) {
+                TextButton(
+                    onClick = { navigateOnce(onChooseFreeAccess) },
+                    modifier = Modifier.testTag("free-access-choose")
+                ) {
+                    Text(stringResource(R.string.free_access_banner))
+                }
+            }
             when {
                 state.loading -> {
                     Box(
@@ -235,6 +245,8 @@ fun TemplateListScreen(
                 else -> TemplateList(
                     items = state.visibleItems,
                     listState = listState,
+                    lockedPlanIds = state.lockedPlanIds,
+                    onExplorePro = onExplorePro,
                     onEdit = { id -> navigateOnce { onEdit(id) } },
                     onArchive = onArchive,
                     onRestore = onRestore,
@@ -347,6 +359,8 @@ private fun EmptyTemplates(
 private fun TemplateList(
     items: List<TemplateListItem>,
     listState: androidx.compose.foundation.lazy.LazyListState,
+    lockedPlanIds: Set<Long>,
+    onExplorePro: () -> Unit,
     onEdit: (Long) -> Unit,
     onArchive: (Long) -> Unit,
     onRestore: (Long) -> Unit,
@@ -369,6 +383,8 @@ private fun TemplateList(
         items(ordered, key = { it.template.id }) { item ->
             TemplateRow(
                 item = item,
+                locked = item.template.id in lockedPlanIds,
+                onExplorePro = onExplorePro,
                 onEdit = { onEdit(item.template.id) },
                 onArchive = { onArchive(item.template.id) },
                 onRestore = { onRestore(item.template.id) },
@@ -385,6 +401,8 @@ private fun TemplateList(
 @Composable
 private fun TemplateRow(
     item: TemplateListItem,
+    locked: Boolean,
+    onExplorePro: () -> Unit,
     onEdit: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
@@ -411,6 +429,9 @@ private fun TemplateRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+            if (locked) {
+                app.mymusclemap.ui.entitlement.FreeAccessLockNote(onExplorePro = onExplorePro)
+            }
             Spacer(Modifier.height(AppDimens.statSecondaryGap))
             Text(
                 text = stringResource(

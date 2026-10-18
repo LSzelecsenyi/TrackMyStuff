@@ -270,6 +270,9 @@ class WorkoutHubViewModel(
                     is StartWorkoutResult.InvalidBodyWeight -> {
                         message.value = WorkoutHubMessage.TemplateEmpty
                     }
+                    StartWorkoutResult.PlanLocked -> {
+                        lockedFeature.value = AppFeature.UnlimitedWorkoutPlans
+                    }
                 }
             } finally {
                 starting.value = false

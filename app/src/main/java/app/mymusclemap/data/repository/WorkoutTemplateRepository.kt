@@ -37,7 +37,9 @@ class WorkoutTemplateRepository(
     private val sessionDao: WorkoutSessionDao? = null,
     private val scheduledWorkoutDao: ScheduledWorkoutDao? = null,
     private val dateProvider: DateProvider = SystemDateProvider(clock),
-    private val onPlansChanged: suspend () -> Unit = {}
+    private val onPlansChanged: suspend () -> Unit = {},
+    private val mayUpdate: suspend (Long) -> Boolean = { true },
+    private val onPlanCreated: suspend (Long) -> Unit = {}
 ) {
     fun observeActiveCount(): Flow<Int> = templateDao.observeActiveCount()
 
@@ -135,6 +137,9 @@ class WorkoutTemplateRepository(
         if (draft.id != null && existing == null) {
             return TemplateSaveResult.NotFound
         }
+        if (existing != null && !mayUpdate(existing.id)) {
+            return TemplateSaveResult.Locked
+        }
         val template = WorkoutTemplateEntity(
             id = existing?.id ?: 0L,
             name = name,
@@ -191,6 +196,7 @@ class WorkoutTemplateRepository(
             ) {
                 is TemplateAggregateWrite.Saved -> {
                     if (existing == null) {
+                        onPlanCreated(write.id)
                         notifyPlansChanged()
                         TemplateSaveResult.Created(write.id)
                     } else {
@@ -211,12 +217,14 @@ class WorkoutTemplateRepository(
 
     suspend fun archive(id: Long): Boolean {
         val existing = templateDao.getById(id) ?: return false
+        if (!mayUpdate(id)) return false
         templateDao.updateTemplate(existing.copy(archived = true, updatedAt = clock.millis()))
         return true
     }
 
     suspend fun restore(id: Long): Boolean {
         val existing = templateDao.getById(id) ?: return false
+        if (!mayUpdate(id)) return false
         templateDao.updateTemplate(existing.copy(archived = false, updatedAt = clock.millis()))
         return true
     }

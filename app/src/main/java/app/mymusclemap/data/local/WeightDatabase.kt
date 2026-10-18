@@ -25,9 +25,12 @@ import androidx.room.RoomDatabase
         UnlockedAchievementEntity::class,
         ProgressEventEntity::class,
         AchievementStateEntity::class,
-        TargetWeightGoalEntity::class
+        TargetWeightGoalEntity::class,
+        FreeAccessStateEntity::class,
+        FreeAccessPlanEntity::class,
+        FreeAccessExerciseEntity::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
@@ -42,6 +45,7 @@ abstract class WeightDatabase : RoomDatabase() {
     abstract fun weeklyWorkoutGoalDao(): WeeklyWorkoutGoalDao
     abstract fun achievementDao(): AchievementDao
     abstract fun targetWeightGoalDao(): TargetWeightGoalDao
+    abstract fun freeAccessDao(): FreeAccessDao
 
     companion object {
         fun create(
@@ -87,7 +91,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_16_17,
                     MIGRATION_17_18,
                     MIGRATION_18_19,
-                    MIGRATION_19_20
+                    MIGRATION_19_20,
+                    MIGRATION_20_21
                 )
                 .build()
         }

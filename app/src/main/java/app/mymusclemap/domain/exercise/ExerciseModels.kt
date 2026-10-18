@@ -50,6 +50,7 @@ sealed class ExerciseSaveResult {
     data object DuplicateName : ExerciseSaveResult()
     data object NotFound : ExerciseSaveResult()
     data object CreationLimited : ExerciseSaveResult()
+    data object Locked : ExerciseSaveResult()
 }
 
 sealed class ExerciseDeleteResult {

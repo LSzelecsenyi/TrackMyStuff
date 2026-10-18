@@ -189,6 +189,7 @@ sealed class StartWorkoutResult {
     data object ScheduleAlreadyStarted : StartWorkoutResult()
     data object ScheduleNotOnToday : StartWorkoutResult()
     data class InvalidBodyWeight(val error: app.mymusclemap.domain.WeightParseError) : StartWorkoutResult()
+    data object PlanLocked : StartWorkoutResult()
 }
 
 sealed class SessionMutationResult {
@@ -223,6 +224,7 @@ sealed class AddExtraExerciseResult {
     data object NotActive : AddExtraExerciseResult()
     data object ExerciseNotFound : AddExtraExerciseResult()
     data object ExerciseArchived : AddExtraExerciseResult()
+    data object ExerciseLocked : AddExtraExerciseResult()
 }
 
 sealed class AbandonWorkoutResult {

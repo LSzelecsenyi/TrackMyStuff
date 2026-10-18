@@ -6,6 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import app.mymusclemap.data.appbackup.AppBackupTables
+import app.mymusclemap.domain.entitlement.FreeAccessPhase
+import app.mymusclemap.domain.entitlement.FreeAccessState
 
 @Dao
 abstract class AppBackupDao {
@@ -171,6 +173,33 @@ abstract class AppBackupDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertAchievementState(rows: List<AchievementStateEntity>)
 
+    @Query("SELECT * FROM free_access_state WHERE id = 1 LIMIT 1")
+    abstract suspend fun getFreeAccessState(): FreeAccessStateEntity?
+
+    @Query("SELECT planId FROM free_access_plans")
+    abstract suspend fun getFreeAccessPlanIds(): List<Long>
+
+    @Query("SELECT exerciseId FROM free_access_exercises")
+    abstract suspend fun getFreeAccessExerciseIds(): List<Long>
+
+    @Query("DELETE FROM free_access_plans")
+    abstract suspend fun deleteFreeAccessPlans()
+
+    @Query("DELETE FROM free_access_exercises")
+    abstract suspend fun deleteFreeAccessExercises()
+
+    @Query("DELETE FROM free_access_state")
+    abstract suspend fun deleteFreeAccessState()
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertFreeAccessState(entity: FreeAccessStateEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertFreeAccessPlans(rows: List<FreeAccessPlanEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertFreeAccessExercises(rows: List<FreeAccessExerciseEntity>)
+
     @Transaction
     open suspend fun loadTables(): AppBackupTables {
         return AppBackupTables(
@@ -191,7 +220,19 @@ abstract class AppBackupDao {
             unlockedAchievements = getUnlockedAchievements(),
             progressEvents = getProgressEvents(),
             achievementState = getAchievementState(),
-            targetWeightGoals = getTargetWeightGoals()
+            targetWeightGoals = getTargetWeightGoals(),
+            freeAccess = readFreeAccess()
+        )
+    }
+
+    private suspend fun readFreeAccess(): FreeAccessState? {
+        val row = getFreeAccessState() ?: return null
+        return FreeAccessState(
+            periodId = row.periodId,
+            lastKnownPro = row.lastKnownPro,
+            phase = FreeAccessPhase.valueOf(row.phase),
+            selectedPlanIds = getFreeAccessPlanIds().toSet(),
+            selectedCustomExerciseIds = getFreeAccessExerciseIds().toSet()
         )
     }
 
@@ -214,6 +255,9 @@ abstract class AppBackupDao {
         deleteBodyMeasurements()
         deleteWeeklyWorkoutGoals()
         deleteWeightMeasurements()
+        deleteFreeAccessPlans()
+        deleteFreeAccessExercises()
+        deleteFreeAccessState()
         if (tables.weightMeasurements.isNotEmpty()) {
             insertWeightMeasurements(tables.weightMeasurements)
         }
@@ -272,6 +316,26 @@ abstract class AppBackupDao {
         }
         if (tables.replacesTargetWeightGoals && tables.targetWeightGoals.isNotEmpty()) {
             insertTargetWeightGoals(tables.targetWeightGoals)
+        }
+        val access = tables.freeAccess
+        if (access != null) {
+            insertFreeAccessState(
+                FreeAccessStateEntity(
+                    periodId = access.periodId,
+                    lastKnownPro = access.lastKnownPro,
+                    phase = access.phase.name
+                )
+            )
+            if (access.selectedPlanIds.isNotEmpty()) {
+                insertFreeAccessPlans(
+                    access.selectedPlanIds.map { FreeAccessPlanEntity(access.periodId, it) }
+                )
+            }
+            if (access.selectedCustomExerciseIds.isNotEmpty()) {
+                insertFreeAccessExercises(
+                    access.selectedCustomExerciseIds.map { FreeAccessExerciseEntity(access.periodId, it) }
+                )
+            }
         }
     }
 }
