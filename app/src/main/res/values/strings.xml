@@ -719,6 +719,13 @@
     <string name="day_sheet_workouts">Workouts</string>
     <string name="day_sheet_scheduled_title">Planned workouts</string>
     <string name="day_sheet_no_scheduled">No workout is scheduled for this day.</string>
+    <string name="day_sheet_today">Today</string>
+    <string name="day_sheet_close">Close</string>
+    <string name="day_sheet_weight_placeholder">e.g. 88.1</string>
+    <string name="day_sheet_completed_heading">Completed workouts</string>
+    <string name="day_sheet_scheduled_heading">Scheduled workouts</string>
+    <string name="day_sheet_completed_workout">Completed workout</string>
+    <string name="day_sheet_scheduled_workout">Scheduled workout</string>
     <string name="action_schedule_workout">+ Schedule workout</string>
     <string name="schedule_picker_title">Schedule workout</string>
     <string name="schedule_picker_empty">There is no workout plan that can be scheduled.</string>

@@ -42,6 +42,16 @@ object UiFormatters {
 
     fun longDateWithWeekday(date: LocalDate): String = date.format(longDateWithWeekdayFormatter())
 
+    /**
+     * Weekday and date for the day sheet. The year is included only when [date]
+     * is outside [today]'s year, using the same locale-ordered pattern as
+     * [longDateWithWeekday].
+     */
+    fun daySheetTitle(date: LocalDate, today: LocalDate): String {
+        val pattern = if (date.year == today.year) "EEEE, MMMM d" else "EEEE, MMMM d, yyyy"
+        return date.format(DateTimeFormatter.ofPattern(pattern, locale()))
+    }
+
     fun chartDate(date: LocalDate): String = date.format(chartDateFormatter())
 
     fun compactDate(date: LocalDate): String = date.format(chartDateFormatter())

@@ -389,6 +389,7 @@ class DashboardViewModelTest {
         val item = viewModel.uiState.first {
             it.daySheet?.scheduledWorkouts?.singleOrNull()?.status == ScheduledWorkoutStatus.IN_PROGRESS
         }.daySheet!!.scheduledWorkouts.single()
+        assertTrue(viewModel.uiState.value.daySheet!!.workouts.isEmpty())
         viewModel.continueScheduled(item.id)
         assertEquals(
             (started as app.mymusclemap.domain.workout.StartWorkoutResult.Started).sessionId,
@@ -397,20 +398,99 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun givenCompletedScheduleWhenOpenedThenJournalSessionIdIsEmitted() = runTest {
+    fun givenFinishedScheduledWorkoutWhenDayOpenedThenOnlyTheCompletedSessionRemains() = runTest {
         val templateId = saveTemplate("Push A")
         val scheduleId = (scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled).id
         val started = sessionRepository.start(templateId, scheduleId) as app.mymusclemap.domain.workout.StartWorkoutResult.Started
         sessionRepository.finish(started.sessionId, skipRemaining = true)
         val viewModel = dashboard()
         viewModel.selectDay(today)
-        val item = viewModel.uiState.first {
-            it.daySheet?.scheduledWorkouts?.singleOrNull()?.status == ScheduledWorkoutStatus.COMPLETED
-        }.daySheet!!.scheduledWorkouts.single()
-        viewModel.openScheduledJournal(item.id)
-        assertEquals(started.sessionId, viewModel.uiState.first { it.journalSessionId != null }.journalSessionId)
-        viewModel.startScheduled(item.id)
+        val sheet = viewModel.uiState.first { state ->
+            val day = state.daySheet
+            day != null &&
+                day.workouts.singleOrNull()?.session?.id == started.sessionId &&
+                day.scheduledWorkouts.isEmpty()
+        }.daySheet!!
+        val workout = sheet.workouts.single()
+        assertEquals(app.mymusclemap.domain.workout.SessionStatus.COMPLETED, workout.session.status)
+        assertTrue(workout.progress.skipped > 0)
+        assertEquals(scheduleId, workout.session.scheduledWorkoutId)
+        viewModel.startScheduled(scheduleId)
         assertNull(viewModel.uiState.value.startedSessionId)
+    }
+
+    @Test
+    fun separateCompletedSessionsWithTheSameNameBothStayVisible() = runTest {
+        val templateId = saveTemplate("Push A")
+        val scheduleId = (scheduled.schedule(templateId, today) as ScheduleWorkoutResult.Scheduled).id
+        val first = sessionRepository.start(templateId, scheduleId) as StartWorkoutResult.Started
+        sessionRepository.finish(first.sessionId, skipRemaining = true)
+        val second = sessionRepository.start(templateId) as StartWorkoutResult.Started
+        sessionRepository.finish(second.sessionId, skipRemaining = true)
+        val viewModel = dashboard()
+        viewModel.selectDay(today)
+        val sheet = viewModel.uiState.first { it.daySheet?.workouts?.size == 2 }.daySheet!!
+        assertEquals(setOf(first.sessionId, second.sessionId), sheet.workouts.map { it.session.id }.toSet())
+        assertTrue(sheet.workouts.all { it.session.templateName == "Push A" })
+        assertTrue(sheet.scheduledWorkouts.isEmpty())
+    }
+
+    @Test
+    fun dayWeightSaveUsesTheSelectedDateAndUpdatesWithoutADuplicate() = runTest {
+        val weights = WeightRepository(database.weightMeasurementDao(), clock)
+        val viewModel = dashboard(weights)
+        val selected = today.minusDays(2)
+        viewModel.selectDay(selected)
+        viewModel.uiState.first { it.daySheet?.date == selected }
+        viewModel.saveDayWeight()
+        assertEquals(
+            app.mymusclemap.domain.WeightParseError.Empty,
+            viewModel.uiState.first { it.dayWeightError != null }.dayWeightError
+        )
+        assertTrue(weights.all().isEmpty())
+
+        viewModel.onDayWeightChange("20")
+        viewModel.saveDayWeight()
+        assertEquals(
+            app.mymusclemap.domain.WeightParseError.OutOfRange,
+            viewModel.uiState.first { it.dayWeightError == app.mymusclemap.domain.WeightParseError.OutOfRange }.dayWeightError
+        )
+        assertTrue(weights.all().isEmpty())
+
+        viewModel.onDayWeightChange("80.55")
+        assertEquals("80.5", viewModel.uiState.first { it.dayWeightInput == "80.5" }.dayWeightInput)
+        viewModel.onDayWeightChange("81,4")
+        assertEquals("81,4", viewModel.uiState.first { it.dayWeightInput == "81,4" }.dayWeightInput)
+        viewModel.saveDayWeight()
+        val created = viewModel.uiState.first { it.daySheet?.measurement?.weightKg == 81.4 }.daySheet!!
+        val stored = weights.all().single()
+        assertEquals(selected, stored.date)
+        assertEquals(81.4, stored.weightKg, 0.0)
+        assertEquals(stored.id, created.measurement!!.id)
+        assertFalse(viewModel.uiState.value.dayWeightEditing)
+        assertEquals("", viewModel.uiState.value.dayWeightInput)
+
+        viewModel.beginDayWeightEdit()
+        assertTrue(viewModel.uiState.value.dayWeightEditing)
+        viewModel.onDayWeightChange("82.0")
+        viewModel.saveDayWeight()
+        viewModel.uiState.first { it.daySheet?.measurement?.weightKg == 82.0 }
+        val updated = weights.all().single()
+        assertEquals(stored.id, updated.id)
+        assertEquals(selected, updated.date)
+        assertEquals(82.0, updated.weightKg, 0.0)
+    }
+
+    @Test
+    fun dayWeightSaveIgnoresAFutureDate() = runTest {
+        val weights = WeightRepository(database.weightMeasurementDao(), clock)
+        val viewModel = dashboard(weights)
+        viewModel.selectDay(today.plusDays(1))
+        val sheet = viewModel.uiState.first { it.daySheet?.date == today.plusDays(1) }.daySheet!!
+        viewModel.onDayWeightChange("80.0")
+        viewModel.saveDayWeight()
+        assertTrue(weights.all().isEmpty())
+        assertFalse(sheet.canRecordWeight)
     }
 
     @Test

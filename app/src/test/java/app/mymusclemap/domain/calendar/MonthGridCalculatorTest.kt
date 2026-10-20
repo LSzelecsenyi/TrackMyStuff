@@ -289,10 +289,137 @@ class DaySheetFactoryTest {
         assertTrue(state.canRecordWeight)
     }
 
+    @Test
+    fun inProgressSessionIsExcludedFromTheDaySheet() {
+        val inProgress = summary(1, today, app.mymusclemap.domain.workout.SessionStatus.IN_PROGRESS)
+        val state = app.mymusclemap.domain.DaySheetFactory.create(
+            date = today,
+            measurements = emptyList(),
+            today = today,
+            workouts = listOf(inProgress),
+            scheduledWorkouts = listOf(
+                scheduled(
+                    id = 4,
+                    date = today,
+                    name = "Push A",
+                    sessionId = 1L,
+                    sessionStatus = app.mymusclemap.domain.workout.SessionStatus.IN_PROGRESS
+                )
+            )
+        )
+        assertTrue(state.workouts.isEmpty())
+        assertEquals(listOf(4L), state.scheduledWorkouts.map { it.id })
+    }
+
+    @Test
+    fun finishedSessionWithSkippedExercisesStaysCompleted() {
+        val finished = summary(
+            id = 1,
+            date = today,
+            status = app.mymusclemap.domain.workout.SessionStatus.COMPLETED,
+            progress = app.mymusclemap.domain.workout.SessionProgress(
+                completed = 1,
+                skipped = 2,
+                pending = 0,
+                total = 3
+            )
+        )
+        val state = app.mymusclemap.domain.DaySheetFactory.create(
+            date = today,
+            measurements = emptyList(),
+            today = today,
+            workouts = listOf(finished)
+        )
+        assertEquals(listOf(1L), state.workouts.map { it.session.id })
+        assertEquals(2, state.workouts.single().progress.skipped)
+    }
+
+    @Test
+    fun completedScheduledWorkoutAppearsOnceAsTheCompletedSession() {
+        val session = summary(
+            id = 10,
+            date = today,
+            status = app.mymusclemap.domain.workout.SessionStatus.COMPLETED,
+            name = "Push A",
+            scheduledWorkoutId = 4L
+        )
+        val linked = scheduled(
+            id = 4,
+            date = today,
+            name = "Push A",
+            sessionId = 10L,
+            sessionStatus = app.mymusclemap.domain.workout.SessionStatus.COMPLETED
+        )
+        val state = app.mymusclemap.domain.DaySheetFactory.create(
+            date = today,
+            measurements = emptyList(),
+            today = today,
+            workouts = listOf(session),
+            scheduledWorkouts = listOf(linked)
+        )
+        assertEquals(listOf(10L), state.workouts.map { it.session.id })
+        assertTrue(state.scheduledWorkouts.isEmpty())
+    }
+
+    @Test
+    fun sameNameDoesNotHideAnUnrelatedSessionOrSchedule() {
+        val linked = summary(
+            id = 10,
+            date = today,
+            status = app.mymusclemap.domain.workout.SessionStatus.COMPLETED,
+            name = "Push A",
+            scheduledWorkoutId = 4L
+        )
+        val separate = summary(
+            id = 11,
+            date = today,
+            status = app.mymusclemap.domain.workout.SessionStatus.COMPLETED,
+            name = "Push A"
+        )
+        val completedSchedule = scheduled(
+            id = 4,
+            date = today,
+            name = "Push A",
+            sessionId = 10L,
+            sessionStatus = app.mymusclemap.domain.workout.SessionStatus.COMPLETED
+        )
+        val remaining = scheduled(id = 5, date = today, name = "Push A")
+        val state = app.mymusclemap.domain.DaySheetFactory.create(
+            date = today,
+            measurements = emptyList(),
+            today = today,
+            workouts = listOf(linked, separate),
+            scheduledWorkouts = listOf(completedSchedule, remaining)
+        )
+        assertEquals(listOf(11L, 10L), state.workouts.map { it.session.id })
+        assertEquals(listOf(5L), state.scheduledWorkouts.map { it.id })
+    }
+
+    @Test
+    fun completedScheduleWithoutASessionOnThisDayIsNotShownAsRemaining() {
+        val linkedElsewhere = scheduled(
+            id = 4,
+            date = today,
+            name = "Push A",
+            sessionId = 10L,
+            sessionStatus = app.mymusclemap.domain.workout.SessionStatus.COMPLETED
+        )
+        val state = app.mymusclemap.domain.DaySheetFactory.create(
+            date = today,
+            measurements = emptyList(),
+            today = today,
+            scheduledWorkouts = listOf(linkedElsewhere)
+        )
+        assertTrue(state.workouts.isEmpty())
+        assertTrue(state.scheduledWorkouts.isEmpty())
+    }
+
     private fun scheduled(
         id: Long,
         date: LocalDate,
-        name: String
+        name: String,
+        sessionId: Long? = null,
+        sessionStatus: app.mymusclemap.domain.workout.SessionStatus? = null
     ): app.mymusclemap.domain.workout.ScheduledWorkout {
         return app.mymusclemap.domain.workout.ScheduledWorkout(
             id = id,
@@ -302,8 +429,8 @@ class DaySheetFactoryTest {
             exerciseCount = 1,
             plannedSetCount = 2,
             templateArchived = false,
-            sessionId = null,
-            sessionStatus = null,
+            sessionId = sessionId,
+            sessionStatus = sessionStatus,
             createdAt = id
         )
     }
@@ -311,13 +438,17 @@ class DaySheetFactoryTest {
     private fun summary(
         id: Long,
         date: LocalDate,
-        status: app.mymusclemap.domain.workout.SessionStatus
+        status: app.mymusclemap.domain.workout.SessionStatus,
+        name: String = "Push A",
+        scheduledWorkoutId: Long? = null,
+        progress: app.mymusclemap.domain.workout.SessionProgress =
+            app.mymusclemap.domain.workout.SessionProgress(3, 0, 0, 3)
     ): app.mymusclemap.domain.workout.WorkoutSessionSummary {
         return app.mymusclemap.domain.workout.WorkoutSessionSummary(
             session = app.mymusclemap.domain.workout.WorkoutSession(
                 id = id,
                 templateId = 1L,
-                templateName = "Push A",
+                templateName = name,
                 status = status,
                 workoutDate = date,
                 startedAt = id * 1_000L,
@@ -328,9 +459,10 @@ class DaySheetFactoryTest {
                 bodyWeightSource = app.mymusclemap.domain.workout.BodyWeightSource.MEASURED_SAME_DAY,
                 bodyWeightSourceDate = date,
                 createdAt = id,
-                updatedAt = id
+                updatedAt = id,
+                scheduledWorkoutId = scheduledWorkoutId
             ),
-            progress = app.mymusclemap.domain.workout.SessionProgress(3, 0, 0, 3),
+            progress = progress,
             exerciseCount = 1,
             primaryMuscles = emptyList(),
             durationMillis = 1_000L

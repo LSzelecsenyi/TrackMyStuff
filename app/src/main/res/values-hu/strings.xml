@@ -719,6 +719,13 @@
     <string name="day_sheet_workouts">Edzések</string>
     <string name="day_sheet_scheduled_title">Tervezett edzések</string>
     <string name="day_sheet_no_scheduled">Erre a napra nincs ütemezett edzés.</string>
+    <string name="day_sheet_today">Ma</string>
+    <string name="day_sheet_close">Bezárás</string>
+    <string name="day_sheet_weight_placeholder">pl. 88,1</string>
+    <string name="day_sheet_completed_heading">Befejezett edzések</string>
+    <string name="day_sheet_scheduled_heading">Ütemezett edzések</string>
+    <string name="day_sheet_completed_workout">Befejezett edzés</string>
+    <string name="day_sheet_scheduled_workout">Ütemezett edzés</string>
     <string name="action_schedule_workout">+ Edzés ütemezése</string>
     <string name="schedule_picker_title">Edzés ütemezése</string>
     <string name="schedule_picker_empty">Nincs ütemezhető edzésterv.</string>

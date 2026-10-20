@@ -22,6 +22,7 @@ import app.mymusclemap.domain.WeeklyOverview
 import app.mymusclemap.domain.WeeklyOverviewLogic
 import app.mymusclemap.domain.MeasurementValidator
 import app.mymusclemap.domain.WeightParseError
+import app.mymusclemap.domain.WeightParser
 import app.mymusclemap.domain.calendar.MonthGrid
 import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
@@ -101,7 +102,11 @@ data class DashboardUiState(
     val onboardingWeightError: WeightParseError? = null,
     val openWeightDetailsForOnboarding: Boolean = false,
     val lockedFeature: AppFeature? = null,
-    val weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(LocalDate.of(1970, 1, 1))
+    val weeklyGoal: WeeklyGoalStatus = WeeklyGoalStatus.none(LocalDate.of(1970, 1, 1)),
+    val dayWeightInput: String = "",
+    val dayWeightError: WeightParseError? = null,
+    val dayWeightEditing: Boolean = false,
+    val dayWeightSavedTick: Int = 0
 )
 
 private data class DashboardChrome(
@@ -149,6 +154,13 @@ private data class OnboardingChrome(
     val openWeightDetails: Boolean
 )
 
+private data class DayWeightChrome(
+    val input: String,
+    val error: WeightParseError?,
+    val editing: Boolean,
+    val savedTick: Int
+)
+
 class DashboardViewModel(
     private val repository: WeightRepository,
     private val sessionRepository: WorkoutSessionRepository,
@@ -178,6 +190,11 @@ class DashboardViewModel(
     private val onboardingWeightInput = MutableStateFlow("")
     private val onboardingWeightError = MutableStateFlow<WeightParseError?>(null)
     private val openWeightDetailsForOnboarding = MutableStateFlow(false)
+    private val dayWeightInput = MutableStateFlow("")
+    private val dayWeightError = MutableStateFlow<WeightParseError?>(null)
+    private val dayWeightEditing = MutableStateFlow(false)
+    private val dayWeightSavedTick = MutableStateFlow(0)
+    private var dayWeightSaving = false
     private val onboardingGuide = onboardingRepository?.observe() ?: flowOf(OnboardingGuide.Inactive)
     private val weeklyGoalStatus = if (weeklyGoalRepository == null) {
         dateProvider.observeToday().map { WeeklyGoalStatus.none(it) }
@@ -290,6 +307,19 @@ class DashboardViewModel(
         OnboardingChrome(guide, input, error, open)
     }
 
+    private val dayWeightChrome = combine(
+        dayWeightInput,
+        dayWeightError,
+        dayWeightEditing,
+        dayWeightSavedTick
+    ) { input, error, editing, savedTick ->
+        DayWeightChrome(input, error, editing, savedTick)
+    }
+
+    private val goalAndDayWeight = combine(weeklyGoalStatus, dayWeightChrome) { goal, weight ->
+        goal to weight
+    }
+
     val uiState: StateFlow<DashboardUiState> = combine(
         combine(
             measurements,
@@ -342,9 +372,10 @@ class DashboardViewModel(
         },
         dialogs,
         onboardingChrome,
-        weeklyGoalStatus
-    ) { state, training, dialogState, onboardingState, goal ->
+        goalAndDayWeight
+    ) { state, training, dialogState, onboardingState, goalAndWeight ->
         val (exercises, aggregates, now) = training
+        val (goal, dayWeight) = goalAndWeight
         state.copy(
             heatmap = MuscleHeatmapAssembler.assemble(exercises, state.today),
             quickInsights = MuscleInsightsLogic.index(aggregates, ZoneId.systemDefault())
@@ -361,7 +392,11 @@ class DashboardViewModel(
             onboardingWeightInput = onboardingState.weightInput,
             onboardingWeightError = onboardingState.weightError,
             openWeightDetailsForOnboarding = onboardingState.openWeightDetails,
-            weeklyGoal = goal
+            weeklyGoal = goal,
+            dayWeightInput = dayWeight.input,
+            dayWeightError = dayWeight.error,
+            dayWeightEditing = dayWeight.editing,
+            dayWeightSavedTick = dayWeight.savedTick
         )
     }.stateIn(
         scope = viewModelScope,
@@ -433,6 +468,7 @@ class DashboardViewModel(
         rescheduleTarget.value = null
         removeTarget.value = null
         scheduleActionError.value = null
+        resetDayWeightDraft()
     }
 
     fun dismissDaySheet() {
@@ -442,6 +478,58 @@ class DashboardViewModel(
         rescheduleTarget.value = null
         removeTarget.value = null
         scheduleActionError.value = null
+        resetDayWeightDraft()
+    }
+
+    fun onDayWeightChange(value: String) {
+        dayWeightInput.value = WeightParser.filterUserInput(value)
+        dayWeightError.value = null
+    }
+
+    fun beginDayWeightEdit() {
+        val measurement = uiState.value.daySheet?.measurement ?: return
+        val date = selectedDay.value ?: return
+        if (date.isAfter(dateProvider.today())) {
+            return
+        }
+        dayWeightEditing.value = true
+        dayWeightInput.value = formatWeightInput(measurement.weightKg)
+        dayWeightError.value = null
+    }
+
+    fun saveDayWeight() {
+        val date = selectedDay.value ?: return
+        if (date.isAfter(dateProvider.today())) {
+            return
+        }
+        if (dayWeightSaving) {
+            return
+        }
+        when (val result = MeasurementValidator.validate(date, dayWeightInput.value, dateProvider.today())) {
+            is MeasurementValidationResult.Invalid -> {
+                dayWeightError.value = result.weightError
+            }
+            is MeasurementValidationResult.Valid -> {
+                dayWeightSaving = true
+                viewModelScope.launch {
+                    try {
+                        repository.save(result.date, result.weightKg)
+                        dayWeightInput.value = ""
+                        dayWeightError.value = null
+                        dayWeightEditing.value = false
+                        dayWeightSavedTick.value = dayWeightSavedTick.value + 1
+                    } finally {
+                        dayWeightSaving = false
+                    }
+                }
+            }
+        }
+    }
+
+    private fun resetDayWeightDraft() {
+        dayWeightInput.value = ""
+        dayWeightError.value = null
+        dayWeightEditing.value = false
     }
 
     fun recordSelectedDay() {
