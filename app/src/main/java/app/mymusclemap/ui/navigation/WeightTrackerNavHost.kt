@@ -66,7 +66,6 @@ import app.mymusclemap.ui.founder.FounderProgramViewModel
 import app.mymusclemap.ui.founder.founderJourney
 import app.mymusclemap.ui.founder.presentedChecklist
 import app.mymusclemap.ui.membership.membershipPresentation
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import app.mymusclemap.domain.reports.ReportPeriod
@@ -149,7 +148,6 @@ import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 
@@ -281,6 +279,15 @@ private fun rememberFounderUiState(viewModel: FounderProgramViewModel?): Founder
 }
 
 @Composable
+private fun freshPromotionInstant(
+    dateProvider: DateProvider,
+    promotionNow: () -> Instant
+): Instant {
+    val tick by dateProvider.observeNow().collectAsStateWithLifecycle(initialValue = dateProvider.now())
+    return remember(tick) { promotionNow() }
+}
+
+@Composable
 fun WeightTrackerNavHost(
     factory: WeightViewModelFactory,
     dateProvider: DateProvider,
@@ -315,7 +322,6 @@ fun WeightTrackerNavHost(
     onActivateProDiscovery: () -> Unit = {},
     onDismissProDiscoveryOffer: () -> Unit = {},
     onDismissProDiscoveryWarning: () -> Unit = {},
-    onPromotionClock: () -> Unit = {},
     welcomeBack: () -> app.mymusclemap.domain.entitlement.WelcomeBackSnapshot = {
         app.mymusclemap.domain.entitlement.WelcomeBackSnapshot()
     },
@@ -782,7 +788,7 @@ fun WeightTrackerNavHost(
                 val welcome = remember(entitlementRevision) { welcomeBack() }
                 val entitlement = remember(entitlementRevision) { currentEntitlement() }
                 val paid = remember(entitlementRevision) { paidSubscription() }
-                val now = promotionNow()
+                val now = freshPromotionInstant(dateProvider, promotionNow)
                 val plan = app.mymusclemap.domain.billing.proPlanPresentation(
                     founderProActive = entitlement.founderProActive,
                     founderLifetime = entitlement.founderLifetime,
@@ -1599,15 +1605,6 @@ fun WeightTrackerNavHost(
     }
     val discovery = remember(entitlementRevision) { proDiscovery() }
     val welcome = remember(entitlementRevision) { welcomeBack() }
-    LaunchedEffect(discovery.nextBoundary, welcome.nextBoundary) {
-        val target = listOfNotNull(discovery.nextBoundary, welcome.nextBoundary).minOrNull()
-            ?: return@LaunchedEffect
-        val wait = Duration.between(promotionNow(), target).toMillis()
-        if (wait > 0) {
-            delay(wait)
-        }
-        onPromotionClock()
-    }
     val prompt = selectStrictOneTimePrompt(
         founderApproval = founderApproval != null,
         workoutCelebration = globalCelebrations.isNotEmpty(),
@@ -1645,7 +1642,7 @@ fun WeightTrackerNavHost(
             if (expiresAt != null) {
                 ProDiscoveryWarningDialog(
                     expiresAt = expiresAt,
-                    now = promotionNow(),
+                    now = freshPromotionInstant(dateProvider, promotionNow),
                     onViewPlans = {
                         onDismissProDiscoveryWarning()
                         navController.navigateInternal(AppRoutes.PRO_BENEFITS)
@@ -1665,7 +1662,7 @@ fun WeightTrackerNavHost(
             if (expiresAt != null) {
                 app.mymusclemap.ui.pro.WelcomeBackWarningDialog(
                     expiresAt = expiresAt,
-                    now = promotionNow(),
+                    now = freshPromotionInstant(dateProvider, promotionNow),
                     onViewPlans = {
                         onDismissWelcomeBackWarning()
                         navController.navigateInternal(AppRoutes.PRO_BENEFITS)

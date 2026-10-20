@@ -18,6 +18,7 @@ import app.mymusclemap.domain.locale.AppLanguage
 import app.mymusclemap.domain.locale.AppLanguageApplicator
 import app.mymusclemap.domain.locale.AppLanguagePolicy
 import app.mymusclemap.domain.locale.SystemLanguage
+import app.mymusclemap.ui.workout.AppForeground
 import kotlinx.coroutines.runBlocking
 import app.mymusclemap.domain.account.AppAuthState
 import app.mymusclemap.domain.account.accountDatabaseName
@@ -109,6 +110,9 @@ class WeightTrackerApplication : Application() {
         }
         databaseOpenProblem.value = null
         container = opened
+        if (AppForeground.inForeground()) {
+            opened.onAppForeground()
+        }
         opened.activeWorkoutNotifications.start()
         applicationScope.launch {
             opened.refreshFounderProgramFromStore()

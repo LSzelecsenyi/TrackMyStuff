@@ -72,6 +72,9 @@ import app.mymusclemap.data.workoutimport.ContentWorkoutImportFileReader
 import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.SystemDateProvider
+import app.mymusclemap.domain.SystemWallClock
+import app.mymusclemap.domain.WallClockMonitor
+import app.mymusclemap.ui.workout.AppForeground
 import app.mymusclemap.domain.entitlement.EntitlementComposer
 import app.mymusclemap.domain.entitlement.FounderApprovalCelebration
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
@@ -99,8 +102,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 class AppContainer(context: Context, val accountUserId: String) {
     private val appContext = context.applicationContext
-    private val clock: Clock = Clock.systemDefaultZone()
-    val dateProvider: DateProvider = SystemDateProvider(clock)
+    private val clock: Clock = SystemWallClock()
+    private val systemDates = SystemDateProvider(clock)
+    val dateProvider: DateProvider = systemDates
     private val database = WeightDatabase.create(
         appContext,
         app.mymusclemap.domain.account.accountDatabaseName(accountUserId)
@@ -269,6 +273,7 @@ class AppContainer(context: Context, val accountUserId: String) {
         simulation = proDiscoverySimulation,
         now = { clock.instant() },
         zone = clock.zone,
+        zoneSource = { clock.zone },
         completions = {
             database.workoutSessionDao().nativeCompletionEpochMillis().map { Instant.ofEpochMilli(it) }
         },
@@ -300,6 +305,7 @@ class AppContainer(context: Context, val accountUserId: String) {
         simulation = welcomeBackSimulation,
         now = { clock.instant() },
         zone = clock.zone,
+        zoneSource = { clock.zone },
         completions = {
             database.workoutSessionDao().nativeCompletionRows().map { row ->
                 WelcomeBackCompletion(row.clientWorkoutId, java.time.Instant.ofEpochMilli(row.completedAt))
@@ -447,6 +453,27 @@ class AppContainer(context: Context, val accountUserId: String) {
                 welcomeBack.noteCompletion(clientWorkoutId)
             }
         }
+        systemDates.bind(founderCacheScope)
+        if (AppForeground.inForeground()) {
+            systemDates.onForeground()
+        }
+        founderCacheScope.launch {
+            val monitor = WallClockMonitor { now ->
+                listOfNotNull(
+                    proDiscovery.snapshot().nextBoundary,
+                    welcomeBack.snapshot().nextBoundary
+                ).filter { now.isBefore(it) }.minOrNull()
+            }
+            systemDates.observeSamples().collect { sample ->
+                val effect = monitor.onSample(sample.instant, sample.today)
+                if (effect.dayChanged) {
+                    refreshFounderProgramFromStore()
+                }
+                if (effect.dayChanged || effect.boundaryReached) {
+                    notePromotionClock()
+                }
+            }
+        }
     }
 
     suspend fun refreshFounderProgramFromStore() {
@@ -522,6 +549,18 @@ class AppContainer(context: Context, val accountUserId: String) {
 
     fun notePromotionClock() {
         entitlementRevision.value = entitlementRevision.value + 1
+    }
+
+    fun onAppForeground() {
+        systemDates.onForeground()
+    }
+
+    fun onAppBackground() {
+        systemDates.onBackground()
+    }
+
+    fun onWallClockChanged() {
+        systemDates.onWallClockChanged()
     }
 
     suspend fun refreshPromotionAvailability() {

@@ -13,8 +13,12 @@ import app.mymusclemap.data.local.WorkoutSessionSetEntity
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
+import app.mymusclemap.domain.AdjustableClock
 import app.mymusclemap.domain.FixedDateProvider
+import app.mymusclemap.domain.SystemDateProvider
 import app.mymusclemap.domain.entitlement.AppFeature
+import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
+import app.mymusclemap.domain.muscleinsights.StimulusAge
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.ExerciseDraft
@@ -34,6 +38,7 @@ import app.mymusclemap.domain.workout.SessionStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -162,6 +167,57 @@ class MuscleInsightsProgressionViewModelTest {
         val all = viewModel.uiState.first { it.period == MuscleInsightsPeriod.All && it.muscle == MuscleGroup.CHEST }
         assertEquals("Secret press", all.progression.exercises.single().displayName)
         assertEquals(MuscleGroup.CHEST, all.muscle)
+    }
+
+    @Test
+    fun lastStimulusAdvancesOnForegroundAndStaysPutWhileBackgrounded() = runTest {
+        val zone = ZoneOffset.UTC
+        val start = Instant.parse("2026-10-16T08:00:00Z")
+        val clock = AdjustableClock(start, zone)
+        var waits = 0
+        val provider = SystemDateProvider(clock) {
+            waits += 1
+            suspendCancellableCoroutine { }
+        }
+        provider.bind(backgroundScope)
+        val exerciseId = saveExercise()
+        val finishedAt = start.minusSeconds(60).toEpochMilli()
+        insertPress(exerciseId, daysAgo = 0, reps = 8, finishedAt = finishedAt)
+        val viewModel = MuscleInsightsViewModel(
+            sessionRepository = sessions,
+            dateProvider = provider,
+            entitlements = OpenFeatureEntitlements,
+            savedStateHandle = SavedStateHandle(),
+            zone = zone
+        )
+        val initial = viewModel.uiState.first {
+            !it.loading && it.insight.lastStimulus == StimulusAge.Minutes(1)
+        }
+        assertEquals(StimulusAge.Minutes(1), initial.insight.lastStimulus)
+        assertEquals(finishedAt, database.workoutSessionDao().getCompletedSets().single().completedAt)
+
+        clock.setInstant(start.plusSeconds(4 * 60))
+        provider.onWallClockChanged()
+        val minutes = viewModel.uiState.first { it.insight.lastStimulus == StimulusAge.Minutes(5) }
+        assertEquals(StimulusAge.Minutes(5), minutes.insight.lastStimulus)
+
+        provider.onForeground()
+        testScheduler.runCurrent()
+        assertTrue(provider.isUiTickerRunning())
+        provider.onBackground()
+        testScheduler.runCurrent()
+        assertFalse(provider.isUiTickerRunning())
+        val waitsWhileHidden = waits
+        clock.setInstant(start.plusSeconds(3 * 60 * 60))
+        assertEquals(StimulusAge.Minutes(5), viewModel.uiState.value.insight.lastStimulus)
+        assertEquals(waitsWhileHidden, waits)
+
+        provider.onForeground()
+        val later = viewModel.uiState.first { it.insight.lastStimulus == StimulusAge.Hours(3) }
+        assertEquals(StimulusAge.Hours(3), later.insight.lastStimulus)
+        assertEquals(finishedAt, database.workoutSessionDao().getCompletedSets().single().completedAt)
+        assertEquals(finishedAt, database.workoutSessionDao().getCompletedSessions().single().finishedAt)
+        provider.onBackground()
     }
 
     private suspend fun saveExercise(): Long {

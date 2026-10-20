@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import java.time.ZoneId
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -334,17 +335,20 @@ class DashboardViewModel(
         },
         combine(
             sessionRepository.observeHeatmapExercises(),
-            sessionRepository.observeCompletedAggregates()
-        ) { exercises, aggregates -> exercises to aggregates },
+            sessionRepository.observeCompletedAggregates(),
+            dateProvider.observeNow()
+        ) { exercises, aggregates, now ->
+            Triple(exercises, aggregates, now)
+        },
         dialogs,
         onboardingChrome,
         weeklyGoalStatus
     ) { state, training, dialogState, onboardingState, goal ->
-        val (exercises, aggregates) = training
+        val (exercises, aggregates, now) = training
         state.copy(
             heatmap = MuscleHeatmapAssembler.assemble(exercises, state.today),
             quickInsights = MuscleInsightsLogic.index(aggregates, ZoneId.systemDefault())
-                .quick(state.today, dateProvider.now()),
+                .quick(state.today, now),
             schedulePickerVisible = dialogState.pickerVisible,
             rescheduleTarget = dialogState.reschedule,
             removeTarget = dialogState.remove,
@@ -375,6 +379,18 @@ class DashboardViewModel(
     init {
         viewModelScope.launch {
             repository.observeAll().collect { measurements.value = it }
+        }
+        viewModelScope.launch {
+            var previousToday = dateProvider.today()
+            dateProvider.observeToday().drop(1).collect { today ->
+                if (displayedMonth.value == YearMonth.from(previousToday)) {
+                    val nextMonth = YearMonth.from(today)
+                    if (displayedMonth.value != nextMonth) {
+                        displayedMonth.value = nextMonth
+                    }
+                }
+                previousToday = today
+            }
         }
     }
 

@@ -226,7 +226,6 @@ class MainActivity : AppCompatActivity() {
                                 onActivateProDiscovery = container::activateProDiscovery,
                                 onDismissProDiscoveryOffer = container::dismissProDiscoveryOffer,
                                 onDismissProDiscoveryWarning = container::dismissProDiscoveryWarning,
-                                onPromotionClock = container::notePromotionClock,
                                 welcomeBack = container::welcomeBackSnapshot,
                                 onActivateWelcomeBack = container::activateWelcomeBack,
                                 onDismissWelcomeBackOffer = container::dismissWelcomeBackOffer,
@@ -300,6 +299,7 @@ class MainActivity : AppCompatActivity() {
         val app = application as WeightTrackerApplication
         app.signIn.bind(this)
         val container = app.container ?: return
+        container.onAppForeground()
         container.bindStrictSignIn(this)
         container.bindBilling(this)
         container.activeWorkoutNotifications.refresh()
@@ -313,8 +313,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         AppForeground.exit()
-        (application as WeightTrackerApplication).signIn.unbind(this)
-        (application as WeightTrackerApplication).container?.unbindStrictSignIn(this)
+        val app = application as WeightTrackerApplication
+        app.signIn.unbind(this)
+        app.container?.onAppBackground()
+        app.container?.unbindStrictSignIn(this)
         super.onStop()
     }
 

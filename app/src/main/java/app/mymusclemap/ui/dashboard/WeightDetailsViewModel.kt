@@ -147,9 +147,12 @@ class WeightDetailsViewModel(
         ) { message, guide ->
             message to guide
         },
-        combine(targetGoal, targetEditor) { goal, editorState -> goal to editorState }
-    ) { series, chrome, messageGuide, targetState ->
-        val today = dateProvider.today()
+        combine(
+            combine(targetGoal, targetEditor) { goal, editorState -> goal to editorState },
+            dateProvider.observeToday()
+        ) { targetState, today -> targetState to today }
+    ) { series, chrome, messageGuide, targetAndToday ->
+        val (targetState, today) = targetAndToday
         val (message, guide) = messageGuide
         val (goal, editorState) = targetState
         WeightDetailsUiState(

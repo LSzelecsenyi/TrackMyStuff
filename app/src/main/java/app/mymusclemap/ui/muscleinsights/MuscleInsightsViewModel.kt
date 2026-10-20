@@ -58,11 +58,12 @@ class MuscleInsightsViewModel(
 
     val uiState: StateFlow<MuscleInsightsUiState> = combine(
         sessionRepository.observeCompletedAggregates(),
-        dateProvider.observeToday(),
+        combine(dateProvider.observeToday(), dateProvider.observeNow()) { today, now -> today to now },
         selectedMuscle,
         selectedPeriod,
         combine(explanation, entitlements.changes()) { topic, _ -> topic }
-    ) { aggregates, today, muscleName, periodName, topic ->
+    ) { aggregates, todayAndNow, muscleName, periodName, topic ->
+        val (today, now) = todayAndNow
         val muscle = MuscleGroup.entries.firstOrNull { it.name == muscleName } ?: MuscleGroup.CHEST
         val safeMuscle = if (muscle == MuscleGroup.FULL_BODY || muscle == MuscleGroup.CARDIOVASCULAR) {
             MuscleGroup.CHEST
@@ -70,7 +71,6 @@ class MuscleInsightsViewModel(
             muscle
         }
         val period = MuscleInsightsPeriod.fromName(periodName)
-        val now = dateProvider.now()
         val demo = !entitlements.hasAccess(AppFeature.AdvancedMuscleAnalytics)
         val insight = if (demo) {
             MuscleInsightsDemo.insight(safeMuscle, today, now, zone, period)

@@ -45,12 +45,12 @@ class StatisticsViewModel(
     val uiState: StateFlow<StatisticsUiState> = combine(
         sessionRepository.observeCompletedAggregates(),
         scheduledWorkoutRepository.observeHistorical(),
-        dateProvider.observeToday(),
+        combine(dateProvider.observeToday(), dateProvider.observeNow()) { today, now -> today to now },
         selectedRange,
         combine(lockedFeature, entitlements.changes()) { locked, _ -> locked }
-    ) { aggregates, scheduled, today, rangeName, locked ->
+    ) { aggregates, scheduled, todayAndNow, rangeName, locked ->
+        val (today, now) = todayAndNow
         val requested = resolvedRange(rangeName)
-        val now = dateProvider.now()
         val zone = ZoneId.systemDefault()
         val muscleInsights = if (entitlements.hasAccess(AppFeature.AdvancedMuscleAnalytics)) {
             MuscleInsightsLogic.index(aggregates, zone).preview(today, now, requested)

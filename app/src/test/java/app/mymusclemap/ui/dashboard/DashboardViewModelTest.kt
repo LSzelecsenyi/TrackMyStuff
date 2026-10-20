@@ -34,6 +34,7 @@ import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedSetDraft
 import app.mymusclemap.domain.workout.ScheduleWorkoutResult
 import app.mymusclemap.domain.workout.ScheduledWorkoutStatus
+import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
 import app.mymusclemap.domain.workout.TemplateSaveResult
@@ -460,7 +461,84 @@ class DashboardViewModelTest {
         assertFalse(after.monthGrid.cells.first { it.date == today }.isToday)
         assertTrue(after.monthGrid.cells.first { it.date == today.plusDays(1) }.isToday)
         assertTrue(after.monthGrid.cells.first { it.date == today }.hasPlannedWorkout)
+        assertEquals(YearMonth.of(2026, 3), after.displayedMonth)
         assertNull(after.daySheet)
+    }
+
+    @Test
+    fun selectedHistoricalDayStaysSelectedWhenTodayMoves() = runTest {
+        val dates = MutableDateProvider(today, LocalTime.of(23, 50))
+        val historical = today.minusDays(4)
+        val viewModel = dashboard(dates = dates)
+        viewModel.selectDay(historical)
+        viewModel.uiState.first { it.daySheet?.date == historical }
+        dates.setNow(today.plusDays(1), LocalTime.of(0, 10))
+        val after = viewModel.uiState.first { it.today == today.plusDays(1) }
+        assertEquals(historical, after.daySheet?.date)
+        assertEquals(YearMonth.from(today), after.displayedMonth)
+        assertTrue(after.monthGrid.cells.first { it.date == today.plusDays(1) }.isToday)
+    }
+
+    @Test
+    fun midnightAcrossAMonthAdvancesTheFollowedMonthOnly() = runTest {
+        val dates = MutableDateProvider(LocalDate.of(2026, 3, 31), LocalTime.of(23, 40))
+        val viewModel = dashboard(dates = dates)
+        viewModel.uiState.first { it.today == LocalDate.of(2026, 3, 31) }
+        dates.setNow(LocalDate.of(2026, 4, 1), LocalTime.of(0, 5))
+        val followed = viewModel.uiState.first {
+            it.today == LocalDate.of(2026, 4, 1) && it.displayedMonth == YearMonth.of(2026, 4)
+        }
+        assertEquals(YearMonth.of(2026, 4), followed.displayedMonth)
+        assertTrue(followed.monthGrid.cells.first { it.date == LocalDate.of(2026, 4, 1) }.isToday)
+    }
+
+    @Test
+    fun yearRolloverFollowsTheCurrentMonthUnlessTheUserNavigatedAway() = runTest {
+        val dates = MutableDateProvider(LocalDate.of(2026, 12, 31), LocalTime.of(23, 40))
+        val viewing = dashboard(dates = dates)
+        viewing.uiState.first { it.displayedMonth == YearMonth.of(2026, 12) }
+        dates.setNow(LocalDate.of(2027, 1, 1), LocalTime.of(0, 5))
+        val followed = viewing.uiState.first {
+            it.today == LocalDate.of(2027, 1, 1) && it.displayedMonth == YearMonth.of(2027, 1)
+        }
+        assertEquals(YearMonth.of(2027, 1), followed.displayedMonth)
+        assertTrue(followed.monthGrid.cells.first { it.date == LocalDate.of(2027, 1, 1) }.isToday)
+        assertFalse(followed.monthGrid.cells.first { it.date == LocalDate.of(2026, 12, 31) }.isToday)
+    }
+
+    @Test
+    fun explicitMonthAndSelectedDateSurviveTheNewYear() = runTest {
+        val dates = MutableDateProvider(LocalDate.of(2026, 12, 31), LocalTime.of(23, 40))
+        val viewModel = dashboard(dates = dates)
+        viewModel.uiState.first { it.today == LocalDate.of(2026, 12, 31) }
+        viewModel.onPreviousMonth()
+        viewModel.selectDay(LocalDate.of(2026, 11, 2))
+        viewModel.uiState.first { it.daySheet?.date == LocalDate.of(2026, 11, 2) }
+        dates.setNow(LocalDate.of(2027, 1, 1), LocalTime.of(0, 5))
+        val after = viewModel.uiState.first { it.today == LocalDate.of(2027, 1, 1) }
+        assertEquals(YearMonth.of(2026, 11), after.displayedMonth)
+        assertEquals(LocalDate.of(2026, 11, 2), after.daySheet?.date)
+        assertTrue(after.monthGrid.cells.none { it.isToday })
+    }
+
+    @Test
+    fun movingTheCalendarDayDoesNotRewriteWorkoutTimestampsOrGoals() = runTest {
+        val dates = MutableDateProvider(today, LocalTime.of(23, 50))
+        val templateId = saveTemplate("Push A")
+        val started = sessionRepository.start(templateId) as StartWorkoutResult.Started
+        val before = database.workoutSessionDao().getById(started.sessionId)!!
+        val goalsBefore = database.weeklyWorkoutGoalDao().getAll()
+        val viewModel = dashboard(dates = dates)
+        viewModel.uiState.first { it.today == today }
+        dates.setNow(today.plusDays(1), LocalTime.of(0, 10))
+        viewModel.uiState.first { it.today == today.plusDays(1) }
+        val after = database.workoutSessionDao().getById(started.sessionId)!!
+        assertEquals(before.startedAt, after.startedAt)
+        assertEquals(before.finishedAt, after.finishedAt)
+        assertEquals(before.workoutDate, after.workoutDate)
+        assertEquals(before.status, after.status)
+        assertEquals(goalsBefore, database.weeklyWorkoutGoalDao().getAll())
+        assertEquals(0, database.achievementDao().unlocks().size)
     }
 
     @Test

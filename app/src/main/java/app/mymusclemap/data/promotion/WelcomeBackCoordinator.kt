@@ -33,7 +33,8 @@ class WelcomeBackCoordinator(
     private val authorizeActivation: suspend (String) -> WelcomeBackAuthorization = {
         WelcomeBackAuthorization.Local
     },
-    private val fetchGrant: suspend () -> WelcomeBackRemote = { WelcomeBackRemote.Unavailable }
+    private val fetchGrant: suspend () -> WelcomeBackRemote = { WelcomeBackRemote.Unavailable },
+    private val zoneSource: () -> ZoneId = { zone }
 ) {
     private var history: List<WelcomeBackCompletion> = emptyList()
     private var automaticWorkoutId: String? = null
@@ -122,7 +123,7 @@ class WelcomeBackCoordinator(
         val qualifying = WelcomeBackPolicy.qualifyingWorkout(
             history,
             workoutId,
-            zone,
+            zoneSource(),
             config.gapDays(),
             config.mode == WelcomeBackDebugMode.ELIGIBLE
         ) ?: return
@@ -226,7 +227,7 @@ class WelcomeBackCoordinator(
         val expiresAt = record.expiresAt
         return WelcomeBackFacts(
             completions = history,
-            zone = zone,
+            zone = zoneSource(),
             now = now(),
             currentlyFree = covered.currentlyFree,
             promotionsEnabled = promotionsEnabled(),

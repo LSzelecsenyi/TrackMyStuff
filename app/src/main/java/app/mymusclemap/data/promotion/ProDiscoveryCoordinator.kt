@@ -29,7 +29,8 @@ class ProDiscoveryCoordinator(
     var coverage: () -> ProDiscoveryCoverage = {
         ProDiscoveryCoverage(currentlyFree = true, continuedBeyond = { false })
     },
-    private val authorizeActivation: suspend () -> TrialAuthorization = { TrialAuthorization.Local }
+    private val authorizeActivation: suspend () -> TrialAuthorization = { TrialAuthorization.Local },
+    private val zoneSource: () -> ZoneId = { zone }
 ) {
     private var history: List<Instant> = emptyList()
 
@@ -143,7 +144,7 @@ class ProDiscoveryCoordinator(
         val expiresAt = record.expiresAt
         return ProDiscoveryFacts(
             nativeCompletions = history,
-            zone = zone,
+            zone = zoneSource(),
             now = now(),
             currentlyFree = covered.currentlyFree,
             promotionsEnabled = promotionsEnabled(),

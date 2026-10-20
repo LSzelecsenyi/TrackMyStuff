@@ -45,6 +45,7 @@ import app.mymusclemap.domain.calendar.CalendarCell
 import app.mymusclemap.domain.calendar.MonthGrid
 import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.calendar.WeekCalendar
+import app.mymusclemap.domain.calendar.WeekPagerAnchor
 import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.workout.WeekProgress
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
@@ -86,6 +87,19 @@ fun OverviewCalendar(
     var scrollExpandedIntoView by remember { mutableStateOf(false) }
     val todayWeekStart = WeekCalendar.start(today)
     val pagerState = rememberPagerState(initialPage = WeekPager.Center, pageCount = { WeekPager.Count })
+    var anchoredToday by remember { mutableStateOf(today) }
+    LaunchedEffect(today) {
+        val page = WeekPagerAnchor.pageAfterTodayChange(
+            currentPage = pagerState.currentPage,
+            centerPage = WeekPager.Center,
+            previousToday = anchoredToday,
+            today = today
+        ).coerceIn(0, WeekPager.Count - 1)
+        if (page != pagerState.currentPage) {
+            pagerState.scrollToPage(page)
+        }
+        anchoredToday = today
+    }
     val weekOffset = pagerState.currentPage - WeekPager.Center
     val weekStart = todayWeekStart.plusWeeks(weekOffset.toLong())
     val scope = rememberCoroutineScope()
@@ -467,7 +481,11 @@ private fun weekCells(grid: MonthGrid, weekStart: LocalDate, today: LocalDate): 
     return WeekCalendar.dates(weekStart).map { date ->
         val existing = byDate[date]
         if (existing != null) {
-            existing.copy(inDisplayedMonth = true)
+            existing.copy(
+                inDisplayedMonth = true,
+                isToday = date == today,
+                isFuture = date.isAfter(today)
+            )
         } else {
             CalendarCell(
                 date = date,

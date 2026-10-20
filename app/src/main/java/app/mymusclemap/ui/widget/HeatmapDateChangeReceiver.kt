@@ -3,6 +3,7 @@ package app.mymusclemap.ui.widget
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import app.mymusclemap.WeightTrackerApplication
 
 /**
  * DATE_CHANGED, TIME_SET, and TIMEZONE_CHANGED remain exempt from the implicit
@@ -14,7 +15,12 @@ class HeatmapDateChangeReceiver : BroadcastReceiver() {
         when (intent.action) {
             Intent.ACTION_DATE_CHANGED,
             Intent.ACTION_TIME_CHANGED,
-            Intent.ACTION_TIMEZONE_CHANGED -> HeatmapWidgetUpdater.update(context)
+            Intent.ACTION_TIMEZONE_CHANGED -> {
+                (context.applicationContext as? WeightTrackerApplication)
+                    ?.container
+                    ?.onWallClockChanged()
+                HeatmapWidgetUpdater.update(context)
+            }
         }
     }
 }
