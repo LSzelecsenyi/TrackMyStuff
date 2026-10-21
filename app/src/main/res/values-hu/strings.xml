@@ -721,7 +721,6 @@
     <string name="day_sheet_no_scheduled">Erre a napra nincs ütemezett edzés.</string>
     <string name="day_sheet_today">Ma</string>
     <string name="day_sheet_close">Bezárás</string>
-    <string name="day_sheet_weight_placeholder">pl. 88,1</string>
     <string name="day_sheet_completed_heading">Befejezett edzések</string>
     <string name="day_sheet_scheduled_heading">Ütemezett edzések</string>
     <string name="day_sheet_completed_workout">Befejezett edzés</string>
@@ -1477,6 +1476,11 @@
     <string name="settings_lock_screen_not_now">Most nem</string>
     <string name="achievements_title">Eredmények</string>
     <string name="achievements_next">Következő eredmény</string>
+    <string name="achievements_view_all">Összes megtekintése</string>
+    <string name="achievements_latest_unlock">Legutóbbi eredmény</string>
+    <string name="achievements_next_milestone">Következő mérföldkő</string>
+    <string name="achievements_earned_today">Ma megszerezve</string>
+    <string name="achievements_earn_first">Szerezd meg az első jelvényedet</string>
     <string name="achievements_workouts_name">%1$d edzés</string>
     <string name="achievements_workouts_requirement">Teljesíts %1$d edzést</string>
     <string name="achievements_progress_count">%1$d / %2$d</string>

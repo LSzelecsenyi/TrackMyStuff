@@ -11,6 +11,7 @@ import app.mymusclemap.domain.achievements.BadgeWallPresentation
 import app.mymusclemap.domain.achievements.BadgeWallPresenter
 import app.mymusclemap.domain.achievements.CelebrationAcknowledgement
 import app.mymusclemap.domain.achievements.NextWorkoutMilestone
+import app.mymusclemap.domain.achievements.OverviewAchievements
 import app.mymusclemap.domain.achievements.PendingCelebration
 import app.mymusclemap.domain.achievements.deliveryKey
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,8 +25,21 @@ import kotlinx.coroutines.launch
 class AchievementsViewModel(
     private val repository: AchievementRepository
 ) : ViewModel() {
-    val board: StateFlow<AchievementBoard> = repository.observeBoard()
+    private val observedBoard: StateFlow<AchievementBoard?> = repository.observeBoard()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val board: StateFlow<AchievementBoard> = observedBoard
+        .map { it ?: EmptyAchievementBoard }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmptyAchievementBoard)
+
+    /**
+     * Null until the repository emits. The empty assembler board is not used as the
+     * initial value, so the home card does not invite the user to earn a first badge
+     * before stored awards have loaded.
+     */
+    val overview: StateFlow<OverviewAchievements?> = observedBoard
+        .map(::homeOverview)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val selectedFilter = MutableStateFlow<AchievementAccess?>(null)
     private val openedBadge = MutableStateFlow<AchievementId?>(null)
@@ -99,6 +113,10 @@ internal suspend fun acknowledgeThenNavigate(
 ) {
     acknowledge(celebrations)
     navigate()
+}
+
+internal fun homeOverview(board: AchievementBoard?): OverviewAchievements? {
+    return board?.let(BadgeWallPresenter::overview)
 }
 
 private val EmptyAchievementBoard = AchievementBoardAssembler.assemble(

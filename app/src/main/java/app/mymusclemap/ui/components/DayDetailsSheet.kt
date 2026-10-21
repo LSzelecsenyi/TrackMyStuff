@@ -355,15 +355,6 @@ private fun DayWeightEditor(
                         .defaultMinSize(minHeight = AppDimens.minTouch),
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    if (input.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.day_sheet_weight_placeholder),
-                            style = AppTypeTokens.statBand,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                     BasicTextField(
                         value = input,
                         onValueChange = { onWeightChange(WeightParser.filterUserInput(it)) },

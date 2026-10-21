@@ -351,6 +351,7 @@ fun WeightTrackerNavHost(
     val currentRoute = backStack?.destination?.route
     val achievementsViewModel: AchievementsViewModel = viewModel(factory = factory)
     val achievementBoard by achievementsViewModel.board.collectAsStateWithLifecycle()
+    val overviewAchievements by achievementsViewModel.overview.collectAsStateWithLifecycle()
     val heldCelebrationKeys by achievementsViewModel.heldCelebrationKeys.collectAsStateWithLifecycle()
     val showBottomBar = AppNavigation.showsBottomBar(currentRoute)
     val workoutHubViewModel: WorkoutHubViewModel = viewModel(factory = factory)
@@ -495,8 +496,15 @@ fun WeightTrackerNavHost(
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
                     onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
                     onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
-                    onOpenAchievements = { navController.navigateInternal(AppRoutes.ACHIEVEMENTS) },
-                    nextAchievement = achievementBoard.next,
+                    onOpenAchievements = {
+                        achievementsViewModel.closeBadge()
+                        navController.navigateInternal(AppRoutes.ACHIEVEMENTS)
+                    },
+                    onOpenAchievement = { id ->
+                        achievementsViewModel.openBadge(id)
+                        navController.navigateInternal(AppRoutes.ACHIEVEMENTS)
+                    },
+                    overviewAchievements = overviewAchievements,
                     onDisplayedMonthChange = viewModel::showMonth,
                     onSetWeeklyGoal = viewModel::setWeeklyGoal,
                     onDisableWeeklyGoal = viewModel::disableWeeklyGoal,

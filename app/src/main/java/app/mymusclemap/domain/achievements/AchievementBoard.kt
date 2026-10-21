@@ -135,7 +135,12 @@ data class AchievementBoard(
     val next: NextWorkoutMilestone,
     val pending: List<PendingCelebration>,
     /** Active target journey, when a baseline exists. Not stored as achievement progress. */
-    val targetWeightProgress: TargetWeightProgress? = null
+    val targetWeightProgress: TargetWeightProgress? = null,
+    /**
+     * Whether the current entitlement can earn Pro badges.
+     * Presentation uses this so a locked Pro award is not offered as the next milestone.
+     */
+    val grantsPro: Boolean = false
 ) {
     /**
      * Pro is earned only while the current entitlement grants Pro and history still meets
@@ -147,6 +152,7 @@ data class AchievementBoard(
         account: AccountAchievementAuthority
     ): AchievementBoard {
         return copy(
+            grantsPro = grantsPro,
             items = items.map { it.withCurrentOwnership(grantsPro, account) },
             pending = pending.filter { celebration ->
                 val id = celebration.referencedAchievement()

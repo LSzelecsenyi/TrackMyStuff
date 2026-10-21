@@ -11,6 +11,32 @@ data class AlmostThereEntry(
     val volumeProgress: VolumeProgress? = null
 )
 
+data class OverviewLatestUnlock(
+    val id: AchievementId,
+    val unlockedAtEpochMillis: Long
+)
+
+/**
+ * Progress the home card can show without inventing a percentage.
+ * [Requirement] is an action the model does not measure as a ratio.
+ */
+sealed interface OverviewProgress {
+    data class Count(val current: Int, val threshold: Int) : OverviewProgress
+    data class Volume(val currentKg: Double, val thresholdKg: Double) : OverviewProgress
+    data class TargetWeight(val remainingKg: Double, val fraction: Double) : OverviewProgress
+    data object Requirement : OverviewProgress
+}
+
+data class OverviewUpcoming(
+    val id: AchievementId,
+    val progress: OverviewProgress
+)
+
+data class OverviewAchievements(
+    val latest: OverviewLatestUnlock?,
+    val upcoming: OverviewUpcoming?
+)
+
 data class BadgeWallSection(
     val category: AchievementCategory,
     val items: List<BadgeWallItem>
@@ -91,6 +117,18 @@ object BadgeWallPresenter {
     }
 
     /**
+     * Home-screen card. Latest unlock is the stored earned instant.
+     * The next milestone reuses [almostThere] when any eligible award has measurable progress,
+     * then a single action award in catalog order. Locked secrets are never recommended.
+     */
+    fun overview(board: AchievementBoard): OverviewAchievements {
+        return OverviewAchievements(
+            latest = latestUnlock(board),
+            upcoming = upcoming(board)
+        )
+    }
+
+    /**
      * At most one next milestone per measurable family, ranked by completion.
      * Binary Journey awards are not candidates.
      */
@@ -105,6 +143,64 @@ object BadgeWallPresenter {
             targetWeightMilestone(board)
         )
         return candidates.sortedWith(almostThereOrder()).take(MAX_ALMOST_THERE)
+    }
+
+    private fun latestUnlock(board: AchievementBoard): OverviewLatestUnlock? {
+        val earned = board.items.filter { it.unlocked && it.unlockedAt != null }
+        val latest = earned.maxWithOrNull(
+            compareBy<BadgeWallItem> { it.unlockedAt!! }
+                .thenBy { AchievementId.entries.indexOf(it.id) }
+        ) ?: return null
+        return OverviewLatestUnlock(
+            id = latest.id,
+            unlockedAtEpochMillis = latest.unlockedAt!!
+        )
+    }
+
+    private fun upcoming(board: AchievementBoard): OverviewUpcoming? {
+        val measurable = almostThere(board).firstOrNull { entry ->
+            val item = board.items.firstOrNull { it.id == entry.achievementId } ?: return@firstOrNull false
+            canRecommend(item, board.grantsPro)
+        }
+        if (measurable != null) {
+            return OverviewUpcoming(
+                id = measurable.achievementId,
+                progress = when {
+                    measurable.countProgress != null -> OverviewProgress.Count(
+                        current = measurable.countProgress.current,
+                        threshold = measurable.countProgress.threshold
+                    )
+                    measurable.volumeProgress != null -> OverviewProgress.Volume(
+                        currentKg = measurable.volumeProgress.currentKg,
+                        thresholdKg = measurable.volumeProgress.thresholdKg
+                    )
+                    measurable.remainingKg != null -> OverviewProgress.TargetWeight(
+                        remainingKg = measurable.remainingKg,
+                        fraction = measurable.fraction
+                    )
+                    else -> OverviewProgress.Requirement
+                }
+            )
+        }
+        val action = board.items
+            .filter { canRecommend(it, board.grantsPro) && isActionBased(it) }
+            .minByOrNull { AchievementId.entries.indexOf(it.id) }
+            ?: return null
+        return OverviewUpcoming(id = action.id, progress = OverviewProgress.Requirement)
+    }
+
+    private fun canRecommend(item: BadgeWallItem, grantsPro: Boolean): Boolean {
+        if (item.unlocked || item.requirementMet) return false
+        if (item.id.secret) return false
+        if (!item.id.listed(item.unlocked)) return false
+        if (item.access == AchievementAccess.SPECIAL) return false
+        if (item.access == AchievementAccess.PRO && !grantsPro) return false
+        return true
+    }
+
+    /** No count or volume ratio. Target weight without an active goal is treated as an action. */
+    private fun isActionBased(item: BadgeWallItem): Boolean {
+        return item.countProgress == null && item.volumeProgress == null
     }
 
     private fun nextCountMilestone(

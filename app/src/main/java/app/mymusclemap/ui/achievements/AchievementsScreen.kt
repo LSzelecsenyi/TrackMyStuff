@@ -501,10 +501,34 @@ private fun BadgeCell(
     }
 }
 
-private enum class BadgeArtworkEmphasis {
+internal enum class BadgeArtworkEmphasis {
     Earned,
     Next,
     Locked
+}
+
+@Composable
+internal fun AchievementBadgeImage(
+    id: AchievementId,
+    unlocked: Boolean,
+    size: Dp,
+    emphasis: BadgeArtworkEmphasis
+) {
+    BadgeArtwork(
+        item = BadgeWallItem(
+            id = id,
+            category = id.category,
+            badgeKey = id.badgeKey,
+            badgeFamily = id.badgeFamily,
+            badgeTier = id.badgeTier,
+            unlocked = unlocked,
+            unlockedAt = null,
+            countProgress = null,
+            access = id.access
+        ),
+        size = size,
+        emphasis = emphasis
+    )
 }
 
 @Composable

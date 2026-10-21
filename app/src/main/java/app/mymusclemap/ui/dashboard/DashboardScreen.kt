@@ -75,7 +75,9 @@ import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.DashboardSnapshot
 import app.mymusclemap.domain.WeeklyOverview
 import app.mymusclemap.domain.WeeklyOverviewLogic
-import app.mymusclemap.domain.achievements.NextWorkoutMilestone
+import app.mymusclemap.domain.achievements.AchievementId
+import app.mymusclemap.domain.achievements.OverviewAchievements
+import app.mymusclemap.ui.achievements.OverviewAchievementsCard
 import app.mymusclemap.domain.calendar.MonthGridCalculator
 import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.WeightMeasurement
@@ -113,7 +115,6 @@ internal const val OVERVIEW_OVERFLOW_TEMPLATES = "overview-overflow-templates"
 internal const val OVERVIEW_OVERFLOW_EXERCISES = "overview-overflow-exercises"
 internal const val OVERVIEW_OVERFLOW_SETTINGS = "overview-overflow-settings"
 internal const val OVERVIEW_OVERFLOW_ACHIEVEMENTS = "overview-overflow-achievements"
-internal const val OVERVIEW_NEXT_ACHIEVEMENT = "overview-next-achievement"
 internal const val OVERVIEW_MEMBERSHIP_BADGE = "overview-membership-badge"
 internal const val OVERVIEW_MEMBERSHIP_INFO = "overview-membership-info"
 private val HeatmapCoachCalloutSpace = 176.dp
@@ -182,7 +183,8 @@ fun DashboardScreen(
     onAcknowledgeTemporaryPro: () -> Unit = {},
     showTrainingCompleteMilestone: Boolean = false,
     onAcknowledgeTrainingComplete: () -> Unit = {},
-    nextAchievement: NextWorkoutMilestone? = null,
+    overviewAchievements: OverviewAchievements? = null,
+    onOpenAchievement: (AchievementId) -> Unit = {},
     onOpenAchievements: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -304,10 +306,12 @@ fun DashboardScreen(
                     reportCalendarBounds(coordinates.boundsInRoot())
                 }
             )
-            if (nextAchievement != null) {
-                NextAchievementLine(
-                    milestone = nextAchievement,
-                    onClick = onOpenAchievements
+            if (overviewAchievements != null) {
+                OverviewAchievementsCard(
+                    achievements = overviewAchievements,
+                    today = state.today,
+                    onViewAll = onOpenAchievements,
+                    onOpenAchievement = onOpenAchievement
                 )
             }
             OverviewSectionDivider()
@@ -431,52 +435,6 @@ fun DashboardScreen(
             detail = membershipDetail,
             onDismiss = { membershipInfoOpen = false }
         )
-    }
-}
-
-@Composable
-internal fun NextAchievementLine(
-    milestone: NextWorkoutMilestone,
-    onClick: () -> Unit
-) {
-    val detail = if (milestone.next == null) {
-        stringResource(R.string.achievements_all_workout_milestones)
-    } else {
-        stringResource(R.string.achievements_workouts_name, milestone.next.workoutThreshold!!)
-    }
-    val progress = milestone.next?.let { next ->
-        val threshold = next.workoutThreshold ?: return@let null
-        stringResource(
-            R.string.achievements_progress_count,
-            milestone.completed.coerceAtMost(threshold),
-            threshold
-        )
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = AppDimens.minTouch)
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp)
-            .testTag(OVERVIEW_NEXT_ACHIEVEMENT)
-    ) {
-        Text(
-            text = stringResource(R.string.achievements_next),
-            style = AppTypeTokens.columnHeader,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = detail,
-            style = MaterialTheme.typography.bodyLarge
-        )
-        if (progress != null) {
-            Text(
-                text = progress,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("overview-next-achievement-progress")
-            )
-        }
     }
 }
 

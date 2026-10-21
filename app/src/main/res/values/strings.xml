@@ -721,7 +721,6 @@
     <string name="day_sheet_no_scheduled">No workout is scheduled for this day.</string>
     <string name="day_sheet_today">Today</string>
     <string name="day_sheet_close">Close</string>
-    <string name="day_sheet_weight_placeholder">e.g. 88.1</string>
     <string name="day_sheet_completed_heading">Completed workouts</string>
     <string name="day_sheet_scheduled_heading">Scheduled workouts</string>
     <string name="day_sheet_completed_workout">Completed workout</string>
@@ -1477,6 +1476,11 @@
     <string name="settings_lock_screen_not_now">Not now</string>
     <string name="achievements_title">Achievements</string>
     <string name="achievements_next">Next achievement</string>
+    <string name="achievements_view_all">View all</string>
+    <string name="achievements_latest_unlock">Latest unlock</string>
+    <string name="achievements_next_milestone">Next milestone</string>
+    <string name="achievements_earned_today">Earned today</string>
+    <string name="achievements_earn_first">Earn your first badge</string>
     <string name="achievements_workouts_name">%1$d workouts</string>
     <string name="achievements_workouts_requirement">Complete %1$d workouts</string>
     <string name="achievements_progress_count">%1$d / %2$d</string>

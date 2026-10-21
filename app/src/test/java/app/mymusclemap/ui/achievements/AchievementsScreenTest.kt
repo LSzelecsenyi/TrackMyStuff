@@ -27,9 +27,7 @@ import app.mymusclemap.domain.achievements.BadgeWallPresenter
 import app.mymusclemap.domain.achievements.CelebrationAcknowledgement
 import app.mymusclemap.domain.achievements.PendingCelebration
 import app.mymusclemap.domain.achievements.UnlockSnapshot
-import app.mymusclemap.domain.achievements.WorkoutCountEvaluator
 import app.mymusclemap.ui.components.UiFormatters
-import app.mymusclemap.ui.dashboard.NextAchievementLine
 import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -484,21 +482,6 @@ class AchievementsScreenTest {
         composeRule.onNodeWithText(testString(R.string.badge_wall_locked), substring = false).assertIsDisplayed()
         composeRule.onNodeWithTag("badge-detail-progress").assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.achievements_progress_count, 28, 30)).assertCountEquals(3)
-    }
-
-    @Test
-    fun overviewNextLineShowsTheFollowingWorkoutMilestone() {
-        composeRule.setContent {
-            WeightTrackerThemeForPreview(seeds = ThemeSeeds.DefaultLight, darkTheme = false) {
-                NextAchievementLine(
-                    milestone = WorkoutCountEvaluator.next(73),
-                    onClick = {}
-                )
-            }
-        }
-        composeRule.onNodeWithText(testString(R.string.achievements_next)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.achievements_workouts_name, 100)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.achievements_progress_count, 73, 100)).assertIsDisplayed()
     }
 
     @Test

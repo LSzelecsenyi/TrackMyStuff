@@ -16,6 +16,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -84,9 +85,9 @@ class DayDetailsSheetLayoutTest {
         )
         composeRule.onNodeWithText(testString(R.string.day_sheet_today).uppercase()).assertIsDisplayed()
         composeRule.onNodeWithText(UiFormatters.daySheetTitle(today, today)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.day_sheet_weight_placeholder)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.unit_kg)).assertIsDisplayed()
         composeRule.onNodeWithTag(DAY_SHEET_WEIGHT_INPUT).assertTextEquals("")
+        composeRule.onNodeWithContentDescription(testString(R.string.field_weight)).assertIsDisplayed()
         composeRule.onNodeWithTag(DAY_SHEET_WEIGHT_INPUT).assertIsNotFocused()
         composeRule.onNodeWithTag(DAY_SHEET_WEIGHT_SAVE).performClick()
         assertEquals(1, saves)
@@ -120,6 +121,22 @@ class DayDetailsSheetLayoutTest {
         composeRule.onAllNodesWithText(testString(R.string.change_from_previous_value, "+0.4 kg")).assertCountEquals(0)
         composeRule.onNodeWithTag(DAY_SHEET_WEIGHT_EDIT).performClick()
         assertEquals(1, edits)
+    }
+
+    @Test
+    fun givenExistingWeightWhenEditingThenTheSavedValueIsPrefilled() {
+        render(
+            state = DaySheetState(
+                date = today,
+                measurement = WeightMeasurement(3, today, 88.1, 0, 0),
+                differenceFromPreviousKg = null
+            ),
+            weightInput = "88.1",
+            weightEditing = true
+        )
+        composeRule.onNodeWithTag(DAY_SHEET_WEIGHT_INPUT).assertTextEquals("88.1")
+        composeRule.onNodeWithText(testString(R.string.unit_kg)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.field_weight)).assertIsDisplayed()
     }
 
     @Test
