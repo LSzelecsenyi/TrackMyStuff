@@ -31,6 +31,8 @@ import app.mymusclemap.data.account.VerifiedAccountProfile
 import app.mymusclemap.data.auth.StrictSignInResult
 import app.mymusclemap.ui.auth.WelcomeSignInScreen
 import app.mymusclemap.ui.settings.DeleteAccountResult
+import app.mymusclemap.ui.settings.DeveloperEntitlementHost
+import app.mymusclemap.ui.settings.LocalDeveloperEntitlement
 import app.mymusclemap.ui.settings.PrivacyPolicyScreen
 import app.mymusclemap.ui.theme.StrictBrand
 import app.mymusclemap.ui.workout.AppForeground
@@ -204,6 +206,27 @@ class MainActivity : AppCompatActivity() {
                             val founderViewModel: FounderProgramViewModel =
                                 viewModel(factory = container.viewModelFactory)
                             val billingState by container.billing.screen.collectAsStateWithLifecycle()
+                            val freeAccessDecisions = remember(container) {
+                                container.freeAccessRepository.decisions()
+                            }
+                            val developerEntitlement = remember(container, freeAccessDecisions) {
+                                DeveloperEntitlementHost(
+                                    control = container.debugEntitlementGate.control,
+                                    revisions = container.entitlementRevisions,
+                                    decisions = freeAccessDecisions,
+                                    panel = container::developerEntitlementPanel,
+                                    onSelect = container.debugEntitlementGate::select,
+                                    onArmNextLaunch = {
+                                        val effective = container.entitlementComposer.resolve()
+                                        container.debugEntitlementGate.armFreeOnNextLaunch(
+                                            effective.grantsPro
+                                        )
+                                    }
+                                )
+                            }
+                            CompositionLocalProvider(
+                                LocalDeveloperEntitlement provides developerEntitlement
+                            ) {
                             WeightTrackerNavHost(
                                 factory = container.viewModelFactory,
                                 dateProvider = container.dateProvider,
@@ -218,6 +241,7 @@ class MainActivity : AppCompatActivity() {
                                 founderProgram = founderViewModel,
                                 currentEntitlement = container.entitlementComposer::resolve,
                                 entitlementChanges = container.featureEntitlements.changes(),
+                                freeAccessDecisions = freeAccessDecisions,
                                 founderApprovalCelebration = container::pendingFounderApprovalCelebration,
                                 onAcknowledgeFounderApproval = container::acknowledgeFounderApprovalCelebration,
                                 proBenefitsStatus = container::proBenefitsStatus,
@@ -285,6 +309,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 onAccountDeletionFinished = { app.restartProcess() }
                             )
+                            }
                         }
                     }
                     }

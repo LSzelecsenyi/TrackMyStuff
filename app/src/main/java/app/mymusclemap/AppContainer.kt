@@ -124,7 +124,7 @@ class AppContainer(context: Context, val accountUserId: String) {
     private val plansChanged = AtomicReference<suspend () -> Unit> { }
     private val grantsPro = AtomicReference<() -> Boolean> { false }
     private val afterBackupRestore = AtomicReference<suspend () -> Unit> { }
-    private val freeAccessEntitlementReady = AtomicReference(false)
+    private val billingEntitlementReady = AtomicReference(false)
     private val onPlanCreated = AtomicReference<suspend (Long) -> Unit> { }
     private val onExerciseCreated = AtomicReference<suspend (Long) -> Unit> { }
     private val planMayStart = AtomicReference<suspend (Long) -> Boolean> { true }
@@ -346,6 +346,10 @@ class AppContainer(context: Context, val accountUserId: String) {
             entitlementRevision.value = entitlementRevision.value + 1
         }
     )
+    val debugEntitlementGate: app.mymusclemap.domain.entitlement.DebugEntitlementGate =
+        DebugEntitlementGateSelection.open(appContext) {
+            entitlementRevision.value = entitlementRevision.value + 1
+        }
     val entitlementComposer = EntitlementComposer(
         subscriptionProvider = subscriptionProvider,
         founderLifetimeProvider = founderLifetimeProvider,
@@ -354,7 +358,8 @@ class AppContainer(context: Context, val accountUserId: String) {
         backendFounder = founderEntitlementCache::current,
         promotionalPro = { proDiscovery.currentGrant() },
         welcomeBack = { welcomeBack.currentGrant() },
-        adjustSources = EntitlementOverrideSelection::adjust
+        adjustSources = EntitlementOverrideSelection::adjust,
+        applyEffective = debugEntitlementGate::apply
     )
     init {
         proDiscovery.coverage = {
@@ -389,7 +394,7 @@ class AppContainer(context: Context, val accountUserId: String) {
         templateDao = database.workoutTemplateDao(),
         exerciseDao = database.exerciseDao(),
         grantsPro = { grantsPro.get().invoke() },
-        entitlementReady = { freeAccessEntitlementReady.get() }
+        entitlementReady = { freeAccessEntitlementKnown() }
     )
 
     init {
@@ -854,9 +859,31 @@ class AppContainer(context: Context, val accountUserId: String) {
 
     suspend fun refreshBilling() {
         verifiedSubscriptions.load()
-        freeAccessEntitlementReady.set(true)
+        billingEntitlementReady.set(true)
         freeAccessRepository.refresh()
         billing.refresh()
+    }
+
+    /**
+     * Forced debug modes are known before Play billing loads. REAL stays unknown
+     * until the subscription cache has been read, so an empty cache is not a downgrade.
+     */
+    private fun freeAccessEntitlementKnown(): Boolean {
+        return billingEntitlementReady.get() ||
+            debugEntitlementGate.control.value.mode != app.mymusclemap.domain.entitlement.DebugEntitlementMode.Real
+    }
+
+    fun developerEntitlementPanel(): app.mymusclemap.domain.entitlement.DeveloperEntitlementPanel {
+        val actualKnown = billingEntitlementReady.get()
+        val effectiveKnown = freeAccessEntitlementKnown()
+        return app.mymusclemap.domain.entitlement.buildDeveloperEntitlementPanel(
+            control = debugEntitlementGate.control.value,
+            actualKnown = actualKnown,
+            effectiveKnown = effectiveKnown,
+            actual = if (actualKnown) entitlementComposer.resolveActual() else null,
+            effective = if (effectiveKnown) entitlementComposer.resolve() else null,
+            decision = freeAccessRepository.current()
+        )
     }
 
     suspend fun launchBilling(activity: android.app.Activity) {

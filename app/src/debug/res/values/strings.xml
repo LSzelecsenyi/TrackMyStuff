@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="debug_tools_title">Developer Tools</string>
+    <string name="debug_entitlement_banner">DEBUG ONLY</string>
+    <string name="debug_entitlement_title">Entitlement override</string>
+    <string name="debug_entitlement_real">Real entitlement</string>
+    <string name="debug_entitlement_force_pro">Force PRO</string>
+    <string name="debug_entitlement_force_free">Force FREE</string>
+    <string name="debug_entitlement_mode">Selected mode: %1$s</string>
+    <string name="debug_entitlement_actual">Actual entitlement: %1$s</string>
+    <string name="debug_entitlement_effective">Effective entitlement: %1$s</string>
+    <string name="debug_entitlement_tier_pro">PRO</string>
+    <string name="debug_entitlement_tier_free">FREE</string>
+    <string name="debug_entitlement_tier_unknown">Unknown</string>
+    <string name="debug_entitlement_phase">FREE access phase: %1$s</string>
+    <string name="debug_entitlement_phase_not_required">Not required</string>
+    <string name="debug_entitlement_phase_required">Required</string>
+    <string name="debug_entitlement_phase_confirmed">Confirmed</string>
+    <string name="debug_entitlement_not_loaded">FREE access: not loaded</string>
+    <string name="debug_entitlement_period">FREE period id: %1$d</string>
+    <string name="debug_entitlement_confirmed">FREE selection confirmed: %1$s</string>
+    <string name="debug_entitlement_yes">Yes</string>
+    <string name="debug_entitlement_no">No</string>
+    <string name="debug_entitlement_selected_plans">Selected plans: %1$d</string>
+    <string name="debug_entitlement_selected_exercises">Selected custom exercises: %1$d</string>
+    <string name="debug_entitlement_locked_plans">Locked plans: %1$d</string>
+    <string name="debug_entitlement_locked_exercises">Locked custom exercises: %1$d</string>
+    <string name="debug_entitlement_pending">Pending: FREE on next launch</string>
+    <string name="debug_entitlement_next_launch">Simulate FREE on next launch</string>
+</resources>

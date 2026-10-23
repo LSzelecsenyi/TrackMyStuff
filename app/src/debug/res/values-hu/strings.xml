@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="debug_tools_title">Fejlesztői eszközök</string>
+    <string name="debug_entitlement_banner">CSAK DEBUG</string>
+    <string name="debug_entitlement_title">Jogosultság felülírása</string>
+    <string name="debug_entitlement_real">Valós jogosultság</string>
+    <string name="debug_entitlement_force_pro">PRO kényszerítése</string>
+    <string name="debug_entitlement_force_free">FREE kényszerítése</string>
+    <string name="debug_entitlement_mode">Kiválasztott mód: %1$s</string>
+    <string name="debug_entitlement_actual">Valós jogosultság: %1$s</string>
+    <string name="debug_entitlement_effective">Hatályos jogosultság: %1$s</string>
+    <string name="debug_entitlement_tier_pro">PRO</string>
+    <string name="debug_entitlement_tier_free">FREE</string>
+    <string name="debug_entitlement_tier_unknown">Ismeretlen</string>
+    <string name="debug_entitlement_phase">FREE hozzáférés fázisa: %1$s</string>
+    <string name="debug_entitlement_phase_not_required">Nem szükséges</string>
+    <string name="debug_entitlement_phase_required">Szükséges</string>
+    <string name="debug_entitlement_phase_confirmed">Megerősítve</string>
+    <string name="debug_entitlement_not_loaded">FREE hozzáférés: nincs betöltve</string>
+    <string name="debug_entitlement_period">FREE időszak azonosítója: %1$d</string>
+    <string name="debug_entitlement_confirmed">FREE választás megerősítve: %1$s</string>
+    <string name="debug_entitlement_yes">Igen</string>
+    <string name="debug_entitlement_no">Nem</string>
+    <string name="debug_entitlement_selected_plans">Kiválasztott tervek: %1$d</string>
+    <string name="debug_entitlement_selected_exercises">Kiválasztott egyéni gyakorlatok: %1$d</string>
+    <string name="debug_entitlement_locked_plans">Zárolt tervek: %1$d</string>
+    <string name="debug_entitlement_locked_exercises">Zárolt egyéni gyakorlatok: %1$d</string>
+    <string name="debug_entitlement_pending">Függőben: FREE a következő indításkor</string>
+    <string name="debug_entitlement_next_launch">FREE szimulálása a következő indításkor</string>
+</resources>

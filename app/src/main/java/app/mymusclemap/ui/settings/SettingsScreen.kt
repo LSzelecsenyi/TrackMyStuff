@@ -330,6 +330,7 @@ fun SettingsScreen(
                     onOpenPrivacyPolicy = onOpenPrivacyPolicy,
                     onOpenHelp = onOpenHelp
                 )
+                DeveloperToolsSection()
             }
         }
     }

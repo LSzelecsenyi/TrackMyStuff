@@ -24,8 +24,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -52,6 +54,8 @@ import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.EffectiveEntitlement
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
 import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
 import app.mymusclemap.domain.entitlement.StrictOneTimePrompt
 import app.mymusclemap.domain.entitlement.selectStrictOneTimePrompt
@@ -312,6 +316,7 @@ fun WeightTrackerNavHost(
         )
     },
     entitlementChanges: Flow<Int> = flowOf(0),
+    freeAccessDecisions: Flow<FreeAccessDecision> = flowOf(FreeAccessLogic.unknown()),
     founderApprovalCelebration: () -> app.mymusclemap.domain.entitlement.FounderApprovalCelebration? = { null },
     onAcknowledgeFounderApproval: () -> Unit = {},
     proBenefitsStatus: () -> app.mymusclemap.domain.entitlement.ProBenefitsStatus = {
@@ -356,6 +361,12 @@ fun WeightTrackerNavHost(
     val showBottomBar = AppNavigation.showsBottomBar(currentRoute)
     val workoutHubViewModel: WorkoutHubViewModel = viewModel(factory = factory)
     val hubState by workoutHubViewModel.uiState.collectAsStateWithLifecycle()
+    val freeAccess by freeAccessDecisions.collectAsStateWithLifecycle(
+        initialValue = FreeAccessLogic.unknown()
+    )
+    var offeredFreeAccessPeriod by rememberSaveable {
+        mutableLongStateOf(FreeAccessStartupNavigation.NONE)
+    }
     val founderViewModel = founderProgram
     val founder = rememberFounderUiState(founderViewModel)
     val entitlementRevision by entitlementChanges.collectAsStateWithLifecycle(initialValue = 0)
@@ -1625,6 +1636,44 @@ fun WeightTrackerNavHost(
         welcomeOffer = welcome.showAutomaticOffer,
         welcomeWarning = welcome.showAutomaticWarning
     )
+    val freeAccessBlocked = hubState.activeSession != null ||
+        hubState.pickerVisible ||
+        hubState.lockedFeature != null ||
+        openNewTemplate ||
+        openFounderProgram ||
+        openPrivacyPolicy ||
+        prompt != null ||
+        FreeAccessStartupNavigation.onboardingBlocks(onboardingGuide)
+    LaunchedEffect(
+        freeAccess.loaded,
+        freeAccess.selectionRequired,
+        freeAccess.state.periodId,
+        currentRoute,
+        freeAccessBlocked
+    ) {
+        when (
+            val action = FreeAccessStartupNavigation.choose(
+                loaded = freeAccess.loaded,
+                selectionRequired = freeAccess.selectionRequired,
+                periodId = freeAccess.state.periodId,
+                offeredPeriodId = offeredFreeAccessPeriod.takeIf {
+                    it != FreeAccessStartupNavigation.NONE
+                },
+                route = currentRoute,
+                blocked = freeAccessBlocked
+            )
+        ) {
+            FreeAccessEntry.None,
+            FreeAccessEntry.Defer -> Unit
+            is FreeAccessEntry.Remember -> offeredFreeAccessPeriod = action.periodId
+            is FreeAccessEntry.Open -> {
+                offeredFreeAccessPeriod = action.periodId
+                navController.navigate(AppRoutes.FREE_ACCESS) {
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
     when (prompt) {
         StrictOneTimePrompt.FounderApproval -> {
             app.mymusclemap.ui.founder.FounderApprovalCelebrationDialog(

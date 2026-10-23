@@ -5,6 +5,9 @@ import java.time.Clock
 /**
  * Combines the store-neutral providers and the local Founder program into one snapshot.
  * Feature code asks this for [EffectiveEntitlement] or [FeatureAccessPolicy].
+ *
+ * [resolveActual] is the resolver output. [resolve] is that value after the single
+ * debug overlay. Release builds pass an identity overlay.
  */
 class EntitlementComposer(
     private val subscriptionProvider: SubscriptionEntitlementProvider,
@@ -14,7 +17,8 @@ class EntitlementComposer(
     private val backendFounder: () -> BackendFounderEntitlement = { BackendFounderEntitlement() },
     private val promotionalPro: () -> PromotionalProEntitlement = { PromotionalProEntitlement() },
     private val welcomeBack: () -> PromotionalProEntitlement = { PromotionalProEntitlement() },
-    private val adjustSources: (EntitlementSources) -> EntitlementSources = { it }
+    private val adjustSources: (EntitlementSources) -> EntitlementSources = { it },
+    private val applyEffective: (EffectiveEntitlement) -> EffectiveEntitlement = { it }
 ) {
     fun sources(): EntitlementSources {
         return EntitlementSources.of(
@@ -27,9 +31,11 @@ class EntitlementComposer(
         )
     }
 
-    fun resolve(): EffectiveEntitlement {
+    fun resolveActual(): EffectiveEntitlement {
         return EntitlementResolver.resolve(adjustSources(sources()), clock.instant())
     }
+
+    fun resolve(): EffectiveEntitlement = applyEffective(resolveActual())
 
     fun policy(): FeatureAccessPolicy = FeatureAccessPolicy(resolve())
 }

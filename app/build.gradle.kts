@@ -374,6 +374,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
         filter {
             includeTestsMatching("app.mymusclemap.FounderProgramRuleSelectionTest")
             includeTestsMatching("app.mymusclemap.EntitlementOverrideSelectionReleaseTest")
+            includeTestsMatching("app.mymusclemap.DebugEntitlementGateReleaseTest")
             includeTestsMatching("app.mymusclemap.ProDiscoveryDebugSelectionReleaseTest")
             includeTestsMatching("app.mymusclemap.WelcomeBackDebugSelectionReleaseTest")
             includeTestsMatching("app.mymusclemap.BillingGatewaySelectionReleaseTest")
