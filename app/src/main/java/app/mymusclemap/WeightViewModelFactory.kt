@@ -94,7 +94,9 @@ class WeightViewModelFactory(
     private val founderRefreshAuthority: suspend () -> Unit = {},
     private val achievementRepository: AchievementRepository? = null,
     private val targetWeightGoalRepository: TargetWeightGoalRepository? = null,
-    private val freeAccessRepository: FreeAccessRepository? = null
+    private val freeAccessRepository: FreeAccessRepository? = null,
+    private val priorProGrantEnded: () -> Boolean = { false },
+    private val entitlementChanges: Flow<Int> = flowOf(0)
 ) : ViewModelProvider.Factory {
     private val accessDecisions = freeAccessRepository?.decisions()
         ?: flowOf(app.mymusclemap.domain.entitlement.FreeAccessLogic.unknown())
@@ -288,7 +290,9 @@ class WeightViewModelFactory(
                 FreeAccessSelectionViewModel(
                     templates = workoutTemplateRepository,
                     exercises = exerciseRepository,
-                    access = checkNotNull(freeAccessRepository)
+                    access = checkNotNull(freeAccessRepository),
+                    priorProGrantEnded = priorProGrantEnded,
+                    entitlementChanges = entitlementChanges
                 )
             }
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")

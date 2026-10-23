@@ -957,6 +957,15 @@ class AppContainer(context: Context, val accountUserId: String) {
         },
         founderRefreshAuthority = { refreshAccountAuthorityFromBackend() },
         freeAccessRepository = freeAccessRepository,
+        priorProGrantEnded = {
+            app.mymusclemap.domain.entitlement.priorProGrantEnded(
+                sources = entitlementComposer.sources(),
+                now = clock.instant(),
+                actualGrantsPro = entitlementComposer.resolveActual().grantsPro,
+                effectiveGrantsPro = entitlementComposer.resolve().grantsPro
+            )
+        },
+        entitlementChanges = entitlementRevision,
         achievementRepository = achievementRepository,
         targetWeightGoalRepository = targetWeightGoalRepository
     )
