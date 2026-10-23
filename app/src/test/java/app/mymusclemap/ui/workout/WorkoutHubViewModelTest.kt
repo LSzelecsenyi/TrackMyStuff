@@ -11,6 +11,11 @@ import app.mymusclemap.data.repository.ScheduledWorkoutRepository
 import app.mymusclemap.data.repository.WeightRepository
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
+import app.mymusclemap.domain.entitlement.FreeAccessPhase
+import app.mymusclemap.domain.entitlement.FreeAccessState
+import app.mymusclemap.domain.entitlement.FreeAccessSubject
 import app.mymusclemap.domain.FixedDateProvider
 import app.mymusclemap.domain.MutableDateProvider
 import app.mymusclemap.domain.exercise.ExerciseCategory
@@ -30,7 +35,10 @@ import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
 import app.mymusclemap.domain.workout.TemplateSaveResult
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import androidx.lifecycle.viewModelScope
@@ -431,9 +439,112 @@ class WorkoutHubViewModelTest {
         assertNull(sessionRepository.observeInProgress().first())
     }
 
+    @Test
+    fun freeAccessMovesPlansBetweenAvailableAndLockedWithoutRewritingThem() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val ids = listOf("Plan A", "Plan B", "Plan C", "Plan D", "Plan E").map { name ->
+            saveTemplate(name, exerciseId)
+        }
+        val subjects = ids.map { FreeAccessSubject(it, it) }
+        val decisions = MutableStateFlow(FreeAccessLogic.unknown())
+        val viewModel = hubViewModel(accessDecisions = decisions)
+        val open = viewModel.uiState.first { it.templates.size == 5 }
+        assertTrue(open.lockedTemplates.isEmpty())
+        assertEquals(ids.sorted(), open.templates.map { it.template.id })
+        val confirmed = FreeAccessLogic.decide(
+            state = FreeAccessState(
+                periodId = 2L,
+                lastKnownPro = false,
+                phase = FreeAccessPhase.Confirmed,
+                selectedPlanIds = ids.take(3).toSet()
+            ),
+            grantsPro = false,
+            plans = subjects,
+            customExercises = emptyList()
+        )
+        decisions.value = confirmed
+        val limited = viewModel.uiState.first { it.lockedTemplates.size == 2 }
+        assertEquals(ids.take(3), limited.templates.map { it.template.id })
+        assertEquals(ids.drop(3), limited.lockedTemplates.map { it.template.id })
+        assertTrue(limited.templates.all { confirmed.planAccessible(it.template.id) })
+        assertTrue(limited.lockedTemplates.none { confirmed.planAccessible(it.template.id) })
+        decisions.value = FreeAccessLogic.decide(
+            state = confirmed.state,
+            grantsPro = true,
+            plans = subjects,
+            customExercises = emptyList()
+        )
+        val restored = viewModel.uiState.first { it.lockedTemplates.isEmpty() && it.templates.size == 5 }
+        assertEquals(ids, restored.templates.map { it.template.id })
+    }
+
+    @Test
+    fun requiredSelectionDoesNotTreatDraftPlanIdsAsStartable() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val ids = listOf("Plan A", "Plan B", "Plan C", "Plan D").map { saveTemplate(it, exerciseId) }
+        val required = FreeAccessLogic.decide(
+            state = FreeAccessState(
+                periodId = 2L,
+                lastKnownPro = false,
+                phase = FreeAccessPhase.Required,
+                selectedPlanIds = ids.take(3).toSet()
+            ),
+            grantsPro = false,
+            plans = ids.map { FreeAccessSubject(it, it) },
+            customExercises = emptyList()
+        )
+        val viewModel = hubViewModel(accessDecisions = flowOf(required))
+        val state = viewModel.uiState.first { it.lockedTemplates.size == ids.size }
+        assertTrue(state.templates.isEmpty())
+        assertTrue(ids.all { !required.planAccessible(it) })
+    }
+
+    @Test
+    fun anArchivedPlanStaysOutOfTheStartLists() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val keep = saveTemplate("Keep", exerciseId)
+        val archived = saveTemplate("Archived", exerciseId)
+        assertTrue(templates.archive(archived))
+        val decision = FreeAccessLogic.decide(
+            state = FreeAccessState(1L, false, FreeAccessPhase.NotRequired),
+            grantsPro = false,
+            plans = listOf(FreeAccessSubject(keep, 1L), FreeAccessSubject(archived, 2L)),
+            customExercises = emptyList()
+        )
+        val viewModel = hubViewModel(accessDecisions = flowOf(decision))
+        val state = viewModel.uiState.first { it.templates.any { item -> item.template.id == keep } }
+        assertTrue(state.templates.none { it.template.id == archived })
+        assertTrue(state.lockedTemplates.none { it.template.id == archived })
+        assertTrue(decision.planAccessible(keep))
+    }
+
+    @Test
+    fun aLockedPlanScheduledForTodayIsNotOfferedAsStartable() = runTest {
+        val exerciseId = saveExercise("Húzódzkodás")
+        val push = saveTemplate("Push A", exerciseId)
+        (scheduled().schedule(push, today) as ScheduleWorkoutResult.Scheduled)
+        val decision = FreeAccessLogic.decide(
+            state = FreeAccessState(
+                periodId = 2L,
+                lastKnownPro = false,
+                phase = FreeAccessPhase.Confirmed,
+                selectedPlanIds = emptySet()
+            ),
+            grantsPro = false,
+            plans = listOf(FreeAccessSubject(push, push)),
+            customExercises = emptyList()
+        )
+        val viewModel = hubViewModel(accessDecisions = flowOf(decision))
+        val state = viewModel.uiState.first { it.lockedTemplates.any { item -> item.template.id == push } }
+        assertTrue(state.todayPlanned.isEmpty())
+        assertTrue(state.templates.isEmpty())
+        assertFalse(decision.planAccessible(push))
+    }
+
     private fun hubViewModel(
         sessionRepository: WorkoutSessionRepository = sessions(),
-        dateProvider: app.mymusclemap.domain.DateProvider = FixedDateProvider(today)
+        dateProvider: app.mymusclemap.domain.DateProvider = FixedDateProvider(today),
+        accessDecisions: Flow<FreeAccessDecision> = flowOf(FreeAccessLogic.unknown())
     ): WorkoutHubViewModel {
         val viewModel = WorkoutHubViewModel(
             repository,
@@ -445,7 +556,8 @@ class WorkoutHubViewModelTest {
                 database.workoutSessionDao(),
                 Clock.fixed(today.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
             ),
-            dateProvider
+            dateProvider,
+            accessDecisions = accessDecisions
         )
         viewModelStore.put("hub-${viewModels.size}", viewModel)
         viewModels += viewModel

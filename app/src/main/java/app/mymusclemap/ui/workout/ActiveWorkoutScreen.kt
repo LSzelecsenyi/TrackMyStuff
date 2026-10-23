@@ -697,6 +697,7 @@ fun ActiveWorkoutScreen(
     if (pickerOpen) {
         ExtraExercisePickerSheet(
             exercises = state.catalog,
+            access = state.exerciseAccess,
             onDismiss = { pickerOpen = false },
             onSelect = { exercise ->
                 pickerOpen = false

@@ -10,22 +10,26 @@ import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.locale.LocalizedLabelOrder
+import app.mymusclemap.domain.workout.StartWorkoutGrouping
 import app.mymusclemap.domain.workout.ActiveSessionSummary
-import app.mymusclemap.domain.workout.QuickStartAssembler
 import app.mymusclemap.domain.workout.ScheduledWorkout
 import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.workout.TemplateListItem
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
 import app.mymusclemap.domain.workout.ScheduledWorkoutUiLogic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -36,6 +40,7 @@ data class WorkoutHubUiState(
     val activeTemplateCount: Int = 0,
     val archivedTemplateCount: Int = 0,
     val templates: List<TemplateListItem> = emptyList(),
+    val lockedTemplates: List<TemplateListItem> = emptyList(),
     val todayPlanned: List<ScheduledWorkout> = emptyList(),
     val todayInProgress: List<ScheduledWorkout> = emptyList(),
     val activeSession: ActiveSessionSummary? = null,
@@ -75,7 +80,8 @@ class WorkoutHubViewModel(
     private val sessionRepository: WorkoutSessionRepository,
     scheduledWorkoutRepository: ScheduledWorkoutRepository,
     private val dateProvider: DateProvider,
-    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements
+    private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
+    accessDecisions: Flow<FreeAccessDecision> = flowOf(FreeAccessLogic.unknown())
 ) : ViewModel() {
     private val starting = MutableStateFlow(false)
     private val preparingStart = MutableStateFlow(false)
@@ -109,7 +115,9 @@ class WorkoutHubViewModel(
         ) { exercises, archivedExercises, templates, archivedTemplates ->
             Counts(exercises, archivedExercises, templates, archivedTemplates)
         },
-        templateRepository.observeActive(),
+        combine(templateRepository.observeActive(), accessDecisions) { templates, decision ->
+            templates to decision
+        },
         sessionRepository.observeInProgress(),
         combine(message, startedSessionId, starting, pickerOpen, lockedFeature) {
             currentMessage, started, isStarting, pickerVisible, locked ->
@@ -123,15 +131,17 @@ class WorkoutHubViewModel(
         ) { recent, todaySchedules ->
             recent to todaySchedules
         }
-    ) { counts, templates, active, extras, recentAndToday ->
+    ) { counts, templatesAndAccess, active, extras, recentAndToday ->
+        val (templates, decision) = templatesAndAccess
         val (recent, todaySchedules) = recentAndToday
-        val assembled = QuickStartAssembler.assemble(
-            templates = LocalizedLabelOrder.sorted(
+        val grouped = StartWorkoutGrouping.group(
+            orderedTemplates = LocalizedLabelOrder.sorted(
                 templates,
                 label = { it.template.name },
                 key = { it.template.id.toString() }
             ),
-            todaySchedules = todaySchedules
+            todaySchedules = todaySchedules,
+            decision = decision
         )
         WorkoutHubUiState(
             loading = false,
@@ -139,9 +149,10 @@ class WorkoutHubViewModel(
             archivedCount = counts.archivedExercises,
             activeTemplateCount = counts.templates,
             archivedTemplateCount = counts.archivedTemplates,
-            templates = assembled.remainingTemplates,
-            todayPlanned = assembled.todayPlanned,
-            todayInProgress = assembled.todayInProgress,
+            templates = grouped.available,
+            lockedTemplates = grouped.locked,
+            todayPlanned = grouped.todayPlanned,
+            todayInProgress = grouped.todayInProgress,
             activeSession = active,
             isStarting = extras.isStarting,
             message = extras.currentMessage,

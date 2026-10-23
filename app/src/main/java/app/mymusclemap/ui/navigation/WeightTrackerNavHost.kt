@@ -1605,7 +1605,12 @@ fun WeightTrackerNavHost(
             todayPlanned = hubState.todayPlanned,
             todayInProgress = hubState.todayInProgress,
             onStartScheduled = workoutHubViewModel::startScheduled,
-            onContinueScheduled = workoutHubViewModel::continueScheduled
+            onContinueScheduled = workoutHubViewModel::continueScheduled,
+            lockedTemplates = hubState.lockedTemplates,
+            onExplorePro = {
+                workoutHubViewModel.dismissPicker()
+                navController.navigateInternal(AppRoutes.PRO_BENEFITS)
+            }
         )
     }
     hubState.lockedFeature?.let { feature ->

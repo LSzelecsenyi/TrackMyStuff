@@ -2,6 +2,7 @@ package app.mymusclemap.ui.workout
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,10 +15,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -32,10 +39,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
@@ -52,8 +61,11 @@ internal const val START_PICKER_TODAY_SECTION = "workout-start-picker-today"
 internal const val START_PICKER_MANAGE = "workout-start-picker-manage"
 internal const val START_PICKER_CREATE = "workout-start-picker-create"
 internal const val START_PICKER_EMPTY = "workout-start-picker-empty"
+internal const val START_PICKER_LOCKED_HEADER = "workout-start-picker-locked-header"
+internal const val START_PICKER_EXPLORE = "workout-start-picker-explore-pro"
 
 internal fun startPickerRowTag(id: Long): String = "workout-start-picker-row-$id"
+internal fun startPickerLockedRowTag(id: Long): String = "workout-start-picker-locked-$id"
 internal fun startPickerScheduledRowTag(id: Long): String = "workout-start-picker-scheduled-$id"
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,11 +80,14 @@ fun WorkoutStartPickerSheet(
     todayPlanned: List<ScheduledWorkout> = emptyList(),
     todayInProgress: List<ScheduledWorkout> = emptyList(),
     onStartScheduled: (ScheduledWorkout) -> Unit = {},
-    onContinueScheduled: (ScheduledWorkout) -> Unit = {}
+    onContinueScheduled: (ScheduledWorkout) -> Unit = {},
+    lockedTemplates: List<TemplateListItem> = emptyList(),
+    onExplorePro: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val keyboard = LocalSoftwareKeyboardController.current
     var selected by remember { mutableStateOf(false) }
+    var explored by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         keyboard?.hide()
     }
@@ -105,6 +120,7 @@ fun WorkoutStartPickerSheet(
             )
             Spacer(Modifier.height(AppDimens.itemGap))
             val hasToday = todayPlanned.isNotEmpty() || todayInProgress.isNotEmpty()
+            val hasPlans = templates.isNotEmpty() || lockedTemplates.isNotEmpty()
             if (hasToday) {
                 Text(
                     text = stringResource(R.string.quick_start_today_section),
@@ -132,7 +148,7 @@ fun WorkoutStartPickerSheet(
                             onStartScheduled(item)
                         }
                     )
-                    if (index != todayPlanned.lastIndex || todayInProgress.isNotEmpty() || templates.isNotEmpty()) {
+                    if (index != todayPlanned.lastIndex || todayInProgress.isNotEmpty() || hasPlans) {
                         HorizontalDivider(
                             thickness = AppDimens.strokeThin,
                             color = MaterialTheme.colorScheme.outlineVariant
@@ -154,18 +170,18 @@ fun WorkoutStartPickerSheet(
                             onContinueScheduled(item)
                         }
                     )
-                    if (index != todayInProgress.lastIndex || templates.isNotEmpty()) {
+                    if (index != todayInProgress.lastIndex || hasPlans) {
                         HorizontalDivider(
                             thickness = AppDimens.strokeThin,
                             color = MaterialTheme.colorScheme.outlineVariant
                         )
                     }
                 }
-                if (templates.isNotEmpty()) {
+                if (hasPlans) {
                     Spacer(Modifier.height(AppDimens.itemGap))
                 }
             }
-            if (templates.isEmpty() && !hasToday) {
+            if (!hasPlans && !hasToday) {
                 Text(
                     text = stringResource(R.string.workout_start_picker_empty),
                     style = AppTypeTokens.statSecondary,
@@ -207,6 +223,19 @@ fun WorkoutStartPickerSheet(
                         )
                     }
                 }
+                if (lockedTemplates.isNotEmpty()) {
+                    if (templates.isNotEmpty()) {
+                        Spacer(Modifier.height(AppDimens.sectionGap))
+                    }
+                    LockedPlansSection(
+                        plans = lockedTemplates,
+                        onExplorePro = {
+                            if (explored) return@LockedPlansSection
+                            explored = true
+                            onExplorePro()
+                        }
+                    )
+                }
                 Spacer(Modifier.height(AppDimens.itemGap))
                 TextButton(
                     onClick = {
@@ -228,6 +257,117 @@ fun WorkoutStartPickerSheet(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LockedPlansSection(
+    plans: List<TemplateListItem>,
+    onExplorePro: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val countLabel = pluralStringResource(R.plurals.start_picker_locked_count, plans.size, plans.size)
+    val support = stringResource(R.string.start_picker_locked_support)
+    val stateLabel = stringResource(
+        if (expanded) R.string.start_picker_locked_expanded else R.string.start_picker_locked_collapsed
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .clickable { expanded = !expanded }
+            .testTag(START_PICKER_LOCKED_HEADER)
+            .semantics {
+                role = Role.Button
+                stateDescription = stateLabel
+            }
+            .padding(vertical = AppDimens.headerStackGap),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Lock,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = countLabel,
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = support,
+                style = AppTypeTokens.statCaption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface
+        )
+    }
+    OutlinedButton(
+        onClick = onExplorePro,
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag(START_PICKER_EXPLORE)
+    ) {
+        Text(
+            text = stringResource(R.string.timed_set_explore_pro),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+    if (expanded) {
+        Spacer(Modifier.height(AppDimens.headerStackGap))
+        plans.forEach { item ->
+            LockedPlanRow(item)
+        }
+    }
+}
+
+@Composable
+private fun LockedPlanRow(item: TemplateListItem) {
+    val meta = stringResource(R.string.template_row_meta, item.exerciseCount, item.setCount)
+    val lockedStatus = stringResource(R.string.free_locked_title)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .testTag(startPickerLockedRowTag(item.template.id))
+            .semantics { stateDescription = lockedStatus }
+            .padding(vertical = AppDimens.headerStackGap),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Lock,
+            contentDescription = lockedStatus,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.template.name,
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = meta,
+                style = AppTypeTokens.statCaption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

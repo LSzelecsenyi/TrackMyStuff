@@ -615,6 +615,10 @@
     <string name="remove_extra_exercise_body">Ez a gyakorlat és a sorozatai kikerülnek az edzésből. A mentett terv változatlan marad.</string>
     <string name="extra_exercise_picker_title">Extra gyakorlat hozzáadása</string>
     <string name="extra_exercise_picker_empty">Nincs elérhető gyakorlat.</string>
+    <string name="extra_exercise_picker_none">Nincs hozzáadható gyakorlat.</string>
+    <string name="start_picker_locked_support">Mentve maradnak, és STRICT PRO-val újra használhatók.</string>
+    <string name="start_picker_locked_expanded">A zárolt edzéstervek látszanak</string>
+    <string name="start_picker_locked_collapsed">A zárolt edzéstervek rejtve vannak</string>
     <string name="active_set_planned">Terv: %1$s</string>
     <string name="active_set_last_time">Legutóbb: %1$s</string>
     <string name="active_set_last_time_none">Nincs korábbi adat</string>

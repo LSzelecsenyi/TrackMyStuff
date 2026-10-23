@@ -120,4 +120,8 @@
         <item quantity="one">Your training history earned you %d badge.</item>
         <item quantity="other">Your training history earned you %d badges.</item>
     </plurals>
+    <plurals name="start_picker_locked_count">
+        <item quantity="one">%d workout locked</item>
+        <item quantity="other">%d workouts locked</item>
+    </plurals>
 </resources>

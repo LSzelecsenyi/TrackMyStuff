@@ -672,6 +672,68 @@ class WorkoutSessionRepositoryRoomTest {
         assertEquals(catalogBefore, exercises.all().size)
     }
 
+    @Test
+    fun aLockedPlanIsRejectedAndDoesNotCreateASession() = runTest {
+        val pull = savePull()
+        val templateId = saveTemplate(
+            "Push A",
+            listOf(pull to listOf(PlannedSetDraft(-1, "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
+        )
+        val guarded = sessions(planMayStart = { false })
+        assertEquals(StartWorkoutResult.PlanLocked, guarded.start(templateId))
+        assertNull(guarded.observeInProgress().first())
+    }
+
+    @Test
+    fun aPlanContainingALockedExerciseStillStarts() = runTest {
+        val pull = savePull()
+        val templateId = saveTemplate(
+            "Push A",
+            listOf(pull to listOf(PlannedSetDraft(-1, "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
+        )
+        val guarded = sessions(exerciseMayExecute = { false })
+        val started = guarded.start(templateId) as StartWorkoutResult.Started
+        val aggregate = guarded.getAggregate(started.sessionId)!!
+        assertEquals(listOf("Húzódzkodás"), aggregate.exercises.map { it.exercise.name })
+    }
+
+    @Test
+    fun aLockedCustomExerciseCannotBeAddedAndTheSessionStaysUnchanged() = runTest {
+        val pull = savePull()
+        val dip = saveDip()
+        val templateId = saveTemplate(
+            "Push A",
+            listOf(pull to listOf(PlannedSetDraft(-1, "8", loadKind = PlannedLoadKind.BODYWEIGHT_ONLY)))
+        )
+        val guarded = sessions(exerciseMayExecute = { id -> id != dip })
+        val started = guarded.start(templateId) as StartWorkoutResult.Started
+        assertEquals(
+            AddExtraExerciseResult.ExerciseLocked,
+            guarded.addExtraExercise(started.sessionId, dip)
+        )
+        assertEquals(
+            listOf("Húzódzkodás"),
+            guarded.getAggregate(started.sessionId)!!.exercises.map { it.exercise.name }
+        )
+    }
+
+    private fun sessions(
+        planMayStart: suspend (Long) -> Boolean = { true },
+        exerciseMayExecute: suspend (Long) -> Boolean = { true }
+    ): WorkoutSessionRepository {
+        val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
+        return WorkoutSessionRepository(
+            database.workoutSessionDao(),
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            weights,
+            clock,
+            FixedDateProvider(today),
+            planMayStart = planMayStart,
+            exerciseMayExecute = exerciseMayExecute
+        )
+    }
+
     private suspend fun savePull(): Long {
         return (exercises.save(
             ExerciseDraft(

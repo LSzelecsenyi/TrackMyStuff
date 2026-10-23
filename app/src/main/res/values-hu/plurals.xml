@@ -120,4 +120,8 @@
         <item quantity="one">Az edzéselőzményeid %d jelvényt szereztek.</item>
         <item quantity="other">Az edzéselőzményeid %d jelvényt szereztek.</item>
     </plurals>
+    <plurals name="start_picker_locked_count">
+        <item quantity="one">%d zárolt edzésterv</item>
+        <item quantity="other">%d zárolt edzésterv</item>
+    </plurals>
 </resources>

@@ -61,7 +61,6 @@ import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
 import app.mymusclemap.ui.entitlement.FreeAccessSelectionViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 
 class WeightViewModelFactory(
     private val weightRepository: WeightRepository,
@@ -141,7 +140,8 @@ class WeightViewModelFactory(
                     workoutSessionRepository,
                     scheduledWorkoutRepository,
                     dateProvider,
-                    featureEntitlements
+                    featureEntitlements,
+                    accessDecisions
                 )
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
@@ -209,7 +209,7 @@ class WeightViewModelFactory(
                     entitlements = featureEntitlements,
                     timerSounds = timerSounds,
                     timerCuePlayer = AndroidTimerCuePlayer(application),
-                    lockedCatalogExerciseIds = accessDecisions.map { it.lockedCustomExerciseIds }
+                    accessDecisions = accessDecisions
                 )
             }
             modelClass.isAssignableFrom(WorkoutDetailViewModel::class.java) -> {

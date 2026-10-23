@@ -9,6 +9,12 @@ import app.mymusclemap.ConfinedMainDispatcherRule
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.repository.ExerciseRepository
 import app.mymusclemap.data.repository.WeightRepository
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
+import app.mymusclemap.domain.entitlement.FreeAccessPhase
+import app.mymusclemap.domain.entitlement.FreeAccessState
+import app.mymusclemap.domain.entitlement.FreeAccessSubject
+import app.mymusclemap.domain.exercise.Exercise
+import app.mymusclemap.domain.workout.ExtraExerciseAccess
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.domain.FixedDateProvider
@@ -1066,6 +1072,78 @@ class ActiveWorkoutViewModelTest {
         assertEquals(RestPhase.COUNTING, afterReboot.rest!!.phase)
     }
 
+    @Test
+    fun pickerCatalogFollowsCanonicalExerciseAccess() = runOnMain {
+        val starter = catalogExercise(1, "Squat", custom = false)
+        val open = catalogExercise(2, "Mine", custom = true)
+        val locked = catalogExercise(3, "Secret Lift", custom = true)
+        val archived = catalogExercise(4, "Old", custom = true, archived = true)
+        val catalog = MutableStateFlow(listOf(starter, open, locked, archived))
+        val subjects = listOf(FreeAccessSubject(2, 2), FreeAccessSubject(3, 3), FreeAccessSubject(4, 4))
+        val confirmed = FreeAccessLogic.decide(
+            state = FreeAccessState(
+                periodId = 2L,
+                lastKnownPro = false,
+                phase = FreeAccessPhase.Confirmed,
+                selectedCustomExerciseIds = setOf(2L)
+            ),
+            grantsPro = false,
+            plans = emptyList(),
+            customExercises = subjects
+        )
+        val access = MutableStateFlow(confirmed)
+        val viewModel = ActiveWorkoutViewModel(
+            SavedStateHandle(mapOf(ActiveWorkoutViewModel.SESSION_ID to -1L)),
+            sessions,
+            observeCatalog = catalog,
+            accessDecisions = access
+        )
+        viewModelStore.put("active-${viewModelKey++}", viewModel)
+        val limited = awaitReal {
+            viewModel.uiState.first { it.exerciseAccess.loaded && it.catalog.isNotEmpty() }
+        }
+        assertEquals(listOf(1L, 2L), limited.catalog.map { it.id })
+        assertTrue(limited.catalog.all { ExtraExerciseAccess.addable(it, confirmed) })
+        assertTrue(limited.catalog.none { it.id == locked.id || it.archived })
+        access.value = FreeAccessLogic.decide(
+            state = confirmed.state,
+            grantsPro = true,
+            plans = emptyList(),
+            customExercises = subjects
+        )
+        val restored = awaitReal {
+            viewModel.uiState.first { state -> state.catalog.any { it.id == locked.id } }
+        }
+        assertEquals(setOf(1L, 2L, 3L), restored.catalog.map { it.id }.toSet())
+        assertTrue(restored.catalog.none { it.archived })
+    }
+
+    @Test
+    fun aStaleLockedExerciseCannotBeAdded() = runOnMain {
+        val dip = saveDip()
+        startSingleSet()
+        val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
+        val guarded = WorkoutSessionRepository(
+            database.workoutSessionDao(),
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            WeightRepository(database.weightMeasurementDao(), clock),
+            clock,
+            FixedDateProvider(today),
+            exerciseMayExecute = { false }
+        )
+        val viewModel = ActiveWorkoutViewModel(
+            SavedStateHandle(mapOf(ActiveWorkoutViewModel.SESSION_ID to sessionId)),
+            guarded
+        )
+        viewModelStore.put("active-${viewModelKey++}", viewModel)
+        viewModel.loaded()
+        viewModel.addExtraExercise(dip)
+        val failed = awaitReal { viewModel.uiState.first { it.message == ActiveWorkoutMessage.SaveFailed } }
+        assertEquals(1, failed.aggregate!!.exercises.size)
+        assertEquals(1, sessions.getAggregate(sessionId)!!.exercises.size)
+    }
+
     private fun runOnMain(block: suspend () -> Unit) = runTest {
         withContext(Dispatchers.Main) {
             block()
@@ -1282,6 +1360,31 @@ class ActiveWorkoutViewModelTest {
                 secondaryMuscles = listOf(MuscleGroup.BICEPS)
             )
         ) as ExerciseSaveResult.Created).id
+    }
+
+    private fun catalogExercise(
+        id: Long,
+        name: String,
+        custom: Boolean,
+        archived: Boolean = false
+    ): Exercise {
+        return Exercise(
+            id = id,
+            name = name,
+            normalizedName = name.lowercase(),
+            category = ExerciseCategory.STRENGTH,
+            movementPattern = MovementPattern.SQUAT,
+            measurementType = MeasurementType.REPETITIONS,
+            resistanceBasis = ResistanceBasis.BODYWEIGHT,
+            weightInterpretation = WeightInterpretation.NOT_APPLICABLE,
+            primaryMuscle = MuscleGroup.CHEST,
+            secondaryMuscles = emptyList(),
+            notes = null,
+            archived = archived,
+            createdAt = id,
+            updatedAt = id,
+            custom = custom
+        )
     }
 
     private suspend fun saveDip(): Long {

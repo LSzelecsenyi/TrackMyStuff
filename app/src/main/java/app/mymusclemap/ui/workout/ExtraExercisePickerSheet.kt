@@ -27,11 +27,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
 import app.mymusclemap.domain.exercise.ArchiveFilter
 import app.mymusclemap.domain.exercise.Exercise
 import app.mymusclemap.domain.exercise.ExerciseCatalogLogic
 import app.mymusclemap.domain.exercise.ExerciseCategory
 import app.mymusclemap.domain.exercise.MuscleGroup
+import app.mymusclemap.domain.workout.ExtraExerciseAccess
 import app.mymusclemap.ui.exercises.CatalogDropdown
 import app.mymusclemap.ui.exercises.labelRes
 import app.mymusclemap.ui.exercises.starterExerciseLabel
@@ -39,22 +42,28 @@ import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.sheetContainerColor
 
 internal const val EXTRA_EXERCISE_PICKER = "extra-exercise-picker"
+internal const val EXTRA_EXERCISE_NONE = "extra-exercise-picker-none"
+internal const val EXTRA_EXERCISE_NO_RESULTS = "extra-exercise-picker-no-results"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ExtraExercisePickerSheet(
     exercises: List<Exercise>,
     onDismiss: () -> Unit,
-    onSelect: (Exercise) -> Unit
+    onSelect: (Exercise) -> Unit,
+    access: FreeAccessDecision = FreeAccessLogic.unknown()
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val keyboard = LocalSoftwareKeyboardController.current
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf<ExerciseCategory?>(null) }
     var muscle by remember { mutableStateOf<MuscleGroup?>(null) }
-    val visible = remember(exercises, query, category, muscle) {
+    val addable = remember(exercises, access) {
+        exercises.filter { ExtraExerciseAccess.addable(it, access) }
+    }
+    val visible = remember(addable, query, category, muscle) {
         ExerciseCatalogLogic.filter(
-            exercises = exercises,
+            exercises = addable,
             query = query,
             category = category,
             muscle = muscle,
@@ -85,10 +94,11 @@ internal fun ExtraExercisePickerSheet(
                 style = MaterialTheme.typography.titleLarge
             )
             Spacer(Modifier.height(AppDimens.itemGap))
-            if (exercises.none { !it.archived }) {
+            if (addable.isEmpty()) {
                 Text(
-                    text = stringResource(R.string.extra_exercise_picker_empty),
-                    style = MaterialTheme.typography.bodyLarge
+                    text = stringResource(R.string.extra_exercise_picker_none),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.testTag(EXTRA_EXERCISE_NONE)
                 )
                 return@Column
             }
@@ -121,12 +131,16 @@ internal fun ExtraExercisePickerSheet(
             if (visible.isEmpty()) {
                 Text(
                     text = stringResource(R.string.extra_exercise_picker_empty),
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.testTag(EXTRA_EXERCISE_NO_RESULTS)
                 )
             }
             visible.forEach { exercise ->
                 TextButton(
-                    onClick = { onSelect(exercise) },
+                    onClick = {
+                        if (!ExtraExerciseAccess.addable(exercise, access)) return@TextButton
+                        onSelect(exercise)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(extraExercisePickerRowTag(exercise.id))

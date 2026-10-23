@@ -11,6 +11,7 @@ import app.mymusclemap.domain.workout.ActualSetDraft
 import app.mymusclemap.domain.workout.ActualSetLogic
 import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.domain.workout.ElapsedTime
+import app.mymusclemap.domain.workout.ExtraExerciseAccess
 import app.mymusclemap.domain.workout.ExerciseHistoryGate
 import app.mymusclemap.domain.workout.ExerciseHistorySelection
 import app.mymusclemap.domain.workout.FinishWorkoutResult
@@ -19,6 +20,8 @@ import app.mymusclemap.domain.workout.SessionExercise
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedLoadLogic
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
+import app.mymusclemap.domain.entitlement.FreeAccessDecision
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
 import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.domain.workout.RestClockSample
@@ -131,6 +134,7 @@ data class ActiveWorkoutUiState(
     val completionSummary: WorkoutCompletionSummary? = null,
     val exerciseHistory: InWorkoutExerciseHistory = InWorkoutExerciseHistory.Loading,
     val catalog: List<Exercise> = emptyList(),
+    val exerciseAccess: FreeAccessDecision = FreeAccessLogic.unknown(),
     val rest: RestTimerUi? = null,
     val work: WorkTimerUi? = null,
     val timersEnabled: Boolean = true,
@@ -181,7 +185,7 @@ class ActiveWorkoutViewModel(
     private val speechLanguage: () -> app.mymusclemap.domain.workout.TimerSpeechLanguage = {
         currentTimerSpeechLanguage()
     },
-    private val lockedCatalogExerciseIds: Flow<Set<Long>> = flowOf(emptySet())
+    accessDecisions: Flow<FreeAccessDecision> = flowOf(FreeAccessLogic.unknown())
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(SESSION_ID) ?: -1L
     private val selectedIndex = savedStateHandle.getStateFlow(SELECTED_INDEX, 0)
@@ -226,7 +230,15 @@ class ActiveWorkoutViewModel(
     private var pendingExerciseIndex: Int? = null
     private var workExpiryJob: Job? = null
     private var workExpiryGeneration: Long? = null
+    private val access = accessDecisions.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = FreeAccessLogic.unknown()
+    )
     private val lockedCatalog = MutableStateFlow<Set<Long>>(emptySet())
+    private val accessibleCatalog = combine(observeCatalog, access) { catalog, decision ->
+        catalog.filter { ExtraExerciseAccess.addable(it, decision) }
+    }
     private val audioMode = MutableStateFlow(TimerAudioMode.BEEPS)
     private val preparation = MutableStateFlow<WorkPreparationSnapshot?>(null)
     private var preparationGeneration = 0L
@@ -417,9 +429,14 @@ class ActiveWorkoutViewModel(
     val uiState: StateFlow<ActiveWorkoutUiState> = combine(
         workoutState,
         exerciseHistory,
-        observeCatalog
-    ) { workout, history, catalog ->
-        workout.copy(exerciseHistory = history, catalog = catalog)
+        accessibleCatalog,
+        access
+    ) { workout, history, catalog, decision ->
+        workout.copy(
+            exerciseHistory = history,
+            catalog = catalog,
+            exerciseAccess = decision
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -428,7 +445,8 @@ class ActiveWorkoutViewModel(
 
     init {
         viewModelScope.launch {
-            lockedCatalogExerciseIds.collect { locked ->
+            access.collect { decision ->
+                val locked = if (decision.loaded) decision.lockedCustomExerciseIds else emptySet()
                 lockedCatalog.value = locked
                 val aggregate = latestAggregate ?: return@collect
                 val workSetId = aggregate.session.workSetId

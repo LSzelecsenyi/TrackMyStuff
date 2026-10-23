@@ -615,6 +615,10 @@
     <string name="remove_extra_exercise_body">This exercise and its sets will be removed from the workout. The saved plan stays unchanged.</string>
     <string name="extra_exercise_picker_title">Add extra exercise</string>
     <string name="extra_exercise_picker_empty">No exercises are available.</string>
+    <string name="extra_exercise_picker_none">No exercises available to add.</string>
+    <string name="start_picker_locked_support">Saved and available with STRICT PRO</string>
+    <string name="start_picker_locked_expanded">Locked workouts shown</string>
+    <string name="start_picker_locked_collapsed">Locked workouts hidden</string>
     <string name="active_set_planned">Plan: %1$s</string>
     <string name="active_set_last_time">Last time: %1$s</string>
     <string name="active_set_last_time_none">No previous data</string>
