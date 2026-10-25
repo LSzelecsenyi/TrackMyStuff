@@ -322,6 +322,11 @@ fun WeightTrackerNavHost(
     proBenefitsStatus: () -> app.mymusclemap.domain.entitlement.ProBenefitsStatus = {
         app.mymusclemap.domain.entitlement.ProBenefitsStatus()
     },
+    proBenefitsAccess: () -> app.mymusclemap.domain.entitlement.ProBenefitsAccess = {
+        app.mymusclemap.domain.entitlement.ProBenefitsAccess(
+            level = app.mymusclemap.domain.entitlement.ProAccessLevel.Free
+        )
+    },
     proDiscovery: () -> ProDiscoverySnapshot = { ProDiscoverySnapshot() },
     promotionNow: () -> Instant = { Instant.now() },
     onActivateProDiscovery: () -> Unit = {},
@@ -806,11 +811,17 @@ fun WeightTrackerNavHost(
             }
             composable(AppRoutes.PRO_BENEFITS) {
                 val benefits = remember(entitlementRevision) { proBenefitsStatus() }
+                val access = remember(entitlementRevision) { proBenefitsAccess() }
                 val discovery = remember(entitlementRevision) { proDiscovery() }
                 val welcome = remember(entitlementRevision) { welcomeBack() }
                 val entitlement = remember(entitlementRevision) { currentEntitlement() }
                 val paid = remember(entitlementRevision) { paidSubscription() }
                 val now = freshPromotionInstant(dateProvider, promotionNow)
+                val subscription = app.mymusclemap.domain.billing.subscriptionFacts(
+                    paid = paid,
+                    billing = billingScreen,
+                    now = now
+                )
                 val plan = app.mymusclemap.domain.billing.proPlanPresentation(
                     founderProActive = entitlement.founderProActive,
                     founderLifetime = entitlement.founderLifetime,
@@ -822,6 +833,7 @@ fun WeightTrackerNavHost(
                 )
                 ProBenefitsScreen(
                     status = benefits,
+                    access = access,
                     onBack = { navController.popBackStack() },
                     discovery = discovery,
                     onActivateTrial = onActivateProDiscovery,
@@ -829,6 +841,7 @@ fun WeightTrackerNavHost(
                     onActivateWelcomeBack = onActivateWelcomeBack,
                     now = now,
                     plan = plan,
+                    subscription = subscription,
                     onSelectOffer = onSelectBillingOffer,
                     onSubscribe = onSubscribe,
                     onManageSubscription = onManageSubscription,
@@ -1193,7 +1206,10 @@ fun WeightTrackerNavHost(
                     onMessageConsumed = viewModel::consumeMessage,
                     onDismissLocked = viewModel::consumeLockedFeature,
                     onChooseFreeAccess = { navController.navigateInternal(AppRoutes.FREE_ACCESS) },
-                    onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) }
+                    onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) },
+                    onRequestRelease = viewModel::requestRelease,
+                    onDismissRelease = viewModel::dismissRelease,
+                    onConfirmRelease = viewModel::confirmRelease
                 )
             }
             composable(

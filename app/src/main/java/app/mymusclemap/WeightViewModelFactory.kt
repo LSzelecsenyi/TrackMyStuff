@@ -169,7 +169,21 @@ class WeightViewModelFactory(
                 OnboardingGuideViewModel(onboardingRepository)
             }
             modelClass.isAssignableFrom(ExerciseListViewModel::class.java) -> {
-                ExerciseListViewModel(exerciseRepository, featureEntitlements, accessDecisions)
+                ExerciseListViewModel(
+                    exerciseRepository,
+                    featureEntitlements,
+                    accessDecisions,
+                    planReferences = { id ->
+                        freeAccessRepository?.plansReferencing(id).orEmpty()
+                    },
+                    exerciseHasPendingWork = { id ->
+                        workoutSessionRepository.catalogExerciseHasPendingWork(id)
+                    },
+                    releaseExercise = { id ->
+                        freeAccessRepository?.releaseCustomExercise(id)
+                            ?: app.mymusclemap.domain.entitlement.FreeExerciseReleaseResult.NotAllocated
+                    }
+                )
             }
             modelClass.isAssignableFrom(ExerciseEditorViewModel::class.java) -> {
                 val application = extras[APPLICATION_KEY]

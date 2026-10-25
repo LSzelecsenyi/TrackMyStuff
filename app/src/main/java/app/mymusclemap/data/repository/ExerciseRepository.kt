@@ -24,9 +24,9 @@ class ExerciseRepository(
     private val clock: Clock,
     private val templateDao: WorkoutTemplateDao? = null,
     private val sessionDao: WorkoutSessionDao? = null,
-    private val allowCustomCreate: (activeCustomCount: Int) -> Boolean = { true },
+    private val allowCustomCreate: suspend (activeCustomCount: Int) -> Boolean = { true },
     private val mayUpdate: suspend (Long) -> Boolean = { true },
-    private val onCustomCreated: suspend (Long) -> Unit = {}
+    private val onCustomCreated: suspend (Long) -> Boolean = { true }
 ) {
     fun observeAll(): Flow<List<Exercise>> {
         return combine(dao.observeAll(), dao.observeMuscles()) { exercises, muscles ->
@@ -131,8 +131,9 @@ class ExerciseRepository(
         return try {
             val id = dao.saveWithMuscles(entity, muscles)
             if (existing == null) {
-                if (creatingCustom) {
-                    onCustomCreated(id)
+                if (creatingCustom && !onCustomCreated(id)) {
+                    dao.deleteById(id)
+                    return ExerciseSaveResult.CreationLimited
                 }
                 ExerciseSaveResult.Created(id)
             } else {

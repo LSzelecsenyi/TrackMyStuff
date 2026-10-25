@@ -78,7 +78,6 @@ class TemplateListViewModel(
     val uiState: StateFlow<TemplateListUiState> = combine(
         repository.observeAll(),
         repository.observeReferencedTemplateIds(),
-        repository.observePlanCount(),
         combine(query, archiveFilter, message, pendingDelete, pendingBlocked) {
                 text, filter, currentMessage, delete, blocked ->
             Controls(text, filter, currentMessage, delete, blocked)
@@ -86,7 +85,7 @@ class TemplateListViewModel(
         combine(lockedFeature, entitlements.changes(), access) { locked, _, decision ->
             locked to decision
         }
-    ) { items, referenced, planCount, controls, extra ->
+    ) { items, referenced, controls, extra ->
         val (locked, decision) = extra
         val visible = TemplateCatalogLogic.filter(
             items = items,
@@ -108,8 +107,8 @@ class TemplateListViewModel(
             pendingDelete = controls.pendingDelete,
             pendingBlocked = controls.pendingBlocked,
             referencedIds = referenced,
-            planCount = planCount,
-            canCreatePlan = WorkoutPlanAccess.canCreateAnother(planCount, entitlements),
+            planCount = items.size,
+            canCreatePlan = WorkoutPlanAccess.canCreateAnother(items.size, entitlements),
             lockedFeature = locked,
             lockedPlanIds = decision.lockedPlanIds,
             selectionRequired = decision.selectionRequired

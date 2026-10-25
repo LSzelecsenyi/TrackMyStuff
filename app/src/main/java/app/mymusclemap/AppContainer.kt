@@ -76,6 +76,7 @@ import app.mymusclemap.domain.SystemWallClock
 import app.mymusclemap.domain.WallClockMonitor
 import app.mymusclemap.ui.workout.AppForeground
 import app.mymusclemap.domain.entitlement.EntitlementComposer
+import app.mymusclemap.domain.entitlement.FreeAccessLogic
 import app.mymusclemap.domain.entitlement.FounderApprovalCelebration
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.FounderProgramRules
@@ -118,7 +119,7 @@ class AppContainer(context: Context, val accountUserId: String) {
         dao = database.bodyMeasurementDao(),
         clock = clock
     )
-    private val customExerciseCreate = AtomicReference<(Int) -> Boolean> { true }
+    private val customExerciseCreate = AtomicReference<suspend (Int) -> Boolean> { true }
     private val nativeWorkoutCompleted = AtomicReference<suspend (String) -> Unit> { _ -> }
     private val weightChanged = AtomicReference<suspend () -> Unit> { }
     private val plansChanged = AtomicReference<suspend () -> Unit> { }
@@ -126,7 +127,7 @@ class AppContainer(context: Context, val accountUserId: String) {
     private val afterBackupRestore = AtomicReference<suspend () -> Unit> { }
     private val billingEntitlementReady = AtomicReference(false)
     private val onPlanCreated = AtomicReference<suspend (Long) -> Unit> { }
-    private val onExerciseCreated = AtomicReference<suspend (Long) -> Unit> { }
+    private val onExerciseCreated = AtomicReference<suspend (Long) -> Boolean> { true }
     private val planMayStart = AtomicReference<suspend (Long) -> Boolean> { true }
     private val exerciseMayExecute = AtomicReference<suspend (Long) -> Boolean> { true }
     private val planMayUpdate = AtomicReference<suspend (Long) -> Boolean> { true }
@@ -394,12 +395,18 @@ class AppContainer(context: Context, val accountUserId: String) {
         templateDao = database.workoutTemplateDao(),
         exerciseDao = database.exerciseDao(),
         grantsPro = { grantsPro.get().invoke() },
-        entitlementReady = { freeAccessEntitlementKnown() }
+        entitlementReady = { freeAccessEntitlementKnown() },
+        sessionDao = database.workoutSessionDao()
     )
 
     init {
-        customExerciseCreate.set { count ->
-            entitlementComposer.policy().customExercises(count).canCreate
+        customExerciseCreate.set { _ ->
+            freeAccessRepository.refresh()
+            FreeAccessLogic.creationAllowed(
+                freeAccessRepository.current(),
+                entitlementComposer.resolve().grantsPro,
+                database.exerciseDao().countActiveCustom()
+            )
         }
         grantsPro.set { entitlementComposer.resolve().grantsPro }
         founderLifetime.set { entitlementComposer.resolve().founderRecognized }
@@ -430,7 +437,7 @@ class AppContainer(context: Context, val accountUserId: String) {
             }
         }
         onPlanCreated.set { id -> freeAccessRepository.notePlanCreated(id) }
-        onExerciseCreated.set { id -> freeAccessRepository.noteCustomExerciseCreated(id) }
+        onExerciseCreated.set { id -> freeAccessRepository.allocateCreatedCustomExercise(id) }
         afterBackupRestore.set {
             freeAccessRepository.refresh(legacyRestoreWithoutSelection = true)
         }
@@ -595,8 +602,8 @@ class AppContainer(context: Context, val accountUserId: String) {
     }
 
     /**
-     * Access copy for the Pro Benefits screen. An expiration is included only when the
-     * trusted cache still has a Founder Pro instant. The screen does not calculate a date.
+     * Founder-grant instant for the benefits screen. It is not a Play subscription
+     * expiry. The screen must not present it as billing renewal.
      */
     fun proBenefitsStatus(): ProBenefitsStatus {
         val now = clock.instant()
@@ -607,6 +614,18 @@ class AppContainer(context: Context, val accountUserId: String) {
             founderProActive = resolved.founderProActive && trusted.founderProActive(now),
             founderLifetime = trusted.founderLifetime,
             founderProExpiresAt = trusted.founderProExpiresAt
+        )
+    }
+
+    /**
+     * Effective access for the benefits screen. Debug labels are omitted in release.
+     * This does not read or change the verified Play subscription.
+     */
+    fun proBenefitsAccess(): app.mymusclemap.domain.entitlement.ProBenefitsAccess {
+        return app.mymusclemap.domain.entitlement.proBenefitsAccess(
+            effective = entitlementComposer.resolve(),
+            actual = entitlementComposer.resolveActual(),
+            revealDebugOverride = BuildConfig.DEBUG
         )
     }
 

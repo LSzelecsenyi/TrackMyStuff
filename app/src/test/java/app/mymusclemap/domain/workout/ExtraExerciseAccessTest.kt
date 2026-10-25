@@ -37,6 +37,20 @@ class ExtraExerciseAccessTest {
     }
 
     @Test
+    fun aReleasedCustomExerciseStaysOutOfTheExtraPicker() {
+        val decision = FreeAccessLogic.decide(
+            state = confirmedState(setOf(2L, 3L)).copy(releasedCustomExerciseIds = setOf(3L)),
+            grantsPro = false,
+            plans = emptyList(),
+            customExercises = subjects
+        )
+        assertFalse(decision.customExerciseAccessible(3L))
+        assertFalse(ExtraExerciseAccess.addable(locked, decision))
+        assertTrue(ExtraExerciseAccess.addable(open, decision))
+        assertTrue(ExtraExerciseAccess.addable(starter, decision))
+    }
+
+    @Test
     fun searchAndFiltersCannotRevealALockedExercise() {
         val decision = confirmed(setOf(2L))
         assertTrue(visible(decision, query = "Secret Lift").isEmpty())

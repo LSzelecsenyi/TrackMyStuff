@@ -105,6 +105,10 @@ class WorkoutSessionRepository(
 ) {
     private val mutex = Mutex()
 
+    suspend fun catalogExerciseHasPendingWork(exerciseId: Long): Boolean {
+        return sessionDao.pendingWorkCount(exerciseId) > 0
+    }
+
     fun observeInProgress(): Flow<ActiveSessionSummary?> {
         return combine(
             sessionDao.observeInProgress(),

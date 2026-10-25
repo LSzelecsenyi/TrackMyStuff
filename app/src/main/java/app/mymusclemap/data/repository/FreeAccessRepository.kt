@@ -1,13 +1,16 @@
 package app.mymusclemap.data.repository
 
 import app.mymusclemap.data.local.ExerciseDao
+import app.mymusclemap.data.local.ExercisePlanReference
 import app.mymusclemap.data.local.FreeAccessDao
+import app.mymusclemap.data.local.WorkoutSessionDao
 import app.mymusclemap.data.local.WorkoutTemplateDao
 import app.mymusclemap.domain.entitlement.FreeAccessDecision
 import app.mymusclemap.domain.entitlement.FreeAccessLogic
 import app.mymusclemap.domain.entitlement.FreeAccessPhase
 import app.mymusclemap.domain.entitlement.FreeAccessState
 import app.mymusclemap.domain.entitlement.FreeAccessSubject
+import app.mymusclemap.domain.entitlement.FreeExerciseReleaseResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -21,7 +24,8 @@ class FreeAccessRepository(
     private val templateDao: WorkoutTemplateDao,
     private val exerciseDao: ExerciseDao,
     private val grantsPro: () -> Boolean,
-    private val entitlementReady: () -> Boolean = { true }
+    private val entitlementReady: () -> Boolean = { true },
+    private val sessionDao: WorkoutSessionDao? = null
 ) {
     private val mutex = Mutex()
     private val latest = AtomicReference(unloaded())
@@ -85,7 +89,87 @@ class FreeAccessRepository(
 
     suspend fun notePlanCreated(planId: Long) = noteCreated(planId = planId)
 
-    suspend fun noteCustomExerciseCreated(exerciseId: Long) = noteCreated(customExerciseId = exerciseId)
+    suspend fun noteCustomExerciseCreated(exerciseId: Long) {
+        allocateCreatedCustomExercise(exerciseId)
+    }
+
+    suspend fun plansReferencing(exerciseId: Long): List<ExercisePlanReference> {
+        return templateDao.plansReferencingExercise(exerciseId)
+    }
+
+    suspend fun releaseCustomExercise(exerciseId: Long): FreeExerciseReleaseResult = mutex.withLock {
+        if ((sessionDao?.pendingWorkCount(exerciseId) ?: 0) > 0) {
+            return@withLock FreeExerciseReleaseResult.BlockedByActiveWorkout
+        }
+        val plans = planSubjects()
+        val exercises = customExerciseSubjects()
+        val pro = grantsPro()
+        if (pro) return@withLock FreeExerciseReleaseResult.NotAllocated
+        val current = dao.read() ?: FreeAccessLogic.reconcile(
+            previous = null,
+            grantsPro = false,
+            plans = plans,
+            customExercises = exercises
+        )
+        if (exerciseId in current.releasedCustomExerciseIds) {
+            return@withLock FreeExerciseReleaseResult.AlreadyReleased
+        }
+        val next = FreeAccessLogic.releaseCustomExercise(current, exerciseId, plans, exercises)
+            ?: return@withLock FreeExerciseReleaseResult.NotAllocated
+        if (next == current) return@withLock FreeExerciseReleaseResult.AlreadyReleased
+        dao.replace(next)
+        latest.set(FreeAccessLogic.decide(next, false, plans, exercises))
+        revision.value += 1
+        FreeExerciseReleaseResult.Released
+    }
+
+    /**
+     * Claims one FREE slot for an exercise id that was not already in this period.
+     * Returns false when the id is locked, released, or the allocation is full.
+     * PRO does not consume a FREE slot.
+     */
+    suspend fun allocateCreatedCustomExercise(exerciseId: Long): Boolean = mutex.withLock {
+        val plans = planSubjects()
+        val exercises = customExerciseSubjects()
+        val pro = grantsPro()
+        val previous = dao.read()
+        if (pro) {
+            val remembered = FreeAccessLogic.reconcile(previous, true, plans, exercises)
+            if (remembered != previous) dao.replace(remembered)
+            latest.set(FreeAccessLogic.decide(remembered, true, plans, exercises))
+            revision.value += 1
+            return@withLock true
+        }
+        val current = previous ?: FreeAccessLogic.reconcile(null, false, plans, exercises)
+        if (current.phase == FreeAccessPhase.Required) {
+            val allowed = exercises.size <= FreeAccessLogic.CUSTOM_EXERCISE_LIMIT
+            if (allowed && current != previous) dao.replace(current)
+            latest.set(FreeAccessLogic.decide(current, false, plans, exercises))
+            revision.value += 1
+            return@withLock allowed
+        }
+        val next = FreeAccessLogic.includeCreated(
+            state = current,
+            customExerciseId = exerciseId,
+            plans = plans,
+            customExercises = exercises
+        )
+        val wasNew = exerciseId !in current.knownCustomExerciseIds &&
+            exerciseId !in current.releasedCustomExerciseIds
+        val accepted = wasNew &&
+            exerciseId in next.knownCustomExerciseIds &&
+            (next.phase != FreeAccessPhase.Confirmed || exerciseId in next.selectedCustomExerciseIds)
+        if (!accepted) {
+            if (previous == null) dao.replace(current)
+            latest.set(FreeAccessLogic.decide(if (previous == null) current else previous, false, plans, exercises))
+            revision.value += 1
+            return@withLock false
+        }
+        if (next != previous) dao.replace(next)
+        latest.set(FreeAccessLogic.decide(next, false, plans, exercises))
+        revision.value += 1
+        true
+    }
 
     private suspend fun noteCreated(planId: Long? = null, customExerciseId: Long? = null) {
         mutex.withLock {

@@ -18,6 +18,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasStateDescription
@@ -1277,6 +1278,25 @@ class ActiveWorkoutScreenLayoutTest {
         assertEquals(0, starts.get())
         assertEquals(2L, displayed.value.currentSetId)
         assertEquals(1L, displayed.value.aggregate!!.session.id)
+    }
+
+    @Test
+    fun lockedTimedSetExploreActionStaysEnabledAtLargeFont() {
+        val opens = AtomicInteger(0)
+        render(
+            state = timedWorkoutState(timersEnabled = false),
+            width = 320.dp,
+            fontScale = 1.6f,
+            onExploreProBenefits = { opens.incrementAndGet() }
+        )
+        val action = composeRule.onNodeWithTag(TIMED_SET_EXPLORE_PRO)
+        val bounds = action.getBoundsInRoot()
+        action.assertIsDisplayed().assertIsEnabled().assertHasClickAction()
+        assertTrue(bounds.bottom - bounds.top >= 48.dp)
+        composeRule.onNodeWithText(testString(R.string.timed_set_explore_pro)).performClick()
+        assertEquals(1, opens.get())
+        composeRule.onAllNodesWithTag("work_start").assertCountEquals(0)
+        composeRule.onNodeWithTag(SET_SKIP_ACTION).assertIsDisplayed()
     }
 
     @Test

@@ -149,3 +149,40 @@ private fun offers(billing: BillingScreenState, trialExpiresAt: Instant?): ProPl
 fun manageSubscriptionUrl(packageName: String, productId: String): String {
     return "https://play.google.com/store/account/subscriptions?package=$packageName&sku=$productId"
 }
+
+/**
+ * Verified Play subscription facts. Founder grants, trials, Welcome Back, and
+ * debug overrides are not represented here.
+ */
+sealed interface SubscriptionFacts {
+    data object Loading : SubscriptionFacts
+    data object Unavailable : SubscriptionFacts
+    data object NotConfigured : SubscriptionFacts
+    data object None : SubscriptionFacts
+    data class Active(
+        val productId: String,
+        val expiresAt: Instant,
+        val autoRenewing: Boolean
+    ) : SubscriptionFacts
+}
+
+fun subscriptionFacts(
+    paid: VerifiedPaidSubscription?,
+    billing: BillingScreenState,
+    now: Instant
+): SubscriptionFacts {
+    val expiresAt = paid?.expiresAt
+    if (paid != null && paid.entitled && expiresAt != null && !now.isAfter(expiresAt)) {
+        return SubscriptionFacts.Active(
+            productId = paid.productId,
+            expiresAt = expiresAt,
+            autoRenewing = paid.autoRenewing
+        )
+    }
+    return when (billing.availability) {
+        BillingAvailability.LOADING -> SubscriptionFacts.Loading
+        BillingAvailability.UNAVAILABLE -> SubscriptionFacts.Unavailable
+        BillingAvailability.NOT_CONFIGURED -> SubscriptionFacts.NotConfigured
+        BillingAvailability.READY -> SubscriptionFacts.None
+    }
+}

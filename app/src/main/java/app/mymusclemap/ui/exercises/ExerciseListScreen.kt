@@ -90,6 +90,8 @@ internal fun catalogRowTag(id: Long): String = "exercise-catalog-row-$id"
 internal fun catalogOverflowAnchorTag(id: Long): String = "exercise-catalog-overflow-anchor-$id"
 internal fun catalogOverflowButtonTag(id: Long): String = "exercise-catalog-overflow-button-$id"
 internal fun catalogOverflowMenuTag(id: Long): String = "exercise-catalog-overflow-menu-$id"
+internal fun catalogReleaseTag(id: Long): String = "exercise-catalog-release-$id"
+internal const val FREE_RELEASE_DIALOG = "free-release-dialog"
 
 @Composable
 fun ExerciseListScreen(
@@ -110,7 +112,10 @@ fun ExerciseListScreen(
     onMessageConsumed: () -> Unit,
     onDismissLocked: () -> Unit = {},
     onChooseFreeAccess: () -> Unit = {},
-    onExplorePro: () -> Unit = {}
+    onExplorePro: () -> Unit = {},
+    onRequestRelease: (Exercise) -> Unit = {},
+    onDismissRelease: () -> Unit = {},
+    onConfirmRelease: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -279,7 +284,9 @@ fun ExerciseListScreen(
                     onEdit = { id -> navigateOnce { onEdit(id) } },
                     onArchive = onArchive,
                     onRestore = onRestore,
-                    onRequestDelete = onRequestDelete
+                    onRequestDelete = onRequestDelete,
+                    onRequestRelease = onRequestRelease,
+                    releasableIds = state.freeReleaseExerciseIds
                 )
             }
         }
@@ -306,6 +313,13 @@ fun ExerciseListScreen(
             }
         )
     }
+    state.pendingRelease?.let { prompt ->
+        FreeReleaseDialog(
+            prompt = prompt,
+            onConfirm = onConfirmRelease,
+            onDismiss = onDismissRelease
+        )
+    }
     state.pendingBlocked?.let {
         AlertDialog(
             onDismissRequest = onDismissDelete,
@@ -324,6 +338,59 @@ fun ExerciseListScreen(
             onDismiss = onDismissLocked
         )
     }
+}
+
+@Composable
+private fun FreeReleaseDialog(
+    prompt: FreeReleasePrompt,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val name = starterExerciseLabel(prompt.exercise.name)
+    val (accessibleLabel, accessibleExtra) = summarizeFreeReleasePlans(prompt.accessiblePlanNames)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(FREE_RELEASE_DIALOG),
+        title = { Text(stringResource(R.string.free_release_access_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+                Text(stringResource(R.string.free_release_becomes_locked, name))
+                if (prompt.accessiblePlanNames.isNotEmpty()) {
+                    Text(
+                        if (accessibleExtra > 0) {
+                            stringResource(
+                                R.string.free_release_used_in_more,
+                                accessibleLabel,
+                                accessibleExtra
+                            )
+                        } else {
+                            stringResource(R.string.free_release_used_in, accessibleLabel)
+                        }
+                    )
+                }
+                if (prompt.lockedPlanNames.isNotEmpty()) {
+                    Text(stringResource(R.string.free_release_locked_plans))
+                }
+                Text(stringResource(R.string.free_release_irreversible, name))
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag("free-release-confirm")
+            ) {
+                Text(stringResource(R.string.free_release_access))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("free-release-cancel")
+            ) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -401,7 +468,9 @@ private fun ExerciseList(
     onEdit: (Long) -> Unit,
     onArchive: (Long) -> Unit,
     onRestore: (Long) -> Unit,
-    onRequestDelete: (Exercise) -> Unit
+    onRequestDelete: (Exercise) -> Unit,
+    onRequestRelease: (Exercise) -> Unit,
+    releasableIds: Set<Long>
 ) {
     val ordered = remember(exercises) {
         LocalizedLabelOrder.sorted(
@@ -425,7 +494,12 @@ private fun ExerciseList(
                 onEdit = { onEdit(exercise.id) },
                 onArchive = { onArchive(exercise.id) },
                 onRestore = { onRestore(exercise.id) },
-                onDelete = { onRequestDelete(exercise) }
+                onDelete = { onRequestDelete(exercise) },
+                onRelease = if (exercise.id in releasableIds) {
+                    { onRequestRelease(exercise) }
+                } else {
+                    null
+                }
             )
             HorizontalDivider(
                 thickness = AppDimens.strokeThin,
@@ -444,7 +518,8 @@ private fun ExerciseRow(
     onEdit: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onRelease: (() -> Unit)?
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val resources = LocalResources.current
@@ -547,6 +622,16 @@ private fun ExerciseRow(
                 onDismissRequest = { menuOpen = false },
                 modifier = Modifier.testTag(catalogOverflowMenuTag(exercise.id))
             ) {
+                if (onRelease != null) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.free_release_access)) },
+                        onClick = {
+                            menuOpen = false
+                            onRelease()
+                        },
+                        modifier = Modifier.testTag(catalogReleaseTag(exercise.id))
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.action_edit)) },
                     onClick = {

@@ -23,6 +23,12 @@ abstract class FreeAccessDao {
     @Query("SELECT exerciseId FROM free_access_exercises WHERE periodId = :periodId")
     abstract suspend fun exerciseIds(periodId: Long): List<Long>
 
+    @Query("SELECT exerciseId FROM free_access_released_exercises WHERE periodId = :periodId")
+    abstract suspend fun releasedExerciseIds(periodId: Long): List<Long>
+
+    @Query("SELECT exerciseId FROM free_access_known_exercises WHERE periodId = :periodId")
+    abstract suspend fun knownExerciseIds(periodId: Long): List<Long>
+
     @Query("DELETE FROM free_access_state")
     abstract suspend fun deleteState()
 
@@ -31,6 +37,12 @@ abstract class FreeAccessDao {
 
     @Query("DELETE FROM free_access_exercises")
     abstract suspend fun deleteExercises()
+
+    @Query("DELETE FROM free_access_released_exercises")
+    abstract suspend fun deleteReleasedExercises()
+
+    @Query("DELETE FROM free_access_known_exercises")
+    abstract suspend fun deleteKnownExercises()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertState(entity: FreeAccessStateEntity)
@@ -41,6 +53,12 @@ abstract class FreeAccessDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertExercises(rows: List<FreeAccessExerciseEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertReleasedExercises(rows: List<FreeAccessReleasedExerciseEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertKnownExercises(rows: List<FreeAccessKnownExerciseEntity>)
+
     @Transaction
     open suspend fun read(): FreeAccessState? {
         val row = state() ?: return null
@@ -49,7 +67,10 @@ abstract class FreeAccessDao {
             lastKnownPro = row.lastKnownPro,
             phase = FreeAccessPhase.valueOf(row.phase),
             selectedPlanIds = planIds(row.periodId).toSet(),
-            selectedCustomExerciseIds = exerciseIds(row.periodId).toSet()
+            selectedCustomExerciseIds = exerciseIds(row.periodId).toSet(),
+            releasedCustomExerciseIds = releasedExerciseIds(row.periodId).toSet(),
+            knownCustomExerciseIds = knownExerciseIds(row.periodId).toSet(),
+            catalogCaptured = row.catalogCaptured
         )
     }
 
@@ -57,12 +78,15 @@ abstract class FreeAccessDao {
     open suspend fun replace(state: FreeAccessState) {
         deletePlans()
         deleteExercises()
+        deleteReleasedExercises()
+        deleteKnownExercises()
         deleteState()
         insertState(
             FreeAccessStateEntity(
                 periodId = state.periodId,
                 lastKnownPro = state.lastKnownPro,
-                phase = state.phase.name
+                phase = state.phase.name,
+                catalogCaptured = state.catalogCaptured
             )
         )
         if (state.selectedPlanIds.isNotEmpty()) {
@@ -71,6 +95,20 @@ abstract class FreeAccessDao {
         if (state.selectedCustomExerciseIds.isNotEmpty()) {
             insertExercises(
                 state.selectedCustomExerciseIds.map { FreeAccessExerciseEntity(state.periodId, it) }
+            )
+        }
+        if (state.releasedCustomExerciseIds.isNotEmpty()) {
+            insertReleasedExercises(
+                state.releasedCustomExerciseIds.map {
+                    FreeAccessReleasedExerciseEntity(state.periodId, it)
+                }
+            )
+        }
+        if (state.knownCustomExerciseIds.isNotEmpty()) {
+            insertKnownExercises(
+                state.knownCustomExerciseIds.map {
+                    FreeAccessKnownExerciseEntity(state.periodId, it)
+                }
             )
         }
     }

@@ -86,5 +86,49 @@ class ProPlanPresentationTest {
         ) as ProPlanPresentation.Paid
         assertTrue(shown.testOnly)
         assertEquals(SubscriptionEntitlement(), paidSubscriptionEntitlement(null))
+        assertEquals(
+            SubscriptionFacts.None,
+            subscriptionFacts(
+                paid = null,
+                billing = BillingScreenState(
+                    availability = BillingAvailability.READY,
+                    testOnly = true,
+                    testActive = true
+                ),
+                now = now
+            )
+        )
+    }
+
+    @Test
+    fun subscriptionFactsFollowVerifiedBillingAndNotOtherGrants() {
+        val expiresAt = now.plusSeconds(86_400)
+        val paid = VerifiedPaidSubscription("strict_pro", expiresAt, false, "ACTIVE", true)
+        val active = subscriptionFacts(paid, BillingScreenState(BillingAvailability.READY), now)
+        assertEquals(
+            SubscriptionFacts.Active("strict_pro", expiresAt, autoRenewing = false),
+            active
+        )
+        assertEquals(
+            SubscriptionFacts.Loading,
+            subscriptionFacts(null, BillingScreenState(BillingAvailability.LOADING), now)
+        )
+        assertEquals(
+            SubscriptionFacts.Unavailable,
+            subscriptionFacts(null, BillingScreenState(BillingAvailability.UNAVAILABLE), now)
+        )
+        assertEquals(
+            SubscriptionFacts.NotConfigured,
+            subscriptionFacts(null, BillingScreenState(), now)
+        )
+        assertEquals(
+            SubscriptionFacts.None,
+            subscriptionFacts(null, BillingScreenState(BillingAvailability.READY), now)
+        )
+        val expired = paid.copy(expiresAt = now.minusSeconds(1))
+        assertEquals(
+            SubscriptionFacts.None,
+            subscriptionFacts(expired, BillingScreenState(BillingAvailability.READY), now)
+        )
     }
 }

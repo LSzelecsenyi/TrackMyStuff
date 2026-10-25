@@ -182,11 +182,23 @@ abstract class AppBackupDao {
     @Query("SELECT exerciseId FROM free_access_exercises")
     abstract suspend fun getFreeAccessExerciseIds(): List<Long>
 
+    @Query("SELECT exerciseId FROM free_access_released_exercises")
+    abstract suspend fun getFreeAccessReleasedExerciseIds(): List<Long>
+
+    @Query("SELECT exerciseId FROM free_access_known_exercises")
+    abstract suspend fun getFreeAccessKnownExerciseIds(): List<Long>
+
     @Query("DELETE FROM free_access_plans")
     abstract suspend fun deleteFreeAccessPlans()
 
     @Query("DELETE FROM free_access_exercises")
     abstract suspend fun deleteFreeAccessExercises()
+
+    @Query("DELETE FROM free_access_released_exercises")
+    abstract suspend fun deleteFreeAccessReleasedExercises()
+
+    @Query("DELETE FROM free_access_known_exercises")
+    abstract suspend fun deleteFreeAccessKnownExercises()
 
     @Query("DELETE FROM free_access_state")
     abstract suspend fun deleteFreeAccessState()
@@ -199,6 +211,12 @@ abstract class AppBackupDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertFreeAccessExercises(rows: List<FreeAccessExerciseEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertFreeAccessReleasedExercises(rows: List<FreeAccessReleasedExerciseEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertFreeAccessKnownExercises(rows: List<FreeAccessKnownExerciseEntity>)
 
     @Transaction
     open suspend fun loadTables(): AppBackupTables {
@@ -232,7 +250,10 @@ abstract class AppBackupDao {
             lastKnownPro = row.lastKnownPro,
             phase = FreeAccessPhase.valueOf(row.phase),
             selectedPlanIds = getFreeAccessPlanIds().toSet(),
-            selectedCustomExerciseIds = getFreeAccessExerciseIds().toSet()
+            selectedCustomExerciseIds = getFreeAccessExerciseIds().toSet(),
+            releasedCustomExerciseIds = getFreeAccessReleasedExerciseIds().toSet(),
+            knownCustomExerciseIds = getFreeAccessKnownExerciseIds().toSet(),
+            catalogCaptured = row.catalogCaptured
         )
     }
 
@@ -257,6 +278,8 @@ abstract class AppBackupDao {
         deleteWeightMeasurements()
         deleteFreeAccessPlans()
         deleteFreeAccessExercises()
+        deleteFreeAccessReleasedExercises()
+        deleteFreeAccessKnownExercises()
         deleteFreeAccessState()
         if (tables.weightMeasurements.isNotEmpty()) {
             insertWeightMeasurements(tables.weightMeasurements)
@@ -323,7 +346,8 @@ abstract class AppBackupDao {
                 FreeAccessStateEntity(
                     periodId = access.periodId,
                     lastKnownPro = access.lastKnownPro,
-                    phase = access.phase.name
+                    phase = access.phase.name,
+                    catalogCaptured = access.catalogCaptured
                 )
             )
             if (access.selectedPlanIds.isNotEmpty()) {
@@ -334,6 +358,20 @@ abstract class AppBackupDao {
             if (access.selectedCustomExerciseIds.isNotEmpty()) {
                 insertFreeAccessExercises(
                     access.selectedCustomExerciseIds.map { FreeAccessExerciseEntity(access.periodId, it) }
+                )
+            }
+            if (access.releasedCustomExerciseIds.isNotEmpty()) {
+                insertFreeAccessReleasedExercises(
+                    access.releasedCustomExerciseIds.map {
+                        FreeAccessReleasedExerciseEntity(access.periodId, it)
+                    }
+                )
+            }
+            if (access.knownCustomExerciseIds.isNotEmpty()) {
+                insertFreeAccessKnownExercises(
+                    access.knownCustomExerciseIds.map {
+                        FreeAccessKnownExerciseEntity(access.periodId, it)
+                    }
                 )
             }
         }

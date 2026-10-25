@@ -7,12 +7,15 @@ import app.mymusclemap.data.local.WorkoutSessionEntity
 import app.mymusclemap.data.local.WorkoutTemplateEntity
 import app.mymusclemap.data.local.WorkoutTemplateExerciseEntity
 import app.mymusclemap.data.local.WorkoutTemplateSetEntity
+import app.mymusclemap.domain.entitlement.FreeAccessPhase
+import app.mymusclemap.domain.entitlement.FreeAccessState
 import app.mymusclemap.domain.theme.AppearanceCodec
 import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.workout.BodyWeightSource
 import app.mymusclemap.domain.workout.SessionStatus
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -278,6 +281,34 @@ class AppBackupJsonTest {
             )
         )
         assertHasCode(AppBackupJson.parse(AppBackupJson.encode(duplicate)), AppBackupErrorCode.DuplicateKey)
+    }
+
+    @Test
+    fun releasedFreeAccessRoundTripsAndOlderBackupsRemainReadable() {
+        val state = FreeAccessState(
+            periodId = 3L,
+            lastKnownPro = false,
+            phase = FreeAccessPhase.Confirmed,
+            selectedPlanIds = setOf(1L),
+            selectedCustomExerciseIds = setOf(4L, 5L),
+            releasedCustomExerciseIds = setOf(9L),
+            knownCustomExerciseIds = setOf(4L, 5L, 9L, 10L),
+            catalogCaptured = true
+        )
+        val snapshot = emptySnapshot().copy(tables = emptyTables().copy(freeAccess = state))
+        val parsed = AppBackupJson.parse(AppBackupJson.encode(snapshot)) as AppBackupParseResult.Success
+        assertEquals(state, parsed.snapshot.tables.freeAccess)
+        val root = JSONObject(AppBackupJson.encode(snapshot))
+        val access = root.getJSONObject("tables").getJSONObject(AppBackupFormat.TABLE_FREE_ACCESS)
+        access.remove("releasedExerciseIds")
+        access.remove("knownExerciseIds")
+        access.remove("catalogCaptured")
+        val older = AppBackupJson.parse(root.toString()) as AppBackupParseResult.Success
+        val restored = older.snapshot.tables.freeAccess!!
+        assertEquals(setOf(4L, 5L), restored.selectedCustomExerciseIds)
+        assertTrue(restored.releasedCustomExerciseIds.isEmpty())
+        assertTrue(restored.knownCustomExerciseIds.isEmpty())
+        assertFalse(restored.catalogCaptured)
     }
 
     private fun assertHasCode(result: AppBackupParseResult, code: AppBackupErrorCode) {

@@ -462,6 +462,9 @@ object AppBackupJson {
                     .put("phase", access.phase.name)
                     .put("planIds", JSONArray(access.selectedPlanIds.sorted()))
                     .put("exerciseIds", JSONArray(access.selectedCustomExerciseIds.sorted()))
+                    .put("releasedExerciseIds", JSONArray(access.releasedCustomExerciseIds.sorted()))
+                    .put("knownExerciseIds", JSONArray(access.knownCustomExerciseIds.sorted()))
+                    .put("catalogCaptured", access.catalogCaptured)
             )
         }
         root.put("tables", tables)
@@ -1309,12 +1312,30 @@ object AppBackupJson {
         }
         val planIds = longIdSet(obj, "planIds", errors) ?: return null
         val exerciseIds = longIdSet(obj, "exerciseIds", errors) ?: return null
+        val releasedIds = if (!obj.has("releasedExerciseIds") || obj.isNull("releasedExerciseIds")) {
+            emptySet()
+        } else {
+            longIdSet(obj, "releasedExerciseIds", errors) ?: return null
+        }
+        val knownIds = if (!obj.has("knownExerciseIds") || obj.isNull("knownExerciseIds")) {
+            emptySet()
+        } else {
+            longIdSet(obj, "knownExerciseIds", errors) ?: return null
+        }
+        val catalogCaptured = if (!obj.has("catalogCaptured") || obj.isNull("catalogCaptured")) {
+            false
+        } else {
+            obj.optBoolean("catalogCaptured", false)
+        }
         return FreeAccessState(
             periodId = periodId,
             lastKnownPro = lastKnownPro,
             phase = phase,
             selectedPlanIds = planIds,
-            selectedCustomExerciseIds = exerciseIds
+            selectedCustomExerciseIds = exerciseIds,
+            releasedCustomExerciseIds = releasedIds,
+            knownCustomExerciseIds = knownIds,
+            catalogCaptured = catalogCaptured
         )
     }
 

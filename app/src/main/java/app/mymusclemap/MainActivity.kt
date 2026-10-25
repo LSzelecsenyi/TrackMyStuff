@@ -245,6 +245,7 @@ class MainActivity : AppCompatActivity() {
                                 founderApprovalCelebration = container::pendingFounderApprovalCelebration,
                                 onAcknowledgeFounderApproval = container::acknowledgeFounderApprovalCelebration,
                                 proBenefitsStatus = container::proBenefitsStatus,
+                                proBenefitsAccess = container::proBenefitsAccess,
                                 proDiscovery = container::proDiscoverySnapshot,
                                 promotionNow = container::promotionNow,
                                 onActivateProDiscovery = container::activateProDiscovery,

@@ -301,6 +301,16 @@ abstract class WorkoutSessionDao {
     @Query("SELECT COUNT(*) FROM workout_session_exercises WHERE exerciseId = :exerciseId")
     abstract suspend fun countExerciseReferences(exerciseId: Long): Int
 
+    @Query(
+        """
+        SELECT COUNT(*) FROM workout_session_sets AS s
+        INNER JOIN workout_session_exercises AS e ON e.id = s.sessionExerciseId
+        INNER JOIN workout_sessions AS w ON w.id = e.sessionId
+        WHERE w.status = 'IN_PROGRESS' AND e.exerciseId = :exerciseId AND s.status = 'PENDING'
+        """
+    )
+    abstract suspend fun pendingWorkCount(exerciseId: Long): Int
+
     @Query("SELECT DISTINCT templateId FROM workout_sessions WHERE templateId IS NOT NULL")
     abstract fun observeReferencedTemplateIds(): Flow<List<Long>>
 

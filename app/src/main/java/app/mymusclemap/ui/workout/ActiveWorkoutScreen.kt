@@ -1770,12 +1770,24 @@ private fun LockedTimedSetActions(
         onClick = onExplorePro,
         enabled = !completing,
         shape = AppShapeTokens.button,
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.Transparent,
+            contentColor = StrictBrand.lime,
+            disabledContentColor = StrictBrand.light.copy(alpha = 0.45f)
+        ),
+        border = BorderStroke(
+            AppDimens.strokeThin,
+            if (completing) StrictBrand.light.copy(alpha = 0.35f) else StrictBrand.lime
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = AppDimens.minTouch)
             .testTag(TIMED_SET_EXPLORE_PRO)
     ) {
-        Text(stringResource(R.string.timed_set_explore_pro))
+        Text(
+            text = stringResource(R.string.timed_set_explore_pro),
+            color = if (completing) StrictBrand.light.copy(alpha = 0.45f) else StrictBrand.lime
+        )
     }
     Spacer(Modifier.height(AppDimens.itemGap))
     LockedSkipAction(enabled = !completing, onClick = onSkip)

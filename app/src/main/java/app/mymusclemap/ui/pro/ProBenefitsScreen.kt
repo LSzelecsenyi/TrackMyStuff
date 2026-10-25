@@ -29,6 +29,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -36,9 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import app.mymusclemap.R
 import app.mymusclemap.domain.billing.ProPlanPresentation
+import app.mymusclemap.domain.billing.SubscriptionFacts
 import app.mymusclemap.domain.billing.SubscriptionOffer
 import app.mymusclemap.domain.entitlement.FeatureAccessPolicy
+import app.mymusclemap.domain.entitlement.ProAccessLevel
+import app.mymusclemap.domain.entitlement.ProAccessSource
+import app.mymusclemap.domain.entitlement.ProBenefitsAccess
 import app.mymusclemap.domain.entitlement.ProBenefitsStatus
+import app.mymusclemap.domain.entitlement.ProComparisonRow
 import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
 import app.mymusclemap.domain.entitlement.WelcomeBackNotice
 import app.mymusclemap.domain.entitlement.WelcomeBackSnapshot
@@ -46,17 +53,18 @@ import app.mymusclemap.domain.entitlement.WorkoutPlanAccess
 import app.mymusclemap.domain.entitlement.formatTrialRemaining
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.domain.statistics.StatisticsRange
-import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.StrictBrand
 import java.time.Instant
-import java.time.ZoneId
 
 internal const val PRO_BENEFITS_ROOT = "pro-benefits-root"
 internal const val PRO_BENEFITS_BACK = "pro-benefits-back"
+internal const val PRO_BENEFITS_INTRO = "pro-benefits-intro"
 internal const val PRO_BENEFITS_STATUS = "pro-benefits-status"
+internal const val PRO_BENEFITS_SOURCE = "pro-benefits-source"
 internal const val PRO_BENEFITS_EXERCISES = "pro-benefits-exercises"
+internal const val PRO_BENEFITS_TIMERS = "pro-benefits-timers"
 internal const val PRO_BENEFITS_ACHIEVEMENTS = "pro-benefits-achievements"
 internal const val PRO_BENEFITS_TRIAL = "pro-benefits-trial"
 internal const val PRO_BENEFITS_OFFER = "pro-benefits-offer"
@@ -80,7 +88,11 @@ fun ProBenefitsScreen(
     welcomeBack: WelcomeBackSnapshot = WelcomeBackSnapshot(),
     onActivateWelcomeBack: () -> Unit = {},
     now: Instant = Instant.now(),
+    access: ProBenefitsAccess = ProBenefitsAccess(
+        level = if (status.proActive) ProAccessLevel.Pro else ProAccessLevel.Free
+    ),
     plan: ProPlanPresentation = ProPlanPresentation.NotConfigured,
+    subscription: SubscriptionFacts? = null,
     onSelectOffer: (String) -> Unit = {},
     onSubscribe: () -> Unit = {},
     onManageSubscription: (String) -> Unit = {},
@@ -128,14 +140,7 @@ fun ProBenefitsScreen(
                     .padding(horizontal = AppDimens.screenPadding)
                     .padding(bottom = AppDimens.scrollEndPadding)
             ) {
-                Text(
-                    text = accessLine(status),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = StrictBrand.light,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(PRO_BENEFITS_STATUS)
-                )
+                AccessIntroduction(access = access)
                 DiscoverySection(
                     discovery = discovery,
                     onActivateTrial = onActivateTrial,
@@ -151,6 +156,7 @@ fun ProBenefitsScreen(
                 Spacer(Modifier.height(AppDimens.sectionGap))
                 PurchaseSection(
                     plan = plan,
+                    subscription = subscription,
                     onSelectOffer = onSelectOffer,
                     onSubscribe = onSubscribe,
                     onManageSubscription = onManageSubscription
@@ -170,6 +176,67 @@ fun ProBenefitsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun AccessIntroduction(access: ProBenefitsAccess) {
+    val pro = access.level == ProAccessLevel.Pro
+    Text(
+        text = stringResource(
+            if (pro) R.string.pro_benefits_yours_title else R.string.pro_benefits_intro_title
+        ),
+        style = MaterialTheme.typography.titleMedium,
+        color = StrictBrand.lime,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(PRO_BENEFITS_INTRO)
+    )
+    Text(
+        text = stringResource(
+            if (pro) R.string.pro_benefits_yours_body else R.string.pro_benefits_intro_body
+        ),
+        style = MaterialTheme.typography.bodyLarge,
+        color = StrictBrand.light,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = AppDimens.headerStackGap)
+    )
+    Text(
+        text = stringResource(
+            if (pro) R.string.pro_benefits_access_pro else R.string.pro_benefits_access_free
+        ),
+        style = MaterialTheme.typography.bodyLarge,
+        color = StrictBrand.light,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = AppDimens.headerStackGap)
+            .testTag(PRO_BENEFITS_STATUS)
+    )
+    val source = sourceLabel(access.source)
+    if (source != null) {
+        Text(
+            text = source,
+            style = MaterialTheme.typography.bodyMedium,
+            color = StrictBrand.light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.headerStackGap)
+                .testTag(PRO_BENEFITS_SOURCE)
+        )
+    }
+}
+
+@Composable
+private fun sourceLabel(source: ProAccessSource): String? {
+    val res = when (source) {
+        ProAccessSource.None -> null
+        ProAccessSource.GooglePlaySubscription -> R.string.pro_benefits_source_play
+        ProAccessSource.Trial -> R.string.pro_benefits_source_trial
+        ProAccessSource.Founder -> R.string.pro_benefits_source_founder
+        ProAccessSource.Promotional -> R.string.pro_benefits_source_promotional
+        ProAccessSource.DebugOverride -> R.string.pro_benefits_source_debug
+    }
+    return res?.let { stringResource(it) }
 }
 
 @Composable
@@ -366,53 +433,6 @@ internal const val WELCOME_BACK_BENEFITS = "welcome-back-benefits"
 
 @Composable
 private fun ComparisonTable() {
-    val rows = listOf(
-        Triple(
-            stringResource(R.string.pro_benefits_statistics_title),
-            stringResource(R.string.pro_benefits_cell_days, StatisticsRange.DAYS_30),
-            stringResource(R.string.pro_benefits_cell_all_time)
-        ),
-        Triple(
-            stringResource(R.string.pro_benefits_reports_title),
-            stringResource(R.string.pro_benefits_cell_reports_free),
-            stringResource(R.string.pro_benefits_cell_reports_pro)
-        ),
-        Triple(
-            stringResource(R.string.pro_benefits_exercises_title),
-            stringResource(R.string.pro_benefits_cell_count, FeatureAccessPolicy.FREE_CUSTOM_EXERCISE_LIMIT),
-            stringResource(R.string.pro_benefits_cell_unlimited)
-        ),
-        Triple(
-            stringResource(R.string.pro_benefits_plans_title),
-            stringResource(R.string.pro_benefits_cell_count, WorkoutPlanAccess.FREE_PLAN_LIMIT),
-            stringResource(R.string.pro_benefits_cell_unlimited)
-        ),
-        Triple(
-            stringResource(R.string.pro_benefits_measurements_title),
-            stringResource(R.string.pro_benefits_cell_measurements_free),
-            stringResource(R.string.pro_benefits_cell_measurements_pro)
-        ),
-        Triple(
-            stringResource(R.string.pro_benefits_photos_title),
-            stringResource(R.string.pro_benefits_cell_photos_free),
-            stringResource(R.string.pro_benefits_cell_photos_pro)
-        ),
-        Triple(
-            stringResource(R.string.pro_benefits_achievements_title),
-            stringResource(R.string.pro_benefits_cell_achievements_free),
-            stringResource(R.string.pro_benefits_cell_achievements_pro)
-        ),
-        Triple(
-            stringResource(R.string.pro_benefits_scheduling_title),
-            stringResource(R.string.pro_benefits_cell_scheduling_free),
-            stringResource(R.string.pro_benefits_cell_scheduling_pro)
-        ),
-        Triple(
-            stringResource(R.string.pro_benefits_import_title),
-            stringResource(R.string.pro_benefits_cell_import_free),
-            stringResource(R.string.pro_benefits_cell_import_pro)
-        )
-    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -424,19 +444,89 @@ private fun ComparisonTable() {
             pro = stringResource(R.string.pro_benefits_pro),
             header = true
         )
-        rows.forEachIndexed { index, row ->
+        ProComparisonRow.order.forEach { row ->
             HorizontalDivider(color = StrictBrand.light.copy(alpha = 0.16f))
+            val cells = comparisonCells(row)
             ComparisonRow(
-                feature = row.first,
-                free = row.second,
-                pro = row.third,
-                tag = when (index) {
-                    2 -> PRO_BENEFITS_EXERCISES
-                    6 -> PRO_BENEFITS_ACHIEVEMENTS
-                    else -> null
-                }
+                feature = cells.feature,
+                free = cells.free,
+                pro = cells.pro,
+                tag = cells.tag
             )
         }
+    }
+}
+
+private data class ComparisonCells(
+    val feature: String,
+    val free: String,
+    val pro: String,
+    val tag: String?
+)
+
+@Composable
+private fun comparisonCells(row: ProComparisonRow): ComparisonCells {
+    return when (row) {
+        ProComparisonRow.WorkoutPlans -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_plans_title),
+            free = stringResource(R.string.pro_benefits_cell_count, WorkoutPlanAccess.FREE_PLAN_LIMIT),
+            pro = stringResource(R.string.pro_benefits_cell_unlimited),
+            tag = null
+        )
+        ProComparisonRow.CustomExercises -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_exercises_title),
+            free = stringResource(R.string.pro_benefits_cell_count, FeatureAccessPolicy.FREE_CUSTOM_EXERCISE_LIMIT),
+            pro = stringResource(R.string.pro_benefits_cell_unlimited),
+            tag = PRO_BENEFITS_EXERCISES
+        )
+        ProComparisonRow.TimedSetsAndTimers -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_timers),
+            free = stringResource(R.string.pro_benefits_cell_unavailable),
+            pro = stringResource(R.string.pro_benefits_cell_included),
+            tag = PRO_BENEFITS_TIMERS
+        )
+        ProComparisonRow.Statistics -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_statistics_title),
+            free = stringResource(R.string.pro_benefits_cell_days, StatisticsRange.DAYS_30),
+            pro = stringResource(R.string.pro_benefits_cell_all_time),
+            tag = null
+        )
+        ProComparisonRow.Reports -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_reports_title),
+            free = stringResource(R.string.pro_benefits_cell_reports_free),
+            pro = stringResource(R.string.pro_benefits_cell_reports_pro),
+            tag = null
+        )
+        ProComparisonRow.WorkoutScheduling -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_scheduling_title),
+            free = stringResource(R.string.pro_benefits_cell_scheduling_free),
+            pro = stringResource(R.string.pro_benefits_cell_scheduling_pro),
+            tag = null
+        )
+        ProComparisonRow.Achievements -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_achievements_title),
+            free = stringResource(R.string.pro_benefits_cell_achievements_free),
+            pro = stringResource(R.string.pro_benefits_cell_achievements_pro),
+            tag = PRO_BENEFITS_ACHIEVEMENTS
+        )
+        ProComparisonRow.BodyMeasurements -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_measurements_title),
+            free = stringResource(R.string.pro_benefits_cell_measurements_free),
+            pro = stringResource(R.string.pro_benefits_cell_measurements_pro),
+            tag = null
+        )
+        ProComparisonRow.ProgressPhotos -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_photos_title),
+            free = stringResource(R.string.pro_benefits_cell_photos_free),
+            pro = stringResource(R.string.pro_benefits_cell_photos_pro),
+            tag = null
+        )
+        ProComparisonRow.ExternalWorkouts -> ComparisonCells(
+            feature = stringResource(R.string.pro_benefits_import_title),
+            free = stringResource(R.string.pro_benefits_cell_import_free),
+            pro = stringResource(R.string.pro_benefits_cell_import_pro),
+            tag = null
+        )
     }
 }
 
@@ -448,139 +538,229 @@ private fun ComparisonRow(
     header: Boolean = false,
     tag: String? = null
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (tag == null) Modifier else Modifier.testTag(tag))
-            .padding(vertical = AppDimens.headerStackGap),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = feature,
-            style = if (header) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
-            color = StrictBrand.light,
-            fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.weight(1.4f)
-        )
-        Text(
-            text = free,
-            style = if (header) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
-            color = StrictBrand.light,
-            fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = pro,
-            style = if (header) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
-            color = StrictBrand.lime,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f)
-        )
+    val fontScale = LocalDensity.current.fontScale
+    val narrow = LocalConfiguration.current.screenWidthDp <= 340
+    val stacked = !header && (fontScale >= 1.5f || (narrow && fontScale >= 1.3f))
+    val featureStyle = if (header) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium
+    val valueStyle = if (header) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium
+    if (stacked) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (tag == null) Modifier else Modifier.testTag(tag))
+                .padding(vertical = AppDimens.headerStackGap)
+        ) {
+            Text(
+                text = feature,
+                style = featureStyle,
+                color = StrictBrand.light,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = AppDimens.headerStackGap),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = free,
+                    style = valueStyle,
+                    color = StrictBrand.light,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = pro,
+                    style = valueStyle,
+                    color = StrictBrand.lime,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (tag == null) Modifier else Modifier.testTag(tag))
+                .padding(vertical = AppDimens.headerStackGap),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = feature,
+                style = featureStyle,
+                color = StrictBrand.light,
+                fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier.weight(2.1f)
+            )
+            Text(
+                text = free,
+                style = valueStyle,
+                color = StrictBrand.light,
+                fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(0.9f)
+            )
+            Text(
+                text = pro,
+                style = valueStyle,
+                color = StrictBrand.lime,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(0.95f)
+            )
+        }
     }
 }
 
 @Composable
 private fun PurchaseSection(
     plan: ProPlanPresentation,
+    subscription: SubscriptionFacts?,
     onSelectOffer: (String) -> Unit,
     onSubscribe: () -> Unit,
     onManageSubscription: (String) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(PRO_BENEFITS_SUBSCRIPTION)
-    ) {
-        when (plan) {
-            ProPlanPresentation.Loading -> {
-                CircularProgressIndicator(color = StrictBrand.lime)
-                Text(
-                    text = stringResource(R.string.pro_plan_loading),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = StrictBrand.light,
-                    modifier = Modifier.padding(top = AppDimens.headerStackGap)
-                )
+    val facts = subscription ?: subscriptionFactsFor(plan)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (plan is ProPlanPresentation.Founder) {
+            val text = if (plan.lifetime || plan.expiresAt == null) {
+                stringResource(R.string.pro_plan_founder_open)
+            } else {
+                stringResource(R.string.pro_plan_founder, proDiscoveryDateTime(plan.expiresAt))
             }
-            ProPlanPresentation.Unavailable -> StatusCopy(stringResource(R.string.pro_plan_unavailable))
-            ProPlanPresentation.NotConfigured -> StatusCopy(stringResource(R.string.pro_plan_not_configured))
-            is ProPlanPresentation.Founder -> {
-                val text = if (plan.lifetime || plan.expiresAt == null) {
-                    stringResource(R.string.pro_plan_founder_open)
-                } else {
-                    stringResource(R.string.pro_plan_founder, proDiscoveryDateTime(plan.expiresAt))
-                }
-                StatusCopy(text)
-            }
-            is ProPlanPresentation.Paid -> {
-                if (plan.testOnly) {
-                    StatusCopy(stringResource(R.string.pro_plan_test_banner))
-                }
-                val whenText = plan.expiresAt?.let { proDiscoveryDateTime(it) }.orEmpty()
-                StatusCopy(
-                    if (plan.renews) {
-                        stringResource(R.string.pro_plan_paid_renews, whenText)
-                    } else {
-                        stringResource(R.string.pro_plan_paid_ends, whenText)
-                    }
-                )
-                Button(
-                    onClick = { onManageSubscription(plan.productId) },
-                    shape = AppShapeTokens.button,
-                    colors = StrictBrand.actionButtonColors(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = AppDimens.headerStackGap)
-                        .testTag(PRO_BENEFITS_MANAGE)
-                ) {
-                    Text(stringResource(R.string.pro_plan_manage))
-                }
-            }
-            is ProPlanPresentation.Offers -> {
-                if (plan.testOnly) {
-                    StatusCopy(stringResource(R.string.pro_plan_test_banner))
-                }
-                if (plan.expiredPreview) {
-                    StatusCopy(stringResource(R.string.pro_plan_expired_preview))
-                }
-                val trialEnds = plan.trialExpiresAt
-                if (trialEnds != null) {
-                    StatusCopy(stringResource(R.string.pro_plan_trial_note, proDiscoveryDateTime(trialEnds)))
-                }
-                if (plan.pending) {
-                    StatusCopy(stringResource(R.string.pro_plan_pending))
-                }
-                if (plan.canceled) {
-                    StatusCopy(stringResource(R.string.pro_plan_canceled))
-                }
-                if (plan.verificationFailed) {
-                    StatusCopy(stringResource(R.string.pro_plan_verify_failed))
-                }
-                if (plan.ownershipConflict) {
-                    StatusCopy(stringResource(R.string.pro_plan_ownership))
-                }
-                plan.offers.forEach { offer ->
-                    OfferRow(
-                        offer = offer,
-                        selected = offer.offerToken == plan.selectedOfferToken,
-                        onSelect = { onSelectOffer(offer.offerToken) }
+            StatusCopy(text)
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.sectionGap)
+                .testTag(PRO_BENEFITS_SUBSCRIPTION)
+        ) {
+            Text(
+                text = stringResource(R.string.pro_benefits_subscription),
+                style = MaterialTheme.typography.titleMedium,
+                color = StrictBrand.lime
+            )
+            when (facts) {
+                SubscriptionFacts.Loading -> {
+                    CircularProgressIndicator(
+                        color = StrictBrand.lime,
+                        modifier = Modifier.padding(top = AppDimens.headerStackGap)
                     )
+                    StatusCopy(stringResource(R.string.pro_plan_loading))
                 }
-                if (plan.offers.isNotEmpty()) {
+                SubscriptionFacts.Unavailable -> StatusCopy(stringResource(R.string.pro_plan_unavailable))
+                SubscriptionFacts.NotConfigured -> StatusCopy(stringResource(R.string.pro_plan_not_configured))
+                SubscriptionFacts.None -> {
+                    if (plan is ProPlanPresentation.Paid && plan.testOnly) {
+                        StatusCopy(stringResource(R.string.pro_plan_test_banner))
+                    } else {
+                        StatusCopy(stringResource(R.string.pro_benefits_subscription_none))
+                    }
+                }
+                is SubscriptionFacts.Active -> {
+                    val whenText = proDiscoveryDateTime(facts.expiresAt)
+                    StatusCopy(
+                        if (facts.autoRenewing) {
+                            stringResource(R.string.pro_plan_paid_renews, whenText)
+                        } else {
+                            stringResource(R.string.pro_plan_paid_ends, whenText)
+                        }
+                    )
                     Button(
-                        onClick = onSubscribe,
+                        onClick = { onManageSubscription(facts.productId) },
                         shape = AppShapeTokens.button,
                         colors = StrictBrand.actionButtonColors(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = AppDimens.headerStackGap)
-                            .testTag(PRO_BENEFITS_SUBSCRIBE)
+                            .testTag(PRO_BENEFITS_MANAGE)
                     ) {
-                        Text(stringResource(R.string.pro_plan_subscribe))
+                        Text(stringResource(R.string.pro_plan_manage))
                     }
                 }
             }
+            if (plan is ProPlanPresentation.Offers) {
+                OfferList(
+                    plan = plan,
+                    onSelectOffer = onSelectOffer,
+                    onSubscribe = onSubscribe
+                )
+            }
+        }
+    }
+}
+
+private fun subscriptionFactsFor(plan: ProPlanPresentation): SubscriptionFacts {
+    return when (plan) {
+        ProPlanPresentation.Loading -> SubscriptionFacts.Loading
+        ProPlanPresentation.Unavailable -> SubscriptionFacts.Unavailable
+        ProPlanPresentation.NotConfigured -> SubscriptionFacts.NotConfigured
+        is ProPlanPresentation.Paid -> {
+            val expiresAt = plan.expiresAt
+            if (plan.testOnly || expiresAt == null) {
+                SubscriptionFacts.None
+            } else {
+                SubscriptionFacts.Active(
+                    productId = plan.productId,
+                    expiresAt = expiresAt,
+                    autoRenewing = plan.renews
+                )
+            }
+        }
+        is ProPlanPresentation.Founder,
+        is ProPlanPresentation.Offers -> SubscriptionFacts.None
+    }
+}
+
+@Composable
+private fun OfferList(
+    plan: ProPlanPresentation.Offers,
+    onSelectOffer: (String) -> Unit,
+    onSubscribe: () -> Unit
+) {
+    if (plan.testOnly) {
+        StatusCopy(stringResource(R.string.pro_plan_test_banner))
+    }
+    if (plan.expiredPreview) {
+        StatusCopy(stringResource(R.string.pro_plan_expired_preview))
+    }
+    val trialEnds = plan.trialExpiresAt
+    if (trialEnds != null) {
+        StatusCopy(stringResource(R.string.pro_plan_trial_note, proDiscoveryDateTime(trialEnds)))
+    }
+    if (plan.pending) {
+        StatusCopy(stringResource(R.string.pro_plan_pending))
+    }
+    if (plan.canceled) {
+        StatusCopy(stringResource(R.string.pro_plan_canceled))
+    }
+    if (plan.verificationFailed) {
+        StatusCopy(stringResource(R.string.pro_plan_verify_failed))
+    }
+    if (plan.ownershipConflict) {
+        StatusCopy(stringResource(R.string.pro_plan_ownership))
+    }
+    plan.offers.forEach { offer ->
+        OfferRow(
+            offer = offer,
+            selected = offer.offerToken == plan.selectedOfferToken,
+            onSelect = { onSelectOffer(offer.offerToken) }
+        )
+    }
+    if (plan.offers.isNotEmpty()) {
+        Button(
+            onClick = onSubscribe,
+            shape = AppShapeTokens.button,
+            colors = StrictBrand.actionButtonColors(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.headerStackGap)
+                .testTag(PRO_BENEFITS_SUBSCRIBE)
+        ) {
+            Text(stringResource(R.string.pro_plan_subscribe))
         }
     }
 }
@@ -646,12 +826,3 @@ private fun billingPeriodLabel(period: String): String {
     return if (res == null) period else stringResource(res)
 }
 
-@Composable
-private fun accessLine(status: ProBenefitsStatus): String {
-    if (!status.proActive) {
-        return stringResource(R.string.pro_benefits_lead)
-    }
-    val expiresAt = status.expiresAt ?: return stringResource(R.string.pro_benefits_active)
-    val date = UiFormatters.longDate(expiresAt.atZone(ZoneId.systemDefault()).toLocalDate())
-    return stringResource(R.string.pro_benefits_active_until, date)
-}

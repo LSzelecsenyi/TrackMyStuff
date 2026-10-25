@@ -52,6 +52,17 @@ abstract class WorkoutTemplateDao {
     @Query("SELECT COUNT(*) FROM workout_template_exercises WHERE exerciseId = :exerciseId")
     abstract suspend fun countReferences(exerciseId: Long): Int
 
+    @Query(
+        """
+        SELECT DISTINCT t.id AS id, t.name AS name, t.archived AS archived
+        FROM workout_templates AS t
+        INNER JOIN workout_template_exercises AS e ON e.templateId = t.id
+        WHERE e.exerciseId = :exerciseId
+        ORDER BY t.name COLLATE NOCASE, t.id
+        """
+    )
+    abstract suspend fun plansReferencingExercise(exerciseId: Long): List<ExercisePlanReference>
+
     @Query("SELECT DISTINCT exerciseId FROM workout_template_exercises")
     abstract fun observeReferencedExerciseIds(): Flow<List<Long>>
 
@@ -268,6 +279,12 @@ abstract class WorkoutTemplateDao {
         }
     }
 }
+
+data class ExercisePlanReference(
+    val id: Long,
+    val name: String,
+    val archived: Boolean
+)
 
 sealed class TemplateAggregateWrite {
     data class Saved(val id: Long) : TemplateAggregateWrite()

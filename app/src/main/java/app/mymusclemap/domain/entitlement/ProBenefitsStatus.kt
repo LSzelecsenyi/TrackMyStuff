@@ -3,11 +3,12 @@ package app.mymusclemap.domain.entitlement
 import java.time.Instant
 
 /**
- * What the Pro Benefits screen may say about current access.
+ * Founder-grant facts the benefits screen may mention beside access.
  *
- * This is not a Founder record and it does not grant Pro. [expiresAt] is an
- * authoritative instant already stored for the active grant. A null date means
- * the screen must not invent one.
+ * This is not a Play subscription and it does not grant Pro. [expiresAt] is the
+ * trusted Founder Pro instant, and only while that grant is the effective
+ * access. A null date means the screen must not invent one or present it as a
+ * subscription renewal.
  */
 data class ProBenefitsStatus(
     val proActive: Boolean = false,

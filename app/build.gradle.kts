@@ -222,7 +222,7 @@ android {
         minSdk = 26
         targetSdk = 37
         // First Play upload. versionCode must increase for every later upload. Do not lower it.
-        versionCode = 1
+        versionCode = 2
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

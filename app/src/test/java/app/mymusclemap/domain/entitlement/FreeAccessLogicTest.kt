@@ -208,6 +208,86 @@ class FreeAccessLogicTest {
         assertTrue(decision.accessiblePlanIds.isEmpty())
     }
 
+    @Test
+    fun releasingAnAllocatedExerciseFreesOneSlotAndCannotBeRepeated() {
+        val exercises = subjects(5, start = 10)
+        val state = FreeAccessLogic.reconcile(null, false, emptyList(), exercises)
+        val released = FreeAccessLogic.releaseCustomExercise(state, 10L, emptyList(), exercises)!!
+        val decision = FreeAccessLogic.decide(released, false, emptyList(), exercises)
+        assertEquals(FreeAccessPhase.Confirmed, released.phase)
+        assertEquals(setOf(10L), released.releasedCustomExerciseIds)
+        assertEquals(4, decision.accessibleCustomExerciseIds.size)
+        assertFalse(decision.customExerciseAccessible(10L))
+        val again = FreeAccessLogic.releaseCustomExercise(released, 10L, emptyList(), exercises)!!
+        assertEquals(released.selectedCustomExerciseIds, again.selectedCustomExerciseIds)
+        assertEquals(1, again.releasedCustomExerciseIds.size)
+    }
+
+    @Test
+    fun aNewExerciseConsumesTheFreedSlotAndALockedIdCannot() {
+        val existing = subjects(8, start = 10)
+        val required = FreeAccessLogic.reconcile(
+            FreeAccessLogic.reconcile(null, true, emptyList(), emptyList()),
+            false,
+            emptyList(),
+            existing
+        )
+        val confirmed = FreeAccessLogic.confirm(
+            required,
+            emptySet(),
+            setOf(10L, 11L, 12L, 13L, 14L),
+            emptyList(),
+            existing
+        )!!
+        val released = FreeAccessLogic.releaseCustomExercise(confirmed, 10L, emptyList(), existing)!!
+        val created = existing + FreeAccessSubject(90L, 9_000L)
+        val claimed = FreeAccessLogic.includeCreated(
+            released,
+            customExerciseId = 90L,
+            plans = emptyList(),
+            customExercises = created
+        )
+        val decision = FreeAccessLogic.decide(claimed, false, emptyList(), created)
+        assertTrue(decision.customExerciseAccessible(90L))
+        assertEquals(5, decision.accessibleCustomExerciseIds.size)
+        assertFalse(decision.customExerciseAccessible(15L))
+        val blocked = FreeAccessLogic.includeCreated(
+            claimed,
+            customExerciseId = 15L,
+            plans = emptyList(),
+            customExercises = created
+        )
+        assertEquals(claimed.selectedCustomExerciseIds, blocked.selectedCustomExerciseIds)
+        val full = FreeAccessLogic.includeCreated(
+            claimed,
+            customExerciseId = 91L,
+            plans = emptyList(),
+            customExercises = created + FreeAccessSubject(91L, 9_100L)
+        )
+        assertFalse(91L in full.selectedCustomExerciseIds)
+    }
+
+    @Test
+    fun reconciliationDoesNotRestoreAReleasedExerciseOrOpenANewPeriod() {
+        val exercises = subjects(5, start = 10)
+        val released = FreeAccessLogic.releaseCustomExercise(
+            FreeAccessLogic.reconcile(null, false, emptyList(), exercises),
+            12L,
+            emptyList(),
+            exercises
+        )!!
+        val restarted = FreeAccessLogic.reconcile(released, false, emptyList(), exercises)
+        assertEquals(released.periodId, restarted.periodId)
+        assertEquals(setOf(12L), restarted.releasedCustomExerciseIds)
+        assertFalse(12L in restarted.selectedCustomExerciseIds)
+        val pro = FreeAccessLogic.reconcile(released, true, emptyList(), exercises)
+        assertEquals(setOf(12L), pro.releasedCustomExerciseIds)
+        val next = FreeAccessLogic.reconcile(pro, false, emptyList(), exercises)
+        assertEquals(released.periodId + 1L, next.periodId)
+        assertTrue(next.releasedCustomExerciseIds.isEmpty())
+        assertTrue(12L in next.knownCustomExerciseIds)
+    }
+
     private fun confirmedPlans(selected: Set<Long>, plans: List<FreeAccessSubject>): FreeAccessState {
         val required = FreeAccessLogic.reconcile(null, false, plans, emptyList())
         return FreeAccessLogic.confirm(required, selected, emptySet(), plans, emptyList())!!
