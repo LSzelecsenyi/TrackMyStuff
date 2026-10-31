@@ -23,6 +23,7 @@ import app.mymusclemap.domain.body.BodyMeasurementParseError
 import app.mymusclemap.domain.body.BodyMeasurementParser
 import app.mymusclemap.domain.body.BodyMeasurementSeries
 import app.mymusclemap.domain.body.BodyMeasurementType
+import app.mymusclemap.domain.body.BodyMeasurementUnit
 import app.mymusclemap.domain.body.BodyMeasurementValidationResult
 import app.mymusclemap.domain.body.BodyMeasurementValidator
 import app.mymusclemap.domain.body.BodyMeasurementWindow
@@ -32,6 +33,8 @@ import app.mymusclemap.domain.entitlement.OpenFeatureEntitlements
 import app.mymusclemap.domain.model.ChartRange
 import app.mymusclemap.domain.model.SaveOutcome
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.domain.units.MeasurementInput
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.onboarding.OnboardingGuide
 import app.mymusclemap.ui.components.EditorUiState
 import app.mymusclemap.ui.components.UserMessage
@@ -120,7 +123,8 @@ class WeightDetailsViewModel(
     private val onboardingRepository: OnboardingRepository? = null,
     private val bodyRepository: BodyMeasurementRepository? = null,
     private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
-    private val targetWeightGoalRepository: TargetWeightGoalRepository? = null
+    private val targetWeightGoalRepository: TargetWeightGoalRepository? = null,
+    private val unitSystem: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC)
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
     private val bodyChartRange = MutableStateFlow(ChartRange.Days30)
@@ -182,6 +186,14 @@ class WeightDetailsViewModel(
         viewModelScope.launch {
             repository.observeAll().collect { measurements.value = it }
         }
+        viewModelScope.launch {
+            var applied = unitSystem.value
+            unitSystem.collect { next ->
+                if (next == applied) return@collect
+                reformatOpenEditors(applied, next)
+                applied = next
+            }
+        }
         val body = bodyRepository
         if (body != null) {
             viewModelScope.launch {
@@ -199,7 +211,7 @@ class WeightDetailsViewModel(
     fun openTargetEditor() {
         val current = targetGoal.value
         targetEditor.value = TargetWeightEditor(
-            input = current?.let { formatWeightInput(it.targetKg) }.orEmpty(),
+            input = current?.let { weightText(it.targetKg) }.orEmpty(),
             error = null
         )
     }
@@ -216,14 +228,22 @@ class WeightDetailsViewModel(
     fun saveTarget() {
         val editorState = targetEditor.value ?: return
         val goals = targetWeightGoalRepository ?: return
-        when (val parsed = WeightParser.parseUserInput(editorState.input)) {
-            is app.mymusclemap.domain.WeightParseResult.Invalid -> {
-                targetEditor.value = editorState.copy(error = parsed.error)
+        when (
+            val result = MeasurementValidator.validate(
+                dateProvider.today(),
+                editorState.input,
+                dateProvider.today(),
+                unitSystem.value,
+                targetGoal.value?.targetKg
+            )
+        ) {
+            is MeasurementValidationResult.Invalid -> {
+                targetEditor.value = editorState.copy(error = result.weightError ?: WeightParseError.Malformed)
             }
-            is app.mymusclemap.domain.WeightParseResult.Valid -> {
+            is MeasurementValidationResult.Valid -> {
                 val latest = measurements.value.maxByOrNull { it.date }?.weightKg
                 viewModelScope.launch {
-                    goals.setTarget(parsed.kilograms, latest)
+                    goals.setTarget(result.weightKg, latest)
                     targetEditor.value = null
                 }
             }
@@ -261,7 +281,7 @@ class WeightDetailsViewModel(
         val existing = measurements.value.find { it.date == date }
         editor.value = EditorUiState(
             date = date,
-            weightInput = existing?.let { formatWeightInput(it.weightKg) }.orEmpty(),
+            weightInput = existing?.let { weightText(it.weightKg) }.orEmpty(),
             existing = existing,
             weightError = null,
             dateError = null
@@ -278,7 +298,7 @@ class WeightDetailsViewModel(
         editor.value = current.copy(
             date = date,
             existing = existing,
-            weightInput = existing?.let { formatWeightInput(it.weightKg) } ?: current.weightInput,
+            weightInput = existing?.let { weightText(it.weightKg) } ?: current.weightInput,
             dateError = null,
             showDeleteConfirm = false
         )
@@ -291,7 +311,15 @@ class WeightDetailsViewModel(
 
     fun saveEditor() {
         val current = editor.value ?: return
-        when (val result = MeasurementValidator.validate(current.date, current.weightInput, dateProvider.today())) {
+        when (
+            val result = MeasurementValidator.validate(
+                current.date,
+                current.weightInput,
+                dateProvider.today(),
+                unitSystem.value,
+                current.existing?.weightKg
+            )
+        ) {
             is MeasurementValidationResult.Invalid -> {
                 editor.value = current.copy(
                     weightError = result.weightError,
@@ -344,7 +372,7 @@ class WeightDetailsViewModel(
         bodyEditor.value = BodyEditorUiState(
             type = type,
             date = existing?.date ?: date,
-            valueInput = existing?.let { formatWeightInput(it.value) }.orEmpty(),
+            valueInput = existing?.let { bodyValueText(type, it.value) }.orEmpty(),
             existing = existing,
             valueError = null,
             dateError = null
@@ -367,7 +395,7 @@ class WeightDetailsViewModel(
         bodyEditor.value = current.copy(
             date = date,
             existing = existing,
-            valueInput = existing?.let { formatWeightInput(it.value) } ?: current.valueInput,
+            valueInput = existing?.let { bodyValueText(current.type, it.value) } ?: current.valueInput,
             dateError = null,
             showDeleteConfirm = false
         )
@@ -389,7 +417,9 @@ class WeightDetailsViewModel(
                 current.type,
                 current.date,
                 current.valueInput,
-                dateProvider.today()
+                dateProvider.today(),
+                unitSystem.value,
+                current.existing?.value
             )
         ) {
             is BodyMeasurementValidationResult.Invalid -> {
@@ -446,6 +476,52 @@ class WeightDetailsViewModel(
 
     fun consumeMessage() {
         userMessage.value = null
+    }
+
+    private fun weightText(kilograms: Double): String {
+        return MeasurementInput.bodyWeightInput(kilograms, unitSystem.value)
+    }
+
+    private fun bodyValueText(type: BodyMeasurementType, value: Double): String {
+        return if (type.unit == BodyMeasurementUnit.PERCENT) {
+            formatWeightInput(value)
+        } else {
+            MeasurementInput.lengthInput(value, unitSystem.value)
+        }
+    }
+
+    private fun reformatOpenEditors(from: UnitSystem, to: UnitSystem) {
+        editor.value?.let { current ->
+            editor.value = current.copy(
+                weightInput = MeasurementInput.reformatBodyWeight(
+                    current.weightInput,
+                    current.existing?.weightKg,
+                    from,
+                    to
+                )
+            )
+        }
+        targetEditor.value?.let { current ->
+            targetEditor.value = current.copy(
+                input = MeasurementInput.reformatBodyWeight(
+                    current.input,
+                    targetGoal.value?.targetKg,
+                    from,
+                    to
+                )
+            )
+        }
+        bodyEditor.value?.let { current ->
+            if (current.type.unit == BodyMeasurementUnit.PERCENT) return@let
+            bodyEditor.value = current.copy(
+                valueInput = MeasurementInput.reformatLength(
+                    current.valueInput,
+                    current.existing?.value,
+                    from,
+                    to
+                )
+            )
+        }
     }
 
     fun markWeightChartSeen() {

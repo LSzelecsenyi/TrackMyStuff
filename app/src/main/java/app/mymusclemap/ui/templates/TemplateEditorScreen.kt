@@ -5,6 +5,11 @@ import app.mymusclemap.domain.workout.RestDuration
 import app.mymusclemap.domain.workout.RestProgressionMode
 import app.mymusclemap.domain.workout.WorkDuration
 import app.mymusclemap.ui.exercises.starterExerciseLabel
+import app.mymusclemap.ui.units.LocalUnitSystem
+import app.mymusclemap.ui.units.WeightStepButtons
+import app.mymusclemap.ui.units.rememberDistanceDraftBinding
+import app.mymusclemap.ui.units.rememberWeightDraftBinding
+import app.mymusclemap.ui.units.weightFieldLabel
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -240,7 +245,7 @@ fun TemplateEditorScreen(
                                 supportingText = {
                                     val message = when {
                                         state.duplicateName -> stringResource(R.string.error_template_duplicate)
-                                        nameError != null -> stringResource(nameError.error.labelRes())
+                                        nameError != null -> stringResource(nameError.error.labelRes(LocalUnitSystem.current))
                                         else -> null
                                     }
                                     if (message != null) Text(message)
@@ -781,17 +786,24 @@ private fun SetCard(
             }
             if (PlannedLoadLogic.requiresPositiveWeight(set.loadKind)) {
                 Spacer(Modifier.height(8.dp))
+                val weightDraft = rememberWeightDraftBinding(
+                    fieldKey = set.localId,
+                    canonicalText = set.weightText,
+                    onCanonicalText = onWeight,
+                    enabled = !fieldsLocked
+                )
                 OutlinedTextField(
-                    value = set.weightText,
-                    onValueChange = onWeight,
+                    value = weightDraft.text,
+                    onValueChange = weightDraft.onText,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.field_weight_kg)) },
+                    label = { Text(weightFieldLabel()) },
                     isError = issues.any { it.error.name.startsWith("Weight") },
                     enabled = !fieldsLocked,
                     readOnly = fieldsLocked,
                     colors = lockedFieldColors(fieldsLocked),
                     singleLine = true
                 )
+                WeightStepButtons(onStep = weightDraft.step, enabled = !fieldsLocked)
             }
             if (PlannedSetLogic.requiresDuration(exercise.measurementType) || displayTimed) {
                 val (minutesShown, secondsShown) = if (displayTimed && !set.timedWork) {
@@ -858,9 +870,16 @@ private fun SetCard(
             }
             if (PlannedSetLogic.requiresDistance(exercise.measurementType)) {
                 Spacer(Modifier.height(8.dp))
+                val distanceDraft = rememberDistanceDraftBinding(
+                    fieldKey = set.localId,
+                    canonicalText = set.distanceText,
+                    canonicalUnit = set.distanceUnit,
+                    onCanonicalText = onDistance,
+                    onCanonicalUnit = onDistanceUnit
+                )
                 OutlinedTextField(
-                    value = set.distanceText,
-                    onValueChange = onDistance,
+                    value = distanceDraft.text,
+                    onValueChange = distanceDraft.onText,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.field_distance)) },
                     enabled = !fieldsLocked,
@@ -870,17 +889,24 @@ private fun SetCard(
                 )
                 Spacer(Modifier.height(8.dp))
                 SegmentedControl(
-                    options = listOf(
-                        stringResource(R.string.distance_unit_m),
-                        stringResource(R.string.distance_unit_km)
-                    ),
-                    selectedIndex = if (set.distanceUnit == DistanceUnit.KILOMETERS) 1 else 0,
-                    onSelected = { onDistanceUnit(if (it == 1) DistanceUnit.KILOMETERS else DistanceUnit.METERS) }
+                    options = if (distanceDraft.imperial) {
+                        listOf(
+                            stringResource(R.string.distance_unit_ft),
+                            stringResource(R.string.distance_unit_mi)
+                        )
+                    } else {
+                        listOf(
+                            stringResource(R.string.distance_unit_m),
+                            stringResource(R.string.distance_unit_km)
+                        )
+                    },
+                    selectedIndex = distanceDraft.selectedIndex,
+                    onSelected = distanceDraft.onUnitSelected
                 )
             }
             issues.forEach { issue ->
                 Text(
-                    text = stringResource(issue.error.labelRes()),
+                    text = stringResource(issue.error.labelRes(LocalUnitSystem.current)),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )

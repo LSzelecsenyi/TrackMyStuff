@@ -1,6 +1,7 @@
 package app.mymusclemap.ui.templates
 
 import app.mymusclemap.R
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.TemplateFieldError
 
@@ -14,7 +15,10 @@ fun PlannedLoadKind.labelRes(): Int {
     }
 }
 
-fun TemplateFieldError.labelRes(): Int {
+fun TemplateFieldError.labelRes(system: UnitSystem = UnitSystem.METRIC): Int {
+    if (this == TemplateFieldError.WeightTooLarge && system == UnitSystem.IMPERIAL) {
+        return R.string.error_template_weight_large_lb
+    }
     return when (this) {
         TemplateFieldError.NameBlank -> R.string.error_template_name_blank
         TemplateFieldError.NameTooLong -> R.string.error_template_name_length

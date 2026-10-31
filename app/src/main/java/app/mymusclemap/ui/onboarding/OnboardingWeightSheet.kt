@@ -67,14 +67,23 @@ fun OnboardingWeightSheet(
                 value = weightInput,
                 onValueChange = { onWeightChange(WeightParser.filterUserInput(it)) },
                 label = { Text(stringResource(R.string.field_weight)) },
-                suffix = { Text(stringResource(R.string.unit_kg)) },
+                suffix = { Text(app.mymusclemap.ui.units.weightUnitLabel()) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 isError = weightError != null,
                 supportingText = {
                     Text(
-                        text = weightError?.let { stringResource(weightErrorMessage(it)) }
-                            ?: stringResource(R.string.weight_input_hint)
+                        text = weightError?.let {
+                            stringResource(weightErrorMessage(it, app.mymusclemap.ui.units.LocalUnitSystem.current))
+                        } ?: stringResource(
+                            if (app.mymusclemap.ui.units.LocalUnitSystem.current ==
+                                app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+                            ) {
+                                R.string.weight_input_hint_lb
+                            } else {
+                                R.string.weight_input_hint
+                            }
+                        )
                     )
                 },
                 modifier = Modifier

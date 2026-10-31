@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.repository.WorkoutSessionRepository
 import app.mymusclemap.domain.journal.WorkoutSetCopy
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.journal.WorkoutSetDisplay
 import app.mymusclemap.domain.workout.DeleteWorkoutResult
 import app.mymusclemap.domain.workout.SessionProgress
@@ -39,7 +40,8 @@ data class WorkoutDetailUiState(
 class WorkoutDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val sessionRepository: WorkoutSessionRepository,
-    private val resources: Resources
+    private val resources: Resources,
+    private val unitSystem: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC)
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(SESSION_ID) ?: -1L
     private val confirmDelete = MutableStateFlow(false)
@@ -56,10 +58,11 @@ class WorkoutDetailViewModel(
 
     val uiState: StateFlow<WorkoutDetailUiState> = combine(
         sessionRepository.observeAggregate(sessionId),
+        unitSystem,
         combine(confirmDelete, deleting, deleted, userMessage) { confirm, inFlight, gone, message ->
             DetailChrome(confirm, inFlight, gone, message)
         }
-    ) { aggregate, chrome ->
+    ) { aggregate, units, chrome ->
         if (chrome.deleted) {
             return@combine WorkoutDetailUiState(
                 loading = false,
@@ -95,7 +98,7 @@ class WorkoutDetailViewModel(
                 setDisplays = buildMap {
                     aggregate.exercises.forEach { item ->
                         item.sets.forEach { set ->
-                            put(set.id, WorkoutSetCopy.display(resources, set, item.exercise))
+                            put(set.id, WorkoutSetCopy.display(resources, set, item.exercise, units))
                         }
                     }
                 },

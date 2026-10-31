@@ -54,7 +54,19 @@ fun BodyMeasurementEditorSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
-    val unit = stringResource(state.type.unit.labelRes())
+    val unit = stringResource(
+        when (state.type.unit) {
+            app.mymusclemap.domain.body.BodyMeasurementUnit.PERCENT -> R.string.body_unit_percent
+            app.mymusclemap.domain.body.BodyMeasurementUnit.CENTIMETERS ->
+                if (app.mymusclemap.ui.units.LocalUnitSystem.current ==
+                    app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+                ) {
+                    R.string.body_unit_in
+                } else {
+                    R.string.body_unit_cm
+                }
+        }
+    )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState

@@ -114,6 +114,7 @@ class FounderInvitationHandoffTest {
         val viewModel = onboardingViewModel(FounderProgramAvailability.Closed)
         assertEquals(OnboardingStep.Welcome, viewModel.step.value)
         viewModel.onContinue()
+        viewModel.onContinue()
         assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.value)
         viewModel.onWeeklyGoalSkipped()
         assertEquals(OnboardingStep.CreatePlan, viewModel.step.value)
@@ -129,7 +130,8 @@ class FounderInvitationHandoffTest {
         assertEquals(FirstRunDecision.ShowOnboarding, firstRun.prepare())
         val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
         viewModel.onContinue()
-        assertEquals(OnboardingStep.FounderInvitation, viewModel.step.first { it != OnboardingStep.Welcome })
+        viewModel.onContinue()
+        assertEquals(OnboardingStep.FounderInvitation, viewModel.step.first { it == OnboardingStep.FounderInvitation })
         assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
         viewModel.onDeclineFounder()
         assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.first { it == OnboardingStep.WeeklyGoal })
@@ -141,6 +143,7 @@ class FounderInvitationHandoffTest {
     fun joinEnrollsOnceAndContinuesOnboarding() = runTest {
         firstRun.prepare()
         val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
+        viewModel.onContinue()
         viewModel.onContinue()
         viewModel.step.first { it == OnboardingStep.FounderInvitation }
         viewModel.onJoinFounder()
@@ -162,6 +165,7 @@ class FounderInvitationHandoffTest {
         firstRun.prepare()
         val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
         viewModel.onContinue()
+        viewModel.onContinue()
         viewModel.step.first { it == OnboardingStep.FounderInvitation }
         viewModel.onDeclineFounder()
         viewModel.step.first { it == OnboardingStep.WeeklyGoal }
@@ -169,7 +173,8 @@ class FounderInvitationHandoffTest {
         assertTrue(acknowledgements.load().invitationHandled)
         val restarted = onboardingViewModel(FounderProgramAvailability.Open)
         restarted.onContinue()
-        assertEquals(OnboardingStep.WeeklyGoal, restarted.step.first { it != OnboardingStep.Welcome })
+        restarted.onContinue()
+        assertEquals(OnboardingStep.WeeklyGoal, restarted.step.first { it == OnboardingStep.WeeklyGoal })
         val settings = FounderProgramViewModel(
             founder,
             rules,

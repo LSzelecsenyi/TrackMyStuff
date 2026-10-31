@@ -55,6 +55,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -236,7 +237,7 @@ private fun BodyWeightSection(session: WorkoutSession) {
     val kilograms = session.bodyWeightKg ?: return
     Spacer(Modifier.height(8.dp))
     Text(
-        text = stringResource(R.string.workout_detail_body_weight, UiFormatters.weightKg(kilograms)),
+        text = stringResource(R.string.workout_detail_body_weight, UiFormatters.weightKg(kilograms, LocalUnitSystem.current)),
         style = MaterialTheme.typography.bodyMedium
     )
     val source = when (session.bodyWeightSource) {

@@ -9,6 +9,7 @@ import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.FounderProgramAvailability
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.ui.founder.FounderJoinNotice
 import app.mymusclemap.ui.founder.shouldOfferFounderOnboardingInvitation
 import app.mymusclemap.ui.founder.toNotice
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 
 enum class OnboardingStep {
     Welcome,
+    MeasurementUnits,
     FounderInvitation,
     WeeklyGoal,
     CreatePlan
@@ -35,31 +37,49 @@ class OnboardingViewModel(
     private val founderInvitations: FounderMilestoneAcknowledgementStore? = null,
     private val founderProgram: FounderProgramCoordinator? = null,
     private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open,
-    private val founderJoin: (suspend () -> FounderJoinResult)? = null
+    private val founderJoin: (suspend () -> FounderJoinResult)? = null,
+    initialUnitSystem: UnitSystem = UnitSystem.METRIC,
+    private val persistUnitSystem: suspend (UnitSystem) -> Unit = {}
 ) : ViewModel() {
     private var founderDeclined = false
     private val stepState = MutableStateFlow(OnboardingStep.Welcome)
     private val exitState = MutableStateFlow<OnboardingExit?>(null)
     private val joiningState = MutableStateFlow(false)
     private val joinNoticeState = MutableStateFlow(FounderJoinNotice.None)
+    private val selectedUnitState = MutableStateFlow(initialUnitSystem)
 
     val step: StateFlow<OnboardingStep> = stepState
     val exit: StateFlow<OnboardingExit?> = exitState
     val founderJoining: StateFlow<Boolean> = joiningState
     val founderJoinNotice: StateFlow<FounderJoinNotice> = joinNoticeState
+    val selectedUnit: StateFlow<UnitSystem> = selectedUnitState
+
+    fun onUnitSystemSelected(system: UnitSystem) {
+        selectedUnitState.value = system
+        viewModelScope.launch { persistUnitSystem(system) }
+    }
 
     fun onContinue() {
+        when (stepState.value) {
+            OnboardingStep.Welcome -> stepState.value = OnboardingStep.MeasurementUnits
+            OnboardingStep.MeasurementUnits -> continueFromUnits()
+            else -> Unit
+        }
+    }
+
+    private fun continueFromUnits() {
         val invitations = founderInvitations
         val program = founderProgram
-        if (
-            invitations == null ||
-            program == null ||
-            founderAvailability != FounderProgramAvailability.Open
-        ) {
-            stepState.value = OnboardingStep.WeeklyGoal
-            return
-        }
         viewModelScope.launch {
+            persistUnitSystem(selectedUnitState.value)
+            if (
+                invitations == null ||
+                program == null ||
+                founderAvailability != FounderProgramAvailability.Open
+            ) {
+                stepState.value = OnboardingStep.WeeklyGoal
+                return@launch
+            }
             program.refresh()
             val offer = shouldOfferFounderOnboardingInvitation(
                 availability = founderAvailability,

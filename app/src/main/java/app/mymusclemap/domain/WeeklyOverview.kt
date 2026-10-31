@@ -3,9 +3,9 @@ package app.mymusclemap.domain
 import app.mymusclemap.domain.model.WeightMeasurement
 import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
-import app.mymusclemap.domain.locale.AppLocale
+import app.mymusclemap.domain.units.MeasurementText
+import app.mymusclemap.domain.units.UnitSystem
 import java.time.LocalDate
-import kotlin.math.abs
 
 data class WeeklyOverview(
     val workoutCount: Int = 0,
@@ -46,12 +46,7 @@ object WeeklyOverviewLogic {
         )
     }
 
-    fun weightChangeLabel(changeKg: Double): String {
-        val formatted = String.format(AppLocale.UI, "%.1f kg", abs(changeKg))
-        return when {
-            changeKg > 0 -> "+$formatted"
-            changeKg < 0 -> "−$formatted"
-            else -> formatted
-        }
+    fun weightChangeLabel(changeKg: Double, system: UnitSystem = UnitSystem.METRIC): String {
+        return MeasurementText.signedWeightLabel(changeKg, system)
     }
 }

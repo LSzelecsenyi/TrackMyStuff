@@ -446,6 +446,8 @@ object WorkoutImportCsv {
         val meters = when (unitRaw) {
             "m" -> distance
             "km" -> distance.multiply(BigDecimal(1000))
+            "ft" -> distance.multiply(app.mymusclemap.domain.units.UnitConversions.FT_TO_M)
+            "mi" -> distance.multiply(app.mymusclemap.domain.units.UnitConversions.MI_TO_M)
             else -> {
                 errors += error(rowNumber, "distance_unit", WorkoutImportErrorCode.InvalidDistanceUnit, unitRaw)
                 return null

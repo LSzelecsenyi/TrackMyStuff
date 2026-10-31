@@ -19,6 +19,9 @@
         <include
             domain="file"
             path="datastore/app_language.preferences_pb" />
+        <include
+            domain="file"
+            path="datastore/unit_system.preferences_pb" />
     </cloud-backup>
     <device-transfer>
         <include
@@ -30,6 +33,9 @@
         <include
             domain="file"
             path="datastore/app_language.preferences_pb" />
+        <include
+            domain="file"
+            path="datastore/unit_system.preferences_pb" />
     </device-transfer>
     <cross-platform-transfer platform="ios">
         <exclude domain="root" path="." />

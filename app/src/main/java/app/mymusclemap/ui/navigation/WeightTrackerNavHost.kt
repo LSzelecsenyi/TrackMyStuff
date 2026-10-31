@@ -354,7 +354,10 @@ fun WeightTrackerNavHost(
     showLanguageSetting: Boolean = false,
     selectedLanguage: app.mymusclemap.domain.locale.AppLanguage =
         app.mymusclemap.domain.locale.AppLanguage.EN,
-    onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {}
+    onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {},
+    selectedUnitSystem: app.mymusclemap.domain.units.UnitSystem =
+        app.mymusclemap.domain.units.UnitSystem.METRIC,
+    onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit = {}
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -744,6 +747,8 @@ fun WeightTrackerNavHost(
                     showLanguageSetting = showLanguageSetting,
                     selectedLanguage = selectedLanguage,
                     onLanguageSelected = onLanguageSelected,
+                    selectedUnitSystem = selectedUnitSystem,
+                    onUnitSystemSelected = onUnitSystemSelected,
                     onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) }
                 )
             }
@@ -1775,6 +1780,8 @@ private fun SettingsRoute(
     showLanguageSetting: Boolean,
     selectedLanguage: app.mymusclemap.domain.locale.AppLanguage,
     onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit,
+    selectedUnitSystem: app.mymusclemap.domain.units.UnitSystem,
+    onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit,
     showFounderProgram: Boolean,
     showFounderBadge: Boolean,
     onOpenHealthDetails: () -> Unit
@@ -1917,6 +1924,8 @@ private fun SettingsRoute(
         showLanguageSetting = showLanguageSetting,
         selectedLanguage = selectedLanguage,
         onLanguageSelected = onLanguageSelected,
+        selectedUnitSystem = selectedUnitSystem,
+        onUnitSystemSelected = onUnitSystemSelected,
         showFounderProgram = showFounderProgram,
         showFounderBadge = showFounderBadge,
         onMessageConsumed = viewModel::consumeMessage,

@@ -75,9 +75,10 @@ object ActiveWorkoutNotificationLogic {
 internal fun notificationLoadLabel(
     kind: PlannedLoadKind,
     weightKg: Double?,
-    bodyweightLabel: String
+    bodyweightLabel: String,
+    system: app.mymusclemap.domain.units.UnitSystem = app.mymusclemap.domain.units.UnitSystem.METRIC
 ): String {
-    val load = PlannedTargetDisplay.load(kind, weightKg)
+    val load = PlannedTargetDisplay.load(kind, weightKg, system)
     return when (load) {
         "BW" -> bodyweightLabel
         "+", "−" -> ""

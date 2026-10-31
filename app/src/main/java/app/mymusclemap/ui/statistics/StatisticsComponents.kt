@@ -43,6 +43,7 @@ import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 internal const val STATISTICS_ROOT = "statistics-root"
 internal const val STATISTICS_EMPTY = "statistics-empty"
@@ -236,16 +237,26 @@ internal fun bestLabel(best: ExerciseBest): String {
     return when (best) {
         is ExerciseBest.Reps -> stringResource(R.string.statistics_best_reps, best.reps)
         is ExerciseBest.WeightedSet -> if (best.perSide) {
+            val units = LocalUnitSystem.current
+            val imperial = units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL
             stringResource(
-                R.string.statistics_best_weight_per_side,
-                UiFormatters.weightValue(best.recordedKg),
+                if (imperial) {
+                    R.string.statistics_best_weight_per_side_lb
+                } else {
+                    R.string.statistics_best_weight_per_side
+                },
+                if (imperial) {
+                    app.mymusclemap.domain.units.MeasurementText.weightNumber(best.recordedKg, units)
+                } else {
+                    UiFormatters.weightValue(best.recordedKg)
+                },
                 best.reps,
-                UiFormatters.weightKg(best.effectiveKg)
+                UiFormatters.weightKg(best.effectiveKg, units)
             )
         } else {
             stringResource(
                 R.string.statistics_best_weight,
-                UiFormatters.weightKg(best.effectiveKg),
+                UiFormatters.weightKg(best.effectiveKg, LocalUnitSystem.current),
                 best.reps
             )
         }
@@ -261,7 +272,16 @@ internal fun bestLabel(best: ExerciseBest): String {
 
 @Composable
 private fun distanceLabel(best: ExerciseBest.Distance): String {
-    val distance = if (best.meters >= 1000.0) {
+    val units = LocalUnitSystem.current
+    val distance = if (units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL) {
+        val (number, word) = app.mymusclemap.domain.units.MeasurementText.distanceNumber(best.meters, units)
+        val res = when (word) {
+            app.mymusclemap.domain.units.DistanceWord.FEET -> R.string.set_copy_distance_ft
+            app.mymusclemap.domain.units.DistanceWord.MILES -> R.string.set_copy_distance_mi
+            else -> R.string.set_copy_distance_m
+        }
+        stringResource(res, number)
+    } else if (best.meters >= 1000.0) {
         stringResource(
             R.string.set_copy_distance_km,
             QuantityParser.formatDisplay(QuantityParser.fromMeters(best.meters, DistanceUnit.KILOMETERS))

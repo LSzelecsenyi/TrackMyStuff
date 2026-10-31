@@ -377,17 +377,34 @@ private fun highlightLabel(kind: PerformanceRecordKind): String {
 
 @Composable
 private fun formatMeasure(value: Double, measure: HighlightMeasure): String {
-    val number = if (measure == HighlightMeasure.REPS) {
-        value.toInt().toString()
-    } else {
-        QuantityParser.formatDisplay(value)
+    val imperial = measure != HighlightMeasure.REPS &&
+        app.mymusclemap.ui.units.LocalUnitSystem.current == app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+    val number = when {
+        measure == HighlightMeasure.REPS -> value.toInt().toString()
+        imperial -> app.mymusclemap.domain.units.MeasurementText.workoutWeightNumber(
+            value,
+            app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+        )
+        else -> QuantityParser.formatDisplay(value)
     }
     return when (measure) {
-        HighlightMeasure.ADDED_KG -> stringResource(R.string.set_copy_added_weight, number)
-        HighlightMeasure.EXTERNAL_KG -> stringResource(R.string.set_copy_weight, number)
-        HighlightMeasure.PER_SIDE_TOTAL_KG -> stringResource(R.string.set_copy_weight_total, number)
+        HighlightMeasure.ADDED_KG -> stringResource(
+            if (imperial) R.string.set_copy_added_weight_lb else R.string.set_copy_added_weight,
+            number
+        )
+        HighlightMeasure.EXTERNAL_KG -> stringResource(
+            if (imperial) R.string.set_copy_weight_lb else R.string.set_copy_weight,
+            number
+        )
+        HighlightMeasure.PER_SIDE_TOTAL_KG -> stringResource(
+            if (imperial) R.string.set_copy_weight_total_lb else R.string.set_copy_weight_total,
+            number
+        )
         HighlightMeasure.REPS -> stringResource(R.string.set_copy_reps, number)
-        HighlightMeasure.VOLUME_KG -> stringResource(R.string.set_copy_weight, number)
+        HighlightMeasure.VOLUME_KG -> stringResource(
+            if (imperial) R.string.set_copy_weight_lb else R.string.set_copy_weight,
+            number
+        )
     }
 }
 

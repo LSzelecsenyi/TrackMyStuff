@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import app.mymusclemap.R
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 @Composable
 fun DeleteMeasurementDialog(
@@ -22,7 +23,7 @@ fun DeleteMeasurementDialog(
                 stringResource(
                     R.string.delete_message,
                     UiFormatters.longDate(measurement.date),
-                    UiFormatters.weightKg(measurement.weightKg)
+                    UiFormatters.weightKg(measurement.weightKg, LocalUnitSystem.current)
                 )
             )
         },

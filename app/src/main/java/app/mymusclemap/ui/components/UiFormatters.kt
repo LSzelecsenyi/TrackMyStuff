@@ -1,6 +1,8 @@
 package app.mymusclemap.ui.components
 
 import app.mymusclemap.domain.locale.AppLocale
+import app.mymusclemap.domain.units.MeasurementText
+import app.mymusclemap.domain.units.UnitSystem
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -21,15 +23,22 @@ object UiFormatters {
     private fun monthAbbrevFormatter(): DateTimeFormatter =
         DateTimeFormatter.ofPattern("MMM", locale())
 
-    fun weightKg(value: Double): String {
-        return String.format(locale(), "%.1f kg", value)
+    fun weightKg(value: Double, system: UnitSystem = UnitSystem.METRIC): String {
+        return if (system == UnitSystem.METRIC) {
+            String.format(locale(), "%.1f kg", value)
+        } else {
+            MeasurementText.weightLabel(value, system)
+        }
     }
 
     fun weightValue(value: Double): String {
         return String.format(locale(), "%.1f", value)
     }
 
-    fun signedWeightKg(value: Double): String {
+    fun signedWeightKg(value: Double, system: UnitSystem = UnitSystem.METRIC): String {
+        if (system == UnitSystem.IMPERIAL) {
+            return MeasurementText.signedWeightLabel(value, system)
+        }
         val formatted = String.format(locale(), "%.1f kg", abs(value))
         return when {
             value > 0 -> "+$formatted"

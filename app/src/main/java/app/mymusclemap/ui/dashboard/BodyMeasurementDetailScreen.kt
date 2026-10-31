@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.ui.units.LocalUnitSystem
 import app.mymusclemap.domain.body.BodyMeasurement
 import app.mymusclemap.domain.entitlement.AppFeature
 import app.mymusclemap.domain.model.ChartRange
@@ -115,7 +116,7 @@ fun BodyMeasurementDetailScreen(
             val latest = detail.window.latest
             if (latest != null) {
                 Text(
-                    text = formatBodyValue(latest.value, detail.type?.unit),
+                    text = formatBodyValue(latest.value, detail.type?.unit, LocalUnitSystem.current),
                     style = AppTypeTokens.statValue,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -129,7 +130,7 @@ fun BodyMeasurementDetailScreen(
                 Text(
                     text = stringResource(
                         R.string.body_measurement_change,
-                        formatSignedBodyValue(change, detail.type?.unit)
+                        formatSignedBodyValue(change, detail.type?.unit, LocalUnitSystem.current)
                     ),
                     style = AppTypeTokens.statCaption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -145,6 +146,8 @@ fun BodyMeasurementDetailScreen(
             )
             Spacer(Modifier.height(AppDimens.itemGap))
             if (detail.showChart) {
+                val units = LocalUnitSystem.current
+                val percent = detail.type?.unit == app.mymusclemap.domain.body.BodyMeasurementUnit.PERCENT
                 SeriesChart(
                     points = detail.window.points.map { SeriesPoint(it.date, it.value) },
                     contentDescription = stringResource(
@@ -155,7 +158,10 @@ fun BodyMeasurementDetailScreen(
                     modifier = Modifier.testTag(BODY_CHART_TAG),
                     chartHeight = 160.dp,
                     valueDomain = ChartValueDomain.Padded,
-                    subdued = true
+                    subdued = true,
+                    yAxisLabel = { value ->
+                        app.mymusclemap.domain.units.MeasurementText.axisLength(value, percent, units)
+                    }
                 )
             } else if (detail.window.points.isEmpty()) {
                 Text(
@@ -183,7 +189,7 @@ fun BodyMeasurementDetailScreen(
                             text = stringResource(
                                 R.string.body_measurement_history_row,
                                 UiFormatters.compactDate(measurement.date),
-                                formatBodyValue(measurement.value, detail.type?.unit)
+                                formatBodyValue(measurement.value, detail.type?.unit, LocalUnitSystem.current)
                             ),
                             style = AppTypeTokens.statSecondary,
                             color = MaterialTheme.colorScheme.onBackground

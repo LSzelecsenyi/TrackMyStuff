@@ -34,6 +34,8 @@ import app.mymusclemap.domain.musclemap.MuscleHeatmapState
 import app.mymusclemap.domain.model.ChartRange
 import app.mymusclemap.domain.model.SaveOutcome
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.domain.units.MeasurementInput
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.onboarding.OnboardingGuide
 import app.mymusclemap.domain.workout.RescheduleWorkoutResult
 import app.mymusclemap.domain.workout.ScheduleWorkoutResult
@@ -47,7 +49,6 @@ import app.mymusclemap.domain.workout.WeeklyGoalStatus
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
 import app.mymusclemap.ui.components.EditorUiState
 import app.mymusclemap.ui.components.UserMessage
-import app.mymusclemap.ui.components.formatWeightInput
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -169,7 +170,8 @@ class DashboardViewModel(
     private val templateRepository: WorkoutTemplateRepository,
     private val onboardingRepository: OnboardingRepository? = null,
     private val entitlements: FeatureEntitlements = OpenFeatureEntitlements,
-    private val weeklyGoalRepository: WeeklyGoalRepository? = null
+    private val weeklyGoalRepository: WeeklyGoalRepository? = null,
+    private val unitSystem: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC)
 ) : ViewModel() {
     private val chartRange = MutableStateFlow(ChartRange.Days30)
     private val editor = MutableStateFlow<EditorUiState?>(null)
@@ -416,6 +418,14 @@ class DashboardViewModel(
             repository.observeAll().collect { measurements.value = it }
         }
         viewModelScope.launch {
+            var applied = unitSystem.value
+            unitSystem.collect { next ->
+                if (next == applied) return@collect
+                reformatOpenWeights(applied, next)
+                applied = next
+            }
+        }
+        viewModelScope.launch {
             var previousToday = dateProvider.today()
             dateProvider.observeToday().drop(1).collect { today ->
                 if (displayedMonth.value == YearMonth.from(previousToday)) {
@@ -493,7 +503,7 @@ class DashboardViewModel(
             return
         }
         dayWeightEditing.value = true
-        dayWeightInput.value = formatWeightInput(measurement.weightKg)
+        dayWeightInput.value = weightText(measurement.weightKg)
         dayWeightError.value = null
     }
 
@@ -505,7 +515,15 @@ class DashboardViewModel(
         if (dayWeightSaving) {
             return
         }
-        when (val result = MeasurementValidator.validate(date, dayWeightInput.value, dateProvider.today())) {
+        when (
+            val result = MeasurementValidator.validate(
+                date,
+                dayWeightInput.value,
+                dateProvider.today(),
+                unitSystem.value,
+                uiState.value.daySheet?.measurement?.weightKg
+            )
+        ) {
             is MeasurementValidationResult.Invalid -> {
                 dayWeightError.value = result.weightError
             }
@@ -523,6 +541,40 @@ class DashboardViewModel(
                     }
                 }
             }
+        }
+    }
+
+    private fun weightText(kilograms: Double): String {
+        return MeasurementInput.bodyWeightInput(kilograms, unitSystem.value)
+    }
+
+    private fun reformatOpenWeights(from: UnitSystem, to: UnitSystem) {
+        val editorState = editor.value
+        if (editorState != null) {
+            editor.value = editorState.copy(
+                weightInput = MeasurementInput.reformatBodyWeight(
+                    editorState.weightInput,
+                    editorState.existing?.weightKg,
+                    from,
+                    to
+                )
+            )
+        }
+        if (dayWeightEditing.value && dayWeightInput.value.isNotBlank()) {
+            dayWeightInput.value = MeasurementInput.reformatBodyWeight(
+                dayWeightInput.value,
+                uiState.value.daySheet?.measurement?.weightKg,
+                from,
+                to
+            )
+        }
+        if (onboardingWeightInput.value.isNotBlank()) {
+            onboardingWeightInput.value = MeasurementInput.reformatBodyWeight(
+                onboardingWeightInput.value,
+                null,
+                from,
+                to
+            )
         }
     }
 
@@ -574,7 +626,7 @@ class DashboardViewModel(
         val existing = measurements.value.find { it.date == date }
         editor.value = EditorUiState(
             date = date,
-            weightInput = existing?.let { formatWeightInput(it.weightKg) }.orEmpty(),
+            weightInput = existing?.let { weightText(it.weightKg) }.orEmpty(),
             existing = existing,
             weightError = null,
             dateError = null
@@ -591,7 +643,7 @@ class DashboardViewModel(
         editor.value = current.copy(
             date = date,
             existing = existing,
-            weightInput = existing?.let { formatWeightInput(it.weightKg) } ?: current.weightInput,
+            weightInput = existing?.let { weightText(it.weightKg) } ?: current.weightInput,
             dateError = null,
             showDeleteConfirm = false
         )
@@ -604,7 +656,15 @@ class DashboardViewModel(
 
     fun saveEditor() {
         val current = editor.value ?: return
-        when (val result = MeasurementValidator.validate(current.date, current.weightInput, dateProvider.today())) {
+        when (
+            val result = MeasurementValidator.validate(
+                current.date,
+                current.weightInput,
+                dateProvider.today(),
+                unitSystem.value,
+                current.existing?.weightKg
+            )
+        ) {
             is MeasurementValidationResult.Invalid -> {
                 editor.value = current.copy(
                     weightError = result.weightError,
@@ -929,7 +989,14 @@ class DashboardViewModel(
 
     fun saveOnboardingWeight() {
         val input = onboardingWeightInput.value
-        when (val result = MeasurementValidator.validate(dateProvider.today(), input, dateProvider.today())) {
+        when (
+            val result = MeasurementValidator.validate(
+                dateProvider.today(),
+                input,
+                dateProvider.today(),
+                unitSystem.value
+            )
+        ) {
             is MeasurementValidationResult.Invalid -> {
                 onboardingWeightError.value = result.weightError
             }

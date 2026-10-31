@@ -1,6 +1,15 @@
 package app.mymusclemap.ui.workout
 
+import app.mymusclemap.domain.units.MeasurementText
+import app.mymusclemap.domain.units.UnitSystem
+import app.mymusclemap.domain.units.WorkoutWeightInput
 import app.mymusclemap.ui.exercises.starterExerciseLabel
+import app.mymusclemap.ui.units.LocalUnitSystem
+import app.mymusclemap.ui.units.WeightStepButtons
+import app.mymusclemap.ui.units.rememberDistanceDraftBinding
+import app.mymusclemap.ui.units.rememberWeightDraftBinding
+import app.mymusclemap.ui.units.weightFieldLabel
+import app.mymusclemap.ui.units.weightUnitLabel
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -1152,7 +1161,11 @@ private fun ExerciseBlock(
                     style = AppTypeTokens.statSecondary,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                val load = shortLoadInfo(item, stringResource(R.string.set_copy_bodyweight))
+                val load = shortLoadInfo(
+                    item,
+                    stringResource(R.string.set_copy_bodyweight),
+                    LocalUnitSystem.current
+                )
                 if (load.isNotBlank()) {
                     Text(
                         text = load,
@@ -1294,7 +1307,11 @@ private fun SetRow(
     onConfirmTimedSet: () -> Unit = {},
     onExploreProBenefits: () -> Unit = {}
 ) {
-    val planned = buildPlannedLabel(set, stringResource(R.string.set_copy_bodyweight))
+    val planned = buildPlannedLabel(
+        set,
+        stringResource(R.string.set_copy_bodyweight),
+        LocalUnitSystem.current
+    )
     val lockedTimed = set.timedWork &&
         set.status == SessionSetStatus.PENDING &&
         !timersEnabled
@@ -1460,7 +1477,7 @@ private fun SetRow(
         if (set.status == SessionSetStatus.COMPLETED && !editing) {
             Spacer(Modifier.height(AppDimens.statSecondaryGap))
             Text(
-                text = actualSummary(set, draft),
+                text = actualSummary(set, draft, LocalUnitSystem.current),
                 style = AppTypeTokens.statSecondary,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1980,15 +1997,27 @@ private fun ActualFields(
             WeightInterpretation.TOTAL -> stringResource(R.string.weight_interpretation_hint_total)
             WeightInterpretation.NOT_APPLICABLE -> null
         }
+        val weightFieldKey = item.sets.firstOrNull { it.status == SessionSetStatus.PENDING }?.id
+            ?: item.exercise.exerciseId
+        val weightDraft = rememberWeightDraftBinding(
+            fieldKey = weightFieldKey,
+            canonicalText = draft.weightText,
+            onCanonicalText = onWeight,
+            enabled = steppersEnabled
+        )
         ConsoleNumericField(
-            value = draft.weightText,
-            onValueChange = onWeight,
-            label = stringResource(R.string.field_weight_kg),
-            unit = "kg",
+            value = weightDraft.text,
+            onValueChange = weightDraft.onText,
+            label = weightFieldLabel(),
+            unit = weightUnitLabel(),
             supportingText = hint,
             isError = errors.any { it.name.startsWith("Weight") },
             decimal = true,
             traversalIndex = 4f
+        )
+        WeightStepButtons(
+            onStep = weightDraft.step,
+            enabled = steppersEnabled
         )
         Spacer(Modifier.height(AppDimens.headerStackGap))
     }
@@ -2012,26 +2041,41 @@ private fun ActualFields(
         Spacer(Modifier.height(AppDimens.headerStackGap))
     }
     if (PlannedSetLogic.requiresDistance(measurement)) {
+        val distanceDraft = rememberDistanceDraftBinding(
+            fieldKey = item.sets.firstOrNull { it.status == SessionSetStatus.PENDING }?.id
+                ?: item.exercise.exerciseId,
+            canonicalText = draft.distanceText,
+            canonicalUnit = draft.distanceUnit,
+            onCanonicalText = onDistance,
+            onCanonicalUnit = onDistanceUnit
+        )
         ConsoleNumericField(
-            value = draft.distanceText,
-            onValueChange = onDistance,
+            value = distanceDraft.text,
+            onValueChange = distanceDraft.onText,
             label = stringResource(R.string.field_distance),
             decimal = true
         )
         Spacer(Modifier.height(AppDimens.headerStackGap))
         SegmentedControl(
-            options = listOf(
-                stringResource(R.string.distance_unit_m),
-                stringResource(R.string.distance_unit_km)
-            ),
-            selectedIndex = if (draft.distanceUnit == DistanceUnit.KILOMETERS) 1 else 0,
-            onSelected = { onDistanceUnit(if (it == 1) DistanceUnit.KILOMETERS else DistanceUnit.METERS) },
+            options = if (distanceDraft.imperial) {
+                listOf(
+                    stringResource(R.string.distance_unit_ft),
+                    stringResource(R.string.distance_unit_mi)
+                )
+            } else {
+                listOf(
+                    stringResource(R.string.distance_unit_m),
+                    stringResource(R.string.distance_unit_km)
+                )
+            },
+            selectedIndex = distanceDraft.selectedIndex,
+            onSelected = distanceDraft.onUnitSelected,
             compact = true
         )
     }
     errors.forEach { error ->
         Text(
-            text = stringResource(error.labelRes()),
+            text = stringResource(error.labelRes(LocalUnitSystem.current)),
             color = MaterialTheme.colorScheme.error,
             style = AppTypeTokens.statSecondary
         )
@@ -2092,19 +2136,23 @@ private fun CompactChoiceChips(
     }
 }
 
-private fun shortLoadInfo(item: SessionExerciseItem, bodyweightLabel: String): String {
+private fun shortLoadInfo(
+    item: SessionExerciseItem,
+    bodyweightLabel: String,
+    system: UnitSystem
+): String {
     val set = item.sets.firstOrNull { it.status == SessionSetStatus.PENDING } ?: item.sets.firstOrNull()
-    return set?.let { buildPlannedLabel(it, bodyweightLabel) }.orEmpty().let { label ->
+    return set?.let { buildPlannedLabel(it, bodyweightLabel, system) }.orEmpty().let { label ->
         if (label == "—") "" else label
     }
 }
 
-private fun buildPlannedLabel(set: SessionSet, bodyweightLabel: String): String {
+private fun buildPlannedLabel(set: SessionSet, bodyweightLabel: String, system: UnitSystem): String {
     val parts = mutableListOf<String>()
     if (!set.timedWork) {
         PlannedTargetDisplay.reps(set.plannedMinReps, set.plannedMaxReps)?.let { parts += it }
     }
-    val load = PlannedTargetDisplay.load(set.plannedLoadKind, set.plannedWeightKg)
+    val load = PlannedTargetDisplay.load(set.plannedLoadKind, set.plannedWeightKg, system)
     if (load.isNotBlank() && load != "BW") {
         parts += load
     } else if (load == "BW") {
@@ -2114,23 +2162,36 @@ private fun buildPlannedLabel(set: SessionSet, bodyweightLabel: String): String 
         val (minutes, seconds) = QuantityParser.fromSeconds(it)
         parts += "${minutes}:${seconds.toString().padStart(2, '0')}"
     }
-    set.plannedDistanceMeters?.let { parts += "${QuantityParser.formatDisplay(it)} m" }
+    set.plannedDistanceMeters?.let { parts += distancePart(it, system) }
     if (parts.isEmpty()) {
         parts += "—"
     }
     return parts.joinToString(" · ")
 }
 
-private fun actualSummary(set: SessionSet, draft: ActualSetDraft): String {
+private fun distancePart(meters: Double, system: UnitSystem): String {
+    if (system == UnitSystem.METRIC) {
+        return "${QuantityParser.formatDisplay(meters)} m"
+    }
+    val (number, word) = MeasurementText.distanceNumber(meters, system)
+    val unit = when (word) {
+        app.mymusclemap.domain.units.DistanceWord.FEET -> "ft"
+        app.mymusclemap.domain.units.DistanceWord.MILES -> "mi"
+        else -> "m"
+    }
+    return "$number $unit"
+}
+
+private fun actualSummary(set: SessionSet, draft: ActualSetDraft, system: UnitSystem): String {
     val parts = mutableListOf<String>()
     if (!set.timedWork && draft.repsText.isNotBlank()) {
         parts += draft.repsText
     }
-    val load = PlannedTargetDisplay.load(draft.loadKind, set.actualWeightKg)
+    val load = PlannedTargetDisplay.load(draft.loadKind, set.actualWeightKg, system)
     if (load.isNotBlank()) {
         parts += load
     } else if (draft.weightText.isNotBlank()) {
-        parts += "${draft.weightText} kg"
+        parts += "${WorkoutWeightInput.displayOf(draft.weightText, system)} ${MeasurementText.weightUnit(system)}"
     }
     if (draft.minutesText.isNotBlank() || draft.secondsText.isNotBlank()) {
         val minutes = draft.minutesText.ifBlank { "0" }

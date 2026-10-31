@@ -125,7 +125,10 @@ private fun WorkoutCard(
             Text(
                 stringResource(
                     R.string.workout_import_body_weight,
-                    WorkoutImportPreviewCopy.bodyWeightValue(workout.bodyWeight.kilograms)
+                    WorkoutImportPreviewCopy.bodyWeightValue(
+                        workout.bodyWeight.kilograms,
+                        app.mymusclemap.ui.units.LocalUnitSystem.current
+                    )
                 )
             )
             Text(
@@ -193,7 +196,12 @@ private fun ExercisePreview(exercise: WorkoutImportResolvedExercise) {
     val interpretation = snapshot?.weightInterpretation ?: WeightInterpretation.NOT_APPLICABLE
     exercise.sets.forEach { set ->
         Text(
-            text = WorkoutImportPreviewCopy.setLine(resources, set, interpretation),
+            text = WorkoutImportPreviewCopy.setLine(
+                resources,
+                set,
+                interpretation,
+                app.mymusclemap.ui.units.LocalUnitSystem.current
+            ),
             style = MaterialTheme.typography.bodyMedium
         )
     }

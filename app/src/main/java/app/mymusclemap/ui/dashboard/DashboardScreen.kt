@@ -107,6 +107,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 internal const val OVERVIEW_OVERFLOW_ANCHOR = "overview-overflow-anchor"
 internal const val OVERVIEW_OVERFLOW_BUTTON = "overview-overflow-button"
@@ -495,14 +496,14 @@ private fun CompactWeightChartSection(
                 snapshot.latest?.let { latest ->
                     CompactStat(
                         label = stringResource(R.string.weight_stat_latest_label),
-                        value = UiFormatters.weightKg(latest.weightKg),
+                        value = UiFormatters.weightKg(latest.weightKg, LocalUnitSystem.current),
                         modifier = Modifier.weight(1f)
                     )
                 }
                 snapshot.chartRangeAverageKg?.let { average ->
                     CompactStat(
                         label = stringResource(R.string.weight_stat_average_label),
-                        value = UiFormatters.weightKg(average),
+                        value = UiFormatters.weightKg(average, LocalUnitSystem.current),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -521,8 +522,8 @@ private fun CompactWeightChartSection(
                 contentDescription = stringResource(
                     R.string.chart_content_description,
                     snapshot.chartPoints.size,
-                    UiFormatters.weightKg(snapshot.chartPoints.minOf { it.weightKg }),
-                    UiFormatters.weightKg(snapshot.chartPoints.maxOf { it.weightKg })
+                    UiFormatters.weightKg(snapshot.chartPoints.minOf { it.weightKg }, LocalUnitSystem.current),
+                    UiFormatters.weightKg(snapshot.chartPoints.maxOf { it.weightKg }, LocalUnitSystem.current)
                 ),
                 onPointSelected = {},
                 subdued = true,
@@ -571,7 +572,8 @@ private fun OverviewHeader(
         WeeklyOverviewLogic.windowStart(today),
         today
     )
-    val weightValue = overview.weightChangeKg?.let(WeeklyOverviewLogic::weightChangeLabel)
+    val units = LocalUnitSystem.current
+    val weightValue = overview.weightChangeKg?.let { WeeklyOverviewLogic.weightChangeLabel(it, units) }
         ?: stringResource(R.string.weekly_overview_missing_weight)
     val description = stringResource(
         R.string.weekly_overview_description,

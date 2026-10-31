@@ -377,7 +377,7 @@ private fun DayWeightEditor(
                 }
                 Spacer(Modifier.width(AppDimens.headerStackGap))
                 Text(
-                    text = stringResource(R.string.unit_kg),
+                    text = app.mymusclemap.ui.units.weightUnitLabel(),
                     style = AppTypeTokens.statSecondary,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = AppDimens.statSecondaryGap)
@@ -437,7 +437,7 @@ private fun DayWeightValue(
         )
         Spacer(Modifier.width(AppDimens.headerStackGap))
         Text(
-            text = stringResource(R.string.unit_kg),
+            text = app.mymusclemap.ui.units.weightUnitLabel(),
             style = AppTypeTokens.statSecondary,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

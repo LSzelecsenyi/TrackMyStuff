@@ -44,6 +44,7 @@ fun WeightChart(
     subdued: Boolean = false,
     chartHeight: Dp = 240.dp
 ) {
+    val units = app.mymusclemap.ui.units.LocalUnitSystem.current
     SeriesChart(
         points = points.map { it.toSeriesPoint() },
         contentDescription = contentDescription,
@@ -52,6 +53,9 @@ fun WeightChart(
         },
         subdued = subdued,
         chartHeight = chartHeight,
+        yAxisLabel = { value ->
+            app.mymusclemap.domain.units.MeasurementText.axisWeight(value, units)
+        },
         valueDomain = ChartValueDomain.Padded,
         modifier = modifier
     )

@@ -38,6 +38,10 @@
     <string name="field_date">Dátum</string>
     <string name="field_weight">Testsúly</string>
     <string name="unit_kg">kg</string>
+    <string name="unit_lb">lb</string>
+    <string name="unit_in">in</string>
+    <string name="weight_input_hint_lb">Adj meg egy 66,1 és 661,4 lb közötti értéket, egy tizedesjeggyel. A vessző és a pont is elfogadott.</string>
+    <string name="error_weight_range_lb">A testsúlynak 66,1 és 661,4 lb között kell lennie.</string>
     <string name="weight_input_hint">Adj meg egy 30,0 és 300,0 kg közötti értéket, egy tizedesjeggyel. A vessző és a pont is elfogadott.</string>
     <string name="error_weight_empty">Add meg a testsúlyt.</string>
     <string name="error_weight_malformed">A testsúly formátuma érvénytelen. Példa: 82.4</string>
@@ -385,11 +389,14 @@
     <string name="load_external">Külső súly</string>
     <string name="load_none">Nincs terhelés</string>
     <string name="field_weight_kg">Súly (kg)</string>
+    <string name="field_weight_lb">Súly (lb)</string>
     <string name="field_minutes">Perc</string>
     <string name="field_seconds">Másodperc</string>
     <string name="field_distance">Távolság</string>
     <string name="distance_unit_m">méter</string>
     <string name="distance_unit_km">kilométer</string>
+    <string name="distance_unit_ft">láb</string>
+    <string name="distance_unit_mi">mérföld</string>
     <string name="template_archived_badge">Archivált</string>
     <string name="action_archive_template">Archiválás</string>
     <string name="action_restore_template">Visszaállítás</string>
@@ -414,6 +421,7 @@
     <string name="error_template_weight_malformed">A súly formátuma érvénytelen. Példa: 8.75</string>
     <string name="error_template_weight_positive">A súlynak pozitív számnak kell lennie.</string>
     <string name="error_template_weight_large">A súly legfeljebb 500 kg lehet.</string>
+    <string name="error_template_weight_large_lb">A súly legfeljebb 1102,3 lb lehet.</string>
     <string name="error_template_duration_required">Add meg az időtartamot.</string>
     <string name="error_template_duration_malformed">Az időtartamot percben és másodpercben kell megadni.</string>
     <string name="error_template_duration_positive">Az időtartamnak nullánál nagyobbnak kell lennie.</string>
@@ -561,6 +569,8 @@
     <string name="action_complete_set">Kész</string>
     <string name="action_complete_set_a11y">Sorozat befejezése</string>
     <string name="action_decrease_reps_a11y">Ismétlések csökkentése</string>
+    <string name="action_decrease_weight_a11y">Súly csökkentése</string>
+    <string name="action_increase_weight_a11y">Súly növelése</string>
     <string name="action_increase_reps_a11y">Ismétlések növelése</string>
     <string name="action_save_set">Mentés</string>
     <string name="action_update_set">Frissítés</string>
@@ -787,6 +797,7 @@
     <string name="body_measurement_thigh">Comb</string>
     <string name="body_measurement_hips">Csípő</string>
     <string name="body_unit_cm">cm</string>
+    <string name="body_unit_in">in</string>
     <string name="body_unit_percent">%</string>
     <string name="body_measurements_section">Méretek</string>
     <string name="body_measurement_add">Hozzáadás</string>
@@ -987,6 +998,13 @@
     <string name="set_copy_distance_km">%1$s km</string>
     <string name="set_copy_distance_m">%1$s m</string>
     <string name="set_copy_weight_total">%1$s kg összesen</string>
+    <string name="set_copy_added_weight_lb">+%1$s lb</string>
+    <string name="set_copy_assistance_lb">%1$s lb rásegítés</string>
+    <string name="set_copy_per_side_lb">%1$s lb oldalanként</string>
+    <string name="set_copy_weight_lb">%1$s lb</string>
+    <string name="set_copy_weight_total_lb">%1$s lb összesen</string>
+    <string name="set_copy_distance_ft">%1$s ft</string>
+    <string name="set_copy_distance_mi">%1$s mi</string>
     <string name="pro_badge">Pro</string>
     <string name="pro_badge_description">Strict Pro lehetőség</string>
     <string name="pro_benefits_title">Pro-előnyök</string>
@@ -1304,6 +1322,9 @@
     <string name="exercise_progression_mixed_results">Vegyes eredmény</string>
     <string name="exercise_progression_summary_at">%1$s, %2$s mellett</string>
     <string name="exercise_progression_kg">%1$s kg</string>
+    <string name="exercise_progression_lb">%1$s lb</string>
+    <string name="exercise_progression_lb_each_side">%1$s lb oldalanként</string>
+    <string name="exercise_progression_lb_added">%1$s lb hozzáadva</string>
     <string name="exercise_progression_kg_each_side">%1$s kg oldalanként</string>
     <string name="exercise_progression_kg_added">%1$s kg plusz</string>
     <string name="exercise_progression_previous">Előző</string>
@@ -1330,6 +1351,7 @@
     <string name="statistics_best_reps">%d ismétlés</string>
     <string name="statistics_best_weight">%1$s × %2$d</string>
     <string name="statistics_best_weight_per_side">%1$s kg oldalanként × %2$d (%3$s összesen)</string>
+    <string name="statistics_best_weight_per_side_lb">%1$s lb oldalanként × %2$d (%3$s összesen)</string>
     <string name="statistics_best_distance_duration">%1$s %2$s alatt</string>
     <string name="statistics_progress_insufficient">A trendhez legalább két edzésnap kell.</string>
     <string name="statistics_progress_chart_description">%1$s fejlődése %2$d edzésnapon</string>
@@ -1521,6 +1543,7 @@
     <string name="badge_wall_requirement_complete">Feltétel teljesítve</string>
     <string name="badge_wall_unlock_with_pro">Feloldás PRO-val</string>
     <string name="badge_wall_volume_progress">%1$s / %2$s kg</string>
+    <string name="badge_wall_volume_progress_lb">%1$s / %2$s lb</string>
     <string name="badge_wall_badges_earned">megszerzett jelvény</string>
     <string name="badge_wall_almost_there">Mindjárt megvan</string>
     <string name="badge_wall_earned">Megszerezve</string>
@@ -1529,6 +1552,7 @@
     <string name="badge_wall_tier_silver">Ezüst</string>
     <string name="badge_wall_tier_gold">Arany</string>
     <string name="badge_wall_kg_to_target">%1$s kg a célig</string>
+    <string name="badge_wall_lb_to_target">%1$s lb a célig</string>
     <string name="badge_wall_section_progress">%1$d / %2$d</string>
     <string name="achievement_on_target_name">Célon</string>
     <string name="achievement_on_target_requirement">Érd el a céltestsúlyodat</string>
@@ -1550,6 +1574,7 @@
     <string name="achievement_volume_record_requirement">Állíts be új edzésvolumen-rekordot</string>
     <string name="achievement_volume_master_name">Volumenmester</string>
     <string name="achievement_volume_master_requirement">Érj el összesen 100 000 kg edzésvolument</string>
+    <string name="achievement_volume_master_requirement_lb">Érj el összesen %1$s lb edzésvolument</string>
     <string name="achievement_iron_discipline_name">Vasfegyelem</string>
     <string name="achievement_iron_discipline_requirement">Teljesíts 250 edzést</string>
     <string name="achievement_founder_name">Founder</string>
@@ -1599,6 +1624,7 @@
     <string name="target_weight_waiting">Az első testsúlymérés határozza meg a kiindulópontot.</string>
     <string name="target_weight_current">Jelenlegi: %1$s</string>
     <string name="target_weight_progress_count">%1$s / %2$s kg</string>
+    <string name="target_weight_progress_count_lb">%1$s / %2$s lb</string>
     <string name="target_weight_to_go">Még %1$s van hátra</string>
     <string name="target_weight_reached_status">A céltestsúlyodon vagy.</string>
     <string name="achievements_all_workout_milestones">Az összes jelenlegi edzésmérföldkő teljes.</string>
@@ -1610,6 +1636,14 @@
     <string name="celebration_workout_body">%1$d edzés befejezve.</string>
     <string name="settings_language">Nyelv</string>
     <string name="settings_language_body">Válaszd ki a Strict nyelvét.</string>
+    <string name="settings_units">Mértékegységek</string>
+    <string name="settings_units_body">A súly, a testméretek és a távolság ezt a választást követi. Az edzéselőzmények nem változnak.</string>
+    <string name="units_metric">Metrikus</string>
+    <string name="units_metric_detail">kg · cm · km</string>
+    <string name="units_imperial">Imperiális</string>
+    <string name="units_imperial_detail">lb · in · mi</string>
+    <string name="onboarding_units_title">Mértékegységek</string>
+    <string name="onboarding_units_body">Válaszd ki, hogyan mutassa a Strict a súlyt, a testméreteket és a távolságot. Később a Beállításokban módosíthatod.</string>
     <string name="language_hungarian">Magyar</string>
     <string name="language_english">English</string>
     <string name="billing_period_week">Hetente</string>

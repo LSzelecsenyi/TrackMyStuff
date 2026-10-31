@@ -193,6 +193,7 @@ fun StatisticsExerciseDetailScreen(
             }
             if (summary.hasProgression && summary.historyKind != ExerciseHistoryKind.COMPLETIONS) {
                 Spacer(Modifier.height(AppDimens.itemGap))
+                val units = app.mymusclemap.ui.units.LocalUnitSystem.current
                 SeriesChart(
                     points = summary.history.map { SeriesPoint(it.date, it.value) },
                     contentDescription = stringResource(
@@ -202,7 +203,16 @@ fun StatisticsExerciseDetailScreen(
                     ),
                     subdued = true,
                     chartHeight = 160.dp,
-                    valueDomain = ChartValueDomain.NonNegative
+                    valueDomain = ChartValueDomain.NonNegative,
+                    yAxisLabel = { value ->
+                        when (summary.historyKind) {
+                            app.mymusclemap.domain.statistics.ExerciseHistoryKind.EFFECTIVE_KG ->
+                                app.mymusclemap.domain.units.MeasurementText.axisWeight(value, units)
+                            app.mymusclemap.domain.statistics.ExerciseHistoryKind.DISTANCE_METERS ->
+                                app.mymusclemap.domain.units.MeasurementText.axisDistance(value, units)
+                            else -> String.format(app.mymusclemap.domain.locale.AppLocale.UI, "%.1f", value)
+                        }
+                    }
                 )
             } else if (!summary.hasProgression) {
                 Spacer(Modifier.height(AppDimens.headerStackGap))

@@ -4,6 +4,7 @@ import android.content.res.Resources
 import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.ResistanceBasis
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.workout.ExerciseHistorySelection
 import app.mymusclemap.domain.workout.ExerciseHistorySet
 import app.mymusclemap.domain.workout.PlannedLoadKind
@@ -42,8 +43,13 @@ object ExerciseHistoryCopy {
         return columns
     }
 
-    fun inlineValue(resources: Resources, selection: ExerciseHistorySelection, set: ExerciseHistorySet): String {
-        val parts = recordedParts(resources, selection, set)
+    fun inlineValue(
+        resources: Resources,
+        selection: ExerciseHistorySelection,
+        set: ExerciseHistorySet,
+        system: UnitSystem = UnitSystem.METRIC
+    ): String {
+        val parts = recordedParts(resources, selection, set, system)
         return parts.joinToString(" · ").ifBlank {
             resources.getString(R.string.active_set_history_empty_value)
         }
@@ -52,7 +58,8 @@ object ExerciseHistoryCopy {
     fun table(
         resources: Resources,
         selection: ExerciseHistorySelection,
-        comparisonPosition: Int
+        comparisonPosition: Int,
+        system: UnitSystem = UnitSystem.METRIC
     ): HistoryTable {
         val columns = columns(selection.measurementType, selection.resistanceBasis).toMutableList().also { list ->
             if (selection.sets.any { it.timedWork } && HistoryColumn.DURATION !in list) {
@@ -65,7 +72,7 @@ object ExerciseHistoryCopy {
         }
         val empty = resources.getString(R.string.active_set_history_empty_value)
         val rows = selection.sets.map { set ->
-            val parts = recordedParts(resources, selection, set)
+            val parts = recordedParts(resources, selection, set, system)
             HistoryTableRow(
                 position = set.position,
                 cells = columns.map { column -> cell(resources, column, set, parts, empty) },
@@ -95,7 +102,8 @@ object ExerciseHistoryCopy {
     private fun recordedParts(
         resources: Resources,
         selection: ExerciseHistorySelection,
-        set: ExerciseHistorySet
+        set: ExerciseHistorySet,
+        system: UnitSystem
     ): RecordedParts {
         val measurement = selection.measurementType
         val reps = set.reps?.toString()?.takeIf {
@@ -105,14 +113,15 @@ object ExerciseHistoryCopy {
             set.timedWork || PlannedSetLogic.requiresDuration(measurement)
         }?.let { WorkoutSetCopy.durationText(resources, it) }
         val distance = set.distanceMeters?.takeIf { PlannedSetLogic.requiresDistance(measurement) }
-            ?.let { WorkoutSetCopy.distanceText(resources, it) }
+            ?.let { WorkoutSetCopy.distanceText(resources, it, system) }
         val load = compatibleLoad(selection, set)?.let { (kind, weight) ->
             WorkoutSetCopy.loadText(
                 resources = resources,
                 kind = kind,
                 weightKg = weight,
                 interpretation = selection.weightInterpretation,
-                markTotalWeight = false
+                markTotalWeight = false,
+                system = system
             )
         }
         val completion = if (measurement == MeasurementType.COMPLETION_ONLY) {

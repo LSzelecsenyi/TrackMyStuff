@@ -59,6 +59,7 @@ import app.mymusclemap.ui.theme.AppTypeTokens
 import java.time.LocalDate
 import kotlin.math.abs
 import kotlin.math.round
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 internal const val REPORTS_ROOT = "reports-root"
 internal const val REPORTS_EMPTY = "reports-empty"
@@ -379,7 +380,7 @@ private fun VolumeTotalSection(summary: ReportSummary) {
             StatisticsCard {
                 StatRow(
                     label = stringResource(R.string.reports_volume_total),
-                    value = ReportVolumeFormat.kilograms(summary.volume.totalKg)
+                    value = ReportVolumeFormat.kilograms(summary.volume.totalKg, LocalUnitSystem.current)
                 )
             }
         }
@@ -456,7 +457,7 @@ private fun comparisonValue(delta: Int, percent: Double?): String {
 
 @Composable
 private fun volumeComparisonValue(comparison: ReportPeriodComparison): String {
-    val amount = ReportVolumeFormat.signedKilograms(comparison.volumeDeltaKg)
+    val amount = ReportVolumeFormat.signedKilograms(comparison.volumeDeltaKg, LocalUnitSystem.current)
     val change = comparison.volumePercent?.let(::signedPercent) ?: return amount
     return stringResource(R.string.reports_comparison_with_percent, amount, change)
 }
@@ -525,7 +526,7 @@ private fun highlightDelta(highlight: ReportExerciseHighlight): String {
             R.string.reports_highlight_reps_delta,
             signedCount(round(highlight.delta).toInt())
         )
-        ReportPerformanceKind.EffectiveKg -> ReportVolumeFormat.signedKilograms(highlight.delta)
+        ReportPerformanceKind.EffectiveKg -> ReportVolumeFormat.signedKilograms(highlight.delta, LocalUnitSystem.current)
         ReportPerformanceKind.DurationSeconds -> stringResource(
             R.string.reports_highlight_duration_delta,
             signedCount(round(highlight.delta).toInt())
@@ -541,7 +542,7 @@ private fun highlightDelta(highlight: ReportExerciseHighlight): String {
 private fun performanceValue(kind: ReportPerformanceKind, value: Double): String {
     return when (kind) {
         ReportPerformanceKind.Reps -> stringResource(R.string.statistics_best_reps, round(value).toInt())
-        ReportPerformanceKind.EffectiveKg -> ReportVolumeFormat.kilograms(value)
+        ReportPerformanceKind.EffectiveKg -> ReportVolumeFormat.kilograms(value, LocalUnitSystem.current)
         ReportPerformanceKind.DurationSeconds -> ElapsedTime.formatMillis(round(value).toLong() * 1000L)
         ReportPerformanceKind.DistanceMeters -> distanceText(value)
     }
@@ -559,6 +560,17 @@ private fun signedDistance(deltaMeters: Double): String {
 
 @Composable
 private fun distanceText(meters: Double): String {
+    val units = LocalUnitSystem.current
+    if (units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL) {
+        val (number, word) = app.mymusclemap.domain.units.MeasurementText.distanceNumber(abs(meters), units)
+        val res = when (word) {
+            app.mymusclemap.domain.units.DistanceWord.FEET -> R.string.set_copy_distance_ft
+            app.mymusclemap.domain.units.DistanceWord.MILES -> R.string.set_copy_distance_mi
+            app.mymusclemap.domain.units.DistanceWord.KILOMETERS -> R.string.set_copy_distance_km
+            app.mymusclemap.domain.units.DistanceWord.METERS -> R.string.set_copy_distance_m
+        }
+        return stringResource(res, number)
+    }
     return if (abs(meters) >= 1000.0) {
         stringResource(
             R.string.set_copy_distance_km,
@@ -582,14 +594,14 @@ private fun BodyWeightSection(weight: ReportBodyWeight) {
             if (weight.lastKg == null) {
                 StatRow(
                     label = UiFormatters.longDate(weight.firstDate),
-                    value = UiFormatters.weightKg(weight.firstKg)
+                    value = UiFormatters.weightKg(weight.firstKg, LocalUnitSystem.current)
                 )
             } else {
                 StatRow(
                     label = stringResource(R.string.reports_body_weight_first),
                     value = stringResource(
                         R.string.reports_body_weight_sample,
-                        UiFormatters.weightKg(weight.firstKg),
+                        UiFormatters.weightKg(weight.firstKg, LocalUnitSystem.current),
                         UiFormatters.compactDate(weight.firstDate)
                     )
                 )
@@ -597,20 +609,20 @@ private fun BodyWeightSection(weight: ReportBodyWeight) {
                     label = stringResource(R.string.reports_body_weight_last),
                     value = stringResource(
                         R.string.reports_body_weight_sample,
-                        UiFormatters.weightKg(weight.lastKg),
+                        UiFormatters.weightKg(weight.lastKg, LocalUnitSystem.current),
                         UiFormatters.compactDate(weight.lastDate ?: weight.firstDate)
                     )
                 )
                 weight.changeKg?.let { change ->
                     StatRow(
                         label = stringResource(R.string.reports_body_weight_change),
-                        value = UiFormatters.signedWeightKg(change)
+                        value = UiFormatters.signedWeightKg(change, LocalUnitSystem.current)
                     )
                 }
                 weight.averageKg?.let { average ->
                     StatRow(
                         label = stringResource(R.string.reports_body_weight_average),
-                        value = UiFormatters.weightKg(average)
+                        value = UiFormatters.weightKg(average, LocalUnitSystem.current)
                     )
                 }
             }
@@ -637,6 +649,7 @@ private fun VolumeChartSection(summary: ReportSummary) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
+            val units = LocalUnitSystem.current
             SeriesChart(
                 points = trend,
                 contentDescription = volumeChartDescription(trend),
@@ -644,7 +657,7 @@ private fun VolumeChartSection(summary: ReportSummary) {
                 chartHeight = 180.dp,
                 valueDomain = ChartValueDomain.NonNegative,
                 snapXAxisToPoints = true,
-                yAxisLabel = ReportVolumeFormat::axis,
+                yAxisLabel = { value -> ReportVolumeFormat.axis(value, units) },
                 xAxisLabel = { date ->
                     ReportChartSeries.axisLabel(
                         date = date,
@@ -702,8 +715,8 @@ private fun volumeChartDescription(points: List<SeriesPoint>): String {
     return stringResource(
         R.string.statistics_volume_chart_description,
         points.size,
-        ReportVolumeFormat.kilograms(values.minOrNull() ?: 0.0),
-        ReportVolumeFormat.kilograms(values.maxOrNull() ?: 0.0)
+        ReportVolumeFormat.kilograms(values.minOrNull() ?: 0.0, LocalUnitSystem.current),
+        ReportVolumeFormat.kilograms(values.maxOrNull() ?: 0.0, LocalUnitSystem.current)
     )
 }
 

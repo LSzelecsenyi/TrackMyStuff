@@ -1,5 +1,7 @@
 package app.mymusclemap.domain.workout
 
+import app.mymusclemap.domain.units.MeasurementText
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.model.WeightMeasurement
@@ -359,13 +361,18 @@ object PlannedTargetDisplay {
         return RepetitionTarget.display(minReps, maxReps)
     }
 
-    fun load(kind: PlannedLoadKind, weightKg: Double?): String {
-        val weight = weightKg?.let { QuantityParser.formatDisplay(it) }
+    fun load(
+        kind: PlannedLoadKind,
+        weightKg: Double?,
+        system: UnitSystem = UnitSystem.METRIC
+    ): String {
+        val weight = weightKg?.let { MeasurementText.workoutWeightNumber(it, system) }
+        val unit = MeasurementText.weightUnit(system)
         return when (kind) {
             PlannedLoadKind.BODYWEIGHT_ONLY -> "BW"
-            PlannedLoadKind.ADDED_WEIGHT -> if (weight != null) "+$weight kg" else "+"
-            PlannedLoadKind.ASSISTANCE -> if (weight != null) "−$weight kg" else "−"
-            PlannedLoadKind.EXTERNAL_WEIGHT -> if (weight != null) "$weight kg" else ""
+            PlannedLoadKind.ADDED_WEIGHT -> if (weight != null) "+$weight $unit" else "+"
+            PlannedLoadKind.ASSISTANCE -> if (weight != null) "−$weight $unit" else "−"
+            PlannedLoadKind.EXTERNAL_WEIGHT -> if (weight != null) "$weight $unit" else ""
             PlannedLoadKind.NONE -> ""
         }
     }

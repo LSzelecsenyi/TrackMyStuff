@@ -69,6 +69,7 @@ import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.StrictBrand
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -230,7 +231,7 @@ private fun TargetWeightSection(
             return@HeroSurface
         }
         Text(
-            text = UiFormatters.weightKg(card.targetKg),
+            text = UiFormatters.weightKg(card.targetKg, LocalUnitSystem.current),
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier
                 .padding(top = 4.dp)
@@ -248,7 +249,7 @@ private fun TargetWeightSection(
             Text(
                 text = stringResource(
                     R.string.target_weight_current,
-                    UiFormatters.weightKg(progress.currentKg)
+                    UiFormatters.weightKg(progress.currentKg, LocalUnitSystem.current)
                 ),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(top = 8.dp)
@@ -263,11 +264,26 @@ private fun TargetWeightSection(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
             Text(
-                text = stringResource(
-                    R.string.target_weight_progress_count,
-                    UiFormatters.weightValue(progress.progressedKg.coerceAtLeast(0.0)),
-                    UiFormatters.weightValue(progress.totalDistanceKg)
-                ),
+                text = run {
+                    val units = LocalUnitSystem.current
+                    val imperial = units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+                    fun number(kilograms: Double): String {
+                        return if (imperial) {
+                            app.mymusclemap.domain.units.MeasurementText.weightNumber(kilograms, units)
+                        } else {
+                            UiFormatters.weightValue(kilograms)
+                        }
+                    }
+                    stringResource(
+                        if (imperial) {
+                            R.string.target_weight_progress_count_lb
+                        } else {
+                            R.string.target_weight_progress_count
+                        },
+                        number(progress.progressedKg.coerceAtLeast(0.0)),
+                        number(progress.totalDistanceKg)
+                    )
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
@@ -278,7 +294,7 @@ private fun TargetWeightSection(
                 } else {
                     stringResource(
                         R.string.target_weight_to_go,
-                        UiFormatters.weightKg(progress.remainingTowardTargetKg)
+                        UiFormatters.weightKg(progress.remainingTowardTargetKg, LocalUnitSystem.current)
                     )
                 },
                 style = MaterialTheme.typography.bodyMedium,
@@ -361,7 +377,7 @@ internal fun WeightHeroSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = UiFormatters.weightKg(snapshot.latest.weightKg),
+                text = UiFormatters.weightKg(snapshot.latest.weightKg, LocalUnitSystem.current),
                 style = MaterialTheme.typography.displaySmall,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -374,7 +390,7 @@ internal fun WeightHeroSection(
                 Text(
                     text = stringResource(
                         R.string.hero_weekly_average,
-                        UiFormatters.weightKg(week.averageKg)
+                        UiFormatters.weightKg(week.averageKg, LocalUnitSystem.current)
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -383,7 +399,7 @@ internal fun WeightHeroSection(
             }
             Text(
                 text = snapshot.previousWeekChangeKg?.let {
-                    stringResource(R.string.change_from_previous_week_value, UiFormatters.signedWeightKg(it))
+                    stringResource(R.string.change_from_previous_week_value, UiFormatters.signedWeightKg(it, LocalUnitSystem.current))
                 } ?: stringResource(R.string.no_previous_week_average),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -427,7 +443,7 @@ internal fun WeightChartBlock(
         } else {
             snapshot.chartRangeAverageKg?.let { average ->
                 Text(
-                    text = stringResource(R.string.chart_range_average, UiFormatters.weightKg(average)),
+                    text = stringResource(R.string.chart_range_average, UiFormatters.weightKg(average, LocalUnitSystem.current)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -438,8 +454,8 @@ internal fun WeightChartBlock(
                 contentDescription = stringResource(
                     R.string.chart_content_description,
                     snapshot.chartPoints.size,
-                    UiFormatters.weightKg(snapshot.chartPoints.minOf { it.weightKg }),
-                    UiFormatters.weightKg(snapshot.chartPoints.maxOf { it.weightKg })
+                    UiFormatters.weightKg(snapshot.chartPoints.minOf { it.weightKg }, LocalUnitSystem.current),
+                    UiFormatters.weightKg(snapshot.chartPoints.maxOf { it.weightKg }, LocalUnitSystem.current)
                 ),
                 onPointSelected = onPointSelected
             )
@@ -448,7 +464,7 @@ internal fun WeightChartBlock(
                     text = stringResource(
                         R.string.chart_selected_point,
                         UiFormatters.longDate(point.date),
-                        UiFormatters.weightKg(point.weightKg)
+                        UiFormatters.weightKg(point.weightKg, LocalUnitSystem.current)
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -478,7 +494,7 @@ private fun BodyMeasurementRow(
     val type = row.type
     val title = type?.let { stringResource(it.labelRes()) } ?: row.typeCode
     val latest = row.latest
-    val valueText = latest?.let { formatBodyValue(it.value, type?.unit) }
+    val valueText = latest?.let { formatBodyValue(it.value, type?.unit, LocalUnitSystem.current) }
     val openLabel = stringResource(
         if (row.lockedEmpty) R.string.body_measurement_open_pro else R.string.body_measurement_open_details
     )
@@ -533,7 +549,7 @@ private fun BodyMeasurementRow(
                     maxLines = 1
                 )
                 if (latest != null) {
-                    val change = row.change?.let { formatSignedBodyValue(it, type?.unit) }
+                    val change = row.change?.let { formatSignedBodyValue(it, type?.unit, LocalUnitSystem.current) }
                     val date = UiFormatters.compactDate(latest.date)
                     Text(
                         text = if (change == null) date else "$date · $change",
@@ -569,20 +585,29 @@ internal fun BodyMeasurementType.labelRes(): Int {
     }
 }
 
-internal fun formatBodyValue(value: Double, unit: BodyMeasurementUnit?): String {
+internal fun formatBodyValue(
+    value: Double,
+    unit: BodyMeasurementUnit?,
+    system: app.mymusclemap.domain.units.UnitSystem = app.mymusclemap.domain.units.UnitSystem.METRIC
+): String {
     val number = String.format(AppLocale.UI, "%.1f", value)
     return when (unit) {
-        BodyMeasurementUnit.CENTIMETERS -> "$number cm"
+        BodyMeasurementUnit.CENTIMETERS ->
+            app.mymusclemap.domain.units.MeasurementText.lengthLabel(value, system)
         BodyMeasurementUnit.PERCENT -> "$number%"
         null -> number
     }
 }
 
-internal fun formatSignedBodyValue(value: Double, unit: BodyMeasurementUnit?): String {
+internal fun formatSignedBodyValue(
+    value: Double,
+    unit: BodyMeasurementUnit?,
+    system: app.mymusclemap.domain.units.UnitSystem = app.mymusclemap.domain.units.UnitSystem.METRIC
+): String {
     val sign = when {
         value > 0.0 -> "+"
         value < 0.0 -> "−"
         else -> ""
     }
-    return sign + formatBodyValue(kotlin.math.abs(value), unit)
+    return sign + formatBodyValue(kotlin.math.abs(value), unit, system)
 }

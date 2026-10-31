@@ -21,4 +21,8 @@
         domain="file"
         path="datastore/app_language.preferences_pb"
         requireFlags="clientSideEncryption" />
+    <include
+        domain="file"
+        path="datastore/unit_system.preferences_pb"
+        requireFlags="clientSideEncryption" />
 </full-backup-content>

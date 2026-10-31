@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.entitlement.FounderProgramRules
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.ui.founder.FounderInvitationScreen
 import app.mymusclemap.ui.founder.FounderJoinNotice
@@ -69,7 +70,9 @@ fun OnboardingScreen(
     onJoinFounder: () -> Unit = {},
     onDeclineFounder: () -> Unit = {},
     founderJoining: Boolean = false,
-    founderJoinNotice: FounderJoinNotice = FounderJoinNotice.None
+    founderJoinNotice: FounderJoinNotice = FounderJoinNotice.None,
+    selectedUnitSystem: UnitSystem = UnitSystem.METRIC,
+    onUnitSystemSelected: (UnitSystem) -> Unit = {}
 ) {
     if (step == OnboardingStep.FounderInvitation) {
         FounderInvitationScreen(
@@ -84,16 +87,19 @@ fun OnboardingScreen(
     var selectedGoal by rememberSaveable { mutableIntStateOf(0) }
     val title = when (step) {
         OnboardingStep.Welcome -> null
+        OnboardingStep.MeasurementUnits -> stringResource(R.string.onboarding_units_title)
         OnboardingStep.WeeklyGoal -> stringResource(R.string.weekly_goal_onboarding_title)
         OnboardingStep.CreatePlan -> stringResource(R.string.onboarding_setup_title)
     }
     val body = when (step) {
         OnboardingStep.Welcome -> stringResource(R.string.onboarding_welcome_body)
+        OnboardingStep.MeasurementUnits -> stringResource(R.string.onboarding_units_body)
         OnboardingStep.WeeklyGoal -> stringResource(R.string.weekly_goal_onboarding_body)
         OnboardingStep.CreatePlan -> stringResource(R.string.onboarding_setup_body)
     }
     val primary = when (step) {
         OnboardingStep.Welcome -> stringResource(R.string.onboarding_continue)
+        OnboardingStep.MeasurementUnits -> stringResource(R.string.onboarding_continue)
         OnboardingStep.WeeklyGoal -> stringResource(R.string.weekly_goal_set)
         OnboardingStep.CreatePlan -> stringResource(R.string.onboarding_create_plan)
     }
@@ -153,6 +159,24 @@ fun OnboardingScreen(
                         .fillMaxWidth()
                         .testTag(ONBOARDING_BODY)
                 )
+                if (step == OnboardingStep.MeasurementUnits) {
+                    Spacer(Modifier.height(AppDimens.sectionGap))
+                    UnitSystemChoice(
+                        title = stringResource(R.string.units_metric),
+                        detail = stringResource(R.string.units_metric_detail),
+                        selected = selectedUnitSystem == UnitSystem.METRIC,
+                        tag = "onboarding-units-metric",
+                        onClick = { onUnitSystemSelected(UnitSystem.METRIC) }
+                    )
+                    Spacer(Modifier.height(AppDimens.itemGap))
+                    UnitSystemChoice(
+                        title = stringResource(R.string.units_imperial),
+                        detail = stringResource(R.string.units_imperial_detail),
+                        selected = selectedUnitSystem == UnitSystem.IMPERIAL,
+                        tag = "onboarding-units-imperial",
+                        onClick = { onUnitSystemSelected(UnitSystem.IMPERIAL) }
+                    )
+                }
                 if (step == OnboardingStep.WeeklyGoal) {
                     Spacer(Modifier.height(AppDimens.sectionGap))
                     Icon(
@@ -193,6 +217,7 @@ fun OnboardingScreen(
                 onClick = {
                     when (step) {
                         OnboardingStep.Welcome -> onContinue()
+                        OnboardingStep.MeasurementUnits -> onContinue()
                         OnboardingStep.WeeklyGoal -> onSetWeeklyGoal(selectedGoal)
                         OnboardingStep.CreatePlan -> onCreatePlan()
                     }
@@ -207,7 +232,7 @@ fun OnboardingScreen(
             ) {
                 Text(primary)
             }
-            if (step != OnboardingStep.Welcome) {
+            if (step != OnboardingStep.Welcome && step != OnboardingStep.MeasurementUnits) {
                 TextButton(
                     onClick = {
                         if (step == OnboardingStep.WeeklyGoal) onSkipWeeklyGoal() else onSkip()
@@ -230,4 +255,31 @@ fun OnboardingScreen(
             }
         }
     }
+}
+
+@Composable
+private fun UnitSystemChoice(
+    title: String,
+    detail: String,
+    selected: Boolean,
+    tag: String,
+    onClick: () -> Unit
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(title)
+                Text(detail, style = AppTypeTokens.statCaption)
+            }
+        },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = StrictBrand.actionContainer(),
+            selectedLabelColor = StrictBrand.onAction()
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(tag)
+    )
 }

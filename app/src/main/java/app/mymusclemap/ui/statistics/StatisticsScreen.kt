@@ -57,6 +57,7 @@ import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.time.LocalDate
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 @Composable
 fun StatisticsScreen(
@@ -249,7 +250,7 @@ private fun VolumeSection(volume: TrainingVolume, range: StatisticsRange) {
                 Spacer(Modifier.height(AppDimens.itemGap))
                 StatRow(
                     label = stringResource(R.string.statistics_volume_total),
-                    value = UiFormatters.weightKg(volume.totalKg ?: 0.0)
+                    value = UiFormatters.weightKg(volume.totalKg ?: 0.0, LocalUnitSystem.current)
                 )
                 if (volume.hasTrend) {
                     Spacer(Modifier.height(AppDimens.itemGap))
@@ -259,6 +260,7 @@ private fun VolumeSection(volume: TrainingVolume, range: StatisticsRange) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(AppDimens.headerStackGap))
+                    val units = LocalUnitSystem.current
                     SeriesChart(
                         points = volume.trend,
                         contentDescription = volumeChartDescription(volume.trend),
@@ -266,6 +268,14 @@ private fun VolumeSection(volume: TrainingVolume, range: StatisticsRange) {
                         chartHeight = 180.dp,
                         valueDomain = ChartValueDomain.NonNegative,
                         snapXAxisToPoints = true,
+                        yAxisLabel = { value ->
+                            val shown = if (units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL) {
+                                app.mymusclemap.domain.units.UnitConversions.kgToLb(value).toDouble()
+                            } else {
+                                value
+                            }
+                            String.format(app.mymusclemap.domain.locale.AppLocale.UI, "%.1f", shown)
+                        },
                         xAxisLabel = { date ->
                             VolumeTrendAxis.label(
                                 date = date,
@@ -405,8 +415,8 @@ private fun volumeChartDescription(points: List<SeriesPoint>): String {
     return stringResource(
         R.string.statistics_volume_chart_description,
         points.size,
-        UiFormatters.weightKg(values.minOrNull() ?: 0.0),
-        UiFormatters.weightKg(values.maxOrNull() ?: 0.0)
+        UiFormatters.weightKg(values.minOrNull() ?: 0.0, LocalUnitSystem.current),
+        UiFormatters.weightKg(values.maxOrNull() ?: 0.0, LocalUnitSystem.current)
     )
 }
 

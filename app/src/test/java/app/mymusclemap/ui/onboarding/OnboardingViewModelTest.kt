@@ -65,6 +65,8 @@ class OnboardingViewModelTest {
         assertEquals(OnboardingStep.Welcome, viewModel.step.value)
         assertNull(viewModel.exit.value)
         viewModel.onContinue()
+        assertEquals(OnboardingStep.MeasurementUnits, viewModel.step.value)
+        viewModel.onContinue()
         assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.value)
         viewModel.onWeeklyGoalSkipped()
         assertEquals(OnboardingStep.CreatePlan, viewModel.step.value)
@@ -77,6 +79,7 @@ class OnboardingViewModelTest {
 
     @Test
     fun skipMarksOnboardingStartedWithoutOpeningTemplateEditor() = runTest {
+        viewModel.onContinue()
         viewModel.onContinue()
         viewModel.onWeeklyGoalSkipped()
         viewModel.onSkip()

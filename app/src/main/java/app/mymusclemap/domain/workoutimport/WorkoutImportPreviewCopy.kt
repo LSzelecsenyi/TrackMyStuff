@@ -38,7 +38,8 @@ object WorkoutImportPreviewCopy {
     fun setLine(
         resources: Resources,
         set: WorkoutImportResolvedSet,
-        interpretation: WeightInterpretation
+        interpretation: WeightInterpretation,
+        system: app.mymusclemap.domain.units.UnitSystem = app.mymusclemap.domain.units.UnitSystem.METRIC
     ): String {
         return WorkoutSetCopy.formatValue(
             resources = resources,
@@ -49,15 +50,22 @@ object WorkoutImportPreviewCopy {
             distanceMeters = set.distanceMeters?.toDouble(),
             interpretation = interpretation,
             markTotalWeight = interpretation == WeightInterpretation.TOTAL &&
-                set.weightKg != null
+                set.weightKg != null,
+            system = system
         )
     }
 
-    fun bodyWeightValue(kilograms: Double?): String {
+    fun bodyWeightValue(
+        kilograms: Double?,
+        system: app.mymusclemap.domain.units.UnitSystem = app.mymusclemap.domain.units.UnitSystem.METRIC
+    ): String {
         if (kilograms == null) {
             return "—"
         }
-        return "${QuantityParser.formatDisplay(kilograms)} kg"
+        if (system == app.mymusclemap.domain.units.UnitSystem.METRIC) {
+            return "${QuantityParser.formatDisplay(kilograms)} kg"
+        }
+        return app.mymusclemap.domain.units.MeasurementText.weightLabel(kilograms, system)
     }
 
     fun bodyWeightSources(plan: WorkoutImportPlan): List<BodyWeightSource> {

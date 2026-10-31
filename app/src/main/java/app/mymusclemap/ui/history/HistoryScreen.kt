@@ -84,6 +84,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 internal const val JOURNAL_ROOT = "journal-root"
 internal const val JOURNAL_ADD = "journal-add"
@@ -511,7 +512,7 @@ private fun WeightJournalRow(
     onDelete: () -> Unit
 ) {
     val item = entry.item
-    val weightLabel = UiFormatters.weightKg(item.measurement.weightKg)
+    val weightLabel = UiFormatters.weightKg(item.measurement.weightKg, LocalUnitSystem.current)
     var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
@@ -545,7 +546,7 @@ private fun WeightJournalRow(
                 } else {
                     stringResource(
                         R.string.change_from_previous_value,
-                        UiFormatters.signedWeightKg(difference)
+                        UiFormatters.signedWeightKg(difference, LocalUnitSystem.current)
                     )
                 },
                 style = AppTypeTokens.statCaption,

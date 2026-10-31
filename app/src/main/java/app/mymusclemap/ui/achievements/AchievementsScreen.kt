@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.ui.units.LocalUnitSystem
 import app.mymusclemap.domain.achievements.AchievementAccess
 import app.mymusclemap.domain.achievements.AchievementCategory
 import app.mymusclemap.domain.achievements.AchievementId
@@ -350,15 +351,21 @@ private fun almostThereProgress(entry: AlmostThereEntry): String {
     }
     val volume = entry.volumeProgress
     if (volume != null) {
-        return stringResource(
-            R.string.badge_wall_volume_progress,
-            volumeAmount(volume.currentKg),
-            volumeAmount(volume.thresholdKg)
-        )
+        return volumeProgressLabel(volume.currentKg, volume.thresholdKg)
     }
     val remaining = entry.remainingKg
     if (remaining != null) {
-        return stringResource(R.string.badge_wall_kg_to_target, UiFormatters.weightValue(remaining))
+        return if (LocalUnitSystem.current == app.mymusclemap.domain.units.UnitSystem.IMPERIAL) {
+            stringResource(
+                R.string.badge_wall_lb_to_target,
+                app.mymusclemap.domain.units.MeasurementText.weightNumber(
+                    remaining,
+                    app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+                )
+            )
+        } else {
+            stringResource(R.string.badge_wall_kg_to_target, UiFormatters.weightValue(remaining))
+        }
     }
     return ""
 }
@@ -482,10 +489,9 @@ private fun BadgeCell(
                 item.countProgress.current,
                 item.countProgress.threshold
             )
-            showProgress && item.volumeProgress != null -> stringResource(
-                R.string.badge_wall_volume_progress,
-                volumeAmount(item.volumeProgress.currentKg),
-                volumeAmount(item.volumeProgress.thresholdKg)
+            showProgress && item.volumeProgress != null -> volumeProgressLabel(
+                item.volumeProgress.currentKg,
+                item.volumeProgress.thresholdKg
             )
             else -> null
         }
@@ -733,7 +739,19 @@ internal fun achievementRequirement(id: AchievementId, revealed: Boolean = !id.s
         id == AchievementId.FOUNDER -> stringResource(R.string.achievement_founder_requirement)
         id == AchievementId.EARLY_ADOPTER -> stringResource(R.string.achievement_early_adopter_requirement)
         id == AchievementId.DEVELOPER -> stringResource(R.string.achievement_developer_requirement)
-        id == AchievementId.VOLUME_MASTER -> stringResource(R.string.achievement_volume_master_requirement)
+        id == AchievementId.VOLUME_MASTER -> if (
+            LocalUnitSystem.current == app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+        ) {
+            stringResource(
+                R.string.achievement_volume_master_requirement_lb,
+                app.mymusclemap.domain.units.MeasurementText.volumeAmount(
+                    100_000.0,
+                    app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+                )
+            )
+        } else {
+            stringResource(R.string.achievement_volume_master_requirement)
+        }
         id.prHunterTarget != null -> stringResource(R.string.achievement_pr_hunter_requirement, id.prHunterTarget)
         id.masterySetTarget != null -> stringResource(
             R.string.achievement_exercise_mastery_requirement,
@@ -843,11 +861,7 @@ private fun ProgressDetail(item: BadgeWallItem) {
             count.current,
             count.threshold
         )
-        volume != null -> stringResource(
-            R.string.badge_wall_volume_progress,
-            volumeAmount(volume.currentKg),
-            volumeAmount(volume.thresholdKg)
-        )
+        volume != null -> volumeProgressLabel(volume.currentKg, volume.thresholdKg)
         else -> return
     }
     Text(
@@ -860,7 +874,22 @@ private fun ProgressDetail(item: BadgeWallItem) {
     )
 }
 
+@Composable
+private fun volumeProgressLabel(currentKg: Double, thresholdKg: Double): String {
+    val imperial = LocalUnitSystem.current == app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+    return stringResource(
+        if (imperial) R.string.badge_wall_volume_progress_lb else R.string.badge_wall_volume_progress,
+        volumeAmount(currentKg),
+        volumeAmount(thresholdKg)
+    )
+}
+
+@Composable
 private fun volumeAmount(value: Double): String {
+    val system = LocalUnitSystem.current
+    if (system == app.mymusclemap.domain.units.UnitSystem.IMPERIAL) {
+        return app.mymusclemap.domain.units.MeasurementText.volumeAmount(value, system)
+    }
     val whole = value.toLong()
     return if (value == whole.toDouble()) "%,d".format(AppLocale.UI, whole) else UiFormatters.weightValue(value)
 }

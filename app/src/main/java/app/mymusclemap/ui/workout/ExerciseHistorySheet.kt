@@ -68,7 +68,12 @@ internal fun ExerciseHistorySheet(
     onDismiss: () -> Unit
 ) {
     val resources = LocalResources.current
-    val table = ExerciseHistoryCopy.table(resources, selection, comparisonPosition)
+    val table = ExerciseHistoryCopy.table(
+        resources,
+        selection,
+        comparisonPosition,
+        app.mymusclemap.ui.units.LocalUnitSystem.current
+    )
     val hasComparison = table.rows.any { it.comparison }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val source = stringResource(
@@ -273,7 +278,12 @@ internal fun LastTimeRow(
             )
         }
         is CurrentSetHistoryLine.Recorded -> {
-            val summary = ExerciseHistoryCopy.inlineValue(resources, line.selection, line.set)
+            val summary = ExerciseHistoryCopy.inlineValue(
+                resources,
+                line.selection,
+                line.set,
+                app.mymusclemap.ui.units.LocalUnitSystem.current
+            )
             ClickableHistoryLine(
                 label = stringResource(R.string.active_set_last_time, summary),
                 onOpen = onOpen

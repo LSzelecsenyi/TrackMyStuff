@@ -1,6 +1,8 @@
 package app.mymusclemap.domain.body
 
 import app.mymusclemap.domain.DateValidationError
+import app.mymusclemap.domain.units.MeasurementInput
+import app.mymusclemap.domain.units.UnitSystem
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -111,20 +113,66 @@ object BodyMeasurementValidator {
         type: BodyMeasurementType,
         date: LocalDate,
         rawValue: String,
-        today: LocalDate
+        today: LocalDate,
+        system: UnitSystem = UnitSystem.METRIC,
+        storedValue: Double? = null
     ): BodyMeasurementValidationResult {
-        val parsed = BodyMeasurementParser.parseUserInput(rawValue, type)
         val future = date.isAfter(today)
-        return when {
-            parsed is BodyMeasurementParseResult.Invalid || future -> BodyMeasurementValidationResult.Invalid(
-                valueError = (parsed as? BodyMeasurementParseResult.Invalid)?.error,
+        if (type.unit == BodyMeasurementUnit.CENTIMETERS &&
+            storedValue != null &&
+            MeasurementInput.sameText(rawValue, MeasurementInput.lengthInput(storedValue, system))
+        ) {
+            return if (future) {
+                BodyMeasurementValidationResult.Invalid(dateError = DateValidationError.Future)
+            } else {
+                BodyMeasurementValidationResult.Valid(date = date, value = storedValue)
+            }
+        }
+        if (type.unit == BodyMeasurementUnit.PERCENT || system == UnitSystem.METRIC) {
+            val parsed = BodyMeasurementParser.parseUserInput(rawValue, type)
+            return when {
+                parsed is BodyMeasurementParseResult.Invalid || future -> BodyMeasurementValidationResult.Invalid(
+                    valueError = (parsed as? BodyMeasurementParseResult.Invalid)?.error,
+                    dateError = if (future) DateValidationError.Future else null
+                )
+                parsed is BodyMeasurementParseResult.Valid -> {
+                    val value = if (storedValue != null && parsed.value == BodyMeasurementParser.quantize(storedValue)) {
+                        storedValue
+                    } else {
+                        parsed.value
+                    }
+                    BodyMeasurementValidationResult.Valid(date = date, value = value)
+                }
+                else -> BodyMeasurementValidationResult.Invalid(valueError = BodyMeasurementParseError.Malformed)
+            }
+        }
+        val centimeters = MeasurementInput.resolveLengthCm(
+            text = rawValue,
+            system = system,
+            storedCentimeters = storedValue,
+            minimumCm = type.minimum,
+            maximumCm = type.maximum
+        )
+        if (centimeters == null) {
+            val error = when {
+                rawValue.isBlank() -> BodyMeasurementParseError.Empty
+                fractionTooLong(rawValue) -> BodyMeasurementParseError.TooManyDecimals
+                MeasurementInput.parseDecimal(rawValue, 1) == null -> BodyMeasurementParseError.Malformed
+                else -> BodyMeasurementParseError.OutOfRange
+            }
+            return BodyMeasurementValidationResult.Invalid(
+                valueError = error,
                 dateError = if (future) DateValidationError.Future else null
             )
-            parsed is BodyMeasurementParseResult.Valid -> BodyMeasurementValidationResult.Valid(
-                date = date,
-                value = parsed.value
-            )
-            else -> BodyMeasurementValidationResult.Invalid(valueError = BodyMeasurementParseError.Malformed)
         }
+        if (future) {
+            return BodyMeasurementValidationResult.Invalid(dateError = DateValidationError.Future)
+        }
+        return BodyMeasurementValidationResult.Valid(date = date, value = centimeters)
+    }
+
+    private fun fractionTooLong(raw: String): Boolean {
+        val fraction = raw.trim().replace(',', '.').substringAfter('.', "")
+        return fraction.length > 1 && fraction.all { it.isDigit() }
     }
 }

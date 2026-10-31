@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.domain.model.MeasurementListItem
+import app.mymusclemap.ui.units.LocalUnitSystem
 
 @Composable
 fun MeasurementRow(
@@ -47,7 +48,7 @@ fun MeasurementRow(
                 } else {
                     stringResource(
                         R.string.change_from_previous_value,
-                        UiFormatters.signedWeightKg(difference)
+                        UiFormatters.signedWeightKg(difference, LocalUnitSystem.current)
                     )
                 },
                 style = MaterialTheme.typography.bodyMedium,
@@ -55,7 +56,7 @@ fun MeasurementRow(
             )
         }
         Text(
-            text = UiFormatters.weightKg(item.measurement.weightKg),
+            text = UiFormatters.weightKg(item.measurement.weightKg, LocalUnitSystem.current),
             style = MaterialTheme.typography.titleMedium
         )
         if (showActions) {

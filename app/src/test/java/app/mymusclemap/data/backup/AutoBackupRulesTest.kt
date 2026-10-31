@@ -21,7 +21,8 @@ class AutoBackupRulesTest {
     private val included = listOf(
         "file" to "strict_user_data",
         "file" to "datastore/weight_tracker_settings.preferences_pb",
-        "file" to "datastore/app_language.preferences_pb"
+        "file" to "datastore/app_language.preferences_pb",
+        "file" to "datastore/unit_system.preferences_pb"
     )
 
     @Test

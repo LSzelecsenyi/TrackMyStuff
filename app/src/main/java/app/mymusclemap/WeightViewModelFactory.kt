@@ -29,6 +29,7 @@ import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.WorkoutImportFileReader
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
@@ -60,6 +61,8 @@ import app.mymusclemap.ui.workout.WorkoutHubViewModel
 import app.mymusclemap.ui.workoutimport.WorkoutImportViewModel
 import app.mymusclemap.ui.entitlement.FreeAccessSelectionViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 
 class WeightViewModelFactory(
@@ -95,7 +98,10 @@ class WeightViewModelFactory(
     private val targetWeightGoalRepository: TargetWeightGoalRepository? = null,
     private val freeAccessRepository: FreeAccessRepository? = null,
     private val priorProGrantEnded: () -> Boolean = { false },
-    private val entitlementChanges: Flow<Int> = flowOf(0)
+    private val entitlementChanges: Flow<Int> = flowOf(0),
+    private val unitSystem: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC),
+    private val initialUnitSystem: UnitSystem = UnitSystem.METRIC,
+    private val persistUnitSystem: suspend (UnitSystem) -> Unit = {}
 ) : ViewModelProvider.Factory {
     private val accessDecisions = freeAccessRepository?.decisions()
         ?: flowOf(app.mymusclemap.domain.entitlement.FreeAccessLogic.unknown())
@@ -112,7 +118,8 @@ class WeightViewModelFactory(
                     workoutTemplateRepository,
                     onboardingRepository,
                     featureEntitlements,
-                    weeklyGoalRepository
+                    weeklyGoalRepository,
+                    unitSystem = unitSystem
                 )
             }
             modelClass.isAssignableFrom(WeightDetailsViewModel::class.java) -> {
@@ -122,7 +129,8 @@ class WeightViewModelFactory(
                     onboardingRepository,
                     bodyMeasurementRepository,
                     featureEntitlements,
-                    targetWeightGoalRepository
+                    targetWeightGoalRepository,
+                    unitSystem = unitSystem
                 )
             }
             modelClass.isAssignableFrom(HistoryViewModel::class.java) -> {
@@ -130,7 +138,8 @@ class WeightViewModelFactory(
                     weightRepository,
                     workoutSessionRepository,
                     dateProvider,
-                    extras.createSavedStateHandle()
+                    extras.createSavedStateHandle(),
+                    unitSystem = unitSystem
                 )
             }
             modelClass.isAssignableFrom(WorkoutHubViewModel::class.java) -> {
@@ -162,7 +171,9 @@ class WeightViewModelFactory(
                     founderMilestoneAcknowledgements,
                     founderProgram,
                     founderAvailability,
-                    founderJoin
+                    founderJoin,
+                    initialUnitSystem = initialUnitSystem,
+                    persistUnitSystem = persistUnitSystem
                 )
             }
             modelClass.isAssignableFrom(OnboardingGuideViewModel::class.java) -> {
@@ -232,7 +243,8 @@ class WeightViewModelFactory(
                 WorkoutDetailViewModel(
                     extras.createSavedStateHandle(),
                     workoutSessionRepository,
-                    application.resources
+                    application.resources,
+                    unitSystem = unitSystem
                 )
             }
             modelClass.isAssignableFrom(WorkoutImportViewModel::class.java) -> {

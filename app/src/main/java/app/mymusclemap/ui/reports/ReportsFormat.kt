@@ -1,6 +1,8 @@
 package app.mymusclemap.ui.reports
 
 import app.mymusclemap.domain.locale.AppLocale
+import app.mymusclemap.domain.units.UnitConversions
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.model.SeriesPoint
 import app.mymusclemap.domain.reports.ReportHistoryCoverage
 import app.mymusclemap.domain.reports.ReportKind
@@ -65,10 +67,12 @@ internal fun reportDuration(millis: Long): String {
 }
 
 internal object ReportVolumeFormat {
-    fun kilograms(value: Double): String = "${magnitude(value)} kg"
+    fun kilograms(value: Double, system: UnitSystem = UnitSystem.METRIC): String {
+        return "${magnitude(displayKg(value, system))} ${MeasurementTextUnit(system)}"
+    }
 
-    fun signedKilograms(value: Double): String {
-        val body = kilograms(abs(value))
+    fun signedKilograms(value: Double, system: UnitSystem = UnitSystem.METRIC): String {
+        val body = kilograms(abs(value), system)
         return when {
             value > 0.0 -> "+$body"
             value < 0.0 -> "−$body"
@@ -76,7 +80,21 @@ internal object ReportVolumeFormat {
         }
     }
 
-    fun axis(value: Double): String = magnitude(value)
+    fun axis(value: Double, system: UnitSystem = UnitSystem.METRIC): String {
+        return magnitude(displayKg(value, system))
+    }
+
+    private fun displayKg(value: Double, system: UnitSystem): Double {
+        return if (system == UnitSystem.IMPERIAL) {
+            UnitConversions.kgToLb(value).toDouble()
+        } else {
+            value
+        }
+    }
+
+    private fun MeasurementTextUnit(system: UnitSystem): String {
+        return if (system == UnitSystem.IMPERIAL) "lb" else "kg"
+    }
 
     private fun magnitude(value: Double): String {
         val absolute = abs(value)

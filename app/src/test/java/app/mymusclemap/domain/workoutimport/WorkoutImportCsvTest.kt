@@ -206,6 +206,20 @@ class WorkoutImportCsvTest {
     }
 
     @Test
+    fun explicitFeetAndMilesConvertOnceAndWeightKilogramsStayKilograms() {
+        val miles = success(
+            header() + row(reps = "", duration = "600", distance = "1", unit = "mi", loadKind = "NONE")
+        )
+        val feet = success(
+            header() + row(reps = "", duration = "60", distance = "100", unit = "ft", loadKind = "NONE")
+        )
+        val weighted = success(header() + row(weight = "100", loadKind = "EXTERNAL_WEIGHT"))
+        assertEquals(0, BigDecimal("1609.344").compareTo(miles.workouts[0].exercises[0].sets[0].distanceMeters))
+        assertEquals(0, BigDecimal("30.48").compareTo(feet.workouts[0].exercises[0].sets[0].distanceMeters))
+        assertEquals(0, BigDecimal("100").compareTo(weighted.workouts[0].exercises[0].sets[0].weightKg))
+    }
+
+    @Test
     fun enforcesDocumentSafetyLimits() {
         val tooManySets = buildString {
             append(header())

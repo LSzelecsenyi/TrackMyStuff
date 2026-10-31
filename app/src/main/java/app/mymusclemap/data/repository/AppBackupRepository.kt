@@ -13,6 +13,9 @@ import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.data.preferences.UnitSystemBackup
+import app.mymusclemap.data.preferences.UnitSystemBackupStore
+import app.mymusclemap.data.preferences.UnitSystemPreferences
 import app.mymusclemap.data.progress.ProgressPhotoStore
 import app.mymusclemap.domain.theme.AppearanceCodec
 import java.io.BufferedInputStream
@@ -25,6 +28,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class AppBackupRepository(
     private val database: WeightDatabase,
     private val themePreferences: ThemePreferences,
+    private val unitSystems: UnitSystemBackupStore? = null,
     private val progressPhotoStore: ProgressPhotoStore? = null,
     private val onHeatmapDataChanged: () -> Unit = {},
     private val beforeDestructiveRestore: suspend () -> Unit = {},
@@ -33,7 +37,7 @@ class AppBackupRepository(
 ) {
     suspend fun exportJson(source: AppBackupSource): String {
         val tables = database.appBackupDao().loadTables()
-        val settings = AppearanceCodec.encode(themePreferences.current())
+        val settings = backupSettings()
         val snapshot = AppBackupSnapshot(
             formatVersion = AppBackupFormat.FORMAT_VERSION,
             schemaVersion = AppBackupFormat.SCHEMA_VERSION,
@@ -71,7 +75,7 @@ class AppBackupRepository(
                 replacesAchievements = true,
                 replacesTargetWeightGoals = true
             ),
-            settings = AppearanceCodec.encode(themePreferences.current())
+            settings = backupSettings()
         )
         return try {
             AppBackupArchive.export(snapshot, files, output)
@@ -185,6 +189,7 @@ class AppBackupRepository(
             )
         }
         themePreferences.replaceAppearance(AppearanceCodec.decodeFrom(snapshot.settings))
+        restoreUnits(snapshot)
         onHeatmapDataChanged()
         notifyRestored()
         return AppBackupRestoreResult.Success
@@ -229,9 +234,20 @@ class AppBackupRepository(
             )
         }
         themePreferences.replaceAppearance(AppearanceCodec.decodeFrom(snapshot.settings))
+        restoreUnits(snapshot)
         onHeatmapDataChanged()
         notifyRestored()
         return AppBackupRestoreResult.Success
+    }
+
+    private suspend fun backupSettings(): Map<String, String> {
+        val appearance = AppearanceCodec.encode(themePreferences.current())
+        val units = unitSystems?.current() ?: return appearance
+        return appearance + (UnitSystemPreferences.SETTINGS_KEY to units.name)
+    }
+
+    private suspend fun restoreUnits(snapshot: AppBackupSnapshot) {
+        unitSystems?.replace(UnitSystemBackup.decode(snapshot.settings))
     }
 
     private suspend fun notifyRestored() {

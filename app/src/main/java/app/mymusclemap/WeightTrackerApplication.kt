@@ -14,6 +14,7 @@ import app.mymusclemap.data.local.AccountDatabaseMigrator
 import app.mymusclemap.data.local.DatabaseOpenProblem
 import app.mymusclemap.data.local.databaseOpenProblemFor
 import app.mymusclemap.data.preferences.LanguagePreferences
+import app.mymusclemap.data.preferences.UnitSystemPreferences
 import app.mymusclemap.domain.locale.AppLanguage
 import app.mymusclemap.domain.locale.AppLanguageApplicator
 import app.mymusclemap.domain.locale.AppLanguagePolicy
@@ -45,6 +46,9 @@ class WeightTrackerApplication : Application() {
     lateinit var languages: LanguagePreferences
         private set
 
+    lateinit var unitSystems: UnitSystemPreferences
+        private set
+
     var resolvedLanguage: AppLanguage = AppLanguage.EN
         private set
 
@@ -56,6 +60,8 @@ class WeightTrackerApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         languages = LanguagePreferences(this)
+        unitSystems = UnitSystemPreferences(this)
+        runBlocking { unitSystems.load() }
         applyLanguagePolicy()
         accounts = AccountDirectory(this)
         signIn = SignInCoordinator(this)
@@ -99,7 +105,7 @@ class WeightTrackerApplication : Application() {
             return
         }
         val opened = try {
-            AppContainer(this, userId)
+            AppContainer(this, userId, unitSystems)
         } catch (error: Throwable) {
             val problem = databaseOpenProblemFor(error)
             if (problem == null) {

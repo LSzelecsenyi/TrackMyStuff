@@ -98,14 +98,23 @@ fun MeasurementEditorSheet(
                 value = state.weightInput,
                 onValueChange = { onWeightChange(WeightParser.filterUserInput(it)) },
                 label = { Text(stringResource(R.string.field_weight)) },
-                suffix = { Text(stringResource(R.string.unit_kg)) },
+                suffix = { Text(app.mymusclemap.ui.units.weightUnitLabel()) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 isError = state.weightError != null,
                 supportingText = {
                     Text(
-                        text = state.weightError?.let { stringResource(weightErrorMessage(it)) }
-                            ?: stringResource(R.string.weight_input_hint)
+                        text = state.weightError?.let {
+                            stringResource(weightErrorMessage(it, app.mymusclemap.ui.units.LocalUnitSystem.current))
+                        } ?: stringResource(
+                            if (app.mymusclemap.ui.units.LocalUnitSystem.current ==
+                                app.mymusclemap.domain.units.UnitSystem.IMPERIAL
+                            ) {
+                                R.string.weight_input_hint_lb
+                            } else {
+                                R.string.weight_input_hint
+                            }
+                        )
                     )
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -186,13 +195,20 @@ fun MeasurementEditorSheet(
     }
 }
 
-fun weightErrorMessage(error: WeightParseError): Int {
+fun weightErrorMessage(
+    error: WeightParseError,
+    system: app.mymusclemap.domain.units.UnitSystem = app.mymusclemap.domain.units.UnitSystem.METRIC
+): Int {
     return when (error) {
         WeightParseError.Empty -> R.string.error_weight_empty
         WeightParseError.Malformed -> R.string.error_weight_malformed
         WeightParseError.NotFinite -> R.string.error_weight_malformed
         WeightParseError.TooManyDecimals -> R.string.error_weight_decimals
-        WeightParseError.OutOfRange -> R.string.error_weight_range
+        WeightParseError.OutOfRange -> if (system == app.mymusclemap.domain.units.UnitSystem.IMPERIAL) {
+            R.string.error_weight_range_lb
+        } else {
+            R.string.error_weight_range
+        }
     }
 }
 

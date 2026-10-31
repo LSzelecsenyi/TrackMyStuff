@@ -15,11 +15,12 @@ import app.mymusclemap.domain.journal.JournalTimeline
 import app.mymusclemap.domain.journal.WorkoutJournalEntry
 import app.mymusclemap.domain.model.SaveOutcome
 import app.mymusclemap.domain.model.WeightMeasurement
+import app.mymusclemap.domain.units.MeasurementInput
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.workout.DeleteWorkoutResult
 import app.mymusclemap.domain.workout.WorkoutSessionSummary
 import app.mymusclemap.ui.components.EditorUiState
 import app.mymusclemap.ui.components.UserMessage
-import app.mymusclemap.ui.components.formatWeightInput
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,7 +55,8 @@ class HistoryViewModel(
     private val repository: WeightRepository,
     private val sessionRepository: WorkoutSessionRepository,
     private val dateProvider: DateProvider,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
+    private val unitSystem: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC)
 ) : ViewModel() {
     private val filter = savedStateHandle.getStateFlow(FILTER, JournalFilter.WORKOUT.name)
     private val includeAbandoned = savedStateHandle.getStateFlow(INCLUDE_ABANDONED, false)
@@ -104,6 +106,23 @@ class HistoryViewModel(
         viewModelScope.launch {
             repository.observeAll().collect { measurements.value = it }
         }
+        viewModelScope.launch {
+            var applied = unitSystem.value
+            unitSystem.collect { next ->
+                if (next == applied) return@collect
+                editor.value?.let { current ->
+                    editor.value = current.copy(
+                        weightInput = MeasurementInput.reformatBodyWeight(
+                            current.weightInput,
+                            current.existing?.weightKg,
+                            applied,
+                            next
+                        )
+                    )
+                }
+                applied = next
+            }
+        }
     }
 
     fun onFilterSelected(value: JournalFilter) {
@@ -123,7 +142,7 @@ class HistoryViewModel(
         val existing = measurements.value.find { it.date == date }
         editor.value = EditorUiState(
             date = date,
-            weightInput = existing?.let { formatWeightInput(it.weightKg) }.orEmpty(),
+            weightInput = existing?.let { MeasurementInput.bodyWeightInput(it.weightKg, unitSystem.value) }.orEmpty(),
             existing = existing,
             weightError = null,
             dateError = null
@@ -144,7 +163,7 @@ class HistoryViewModel(
         editor.value = current.copy(
             date = date,
             existing = existing,
-            weightInput = existing?.let { formatWeightInput(it.weightKg) } ?: current.weightInput,
+            weightInput = existing?.let { MeasurementInput.bodyWeightInput(it.weightKg, unitSystem.value) } ?: current.weightInput,
             dateError = null,
             showDeleteConfirm = false
         )
@@ -157,7 +176,15 @@ class HistoryViewModel(
 
     fun saveEditor() {
         val current = editor.value ?: return
-        when (val result = MeasurementValidator.validate(current.date, current.weightInput, dateProvider.today())) {
+        when (
+            val result = MeasurementValidator.validate(
+                current.date,
+                current.weightInput,
+                dateProvider.today(),
+                unitSystem.value,
+                current.existing?.weightKg
+            )
+        ) {
             is MeasurementValidationResult.Invalid -> {
                 editor.value = current.copy(
                     weightError = result.weightError,

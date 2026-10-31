@@ -428,12 +428,12 @@ class SettingsScreenLayoutTest {
     @Test
     fun givenFoundingMemberThenSettingsShowsMemberStatusOnce() {
         render(state = SettingsUiState(appVersionName = "0.1.0-debug"), showFounderBadge = true)
-        composeRule.onNodeWithText(testString(R.string.founder_badge)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.founder_member_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_badge)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_member_subtitle)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_open)).assertDoesNotExist()
         composeRule.onNodeWithText(
             testString(R.string.about_version_status, "0.1.0-debug", testString(R.string.founder_badge))
-        ).assertIsDisplayed()
+        ).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.founder_member_subtitle)).assertCountEquals(1)
     }
 
@@ -451,9 +451,9 @@ class SettingsScreenLayoutTest {
     @Test
     fun givenAppVersionThenAboutSectionShowsDynamicVersion() {
         render(state = SettingsUiState(appVersionName = "9.9.9-debug"))
-        composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.about_version, "9.9.9-debug")).assertIsDisplayed()
-        composeRule.onNodeWithTag(SETTINGS_APP_VERSION).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.about_version, "9.9.9-debug")).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_APP_VERSION).performScrollTo().assertIsDisplayed()
     }
 
     @Test

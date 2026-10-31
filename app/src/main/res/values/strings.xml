@@ -38,6 +38,10 @@
     <string name="field_date">Date</string>
     <string name="field_weight">Body weight</string>
     <string name="unit_kg">kg</string>
+    <string name="unit_lb">lb</string>
+    <string name="unit_in">in</string>
+    <string name="weight_input_hint_lb">Enter a value between 66.1 and 661.4 lb, with one decimal place. A comma or a period is accepted.</string>
+    <string name="error_weight_range_lb">Body weight must be between 66.1 and 661.4 lb.</string>
     <string name="weight_input_hint">Enter a value between 30.0 and 300.0 kg, with one decimal place. A comma or a period is accepted.</string>
     <string name="error_weight_empty">Enter the body weight.</string>
     <string name="error_weight_malformed">The body-weight format is not valid. Example: 82.4</string>
@@ -385,11 +389,14 @@
     <string name="load_external">External weight</string>
     <string name="load_none">No load</string>
     <string name="field_weight_kg">Weight (kg)</string>
+    <string name="field_weight_lb">Weight (lb)</string>
     <string name="field_minutes">Minutes</string>
     <string name="field_seconds">Seconds</string>
     <string name="field_distance">Distance</string>
     <string name="distance_unit_m">meters</string>
     <string name="distance_unit_km">kilometers</string>
+    <string name="distance_unit_ft">feet</string>
+    <string name="distance_unit_mi">miles</string>
     <string name="template_archived_badge">Archived</string>
     <string name="action_archive_template">Archive</string>
     <string name="action_restore_template">Restore</string>
@@ -414,6 +421,7 @@
     <string name="error_template_weight_malformed">The weight format is not valid. Example: 8.75</string>
     <string name="error_template_weight_positive">The weight must be a positive number.</string>
     <string name="error_template_weight_large">The weight can be at most 500 kg.</string>
+    <string name="error_template_weight_large_lb">The weight can be at most 1,102.3 lb.</string>
     <string name="error_template_duration_required">Enter the duration.</string>
     <string name="error_template_duration_malformed">Duration is entered in minutes and seconds.</string>
     <string name="error_template_duration_positive">Duration must be greater than zero.</string>
@@ -561,6 +569,8 @@
     <string name="action_complete_set">Done</string>
     <string name="action_complete_set_a11y">Complete set</string>
     <string name="action_decrease_reps_a11y">Decrease reps</string>
+    <string name="action_decrease_weight_a11y">Decrease weight</string>
+    <string name="action_increase_weight_a11y">Increase weight</string>
     <string name="action_increase_reps_a11y">Increase reps</string>
     <string name="action_save_set">Save</string>
     <string name="action_update_set">Update</string>
@@ -787,6 +797,7 @@
     <string name="body_measurement_thigh">Thigh</string>
     <string name="body_measurement_hips">Hips</string>
     <string name="body_unit_cm">cm</string>
+    <string name="body_unit_in">in</string>
     <string name="body_unit_percent">%</string>
     <string name="body_measurements_section">Measurements</string>
     <string name="body_measurement_add">Add</string>
@@ -987,6 +998,13 @@
     <string name="set_copy_distance_km">%1$s km</string>
     <string name="set_copy_distance_m">%1$s m</string>
     <string name="set_copy_weight_total">%1$s kg total</string>
+    <string name="set_copy_added_weight_lb">+%1$s lb</string>
+    <string name="set_copy_assistance_lb">%1$s lb assistance</string>
+    <string name="set_copy_per_side_lb">%1$s lb per side</string>
+    <string name="set_copy_weight_lb">%1$s lb</string>
+    <string name="set_copy_weight_total_lb">%1$s lb total</string>
+    <string name="set_copy_distance_ft">%1$s ft</string>
+    <string name="set_copy_distance_mi">%1$s mi</string>
     <string name="pro_badge">Pro</string>
     <string name="pro_badge_description">Strict Pro capability</string>
     <string name="pro_benefits_title">Pro benefits</string>
@@ -1304,6 +1322,9 @@
     <string name="exercise_progression_mixed_results">Mixed results</string>
     <string name="exercise_progression_summary_at">%1$s at %2$s</string>
     <string name="exercise_progression_kg">%1$s kg</string>
+    <string name="exercise_progression_lb">%1$s lb</string>
+    <string name="exercise_progression_lb_each_side">%1$s lb each side</string>
+    <string name="exercise_progression_lb_added">%1$s lb added</string>
     <string name="exercise_progression_kg_each_side">%1$s kg each side</string>
     <string name="exercise_progression_kg_added">%1$s kg added</string>
     <string name="exercise_progression_previous">Previous</string>
@@ -1330,6 +1351,7 @@
     <string name="statistics_best_reps">%d reps</string>
     <string name="statistics_best_weight">%1$s × %2$d</string>
     <string name="statistics_best_weight_per_side">%1$s kg per side × %2$d (%3$s total)</string>
+    <string name="statistics_best_weight_per_side_lb">%1$s lb per side × %2$d (%3$s total)</string>
     <string name="statistics_best_distance_duration">%1$s in %2$s</string>
     <string name="statistics_progress_insufficient">Need at least two training days for a trend.</string>
     <string name="statistics_progress_chart_description">Progress for %1$s across %2$d training days</string>
@@ -1521,6 +1543,7 @@
     <string name="badge_wall_requirement_complete">Requirement complete</string>
     <string name="badge_wall_unlock_with_pro">Unlock with PRO</string>
     <string name="badge_wall_volume_progress">%1$s / %2$s kg</string>
+    <string name="badge_wall_volume_progress_lb">%1$s / %2$s lb</string>
     <string name="badge_wall_badges_earned">badges earned</string>
     <string name="badge_wall_almost_there">Almost there</string>
     <string name="badge_wall_earned">Earned</string>
@@ -1529,6 +1552,7 @@
     <string name="badge_wall_tier_silver">Silver</string>
     <string name="badge_wall_tier_gold">Gold</string>
     <string name="badge_wall_kg_to_target">%1$s kg to target</string>
+    <string name="badge_wall_lb_to_target">%1$s lb to target</string>
     <string name="badge_wall_section_progress">%1$d / %2$d</string>
     <string name="achievement_on_target_name">On Target</string>
     <string name="achievement_on_target_requirement">Reach your target body weight</string>
@@ -1550,6 +1574,7 @@
     <string name="achievement_volume_record_requirement">Set a new workout volume personal record</string>
     <string name="achievement_volume_master_name">Volume Master</string>
     <string name="achievement_volume_master_requirement">Reach 100,000 kg total workout volume</string>
+    <string name="achievement_volume_master_requirement_lb">Reach %1$s lb total workout volume</string>
     <string name="achievement_iron_discipline_name">Iron Discipline</string>
     <string name="achievement_iron_discipline_requirement">Complete 250 workouts</string>
     <string name="achievement_founder_name">Founder</string>
@@ -1599,6 +1624,7 @@
     <string name="target_weight_waiting">Your first weight measurement sets the starting point.</string>
     <string name="target_weight_current">Current %1$s</string>
     <string name="target_weight_progress_count">%1$s / %2$s kg</string>
+    <string name="target_weight_progress_count_lb">%1$s / %2$s lb</string>
     <string name="target_weight_to_go">%1$s to go</string>
     <string name="target_weight_reached_status">You\'re at your target weight.</string>
     <string name="achievements_all_workout_milestones">All current workout milestones are complete.</string>
@@ -1610,6 +1636,14 @@
     <string name="celebration_workout_body">%1$d workouts completed.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_body">Choose the language used in Strict.</string>
+    <string name="settings_units">Measurement units</string>
+    <string name="settings_units_body">Weight, body measurements, and distance follow this choice. Workout history stays unchanged.</string>
+    <string name="units_metric">Metric</string>
+    <string name="units_metric_detail">kg · cm · km</string>
+    <string name="units_imperial">Imperial</string>
+    <string name="units_imperial_detail">lb · in · mi</string>
+    <string name="onboarding_units_title">Measurement units</string>
+    <string name="onboarding_units_body">Choose how Strict shows weight, body measurements, and distance. You can change this later in Settings.</string>
     <string name="language_hungarian">Magyar</string>
     <string name="language_english">English</string>
     <string name="billing_period_week">Every week</string>

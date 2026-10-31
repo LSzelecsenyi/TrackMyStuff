@@ -19,6 +19,9 @@ import app.mymusclemap.R
 import app.mymusclemap.domain.workout.ActiveWorkoutNotificationBody
 import app.mymusclemap.domain.workout.ActiveWorkoutNotificationModel
 import app.mymusclemap.domain.workout.QuantityParser
+import app.mymusclemap.data.preferences.DisplayedUnitSystem
+import app.mymusclemap.domain.units.DistanceWord
+import app.mymusclemap.domain.units.MeasurementText
 import app.mymusclemap.domain.workout.notificationLoadLabel
 import app.mymusclemap.domain.workout.notificationValueParts
 
@@ -291,11 +294,13 @@ internal object ActiveWorkoutNotifications {
     internal fun valueLabel(context: Context, body: ActiveWorkoutNotificationBody.CurrentSet): String {
         if (!body.completable) return ""
         val reps = body.reps?.let { context.getString(R.string.notification_reps, it) }
+        val units = DisplayedUnitSystem.current
         val load = body.loadKind?.let { kind ->
             notificationLoadLabel(
                 kind,
                 body.weightKg,
-                context.getString(R.string.set_copy_bodyweight)
+                context.getString(R.string.set_copy_bodyweight),
+                units
             )
         }
         val duration = body.durationSeconds?.let { seconds ->
@@ -303,10 +308,20 @@ internal object ActiveWorkoutNotifications {
             "$minutes:${remainder.toString().padStart(2, '0')}"
         }
         val distance = body.distanceMeters?.let { meters ->
-            context.getString(
-                R.string.notification_distance_meters,
-                QuantityParser.formatDisplay(meters)
-            )
+            if (units == app.mymusclemap.domain.units.UnitSystem.METRIC) {
+                context.getString(
+                    R.string.notification_distance_meters,
+                    QuantityParser.formatDisplay(meters)
+                )
+            } else {
+                val (number, word) = MeasurementText.distanceNumber(meters, units)
+                val res = when (word) {
+                    DistanceWord.FEET -> R.string.set_copy_distance_ft
+                    DistanceWord.MILES -> R.string.set_copy_distance_mi
+                    else -> R.string.notification_distance_meters
+                }
+                context.getString(res, number)
+            }
         }
         return notificationValueParts(reps, load, duration, distance)
     }

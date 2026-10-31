@@ -207,7 +207,10 @@ fun SettingsScreen(
     showLanguageSetting: Boolean = false,
     selectedLanguage: app.mymusclemap.domain.locale.AppLanguage =
         app.mymusclemap.domain.locale.AppLanguage.EN,
-    onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {}
+    onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {},
+    selectedUnitSystem: app.mymusclemap.domain.units.UnitSystem =
+        app.mymusclemap.domain.units.UnitSystem.METRIC,
+    onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
@@ -273,6 +276,11 @@ fun SettingsScreen(
                     )
                     CompactEditorDivider()
                 }
+                MeasurementUnitsSection(
+                    selected = selectedUnitSystem,
+                    onSelected = onUnitSystemSelected
+                )
+                CompactEditorDivider()
                 AppearanceSection(
                     state = state,
                     customEditorVisible = customEditorVisible,
@@ -524,6 +532,38 @@ private fun LanguageSection(
                 selected = selected == app.mymusclemap.domain.locale.AppLanguage.EN,
                 testTag = SETTINGS_LANGUAGE_EN,
                 onClick = { onSelected(app.mymusclemap.domain.locale.AppLanguage.EN) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MeasurementUnitsSection(
+    selected: app.mymusclemap.domain.units.UnitSystem,
+    onSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit
+) {
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.settings_units))) {
+        Text(
+            text = stringResource(R.string.settings_units_body),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("settings-units")
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        Column(modifier = Modifier.selectableGroup()) {
+            ChoiceRow(
+                label = stringResource(R.string.units_metric),
+                supporting = stringResource(R.string.units_metric_detail),
+                selected = selected == app.mymusclemap.domain.units.UnitSystem.METRIC,
+                testTag = "settings-units-metric",
+                onClick = { onSelected(app.mymusclemap.domain.units.UnitSystem.METRIC) }
+            )
+            ChoiceRow(
+                label = stringResource(R.string.units_imperial),
+                supporting = stringResource(R.string.units_imperial_detail),
+                selected = selected == app.mymusclemap.domain.units.UnitSystem.IMPERIAL,
+                testTag = "settings-units-imperial",
+                onClick = { onSelected(app.mymusclemap.domain.units.UnitSystem.IMPERIAL) }
             )
         }
     }

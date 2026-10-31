@@ -51,6 +51,7 @@ import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
 import app.mymusclemap.data.preferences.TimerSoundPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.data.preferences.UnitSystemPreferences
 import app.mymusclemap.domain.achievements.AccountAchievementAuthority
 import app.mymusclemap.data.repository.AchievementRepository
 import app.mymusclemap.data.repository.AppBackupRepository
@@ -103,7 +104,11 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicReference
 
-class AppContainer(context: Context, val accountUserId: String) {
+class AppContainer(
+    context: Context,
+    val accountUserId: String,
+    val unitSystems: UnitSystemPreferences
+) {
     private val appContext = context.applicationContext
     private val clock: Clock = SystemWallClock()
     private val systemDates = SystemDateProvider(clock)
@@ -212,6 +217,7 @@ class AppContainer(context: Context, val accountUserId: String) {
     val appBackupRepository = AppBackupRepository(
         database,
         themePreferences,
+        unitSystems = unitSystems,
         progressPhotoStore = progressPhotoStore,
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
         onAfterRestore = {
@@ -1001,7 +1007,13 @@ class AppContainer(context: Context, val accountUserId: String) {
         },
         entitlementChanges = entitlementRevision,
         achievementRepository = achievementRepository,
-        targetWeightGoalRepository = targetWeightGoalRepository
+        targetWeightGoalRepository = targetWeightGoalRepository,
+        unitSystem = unitSystems.system,
+        initialUnitSystem = unitSystems.storedOrNull()
+            ?: app.mymusclemap.domain.units.UnitSystemSuggestion.fromRegion(
+                java.util.Locale.getDefault().country
+            ),
+        persistUnitSystem = { unitSystems.write(it) }
     )
 }
 

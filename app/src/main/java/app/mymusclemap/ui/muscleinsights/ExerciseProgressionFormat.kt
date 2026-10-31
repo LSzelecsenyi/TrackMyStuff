@@ -173,13 +173,25 @@ private fun loadText(
     kind: PlannedLoadKind,
     interpretation: WeightInterpretation
 ): String {
+    val units = app.mymusclemap.ui.units.LocalUnitSystem.current
     val perSide = kind == PlannedLoadKind.EXTERNAL_WEIGHT &&
         interpretation == WeightInterpretation.PER_SIDE
-    val shown = if (perSide) effectiveKilograms / 2.0 else effectiveKilograms
+    val shownKg = if (perSide) effectiveKilograms / 2.0 else effectiveKilograms
+    val shown = if (units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL) {
+        app.mymusclemap.domain.units.UnitConversions.kgToLb(shownKg).toDouble()
+    } else {
+        shownKg
+    }
     val number = progressionQuantity(abs(shown))
     return when {
+        kind == PlannedLoadKind.ADDED_WEIGHT && units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL ->
+            stringResource(R.string.exercise_progression_lb_added, number)
         kind == PlannedLoadKind.ADDED_WEIGHT -> stringResource(R.string.exercise_progression_kg_added, number)
+        perSide && units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL ->
+            stringResource(R.string.exercise_progression_lb_each_side, number)
         perSide -> stringResource(R.string.exercise_progression_kg_each_side, number)
+        units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL ->
+            stringResource(R.string.exercise_progression_lb, number)
         else -> stringResource(R.string.exercise_progression_kg, number)
     }
 }
@@ -190,14 +202,26 @@ private fun signedLoad(
     kind: PlannedLoadKind,
     interpretation: WeightInterpretation
 ): String {
+    val units = app.mymusclemap.ui.units.LocalUnitSystem.current
     val perSide = kind == PlannedLoadKind.EXTERNAL_WEIGHT &&
         interpretation == WeightInterpretation.PER_SIDE
-    val shown = if (perSide) delta / 2.0 else delta
+    val shownKg = if (perSide) delta / 2.0 else delta
+    val shown = if (units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL) {
+        app.mymusclemap.domain.units.UnitConversions.kgToLb(shownKg).toDouble()
+    } else {
+        shownKg
+    }
     val number = progressionQuantity(abs(shown))
     val signed = signedPrefix(shown) + number
     return when {
+        kind == PlannedLoadKind.ADDED_WEIGHT && units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL ->
+            stringResource(R.string.exercise_progression_lb_added, signed)
         kind == PlannedLoadKind.ADDED_WEIGHT -> stringResource(R.string.exercise_progression_kg_added, signed)
+        perSide && units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL ->
+            stringResource(R.string.exercise_progression_lb_each_side, signed)
         perSide -> stringResource(R.string.exercise_progression_kg_each_side, signed)
+        units == app.mymusclemap.domain.units.UnitSystem.IMPERIAL ->
+            stringResource(R.string.exercise_progression_lb, signed)
         else -> stringResource(R.string.exercise_progression_kg, signed)
     }
 }

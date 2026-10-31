@@ -3,7 +3,9 @@ package app.mymusclemap.domain.journal
 import android.content.res.Resources
 import app.mymusclemap.R
 import app.mymusclemap.domain.exercise.WeightInterpretation
-import app.mymusclemap.domain.workout.DistanceUnit
+import app.mymusclemap.domain.units.DistanceWord
+import app.mymusclemap.domain.units.MeasurementText
+import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.QuantityParser
 import app.mymusclemap.domain.workout.RepetitionTarget
@@ -21,11 +23,16 @@ data class WorkoutSetDisplay(
 )
 
 object WorkoutSetCopy {
-    fun display(resources: Resources, set: SessionSet, exercise: SessionExercise): WorkoutSetDisplay {
-        val planned = plannedValue(resources, set, exercise.weightInterpretation)
+    fun display(
+        resources: Resources,
+        set: SessionSet,
+        exercise: SessionExercise,
+        system: UnitSystem = UnitSystem.METRIC
+    ): WorkoutSetDisplay {
+        val planned = plannedValue(resources, set, exercise.weightInterpretation, system)
         val performed = when (set.status) {
             SessionSetStatus.SKIPPED, SessionSetStatus.PENDING -> ""
-            SessionSetStatus.COMPLETED -> performedValue(resources, set, exercise.weightInterpretation)
+            SessionSetStatus.COMPLETED -> performedValue(resources, set, exercise.weightInterpretation, system)
         }
         return WorkoutSetDisplay(
             position = set.position + 1,
@@ -40,7 +47,12 @@ object WorkoutSetCopy {
         )
     }
 
-    fun plannedValue(resources: Resources, set: SessionSet, interpretation: WeightInterpretation): String {
+    fun plannedValue(
+        resources: Resources,
+        set: SessionSet,
+        interpretation: WeightInterpretation,
+        system: UnitSystem = UnitSystem.METRIC
+    ): String {
         return formatValue(
             resources = resources,
             repsText = plannedReps(set.plannedMinReps, set.plannedMaxReps),
@@ -48,11 +60,17 @@ object WorkoutSetCopy {
             weightKg = set.plannedWeightKg,
             durationSeconds = set.plannedDurationSeconds,
             distanceMeters = set.plannedDistanceMeters,
-            interpretation = interpretation
+            interpretation = interpretation,
+            system = system
         )
     }
 
-    fun performedValue(resources: Resources, set: SessionSet, interpretation: WeightInterpretation): String {
+    fun performedValue(
+        resources: Resources,
+        set: SessionSet,
+        interpretation: WeightInterpretation,
+        system: UnitSystem = UnitSystem.METRIC
+    ): String {
         return formatValue(
             resources = resources,
             repsText = set.actualReps?.toString(),
@@ -60,7 +78,8 @@ object WorkoutSetCopy {
             weightKg = set.actualWeightKg,
             durationSeconds = set.actualDurationSeconds,
             distanceMeters = set.actualDistanceMeters,
-            interpretation = interpretation
+            interpretation = interpretation,
+            system = system
         )
     }
 
@@ -72,15 +91,16 @@ object WorkoutSetCopy {
         durationSeconds: Int?,
         distanceMeters: Double?,
         interpretation: WeightInterpretation,
-        markTotalWeight: Boolean = false
+        markTotalWeight: Boolean = false,
+        system: UnitSystem = UnitSystem.METRIC
     ): String {
         val parts = mutableListOf<String>()
         if (!repsText.isNullOrBlank()) {
             parts += resources.getString(R.string.set_copy_reps, repsText)
         }
-        loadLabel(resources, loadKind, weightKg, interpretation, markTotalWeight)?.let { parts += it }
+        loadLabel(resources, loadKind, weightKg, interpretation, markTotalWeight, system)?.let { parts += it }
         if (distanceMeters != null) {
-            parts += distanceLabel(resources, distanceMeters)
+            parts += distanceLabel(resources, distanceMeters, system)
             durationSeconds?.let { parts += clock(it) }
         } else {
             durationSeconds?.let { parts += durationLabel(resources, it) }
@@ -100,40 +120,62 @@ object WorkoutSetCopy {
         kind: PlannedLoadKind?,
         weightKg: Double?,
         interpretation: WeightInterpretation,
-        markTotalWeight: Boolean = false
-    ): String? = loadLabel(resources, kind, weightKg, interpretation, markTotalWeight)
+        markTotalWeight: Boolean = false,
+        system: UnitSystem = UnitSystem.METRIC
+    ): String? = loadLabel(resources, kind, weightKg, interpretation, markTotalWeight, system)
 
     fun durationText(resources: Resources, seconds: Int): String = durationLabel(resources, seconds)
 
-    fun distanceText(resources: Resources, meters: Double): String = distanceLabel(resources, meters)
+    fun distanceText(
+        resources: Resources,
+        meters: Double,
+        system: UnitSystem = UnitSystem.METRIC
+    ): String = distanceLabel(resources, meters, system)
 
     private fun loadLabel(
         resources: Resources,
         kind: PlannedLoadKind?,
         weightKg: Double?,
         interpretation: WeightInterpretation,
-        markTotalWeight: Boolean
+        markTotalWeight: Boolean,
+        system: UnitSystem
     ): String? {
-        val weight = weightKg?.let { QuantityParser.formatDisplay(it) }
+        val weight = weightKg?.let { MeasurementText.workoutWeightNumber(it, system) }
+        val imperial = system == UnitSystem.IMPERIAL
         return when (kind) {
             null, PlannedLoadKind.NONE -> null
             PlannedLoadKind.BODYWEIGHT_ONLY -> resources.getString(R.string.set_copy_bodyweight)
             PlannedLoadKind.ADDED_WEIGHT -> if (weight != null) {
-                resources.getString(R.string.set_copy_added_weight, weight)
+                resources.getString(
+                    if (imperial) R.string.set_copy_added_weight_lb else R.string.set_copy_added_weight,
+                    weight
+                )
             } else {
                 resources.getString(R.string.set_copy_added_weight, "").trim()
             }
             PlannedLoadKind.ASSISTANCE -> if (weight != null) {
-                resources.getString(R.string.set_copy_assistance, weight)
+                resources.getString(
+                    if (imperial) R.string.set_copy_assistance_lb else R.string.set_copy_assistance,
+                    weight
+                )
             } else {
                 resources.getString(R.string.set_copy_assistance_plain)
             }
             PlannedLoadKind.EXTERNAL_WEIGHT -> when {
                 weight == null -> null
                 interpretation == WeightInterpretation.PER_SIDE ->
-                    resources.getString(R.string.set_copy_per_side, weight)
-                markTotalWeight -> resources.getString(R.string.set_copy_weight_total, weight)
-                else -> resources.getString(R.string.set_copy_weight, weight)
+                    resources.getString(
+                        if (imperial) R.string.set_copy_per_side_lb else R.string.set_copy_per_side,
+                        weight
+                    )
+                markTotalWeight -> resources.getString(
+                    if (imperial) R.string.set_copy_weight_total_lb else R.string.set_copy_weight_total,
+                    weight
+                )
+                else -> resources.getString(
+                    if (imperial) R.string.set_copy_weight_lb else R.string.set_copy_weight,
+                    weight
+                )
             }
         }
     }
@@ -153,18 +195,27 @@ object WorkoutSetCopy {
         return "$minutes:${remainder.toString().padStart(2, '0')}"
     }
 
-    private fun distanceLabel(resources: Resources, meters: Double): String {
-        return if (meters >= 1000.0) {
-            val kilometers = QuantityParser.fromMeters(meters, DistanceUnit.KILOMETERS)
-            resources.getString(
+    private fun distanceLabel(resources: Resources, meters: Double, system: UnitSystem): String {
+        if (system == UnitSystem.METRIC && meters >= 1000.0) {
+            val kilometers = QuantityParser.fromMeters(meters, app.mymusclemap.domain.workout.DistanceUnit.KILOMETERS)
+            return resources.getString(
                 R.string.set_copy_distance_km,
                 QuantityParser.formatDisplay(kilometers)
             )
-        } else {
-            resources.getString(
+        }
+        if (system == UnitSystem.METRIC) {
+            return resources.getString(
                 R.string.set_copy_distance_m,
                 QuantityParser.formatDisplay(meters)
             )
         }
+        val (number, word) = MeasurementText.distanceNumber(meters, system)
+        val res = when (word) {
+            DistanceWord.METERS -> R.string.set_copy_distance_m
+            DistanceWord.KILOMETERS -> R.string.set_copy_distance_km
+            DistanceWord.FEET -> R.string.set_copy_distance_ft
+            DistanceWord.MILES -> R.string.set_copy_distance_mi
+        }
+        return resources.getString(res, number)
     }
 }
