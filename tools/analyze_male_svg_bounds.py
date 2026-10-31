@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-SRC = Path(r"D:\TrackMyStuff\male_msucle_map.svg")
+SRC = Path(r"D:\TrackMyStuff\male_muscle_map.svg")
 OUT = Path(r"D:\TrackMyStuff\tools\male_svg_preview")
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -155,11 +155,11 @@ for el in root.findall(f".//{SVG}path"):
     cy = (y0 + y1) / 2
     side = "LEFT" if cx < 526 else "RIGHT"
     print(f"{pid:24} {label:22} {x0:7.1f},{y0:7.1f} {x1:7.1f},{y1:7.1f} {cx:8.1f} {cy:8.1f} {side} subs={len(re.findall('[Mm]', d))}")
-    color = (255, 40, 40, 90) if pid == "path27" else (40, 90, 255, 50)
+    color = (255, 40, 40, 90) if pid == "obliques_back" else (40, 90, 255, 50)
     # rough: draw bbox
     draw.rectangle(
         [x0 * scale, y0 * scale, x1 * scale, y1 * scale],
-        outline=(255, 0, 0, 180) if pid in {"path27", "sbd"} else (0, 180, 80, 160),
+        outline=(255, 0, 0, 180) if pid in {"obliques_back", "sbd"} else (0, 180, 80, 160),
         width=2,
     )
 

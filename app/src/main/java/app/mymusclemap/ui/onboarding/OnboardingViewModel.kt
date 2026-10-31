@@ -9,6 +9,7 @@ import app.mymusclemap.data.repository.FirstRunCoordinator
 import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.FounderProgramAvailability
+import app.mymusclemap.domain.musclemap.MuscleMapBodyModel
 import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.ui.founder.FounderJoinNotice
 import app.mymusclemap.ui.founder.shouldOfferFounderOnboardingInvitation
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 enum class OnboardingStep {
     Welcome,
     MeasurementUnits,
+    BodyModel,
     FounderInvitation,
     WeeklyGoal,
     CreatePlan
@@ -39,7 +41,9 @@ class OnboardingViewModel(
     private val founderAvailability: FounderProgramAvailability = FounderProgramAvailability.Open,
     private val founderJoin: (suspend () -> FounderJoinResult)? = null,
     initialUnitSystem: UnitSystem = UnitSystem.METRIC,
-    private val persistUnitSystem: suspend (UnitSystem) -> Unit = {}
+    private val persistUnitSystem: suspend (UnitSystem) -> Unit = {},
+    initialBodyModel: MuscleMapBodyModel = MuscleMapBodyModel.MALE,
+    private val persistBodyModel: suspend (MuscleMapBodyModel) -> Unit = {}
 ) : ViewModel() {
     private var founderDeclined = false
     private val stepState = MutableStateFlow(OnboardingStep.Welcome)
@@ -47,31 +51,40 @@ class OnboardingViewModel(
     private val joiningState = MutableStateFlow(false)
     private val joinNoticeState = MutableStateFlow(FounderJoinNotice.None)
     private val selectedUnitState = MutableStateFlow(initialUnitSystem)
+    private val selectedBodyModelState = MutableStateFlow(initialBodyModel)
 
     val step: StateFlow<OnboardingStep> = stepState
     val exit: StateFlow<OnboardingExit?> = exitState
     val founderJoining: StateFlow<Boolean> = joiningState
     val founderJoinNotice: StateFlow<FounderJoinNotice> = joinNoticeState
     val selectedUnit: StateFlow<UnitSystem> = selectedUnitState
+    val selectedBodyModel: StateFlow<MuscleMapBodyModel> = selectedBodyModelState
 
     fun onUnitSystemSelected(system: UnitSystem) {
         selectedUnitState.value = system
         viewModelScope.launch { persistUnitSystem(system) }
     }
 
+    fun onBodyModelSelected(model: MuscleMapBodyModel) {
+        selectedBodyModelState.value = model
+        viewModelScope.launch { persistBodyModel(model) }
+    }
+
     fun onContinue() {
         when (stepState.value) {
             OnboardingStep.Welcome -> stepState.value = OnboardingStep.MeasurementUnits
-            OnboardingStep.MeasurementUnits -> continueFromUnits()
+            OnboardingStep.MeasurementUnits -> stepState.value = OnboardingStep.BodyModel
+            OnboardingStep.BodyModel -> continueFromBodyModel()
             else -> Unit
         }
     }
 
-    private fun continueFromUnits() {
+    private fun continueFromBodyModel() {
         val invitations = founderInvitations
         val program = founderProgram
         viewModelScope.launch {
             persistUnitSystem(selectedUnitState.value)
+            persistBodyModel(selectedBodyModelState.value)
             if (
                 invitations == null ||
                 program == null ||

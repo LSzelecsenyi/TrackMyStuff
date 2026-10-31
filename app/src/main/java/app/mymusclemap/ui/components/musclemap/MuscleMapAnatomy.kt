@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector
 import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapFigureArtwork
+import kotlin.math.roundToInt
 
 object MuscleMapAnatomy {
     @Volatile
@@ -35,8 +36,8 @@ object MuscleMapAnatomy {
         val full = context.assets.open(artwork.anatomyAsset).use { stream ->
             BitmapFactory.decodeStream(stream)
         } ?: error("Muscle map anatomy is missing: ${artwork.anatomyAsset}")
-        val split = artwork.splitX.toInt()
-        val front = crop(full, 0, split)
+        val split = artwork.splitX
+        val front = crop(full, 0f, split)
         val back = crop(full, split, full.width - split)
         if (full !== front && full !== back) {
             full.recycle()
@@ -49,9 +50,18 @@ object MuscleMapAnatomy {
         )
     }
 
-    private fun crop(source: Bitmap, x: Int, width: Int): Bitmap {
-        val out = Bitmap.createBitmap(width, source.height, Bitmap.Config.ARGB_8888)
-        Canvas(out).drawBitmap(source, -x.toFloat(), 0f, null)
+    private fun crop(source: Bitmap, x: Float, width: Float): Bitmap {
+        if (x == x.toInt().toFloat() && width == width.toInt().toFloat()) {
+            val pixelsWide = width.toInt()
+            val out = Bitmap.createBitmap(pixelsWide, source.height, Bitmap.Config.ARGB_8888)
+            Canvas(out).drawBitmap(source, -x, 0f, null)
+            return out
+        }
+        val pixelsWide = width.roundToInt().coerceAtLeast(1)
+        val out = Bitmap.createBitmap(pixelsWide, source.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        canvas.scale(pixelsWide / width, 1f)
+        canvas.drawBitmap(source, -x, 0f, null)
         return out
     }
 }

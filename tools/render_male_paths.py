@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-SRC = Path(r"D:\TrackMyStuff\male_msucle_map.svg")
+SRC = Path(r"D:\TrackMyStuff\male_muscle_map.svg")
 OUT = Path(r"D:\TrackMyStuff\tools\male_svg_preview")
 SVG = "{http://www.w3.org/2000/svg}"
 INK = "{http://www.inkscape.org/namespaces/inkscape}"
@@ -150,7 +150,7 @@ def main():
     base = bg.resize((int(bg.width * scale), int(bg.height * scale)), Image.Resampling.LANCZOS)
 
     colors = {
-        "path27": (220, 30, 30, 140),
+        "obliques_back": (220, 30, 30, 140),
         "sbd": (30, 90, 220, 110),
         "serratus": (20, 160, 60, 120),
         "obliques_front": (200, 120, 20, 120),
@@ -177,7 +177,7 @@ def main():
 
     # isolated crops for ambiguous regions
     crops = {
-        "path27": (680, 340, 900, 500),
+        "obliques_back": (680, 340, 900, 500),
         "torso_front": (140, 250, 400, 520),
         "thighs_front": (140, 430, 400, 760),
         "thighs_back": (650, 440, 930, 780),
@@ -188,7 +188,7 @@ def main():
     isolated = ImageDraw.Draw(full, "RGBA")
     for el in root.findall(f".//{SVG}path"):
         pid = el.attrib["id"]
-        if pid not in {"path27", "lower_back", "lats", "upper_back", "obliques_front", "serratus", "sbd"}:
+        if pid not in {"obliques_back", "lower_back", "lats", "upper_back", "obliques_front", "serratus", "sbd"}:
             continue
         color = colors[pid]
         for contour in flatten(el.attrib["d"]):

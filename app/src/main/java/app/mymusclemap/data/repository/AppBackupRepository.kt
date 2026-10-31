@@ -12,6 +12,9 @@ import app.mymusclemap.data.appbackup.AppBackupSnapshot
 import app.mymusclemap.data.appbackup.AppBackupSource
 import app.mymusclemap.data.appbackup.AppBackupWriteResult
 import app.mymusclemap.data.local.WeightDatabase
+import app.mymusclemap.data.preferences.MuscleMapBodyModelBackup
+import app.mymusclemap.data.preferences.MuscleMapBodyModelBackupStore
+import app.mymusclemap.data.preferences.MuscleMapBodyModelPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.preferences.UnitSystemBackup
 import app.mymusclemap.data.preferences.UnitSystemBackupStore
@@ -29,6 +32,7 @@ class AppBackupRepository(
     private val database: WeightDatabase,
     private val themePreferences: ThemePreferences,
     private val unitSystems: UnitSystemBackupStore? = null,
+    private val bodyModels: MuscleMapBodyModelBackupStore? = null,
     private val progressPhotoStore: ProgressPhotoStore? = null,
     private val onHeatmapDataChanged: () -> Unit = {},
     private val beforeDestructiveRestore: suspend () -> Unit = {},
@@ -190,6 +194,7 @@ class AppBackupRepository(
         }
         themePreferences.replaceAppearance(AppearanceCodec.decodeFrom(snapshot.settings))
         restoreUnits(snapshot)
+        restoreBodyModel(snapshot)
         onHeatmapDataChanged()
         notifyRestored()
         return AppBackupRestoreResult.Success
@@ -235,6 +240,7 @@ class AppBackupRepository(
         }
         themePreferences.replaceAppearance(AppearanceCodec.decodeFrom(snapshot.settings))
         restoreUnits(snapshot)
+        restoreBodyModel(snapshot)
         onHeatmapDataChanged()
         notifyRestored()
         return AppBackupRestoreResult.Success
@@ -242,12 +248,17 @@ class AppBackupRepository(
 
     private suspend fun backupSettings(): Map<String, String> {
         val appearance = AppearanceCodec.encode(themePreferences.current())
-        val units = unitSystems?.current() ?: return appearance
-        return appearance + (UnitSystemPreferences.SETTINGS_KEY to units.name)
+        val units = unitSystems?.current()?.let { UnitSystemPreferences.SETTINGS_KEY to it.name }
+        val bodyModel = bodyModels?.current()?.let { MuscleMapBodyModelPreferences.SETTINGS_KEY to it.name }
+        return appearance + listOfNotNull(units, bodyModel)
     }
 
     private suspend fun restoreUnits(snapshot: AppBackupSnapshot) {
         unitSystems?.replace(UnitSystemBackup.decode(snapshot.settings))
+    }
+
+    private suspend fun restoreBodyModel(snapshot: AppBackupSnapshot) {
+        bodyModels?.replace(MuscleMapBodyModelBackup.decode(snapshot.settings))
     }
 
     private suspend fun notifyRestored() {

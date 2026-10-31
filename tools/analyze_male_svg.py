@@ -1,9 +1,9 @@
-"""One-off inspection of male_msucle_map.svg. Does not modify the source."""
+"""One-off inspection of male_muscle_map.svg. Does not modify the source."""
 import re
 import xml.etree.ElementTree as ET
 from collections import Counter
 
-SRC = r"D:\TrackMyStuff\male_msucle_map.svg"
+SRC = r"D:\TrackMyStuff\male_muscle_map.svg"
 INK = "{http://www.inkscape.org/namespaces/inkscape}"
 XLINK = "{http://www.w3.org/1999/xlink}"
 SVG = "{http://www.w3.org/2000/svg}"

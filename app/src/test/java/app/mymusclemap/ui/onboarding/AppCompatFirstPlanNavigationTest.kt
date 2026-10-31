@@ -245,6 +245,7 @@ class AppCompatFirstPlanNavigationTest {
         composeRule.onNodeWithTag(ONBOARDING_SCREEN).assertIsDisplayed()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
+        composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_SKIP).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {

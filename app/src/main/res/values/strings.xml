@@ -1644,6 +1644,12 @@
     <string name="units_imperial_detail">lb · in · mi</string>
     <string name="onboarding_units_title">Measurement units</string>
     <string name="onboarding_units_body">Choose how Strict shows weight, body measurements, and distance. You can change this later in Settings.</string>
+    <string name="settings_body_model">Muscle map body model</string>
+    <string name="settings_body_model_body">The muscle heatmap uses this body model. Workout history stays unchanged.</string>
+    <string name="body_model_male">Male</string>
+    <string name="body_model_female">Female</string>
+    <string name="onboarding_body_model_title">Muscle map body model</string>
+    <string name="onboarding_body_model_body">Choose the body model used in your muscle heatmap. You can change this later in Settings.</string>
     <string name="language_hungarian">Magyar</string>
     <string name="language_english">English</string>
     <string name="billing_period_week">Every week</string>

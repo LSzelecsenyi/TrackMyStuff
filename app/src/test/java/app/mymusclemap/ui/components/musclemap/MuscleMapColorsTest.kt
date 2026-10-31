@@ -104,7 +104,7 @@ class MuscleMapColorsTest {
     fun everyInteractivePathIsALogicalMuscleAndSystemGroupsStayOffTheMap() {
         val regions = MuscleMapArtworkSelector.current().regions
         assertTrue(regions.none { it.muscleGroup == null })
-        assertTrue(regions.none { it.id in MuscleMapCatalog.groupByPathId.keys && it.muscleGroup == null })
+        assertTrue(regions.none { it.id in MuscleMapCatalog.maleGroupByPathId.keys && it.muscleGroup == null })
         val fills = MuscleMapColors.heatmapFills(MuscleHeatmapAssembler.assemble(emptyList(), today))
         assertTrue(fills.keys.all { it in MuscleHeatmapAssembler.anatomicalGroups })
         assertFalse(fills.containsKey(MuscleGroup.FULL_BODY))

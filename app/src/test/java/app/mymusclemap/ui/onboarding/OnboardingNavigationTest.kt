@@ -225,6 +225,8 @@ class OnboardingNavigationTest {
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithText("Measurement units").assertIsDisplayed()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
+        composeRule.onNodeWithText("Muscle map body model").assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithText("Set a weekly workout goal").assertIsDisplayed()
         composeRule.onNodeWithTag(ONBOARDING_SKIP).performClick()
         composeRule.onNodeWithText("Create workout plan").assertIsDisplayed()
@@ -278,6 +280,7 @@ class OnboardingNavigationTest {
                 }
             }
         }
+        composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithText("Not now").performClick()

@@ -115,6 +115,7 @@ class FounderInvitationHandoffTest {
         assertEquals(OnboardingStep.Welcome, viewModel.step.value)
         viewModel.onContinue()
         viewModel.onContinue()
+        viewModel.onContinue()
         assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.value)
         viewModel.onWeeklyGoalSkipped()
         assertEquals(OnboardingStep.CreatePlan, viewModel.step.value)
@@ -131,6 +132,7 @@ class FounderInvitationHandoffTest {
         val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
         viewModel.onContinue()
         viewModel.onContinue()
+        viewModel.onContinue()
         assertEquals(OnboardingStep.FounderInvitation, viewModel.step.first { it == OnboardingStep.FounderInvitation })
         assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
         viewModel.onDeclineFounder()
@@ -143,6 +145,7 @@ class FounderInvitationHandoffTest {
     fun joinEnrollsOnceAndContinuesOnboarding() = runTest {
         firstRun.prepare()
         val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
+        viewModel.onContinue()
         viewModel.onContinue()
         viewModel.onContinue()
         viewModel.step.first { it == OnboardingStep.FounderInvitation }
@@ -166,12 +169,14 @@ class FounderInvitationHandoffTest {
         val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
         viewModel.onContinue()
         viewModel.onContinue()
+        viewModel.onContinue()
         viewModel.step.first { it == OnboardingStep.FounderInvitation }
         viewModel.onDeclineFounder()
         viewModel.step.first { it == OnboardingStep.WeeklyGoal }
         assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
         assertTrue(acknowledgements.load().invitationHandled)
         val restarted = onboardingViewModel(FounderProgramAvailability.Open)
+        restarted.onContinue()
         restarted.onContinue()
         restarted.onContinue()
         assertEquals(OnboardingStep.WeeklyGoal, restarted.step.first { it == OnboardingStep.WeeklyGoal })

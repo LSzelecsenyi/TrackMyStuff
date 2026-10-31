@@ -10,6 +10,7 @@ import android.graphics.RectF
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.toArgb
 import app.mymusclemap.domain.exercise.MuscleGroup
+import app.mymusclemap.ui.components.musclemap.artwork.MaleMuscleMapGeometry
 import kotlin.math.roundToInt
 
 /**
@@ -76,6 +77,7 @@ object MuscleMapFigurePainter {
         edgeLightColor: Int = 0
     ) {
         val destination = RectF(0f, 0f, viewWidth, viewHeight)
+        val strokeScale = viewWidth / MaleMuscleMapGeometry.FIGURE_WIDTH
         val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         canvas.drawBitmap(anatomy, null, destination, bitmapPaint)
         val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -89,8 +91,8 @@ object MuscleMapFigurePainter {
             strokeJoin = Paint.Join.ROUND
             strokeCap = Paint.Cap.ROUND
         }
-        val darkEdge = if (edgeDarkWidth > 0f) edgePaint(edgeDarkWidth, edgeDarkColor) else null
-        val lightEdge = if (edgeLightWidth > 0f) edgePaint(edgeLightWidth, edgeLightColor) else null
+        val darkEdge = if (edgeDarkWidth > 0f) edgePaint(edgeDarkWidth * strokeScale, edgeDarkColor) else null
+        val lightEdge = if (edgeLightWidth > 0f) edgePaint(edgeLightWidth * strokeScale, edgeLightColor) else null
         regions.forEach { parsed ->
             val group = parsed.region.muscleGroup
             val fill = group?.let { fills[it] } ?: unmappedFill
@@ -108,9 +110,9 @@ object MuscleMapFigurePainter {
                 else -> outline.toArgb()
             }
             strokePaint.strokeWidth = if (isSelected) {
-                MUSCLE_MAP_SELECTED_STROKE_WIDTH
+                MUSCLE_MAP_SELECTED_STROKE_WIDTH * strokeScale
             } else {
-                MUSCLE_MAP_STROKE_WIDTH
+                MUSCLE_MAP_STROKE_WIDTH * strokeScale
             }
             canvas.drawPath(path, strokePaint)
             if (lightEdge != null && darkEdge != null) {

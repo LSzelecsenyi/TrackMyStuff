@@ -357,7 +357,10 @@ fun WeightTrackerNavHost(
     onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {},
     selectedUnitSystem: app.mymusclemap.domain.units.UnitSystem =
         app.mymusclemap.domain.units.UnitSystem.METRIC,
-    onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit = {}
+    onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit = {},
+    selectedBodyModel: app.mymusclemap.domain.musclemap.MuscleMapBodyModel =
+        app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE,
+    onBodyModelSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit = {}
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -749,6 +752,8 @@ fun WeightTrackerNavHost(
                     onLanguageSelected = onLanguageSelected,
                     selectedUnitSystem = selectedUnitSystem,
                     onUnitSystemSelected = onUnitSystemSelected,
+                    selectedBodyModel = selectedBodyModel,
+                    onBodyModelSelected = onBodyModelSelected,
                     onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) }
                 )
             }
@@ -1782,6 +1787,8 @@ private fun SettingsRoute(
     onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit,
     selectedUnitSystem: app.mymusclemap.domain.units.UnitSystem,
     onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit,
+    selectedBodyModel: app.mymusclemap.domain.musclemap.MuscleMapBodyModel,
+    onBodyModelSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit,
     showFounderProgram: Boolean,
     showFounderBadge: Boolean,
     onOpenHealthDetails: () -> Unit
@@ -1926,6 +1933,8 @@ private fun SettingsRoute(
         onLanguageSelected = onLanguageSelected,
         selectedUnitSystem = selectedUnitSystem,
         onUnitSystemSelected = onUnitSystemSelected,
+        selectedBodyModel = selectedBodyModel,
+        onBodyModelSelected = onBodyModelSelected,
         showFounderProgram = showFounderProgram,
         showFounderBadge = showFounderBadge,
         onMessageConsumed = viewModel::consumeMessage,

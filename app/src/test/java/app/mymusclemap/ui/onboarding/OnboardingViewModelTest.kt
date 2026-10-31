@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.mymusclemap.MainDispatcherRule
+import app.mymusclemap.domain.musclemap.MuscleMapBodyModel
 import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.ExerciseRepository
@@ -67,6 +68,8 @@ class OnboardingViewModelTest {
         viewModel.onContinue()
         assertEquals(OnboardingStep.MeasurementUnits, viewModel.step.value)
         viewModel.onContinue()
+        assertEquals(OnboardingStep.BodyModel, viewModel.step.value)
+        viewModel.onContinue()
         assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.value)
         viewModel.onWeeklyGoalSkipped()
         assertEquals(OnboardingStep.CreatePlan, viewModel.step.value)
@@ -81,11 +84,31 @@ class OnboardingViewModelTest {
     fun skipMarksOnboardingStartedWithoutOpeningTemplateEditor() = runTest {
         viewModel.onContinue()
         viewModel.onContinue()
+        viewModel.onContinue()
         viewModel.onWeeklyGoalSkipped()
         viewModel.onSkip()
         assertEquals(OnboardingExit.Dismiss, viewModel.exit.first { it != null })
         assertTrue(themePreferences.isOnboardingStarted())
         assertFalse(themePreferences.isOnboardingCompleted())
         assertEquals(FirstRunDecision.Ready, coordinator.prepare())
+    }
+
+    @Test
+    fun bodyModelSelectionPersistsAndDefaultsToMale() = runTest {
+        val saved = mutableListOf<MuscleMapBodyModel>()
+        val choosing = OnboardingViewModel(
+            coordinator,
+            initialBodyModel = MuscleMapBodyModel.MALE,
+            persistBodyModel = { saved += it }
+        )
+        assertEquals(MuscleMapBodyModel.MALE, choosing.selectedBodyModel.value)
+        choosing.onContinue()
+        choosing.onContinue()
+        assertEquals(OnboardingStep.BodyModel, choosing.step.value)
+        choosing.onBodyModelSelected(MuscleMapBodyModel.FEMALE)
+        assertEquals(listOf(MuscleMapBodyModel.FEMALE), saved)
+        choosing.onContinue()
+        assertEquals(listOf(MuscleMapBodyModel.FEMALE, MuscleMapBodyModel.FEMALE), saved)
+        assertEquals(OnboardingStep.WeeklyGoal, choosing.step.value)
     }
 }

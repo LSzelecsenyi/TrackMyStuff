@@ -33,8 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
 import androidx.compose.ui.unit.isSpecified
 import app.mymusclemap.domain.exercise.MuscleGroup
+import app.mymusclemap.domain.musclemap.MuscleMapBodyModel
 import app.mymusclemap.ui.components.musclemap.artwork.MuscleArtworkRegion
 import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapArtworkSelector
+import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapFigureArtwork
 import app.mymusclemap.ui.components.musclemap.artwork.MuscleMapView
 import kotlin.math.min
 
@@ -45,12 +47,15 @@ data class ParsedMuscleRegion(
 )
 
 @Composable
-fun rememberParsedMuscleRegions(): List<ParsedMuscleRegion> {
-    return remember { parseMuscleRegions() }
+fun rememberParsedMuscleRegions(
+    bodyModel: MuscleMapBodyModel = LocalMuscleMapBodyModel.current
+): List<ParsedMuscleRegion> {
+    return remember(bodyModel) { parseMuscleRegions(MuscleMapArtworkSelector.select(bodyModel)) }
 }
 
-fun parseMuscleRegions(): List<ParsedMuscleRegion> {
-    val artwork = MuscleMapArtworkSelector.current()
+fun parseMuscleRegions(
+    artwork: MuscleMapFigureArtwork = MuscleMapArtworkSelector.current()
+): List<ParsedMuscleRegion> {
     return artwork.regions.map { region ->
         val parser = PathParser()
         parser.parsePathString(region.pathData)
@@ -91,8 +96,10 @@ fun MuscleMap(
     maxFigureHeight: Dp = Dp.Unspecified
 ) {
     val context = LocalContext.current
-    val anatomy = remember { MuscleMapAnatomy.load(context) }
-    val parsed = rememberParsedMuscleRegions()
+    val bodyModel = LocalMuscleMapBodyModel.current
+    val artwork = remember(bodyModel) { MuscleMapArtworkSelector.select(bodyModel) }
+    val anatomy = remember(artwork.anatomyAsset) { MuscleMapAnatomy.load(context, artwork) }
+    val parsed = rememberParsedMuscleRegions(bodyModel)
     val front = remember(parsed) {
         paintOrderedRegions(parsed.filter { it.region.view == MuscleMapView.FRONT })
     }
@@ -121,12 +128,14 @@ fun MuscleMap(
         val pair = muscleMapPairLayout(
             availableWidth = availableWidth,
             gap = MUSCLE_MAP_FIGURE_GAP,
-            maxFigureHeight = heightCap
+            maxFigureHeight = heightCap,
+            aspect = artwork.viewHeight / artwork.viewWidth
         )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(pair.figureHeight)
+                .testTag("muscle_map_${bodyModel.name}")
                 .then(semanticsModifier),
             horizontalArrangement = Arrangement.spacedBy(pair.gap, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.Top
@@ -135,6 +144,7 @@ fun MuscleMap(
                 .width(pair.figureWidth)
                 .height(pair.figureHeight)
             MuscleFigure(
+                artwork = artwork,
                 regions = front,
                 anatomy = anatomy.front,
                 lighting = anatomy.frontLighting,
@@ -150,6 +160,7 @@ fun MuscleMap(
                 modifier = figureModifier
             )
             MuscleFigure(
+                artwork = artwork,
                 regions = back,
                 anatomy = anatomy.back,
                 lighting = anatomy.backLighting,
@@ -170,6 +181,7 @@ fun MuscleMap(
 
 @Composable
 private fun MuscleFigure(
+    artwork: MuscleMapFigureArtwork,
     regions: List<ParsedMuscleRegion>,
     anatomy: android.graphics.Bitmap,
     lighting: android.graphics.Bitmap,
@@ -184,14 +196,13 @@ private fun MuscleFigure(
     testTag: String,
     modifier: Modifier
 ) {
-    val artwork = MuscleMapArtworkSelector.current()
     Canvas(
         modifier = modifier
             .testTag(testTag)
             .pointerInput(regions, interactive) {
                 if (!interactive) return@pointerInput
                 detectTapGestures { offset ->
-                    val layout = figureLayout(size.width.toFloat(), size.height.toFloat())
+                    val layout = figureLayout(size.width.toFloat(), size.height.toFloat(), artwork)
                     val svg = Offset(
                         (offset.x - layout.offsetX) / layout.scale,
                         (offset.y - layout.offsetY) / layout.scale
@@ -200,7 +211,7 @@ private fun MuscleFigure(
                 }
             }
     ) {
-        val layout = figureLayout(size.width, size.height)
+        val layout = figureLayout(size.width, size.height, artwork)
         drawIntoCanvas { composeCanvas ->
             val native = composeCanvas.nativeCanvas
             native.save()
@@ -249,7 +260,8 @@ internal data class MuscleMapPairLayout(
 internal fun muscleMapPairLayout(
     availableWidth: Dp,
     gap: Dp = MUSCLE_MAP_FIGURE_GAP,
-    maxFigureHeight: Dp = Dp.Unspecified
+    maxFigureHeight: Dp = Dp.Unspecified,
+    aspect: Float = MUSCLE_MAP_ASPECT
 ): MuscleMapPairLayout {
     val boundedWidth = if (!availableWidth.isSpecified || !availableWidth.isFinite || availableWidth < 0.dp) {
         0.dp
@@ -257,7 +269,7 @@ internal fun muscleMapPairLayout(
         availableWidth
     }
     val naturalWidth = ((boundedWidth - gap) / 2f).coerceAtLeast(0.dp)
-    val naturalHeight = naturalWidth * MUSCLE_MAP_ASPECT
+    val naturalHeight = naturalWidth * aspect
     val figureHeight = if (maxFigureHeight.isSpecified && naturalHeight > maxFigureHeight) {
         maxFigureHeight
     } else {
@@ -266,7 +278,7 @@ internal fun muscleMapPairLayout(
     val figureWidth = if (figureHeight == naturalHeight) {
         naturalWidth
     } else {
-        (figureHeight / MUSCLE_MAP_ASPECT).coerceAtLeast(0.dp)
+        (figureHeight / aspect).coerceAtLeast(0.dp)
     }
     return MuscleMapPairLayout(
         figureWidth = figureWidth,
@@ -281,8 +293,11 @@ internal data class FigureLayout(
     val offsetY: Float
 )
 
-internal fun figureLayout(width: Float, height: Float): FigureLayout {
-    val artwork = MuscleMapArtworkSelector.current()
+internal fun figureLayout(
+    width: Float,
+    height: Float,
+    artwork: MuscleMapFigureArtwork = MuscleMapArtworkSelector.current()
+): FigureLayout {
     val scale = min(
         width / artwork.viewWidth,
         height / artwork.viewHeight

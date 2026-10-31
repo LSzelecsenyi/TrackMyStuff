@@ -1644,6 +1644,12 @@
     <string name="units_imperial_detail">lb · in · mi</string>
     <string name="onboarding_units_title">Mértékegységek</string>
     <string name="onboarding_units_body">Válaszd ki, hogyan mutassa a Strict a súlyt, a testméreteket és a távolságot. Később a Beállításokban módosíthatod.</string>
+    <string name="settings_body_model">Izomtérkép-testmodell</string>
+    <string name="settings_body_model_body">Az izom-hőtérkép ezt a testmodellt használja. Az edzéselőzmények nem változnak.</string>
+    <string name="body_model_male">Férfi</string>
+    <string name="body_model_female">Nő</string>
+    <string name="onboarding_body_model_title">Izomtérkép-testmodell</string>
+    <string name="onboarding_body_model_body">Válaszd ki az izomtérképen használt testmodellt. Később a Beállításokban módosíthatod.</string>
     <string name="language_hungarian">Magyar</string>
     <string name="language_english">English</string>
     <string name="billing_period_week">Hetente</string>

@@ -5,6 +5,7 @@ import app.mymusclemap.domain.exercise.ExerciseEnumCodec
 import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.StarterCatalog
 import app.mymusclemap.domain.musclemap.MuscleHeatmapAssembler
+import app.mymusclemap.domain.musclemap.MuscleMapBodyModel
 import app.mymusclemap.domain.musclemap.MuscleRecencyBand
 import app.mymusclemap.domain.musclemap.MuscleTrainingExercise
 import app.mymusclemap.domain.workout.SessionStatus
@@ -15,7 +16,6 @@ import app.mymusclemap.ui.components.musclemap.pathContains
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,8 +72,8 @@ class MaleMuscleMapTest {
 
     @Test
     fun sourceSvgMatchesTheRepositoryOriginalAndHasNoDuplicateIds() {
-        val copy = moduleFile("src/main/assets/musclemap/male/male_msucle_map.svg")
-        val original = moduleFile("../male_msucle_map.svg")
+        val copy = moduleFile("src/main/assets/musclemap/male/male_muscle_map.svg")
+        val original = moduleFile("../male_muscle_map.svg")
         assertEquals(original.readBytes().size, copy.readBytes().size)
         assertTrue(original.readBytes().contentEquals(copy.readBytes()))
         val factory = DocumentBuilderFactory.newInstance()
@@ -103,13 +103,17 @@ class MaleMuscleMapTest {
     }
 
     @Test
-    fun femaleArtworkIsNotFabricatedAndMaleRemainsTheOnlyVisualization() {
-        assertNull(MuscleMapArtworkSelector.femaleOrNull())
-        assertEquals(MuscleMapSex.MALE, MuscleMapArtworkSelector.select(MuscleMapSex.FEMALE).sex)
-        assertEquals(MuscleMapSex.MALE, MuscleMapArtworkSelector.select(MuscleMapSex.MALE).sex)
+    fun maleArtworkStaysTheDefaultAndDoesNotUseTheOldUnnamedOblique() {
+        assertEquals(MuscleMapBodyModel.MALE, MuscleMapArtworkSelector.select().bodyModel)
+        assertEquals(MuscleMapBodyModel.MALE, MuscleMapArtworkSelector.current().bodyModel)
+        assertTrue(MaleMuscleMapGeometry.paths.none { it.id == "path27" })
         assertEquals(
-            MuscleMapArtworkSelector.current().regions.map { it.id },
-            MuscleMapArtworkSelector.select(MuscleMapSex.FEMALE).regions.map { it.id }
+            MuscleGroup.OBLIQUES,
+            MuscleMapArtworkSelector.select().regions.first { it.id == "obliques_back" }.muscleGroup
+        )
+        assertEquals(
+            MuscleMapView.BACK,
+            MaleMuscleMapGeometry.paths.first { it.id == "obliques_back" }.view
         )
     }
 
@@ -282,7 +286,7 @@ class MaleMuscleMapTest {
             "neck_back" to MuscleGroup.NECK,
             "serratus" to MuscleGroup.SERRATUS,
             "obliques_front" to MuscleGroup.OBLIQUES,
-            "path27" to MuscleGroup.OBLIQUES,
+            "obliques_back" to MuscleGroup.OBLIQUES,
             "forearms_back" to MuscleGroup.FOREARMS
         )
     }

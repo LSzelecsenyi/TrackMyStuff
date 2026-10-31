@@ -29,6 +29,7 @@ import app.mymusclemap.data.repository.WeeklyGoalRepository
 import app.mymusclemap.data.repository.WorkoutTemplateRepository
 import app.mymusclemap.data.workoutimport.WorkoutImportFileReader
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.musclemap.MuscleMapBodyModel
 import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.entitlement.FeatureEntitlements
 import app.mymusclemap.domain.entitlement.FounderProgramAvailability
@@ -101,7 +102,9 @@ class WeightViewModelFactory(
     private val entitlementChanges: Flow<Int> = flowOf(0),
     private val unitSystem: StateFlow<UnitSystem> = MutableStateFlow(UnitSystem.METRIC),
     private val initialUnitSystem: UnitSystem = UnitSystem.METRIC,
-    private val persistUnitSystem: suspend (UnitSystem) -> Unit = {}
+    private val persistUnitSystem: suspend (UnitSystem) -> Unit = {},
+    private val initialBodyModel: MuscleMapBodyModel = MuscleMapBodyModel.MALE,
+    private val persistBodyModel: suspend (MuscleMapBodyModel) -> Unit = {}
 ) : ViewModelProvider.Factory {
     private val accessDecisions = freeAccessRepository?.decisions()
         ?: flowOf(app.mymusclemap.domain.entitlement.FreeAccessLogic.unknown())
@@ -173,7 +176,9 @@ class WeightViewModelFactory(
                     founderAvailability,
                     founderJoin,
                     initialUnitSystem = initialUnitSystem,
-                    persistUnitSystem = persistUnitSystem
+                    persistUnitSystem = persistUnitSystem,
+                    initialBodyModel = initialBodyModel,
+                    persistBodyModel = persistBodyModel
                 )
             }
             modelClass.isAssignableFrom(OnboardingGuideViewModel::class.java) -> {

@@ -61,7 +61,9 @@ import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.ui.founder.AppLaunchStage
 import app.mymusclemap.ui.founder.FounderProgramViewModel
 import app.mymusclemap.ui.navigation.WeightTrackerNavHost
+import app.mymusclemap.ui.components.musclemap.LocalMuscleMapBodyModel
 import app.mymusclemap.ui.units.LocalUnitSystem
+import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
 import app.mymusclemap.ui.onboarding.OnboardingExit
 import app.mymusclemap.ui.onboarding.OnboardingScreen
 import app.mymusclemap.ui.onboarding.OnboardingViewModel
@@ -123,6 +125,7 @@ class MainActivity : AppCompatActivity() {
                 initialValue = AppearanceSettings.Default
             )
             val units by app.unitSystems.system.collectAsStateWithLifecycle()
+            val bodyModel by app.bodyModels.model.collectAsStateWithLifecycle()
             LaunchedEffect(units) {
                 container.activeWorkoutNotifications.refresh()
             }
@@ -151,7 +154,8 @@ class MainActivity : AppCompatActivity() {
             }
             CompositionLocalProvider(
                 LocalFeatureEntitlements provides container.featureEntitlements,
-                LocalUnitSystem provides units
+                LocalUnitSystem provides units,
+                LocalMuscleMapBodyModel provides bodyModel
             ) {
                 WeightTrackerTheme(appearance = appearance) {
                     val otherAccounts by app.inactiveMigrationFailures.collectAsStateWithLifecycle()
@@ -190,6 +194,7 @@ class MainActivity : AppCompatActivity() {
                             val founderJoining by viewModel.founderJoining.collectAsStateWithLifecycle()
                             val founderJoinNotice by viewModel.founderJoinNotice.collectAsStateWithLifecycle()
                             val selectedUnit by viewModel.selectedUnit.collectAsStateWithLifecycle()
+                            val selectedBodyModel by viewModel.selectedBodyModel.collectAsStateWithLifecycle()
                             LaunchedEffect(exit) {
                                 val chosen = exit ?: return@LaunchedEffect
                                 openNewTemplate = chosen == OnboardingExit.OpenTemplateEditor
@@ -208,7 +213,9 @@ class MainActivity : AppCompatActivity() {
                                 founderJoining = founderJoining,
                                 founderJoinNotice = founderJoinNotice,
                                 selectedUnitSystem = selectedUnit,
-                                onUnitSystemSelected = viewModel::onUnitSystemSelected
+                                onUnitSystemSelected = viewModel::onUnitSystemSelected,
+                                selectedBodyModel = selectedBodyModel,
+                                onBodyModelSelected = viewModel::onBodyModelSelected
                             )
                         }
                         AppLaunchStage.App -> {
@@ -299,6 +306,13 @@ class MainActivity : AppCompatActivity() {
                                     lifecycleScope.launch {
                                         app.unitSystems.write(system)
                                         container.activeWorkoutNotifications.refresh()
+                                    }
+                                },
+                                selectedBodyModel = bodyModel,
+                                onBodyModelSelected = { model ->
+                                    lifecycleScope.launch {
+                                        app.bodyModels.write(model)
+                                        HeatmapWidgetUpdater.update(this@MainActivity)
                                     }
                                 },
                                 onSignOut = {

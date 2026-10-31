@@ -25,4 +25,8 @@
         domain="file"
         path="datastore/unit_system.preferences_pb"
         requireFlags="clientSideEncryption" />
+    <include
+        domain="file"
+        path="datastore/muscle_map_body_model.preferences_pb"
+        requireFlags="clientSideEncryption" />
 </full-backup-content>

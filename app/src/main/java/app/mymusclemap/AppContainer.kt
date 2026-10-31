@@ -51,6 +51,7 @@ import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
 import app.mymusclemap.data.preferences.TimerSoundPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.data.preferences.MuscleMapBodyModelPreferences
 import app.mymusclemap.data.preferences.UnitSystemPreferences
 import app.mymusclemap.domain.achievements.AccountAchievementAuthority
 import app.mymusclemap.data.repository.AchievementRepository
@@ -107,7 +108,8 @@ import java.util.concurrent.atomic.AtomicReference
 class AppContainer(
     context: Context,
     val accountUserId: String,
-    val unitSystems: UnitSystemPreferences
+    val unitSystems: UnitSystemPreferences,
+    val bodyModels: MuscleMapBodyModelPreferences
 ) {
     private val appContext = context.applicationContext
     private val clock: Clock = SystemWallClock()
@@ -218,6 +220,7 @@ class AppContainer(
         database,
         themePreferences,
         unitSystems = unitSystems,
+        bodyModels = bodyModels,
         progressPhotoStore = progressPhotoStore,
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
         onAfterRestore = {
@@ -1013,7 +1016,9 @@ class AppContainer(
             ?: app.mymusclemap.domain.units.UnitSystemSuggestion.fromRegion(
                 java.util.Locale.getDefault().country
             ),
-        persistUnitSystem = { unitSystems.write(it) }
+        persistUnitSystem = { unitSystems.write(it) },
+        initialBodyModel = bodyModels.storedOrNull() ?: app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE,
+        persistBodyModel = { bodyModels.write(it) }
     )
 }
 

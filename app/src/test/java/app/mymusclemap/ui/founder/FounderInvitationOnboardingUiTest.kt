@@ -125,6 +125,7 @@ class FounderInvitationOnboardingUiTest {
         composeRule.onNodeWithTag(FOUNDER_INVITATION).assertDoesNotExist()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
+        composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag(FOUNDER_INVITATION).fetchSemanticsNodes().size == 1
         }
@@ -149,6 +150,7 @@ class FounderInvitationOnboardingUiTest {
         )
         show(viewModel)
         composeRule.onNodeWithText(testString(R.string.brand_tagline)).assertIsDisplayed()
+        composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithText(testString(R.string.weekly_goal_onboarding_title)).assertIsDisplayed()

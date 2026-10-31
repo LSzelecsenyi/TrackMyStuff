@@ -210,7 +210,10 @@ fun SettingsScreen(
     onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {},
     selectedUnitSystem: app.mymusclemap.domain.units.UnitSystem =
         app.mymusclemap.domain.units.UnitSystem.METRIC,
-    onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit = {}
+    onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit = {},
+    selectedBodyModel: app.mymusclemap.domain.musclemap.MuscleMapBodyModel =
+        app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE,
+    onBodyModelSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
@@ -279,6 +282,11 @@ fun SettingsScreen(
                 MeasurementUnitsSection(
                     selected = selectedUnitSystem,
                     onSelected = onUnitSystemSelected
+                )
+                CompactEditorDivider()
+                MuscleMapBodyModelSection(
+                    selected = selectedBodyModel,
+                    onSelected = onBodyModelSelected
                 )
                 CompactEditorDivider()
                 AppearanceSection(
@@ -564,6 +572,36 @@ private fun MeasurementUnitsSection(
                 selected = selected == app.mymusclemap.domain.units.UnitSystem.IMPERIAL,
                 testTag = "settings-units-imperial",
                 onClick = { onSelected(app.mymusclemap.domain.units.UnitSystem.IMPERIAL) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MuscleMapBodyModelSection(
+    selected: app.mymusclemap.domain.musclemap.MuscleMapBodyModel,
+    onSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit
+) {
+    CompactEditorSection(title = settingsKicker(stringResource(R.string.settings_body_model))) {
+        Text(
+            text = stringResource(R.string.settings_body_model_body),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("settings-body-model")
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        Column(modifier = Modifier.selectableGroup()) {
+            ChoiceRow(
+                label = stringResource(R.string.body_model_male),
+                selected = selected == app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE,
+                testTag = "settings-body-model-male",
+                onClick = { onSelected(app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE) }
+            )
+            ChoiceRow(
+                label = stringResource(R.string.body_model_female),
+                selected = selected == app.mymusclemap.domain.musclemap.MuscleMapBodyModel.FEMALE,
+                testTag = "settings-body-model-female",
+                onClick = { onSelected(app.mymusclemap.domain.musclemap.MuscleMapBodyModel.FEMALE) }
             )
         }
     }

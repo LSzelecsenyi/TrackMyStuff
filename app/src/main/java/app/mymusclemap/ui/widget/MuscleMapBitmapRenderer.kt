@@ -49,10 +49,10 @@ object MuscleMapBitmapRenderer {
         chrome: MuscleMapBitmapChrome
     ): MuscleMapBitmaps {
         val (width, height) = pixelSize(widthPx, heightPx)
-        val parsed = parseMuscleRegions()
-        val fills = MuscleMapColors.heatmapFills(state)
-        val anatomy = MuscleMapAnatomy.load(context)
         val artwork = MuscleMapArtworkSelector.current()
+        val parsed = parseMuscleRegions(artwork)
+        val fills = MuscleMapColors.heatmapFills(state)
+        val anatomy = MuscleMapAnatomy.load(context, artwork)
         return MuscleMapBitmaps(
             front = drawFigure(
                 anatomy = anatomy.front,
@@ -63,7 +63,8 @@ object MuscleMapBitmapRenderer {
                 heightPx = height,
                 chrome = chrome,
                 viewWidth = artwork.viewWidth,
-                viewHeight = artwork.viewHeight
+                viewHeight = artwork.viewHeight,
+                artwork = artwork
             ),
             back = drawFigure(
                 anatomy = anatomy.back,
@@ -74,7 +75,8 @@ object MuscleMapBitmapRenderer {
                 heightPx = height,
                 chrome = chrome,
                 viewWidth = artwork.viewWidth,
-                viewHeight = artwork.viewHeight
+                viewHeight = artwork.viewHeight,
+                artwork = artwork
             )
         )
     }
@@ -105,11 +107,12 @@ object MuscleMapBitmapRenderer {
         heightPx: Int,
         chrome: MuscleMapBitmapChrome,
         viewWidth: Float,
-        viewHeight: Float
+        viewHeight: Float,
+        artwork: app.mymusclemap.ui.components.musclemap.artwork.MuscleMapFigureArtwork
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bitmap)
-        val layout = figureLayout(widthPx.toFloat(), heightPx.toFloat())
+        val layout = figureLayout(widthPx.toFloat(), heightPx.toFloat(), artwork)
         canvas.save()
         canvas.translate(layout.offsetX, layout.offsetY)
         canvas.scale(layout.scale, layout.scale)

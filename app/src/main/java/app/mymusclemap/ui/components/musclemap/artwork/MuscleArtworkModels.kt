@@ -5,11 +5,7 @@
 package app.mymusclemap.ui.components.musclemap.artwork
 
 import app.mymusclemap.domain.exercise.MuscleGroup
-
-enum class MuscleMapSex {
-    MALE,
-    FEMALE
-}
+import app.mymusclemap.domain.musclemap.MuscleMapBodyModel
 
 enum class MuscleMapView {
     FRONT,
@@ -22,6 +18,13 @@ enum class AnatomicalSide {
     CENTRAL
 }
 
+internal data class MuscleArtworkPath(
+    val id: String,
+    val inkscapeLabel: String,
+    val view: MuscleMapView,
+    val pathData: String
+)
+
 data class MuscleArtworkRegion(
     val id: String,
     val view: MuscleMapView,
@@ -31,7 +34,7 @@ data class MuscleArtworkRegion(
 )
 
 data class MuscleMapFigureArtwork(
-    val sex: MuscleMapSex,
+    val bodyModel: MuscleMapBodyModel,
     val viewWidth: Float,
     val viewHeight: Float,
     val splitX: Float,
