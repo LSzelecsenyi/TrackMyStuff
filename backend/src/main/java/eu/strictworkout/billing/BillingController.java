@@ -4,6 +4,7 @@ import eu.strictworkout.auth.StrictUserAuthentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,6 +43,24 @@ class BillingController {
             case NOT_CONFIGURED, UNAVAILABLE -> ResponseEntity.status(503).body(Map.of("status", outcome.status().name()));
             case CONFLICT -> ResponseEntity.status(409).body(Map.of("status", "CONFLICT"));
             default -> ResponseEntity.badRequest().body(Map.of("status", outcome.status().name()));
+        };
+    }
+
+    @GetMapping("/api/v1/billing/subscriptions/current")
+    ResponseEntity<?> current() {
+        UUID user = currentUser();
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("status", "UNAUTHENTICATED"));
+        }
+        PlaySubscriptionService.Outcome outcome = subscriptions.current(user);
+        return switch (outcome.status()) {
+            case VERIFIED -> ResponseEntity.ok(body(outcome.subscription()));
+            case ABSENT -> ResponseEntity.ok(Map.of("status", "ABSENT"));
+            case NOT_CONFIGURED, UNAVAILABLE ->
+                    ResponseEntity.status(503).body(Map.of("status", outcome.status().name()));
+            case CONFLICT -> ResponseEntity.status(409).body(Map.of("status", "CONFLICT"));
+            case INVALID_TOKEN, PRODUCT_MISMATCH, PACKAGE_MISMATCH, DUPLICATE ->
+                    ResponseEntity.badRequest().body(Map.of("status", outcome.status().name()));
         };
     }
 

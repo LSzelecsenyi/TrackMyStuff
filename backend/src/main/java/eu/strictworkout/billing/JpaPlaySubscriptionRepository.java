@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 class JpaPlaySubscriptionRepository implements PlaySubscriptionRepository {
@@ -28,6 +29,16 @@ class JpaPlaySubscriptionRepository implements PlaySubscriptionRepository {
     @Override
     public Optional<StoredPlaySubscription> find(String tokenHash) {
         return subscriptions.findById(tokenHash).map(PlaySubscriptionEntity::toRecord);
+    }
+
+    @Override
+    public Optional<StoredPlaySubscription> findLinked(UUID userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return subscriptions.findByLinkedUserIdOrderByUpdatedAtDesc(userId).stream()
+                .findFirst()
+                .map(PlaySubscriptionEntity::toRecord);
     }
 
     @Override

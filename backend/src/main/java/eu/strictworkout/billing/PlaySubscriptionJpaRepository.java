@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 interface PlaySubscriptionJpaRepository extends JpaRepository<PlaySubscriptionEntity, String> {
 
@@ -21,7 +22,9 @@ interface PlaySubscriptionJpaRepository extends JpaRepository<PlaySubscriptionEn
             and subscription.entitled = true
             and subscription.expiryTime > :now
             """)
-    boolean hasEntitledSubscription(@Param("userId") java.util.UUID userId, @Param("now") Instant now);
+    boolean hasEntitledSubscription(@Param("userId") UUID userId, @Param("now") Instant now);
+
+    List<PlaySubscriptionEntity> findByLinkedUserIdOrderByUpdatedAtDesc(UUID linkedUserId);
 }
 
 interface PlayRtdnMessageJpaRepository extends JpaRepository<PlayRtdnMessageEntity, String> {

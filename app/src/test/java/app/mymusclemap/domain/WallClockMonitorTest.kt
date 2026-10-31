@@ -54,6 +54,19 @@ class WallClockMonitorTest {
     }
 
     @Test
+    fun rearmSelectsAFutureBoundaryAndDoesNotRepeatAPastOne() {
+        var expiry = boundary
+        val monitor = WallClockMonitor { now -> expiry.takeIf { now.isBefore(it) } }
+        assertFalse(monitor.onSample(morning, LocalDate.of(2026, 3, 11)).boundaryReached)
+        assertTrue(monitor.onSample(boundary, LocalDate.of(2026, 3, 11)).boundaryReached)
+        expiry = boundary.plusSeconds(600)
+        monitor.rearm(boundary.plusSeconds(30))
+        assertFalse(monitor.onSample(boundary.plusSeconds(60), LocalDate.of(2026, 3, 11)).boundaryReached)
+        assertTrue(monitor.onSample(expiry, LocalDate.of(2026, 3, 11)).boundaryReached)
+        assertFalse(monitor.onSample(expiry.plusSeconds(30), LocalDate.of(2026, 3, 11)).boundaryReached)
+    }
+
+    @Test
     fun sameInstantAcrossZonesReportsOneDayChange() {
         val monitor = WallClockMonitor { null }
         val instant = Instant.parse("2026-03-28T23:30:00Z")

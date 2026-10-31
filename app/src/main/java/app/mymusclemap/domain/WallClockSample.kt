@@ -15,7 +15,7 @@ data class WallClockSample(
 /**
  * Decides when a wall-clock sample should refresh time-sensitive business rules.
  * The first sample only arms the next boundary. Later samples report a calendar-day
- * change once, and each promotion boundary instant at most once.
+ * change once, and each armed boundary instant at most once.
  */
 class WallClockMonitor(
     private val nextBoundary: (Instant) -> Instant?
@@ -41,5 +41,10 @@ class WallClockMonitor(
         val boundaryReached = due != null && !instant.isBefore(due) && firedBoundaries.add(due)
         armedBoundary = nextBoundary(instant)
         return Effect(dayChanged = dayChanged, boundaryReached = boundaryReached)
+    }
+
+    /** Points the next boundary at whatever is still ahead of [instant]. Does not fire one. */
+    fun rearm(instant: Instant) {
+        armedBoundary = nextBoundary(instant)
     }
 }

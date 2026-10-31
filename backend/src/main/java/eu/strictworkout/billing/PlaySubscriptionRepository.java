@@ -25,6 +25,12 @@ record StoredPlaySubscription(
 interface PlaySubscriptionRepository {
     Optional<StoredPlaySubscription> find(String tokenHash);
 
+    /**
+     * The newest subscription linked to this account. Empty when the user has none.
+     * The caller decides whether to re-read Play; this lookup does not write.
+     */
+    Optional<StoredPlaySubscription> findLinked(UUID userId);
+
     StoredPlaySubscription save(StoredPlaySubscription subscription);
 
     List<StoredPlaySubscription> reconciliationCandidates(Instant now);

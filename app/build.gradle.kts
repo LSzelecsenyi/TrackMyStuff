@@ -222,7 +222,7 @@ android {
         minSdk = 26
         targetSdk = 37
         // First Play upload. versionCode must increase for every later upload. Do not lower it.
-        versionCode = 2
+        versionCode = 4
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -443,6 +443,21 @@ dependencies {
     testImplementation(libs.androidx.glance.appwidget.testing)
 }
 
+fun configuredBillingProductIds(raw: String): List<String> {
+    return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+}
+
+fun releaseBillingProductFailure(): String? {
+    if (configuredBillingProductIds(strictBillingProductIds).isNotEmpty()) {
+        return null
+    }
+    return "Release packaging requires at least one Google Play Billing product ID. " +
+        "The current subscription is strict_pro. Set strict.billing.productIds=strict_pro in " +
+        "gitignored local.properties, or export STRICT_BILLING_PRODUCT_IDS=strict_pro. " +
+        "An empty value is ignored. Debug and dev builds are not blocked. " +
+        "This check does not contact Google Play or the backend."
+}
+
 fun requestsProdReleaseArtifact(name: String): Boolean {
     return name == "assembleRelease" ||
         name == "bundleRelease" ||
@@ -454,6 +469,25 @@ fun requestsProdReleaseArtifact(name: String): Boolean {
 
 fun requestsDevArtifact(name: String): Boolean {
     return name == "assembleDev" || name == "packageDev"
+}
+
+tasks.register("checkReleaseBilling") {
+    group = "verification"
+    description = "Checks the release Play Billing product ID without packaging a release artifact."
+    doLast {
+        val failure = releaseBillingProductFailure()
+        if (failure != null) {
+            error(failure)
+        }
+        logger.lifecycle(
+            "Release billing is configured. Product IDs: " +
+                configuredBillingProductIds(strictBillingProductIds).joinToString(",") +
+                ". applicationId=${android.defaultConfig.applicationId}. " +
+                "versionCode=${android.defaultConfig.versionCode}. " +
+                "versionName=${android.defaultConfig.versionName}. " +
+                "api=$strictReleaseApiUrl."
+        )
+    }
 }
 
 tasks.register("checkReleaseSigning") {
@@ -477,6 +511,9 @@ gradle.taskGraph.whenReady {
     if (!touchesProdRelease && !touchesDev) return@whenReady
     val problems = mutableListOf<String>()
     releaseSigningFailure()?.let { problems += it }
+    if (touchesProdRelease) {
+        releaseBillingProductFailure()?.let { problems += it }
+    }
     if (touchesProdRelease && strictGoogleServerClientId.isBlank()) {
         problems += "Release packaging requires the Web OAuth client ID. Set " +
             "strict.google.serverClientId in gitignored local.properties, or " +

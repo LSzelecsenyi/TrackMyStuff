@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -178,6 +179,120 @@ class PlaySubscriptionServiceTest {
     }
 
     @Test
+    void expiredWithAFutureExpiryIsNotEntitled() {
+        UUID user = UUID.randomUUID();
+        service.verify(TOKEN, PRODUCT, user);
+        play.purchase = new PlayPurchase("com.strictworkout.app", "EXPIRED", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "GPA.1",
+                List.of(new PlayLineItem(PRODUCT, "monthly", NOW.plusSeconds(300), false)));
+        PlaySubscriptionService.Outcome current = service.current(user);
+        assertEquals(PlaySubscriptionService.Status.VERIFIED, current.status());
+        assertFalse(current.subscription().entitled());
+        assertEquals(NOW.plusSeconds(300), current.subscription().expiry());
+        assertFalse(repository.findLinked(user).orElseThrow().entitled());
+    }
+
+    @Test
+    void canceledWithAFutureExpiryStaysEntitled() {
+        UUID user = UUID.randomUUID();
+        service.verify(TOKEN, PRODUCT, user);
+        play.purchase = new PlayPurchase("com.strictworkout.app", "CANCELED", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "GPA.1",
+                List.of(new PlayLineItem(PRODUCT, "monthly", NOW.plusSeconds(3_600), false)));
+        PlaySubscriptionService.Outcome current = service.current(user);
+        assertTrue(current.subscription().entitled());
+        assertFalse(current.subscription().autoRenewing());
+        assertEquals(NOW.plusSeconds(3_600), current.subscription().expiry());
+    }
+
+    @Test
+    void unavailableAndInvalidTokenLeaveTheStoredEntitlement() {
+        UUID user = UUID.randomUUID();
+        service.verify(TOKEN, PRODUCT, user);
+        play.failure = PlayApiFailure.UNAVAILABLE;
+        assertEquals(PlaySubscriptionService.Status.UNAVAILABLE, service.current(user).status());
+        assertTrue(repository.findLinked(user).orElseThrow().entitled());
+        BillingController controller = new BillingController(
+                service,
+                new GooglePushAuthenticator("", ""),
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new eu.strictworkout.auth.StrictUserAuthentication(
+                        new eu.strictworkout.auth.StrictPrincipal(user, UUID.randomUUID())
+                )
+        );
+        try {
+            org.springframework.http.ResponseEntity<?> unavailable = controller.current();
+            assertEquals(503, unavailable.getStatusCode().value());
+            assertEquals(java.util.Map.of("status", "UNAVAILABLE"), unavailable.getBody());
+            assertFalse(String.valueOf(unavailable.getBody()).contains(TOKEN));
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+        assertTrue(repository.findLinked(user).orElseThrow().entitled());
+        play.failure = PlayApiFailure.INVALID_TOKEN;
+        assertEquals(PlaySubscriptionService.Status.INVALID_TOKEN, service.current(user).status());
+        assertTrue(repository.findLinked(user).orElseThrow().entitled());
+        assertEquals("ACTIVE", repository.findLinked(user).orElseThrow().state());
+    }
+
+    @Test
+    void aUserWithoutALinkedSubscriptionIsAbsent() {
+        int fetches = play.fetches;
+        assertEquals(PlaySubscriptionService.Status.ABSENT, service.current(UUID.randomUUID()).status());
+        assertEquals(fetches, play.fetches);
+        assertTrue(repository.rows.isEmpty());
+    }
+
+    @Test
+    void currentBelongsToTheAuthenticatedUserAndHidesThePurchaseToken() {
+        UUID owner = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        service.verify(TOKEN, PRODUCT, owner);
+        int fetches = play.fetches;
+        assertEquals(PlaySubscriptionService.Status.ABSENT, service.current(other).status());
+        assertEquals(fetches, play.fetches);
+        assertEquals(owner, repository.findLinked(owner).orElseThrow().linkedUserId());
+
+        BillingController controller = new BillingController(
+                service,
+                new GooglePushAuthenticator("", ""),
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        assertEquals(401, controller.current().getStatusCode().value());
+
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new eu.strictworkout.auth.StrictUserAuthentication(
+                        new eu.strictworkout.auth.StrictPrincipal(owner, UUID.randomUUID())
+                )
+        );
+        try {
+            play.purchase = new PlayPurchase("com.strictworkout.app", "EXPIRED", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "GPA.1",
+                    List.of(new PlayLineItem(PRODUCT, "monthly", NOW.plusSeconds(300), false)));
+            org.springframework.http.ResponseEntity<?> response = controller.current();
+            assertEquals(200, response.getStatusCode().value());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = (Map<String, Object>) response.getBody();
+            assertEquals(false, body.get("entitled"));
+            assertEquals("EXPIRED", body.get("state"));
+            assertFalse(body.containsKey("purchaseToken"));
+            assertFalse(body.values().toString().contains(TOKEN));
+
+            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                    new eu.strictworkout.auth.StrictUserAuthentication(
+                            new eu.strictworkout.auth.StrictPrincipal(other, UUID.randomUUID())
+                    )
+            );
+            org.springframework.http.ResponseEntity<?> absent = controller.current();
+            assertEquals(200, absent.getStatusCode().value());
+            assertEquals(Map.of("status", "ABSENT"), absent.getBody());
+            assertFalse(repository.findLinked(owner).orElseThrow().entitled());
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
     void rtdnPayloadDecodesTheSubscriptionToken() {
         String notification = """
                 {"packageName":"com.strictworkout.app","eventTimeMillis":"1503349566168","subscriptionNotification":{"notificationType":4,"purchaseToken":"token-1"}}
@@ -240,6 +355,13 @@ class PlaySubscriptionServiceTest {
         @Override
         public Optional<StoredPlaySubscription> find(String tokenHash) {
             return Optional.ofNullable(rows.get(tokenHash));
+        }
+
+        @Override
+        public Optional<StoredPlaySubscription> findLinked(UUID userId) {
+            return rows.values().stream()
+                    .filter(row -> userId != null && userId.equals(row.linkedUserId()))
+                    .max(Comparator.comparing(StoredPlaySubscription::updatedAt));
         }
 
         @Override

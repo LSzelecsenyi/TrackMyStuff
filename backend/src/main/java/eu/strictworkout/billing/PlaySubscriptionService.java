@@ -21,7 +21,8 @@ public final class PlaySubscriptionService {
         PACKAGE_MISMATCH,
         CONFLICT,
         DUPLICATE,
-        UNAVAILABLE
+        UNAVAILABLE,
+        ABSENT
     }
 
     public record Outcome(Status status, StoredPlaySubscription subscription) {
@@ -55,6 +56,20 @@ public final class PlaySubscriptionService {
             return new Outcome(Status.PRODUCT_MISMATCH, null);
         }
         return apply(purchaseToken, claimedProductId, userId);
+    }
+
+    /**
+     * Re-reads the account's linked purchase from Play. No linked row is an absent
+     * result and writes nothing. An unavailable Play call returns before the stored
+     * entitlement is replaced.
+     */
+    public Outcome current(UUID userId) {
+        Optional<StoredPlaySubscription> linked = subscriptions.findLinked(userId);
+        if (linked.isEmpty()) {
+            return new Outcome(Status.ABSENT, null);
+        }
+        StoredPlaySubscription row = linked.get();
+        return apply(row.purchaseToken(), row.productId(), userId);
     }
 
     public Outcome onNotification(

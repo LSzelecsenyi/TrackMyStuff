@@ -73,6 +73,8 @@ import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
 import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.SystemDateProvider
 import app.mymusclemap.domain.SystemWallClock
+import app.mymusclemap.domain.applyEntitlementClock
+import app.mymusclemap.domain.billing.PlaySubscriptionClock
 import app.mymusclemap.domain.WallClockMonitor
 import app.mymusclemap.ui.workout.AppForeground
 import app.mymusclemap.domain.entitlement.EntitlementComposer
@@ -471,19 +473,30 @@ class AppContainer(context: Context, val accountUserId: String) {
         }
         founderCacheScope.launch {
             val monitor = WallClockMonitor { now ->
-                listOfNotNull(
-                    proDiscovery.snapshot().nextBoundary,
-                    welcomeBack.snapshot().nextBoundary
-                ).filter { now.isBefore(it) }.minOrNull()
+                PlaySubscriptionClock.nextBoundary(
+                    now,
+                    PlaySubscriptionClock.expiryBoundary(verifiedSubscriptions.snapshot()),
+                    listOfNotNull(
+                        proDiscovery.snapshot().nextBoundary,
+                        welcomeBack.snapshot().nextBoundary
+                    )
+                )
             }
+            var clockArmed = false
             systemDates.observeSamples().collect { sample ->
-                val effect = monitor.onSample(sample.instant, sample.today)
-                if (effect.dayChanged) {
-                    refreshFounderProgramFromStore()
+                applyEntitlementClock(
+                    effect = monitor.onSample(sample.instant, sample.today),
+                    now = sample.instant,
+                    playExpiresAt = PlaySubscriptionClock.expiryBoundary(verifiedSubscriptions.snapshot()),
+                    refreshFounderProgram = { refreshFounderProgramFromStore() },
+                    reevaluateEntitlement = { notePromotionClock() },
+                    refreshBilling = { refreshBilling() },
+                    rearm = { monitor.rearm(clock.instant()) }
+                )
+                if (clockArmed) {
+                    billing.onForegroundSample(sample.instant)
                 }
-                if (effect.dayChanged || effect.boundaryReached) {
-                    notePromotionClock()
-                }
+                clockArmed = true
             }
         }
     }
@@ -714,7 +727,9 @@ class AppContainer(context: Context, val accountUserId: String) {
     val billing = BillingCoordinator(
         gateway = billingGateway,
         verifier = billingVerifier::verify,
-        store = verifiedSubscriptions
+        store = verifiedSubscriptions,
+        current = billingVerifier::current,
+        clock = clock
     )
 
     init {

@@ -80,6 +80,16 @@ class BillingCoordinatorTest {
     }
 
     @Test
+    fun anEmptyPurchaseListDoesNotClearACachedSubscription() = runBlocking {
+        val cached = VerifiedPaidSubscription("strict_pro", Instant.parse("2026-12-01T00:00:00Z"), true, "ACTIVE", true)
+        store.save(cached)
+        gateway.snapshot = BillingSnapshot(BillingAvailability.READY, listOf(offer), purchases = emptyList())
+        coordinator { _, _ -> error("verifier must not run") }.refresh()
+        assertEquals(cached, store.saved)
+        assertEquals(0, store.clears)
+    }
+
+    @Test
     fun anOwnershipConflictDoesNotStorePro() = runBlocking {
         val coordinator = coordinator { _, _ -> BillingVerification.OwnershipConflict }
         coordinator.onUpdate(listOf(ClientPurchase("token", "strict_pro", pending = false)), null)
@@ -95,6 +105,7 @@ class BillingCoordinatorTest {
     private class MemoryStore : VerifiedSubscriptionCache {
         var saved: VerifiedPaidSubscription? = null
         var saves = 0
+        var clears = 0
         override fun current(): SubscriptionEntitlement =
             app.mymusclemap.domain.billing.paidSubscriptionEntitlement(saved)
         override fun snapshot(): VerifiedPaidSubscription? = saved
@@ -104,6 +115,7 @@ class BillingCoordinatorTest {
             saved = subscription
         }
         override suspend fun clear() {
+            clears += 1
             saved = null
         }
     }

@@ -13,9 +13,11 @@ import java.time.Instant
 
 sealed interface BillingVerification {
     data class Verified(val subscription: VerifiedPaidSubscription) : BillingVerification
-data object Failed : BillingVerification
-data object OwnershipConflict : BillingVerification
-data object NotConfigured : BillingVerification
+    data object Failed : BillingVerification
+    data object OwnershipConflict : BillingVerification
+    data object NotConfigured : BillingVerification
+    /** The signed-in account has no linked Play subscription. This is not a revocation. */
+    data object Absent : BillingVerification
 }
 
 /**
@@ -57,19 +59,61 @@ class BillingVerificationClient(
         }
     }
 
+    /**
+     * Asks the backend to re-read the linked purchase. The request carries no purchase token.
+     * Absent, unavailable, and network failures leave the caller’s cached snapshot alone.
+     */
+    suspend fun current(): BillingVerification = withContext(Dispatchers.IO) {
+        if (root.isEmpty()) {
+            return@withContext BillingVerification.Failed
+        }
+        val requestBuilder = Request.Builder()
+            .url("$root/api/v1/billing/subscriptions/current")
+            .get()
+        sessionToken()?.let { requestBuilder.header("Authorization", "Bearer $it") }
+        try {
+            http.newCall(requestBuilder.build()).execute().use { response ->
+                when (response.code) {
+                    503 -> BillingVerification.NotConfigured
+                    401 -> BillingVerification.Failed
+                    200 -> parseCurrent(response.body.string())
+                    else -> BillingVerification.Failed
+                }
+            }
+        } catch (_: IOException) {
+            BillingVerification.Failed
+        }
+    }
+
+    private fun parseCurrent(raw: String?): BillingVerification {
+        if (raw.isNullOrBlank()) {
+            return BillingVerification.Failed
+        }
+        return try {
+            val json = JSONObject(raw)
+            if ((json.optString("status") ?: "") == "ABSENT") {
+                BillingVerification.Absent
+            } else {
+                parse(raw)
+            }
+        } catch (_: org.json.JSONException) {
+            BillingVerification.Failed
+        }
+    }
+
     private fun parse(raw: String?): BillingVerification {
         if (raw.isNullOrBlank()) {
             return BillingVerification.Failed
         }
         return try {
             val json = JSONObject(raw)
-            val expires = json.optString("expiresAt", "")
+            val expires = json.optString("expiresAt", "") ?: ""
             BillingVerification.Verified(
                 VerifiedPaidSubscription(
-                    productId = json.optString("productId"),
+                    productId = json.optString("productId") ?: "",
                     expiresAt = expires.takeIf { it.isNotBlank() }?.let(Instant::parse),
                     autoRenewing = json.optBoolean("autoRenewing"),
-                    state = json.optString("state"),
+                    state = json.optString("state") ?: "",
                     entitled = json.optBoolean("entitled")
                 )
             )
