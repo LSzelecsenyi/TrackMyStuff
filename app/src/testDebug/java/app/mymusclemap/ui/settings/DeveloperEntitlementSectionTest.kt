@@ -40,28 +40,7 @@ class DeveloperEntitlementSectionTest {
     fun settingsHidesTheOverrideUntilADebugHostIsProvided() {
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                SettingsScreen(
-                    state = SettingsUiState(),
-                    onSelectDefaultPalette = {},
-                    onSelectCustomPalette = {},
-                    onEditingDarkChange = {},
-                    onDraftFieldChange = { _, _ -> },
-                    onDraftColorPicked = { _, _ -> },
-                    onGenerateDark = {},
-                    onSaveDraft = {},
-                    onCancelDraft = {},
-                    onResetCustomDraft = {},
-                    onAppBackupExportClick = {},
-                    onRestoreClick = {},
-                    onConfirmRestoreExplanation = {},
-                    onDismissRestoreExplanation = {},
-                    onDismissRestoreErrors = {},
-                    onSendFeedback = {},
-                    onOpenPrivacyPolicy = {},
-                    onOpenHelp = {},
-                    onMessageConsumed = {},
-                    onBack = {}
-                )
+                AccountMembershipScreen(onBack = {})
             }
         }
         composeRule.onNodeWithTag(DEBUG_ENTITLEMENT_SECTION).assertDoesNotExist()
@@ -105,28 +84,7 @@ class DeveloperEntitlementSectionTest {
                         }
                     )
                 ) {
-                    SettingsScreen(
-                        state = SettingsUiState(),
-                        onSelectDefaultPalette = {},
-                        onSelectCustomPalette = {},
-                        onEditingDarkChange = {},
-                        onDraftFieldChange = { _, _ -> },
-                        onDraftColorPicked = { _, _ -> },
-                        onGenerateDark = {},
-                        onSaveDraft = {},
-                        onCancelDraft = {},
-                        onResetCustomDraft = {},
-                        onAppBackupExportClick = {},
-                        onRestoreClick = {},
-                        onConfirmRestoreExplanation = {},
-                        onDismissRestoreExplanation = {},
-                        onDismissRestoreErrors = {},
-                        onSendFeedback = {},
-                        onOpenPrivacyPolicy = {},
-                        onOpenHelp = {},
-                        onMessageConsumed = {},
-                        onBack = {}
-                    )
+                    AccountMembershipScreen(onBack = {})
                 }
             }
         }

@@ -36,26 +36,8 @@ class MuscleMapBodyModelUiTest {
         var selected = MuscleMapBodyModel.MALE
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                app.mymusclemap.ui.settings.SettingsScreen(
+                app.mymusclemap.ui.settings.AppearancePreferencesScreen(
                     state = app.mymusclemap.ui.settings.SettingsUiState(),
-                    onSelectDefaultPalette = {},
-                    onSelectCustomPalette = {},
-                    onEditingDarkChange = {},
-                    onDraftFieldChange = { _, _ -> },
-                    onDraftColorPicked = { _, _ -> },
-                    onGenerateDark = {},
-                    onSaveDraft = {},
-                    onCancelDraft = {},
-                    onResetCustomDraft = {},
-                    onAppBackupExportClick = {},
-                    onRestoreClick = {},
-                    onConfirmRestoreExplanation = {},
-                    onDismissRestoreExplanation = {},
-                    onDismissRestoreErrors = {},
-                    onSendFeedback = {},
-                    onOpenPrivacyPolicy = {},
-                    onOpenHelp = {},
-                    onMessageConsumed = {},
                     onBack = {},
                     selectedBodyModel = selected,
                     onBodyModelSelected = { selected = it }

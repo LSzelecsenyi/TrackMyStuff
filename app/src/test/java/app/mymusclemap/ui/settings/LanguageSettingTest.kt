@@ -26,26 +26,8 @@ class LanguageSettingTest {
         var selected = AppLanguage.HU
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                SettingsScreen(
+                AppearancePreferencesScreen(
                     state = SettingsUiState(),
-                    onSelectDefaultPalette = {},
-                    onSelectCustomPalette = {},
-                    onEditingDarkChange = {},
-                    onDraftFieldChange = { _, _ -> },
-                    onDraftColorPicked = { _, _ -> },
-                    onGenerateDark = {},
-                    onSaveDraft = {},
-                    onCancelDraft = {},
-                    onResetCustomDraft = {},
-                    onAppBackupExportClick = {},
-                    onRestoreClick = {},
-                    onConfirmRestoreExplanation = {},
-                    onDismissRestoreExplanation = {},
-                    onDismissRestoreErrors = {},
-                    onSendFeedback = {},
-                    onOpenPrivacyPolicy = {},
-                    onOpenHelp = {},
-                    onMessageConsumed = {},
                     onBack = {},
                     showLanguageSetting = true,
                     selectedLanguage = selected,
@@ -64,31 +46,14 @@ class LanguageSettingTest {
     fun aNonHungarianDeviceHidesTheLanguageSetting() {
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                SettingsScreen(
+                AppearancePreferencesScreen(
                     state = SettingsUiState(),
-                    onSelectDefaultPalette = {},
-                    onSelectCustomPalette = {},
-                    onEditingDarkChange = {},
-                    onDraftFieldChange = { _, _ -> },
-                    onDraftColorPicked = { _, _ -> },
-                    onGenerateDark = {},
-                    onSaveDraft = {},
-                    onCancelDraft = {},
-                    onResetCustomDraft = {},
-                    onAppBackupExportClick = {},
-                    onRestoreClick = {},
-                    onConfirmRestoreExplanation = {},
-                    onDismissRestoreExplanation = {},
-                    onDismissRestoreErrors = {},
-                    onSendFeedback = {},
-                    onOpenPrivacyPolicy = {},
-                    onOpenHelp = {},
-                    onMessageConsumed = {},
-                    onBack = {},
-                    showLanguageSetting = false
+                    onBack = {}
                 )
             }
         }
         composeRule.onAllNodesWithTag(SETTINGS_LANGUAGE).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(SETTINGS_LANGUAGE_HU).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(SETTINGS_LANGUAGE_EN).assertCountEquals(0)
     }
 }

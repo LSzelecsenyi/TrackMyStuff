@@ -7,6 +7,15 @@
     <string name="nav_journal">Journal</string>
     <string name="history_title">Journal</string>
     <string name="settings_title">Settings</string>
+    <string name="settings_category_appearance">Appearance &amp; preferences</string>
+    <string name="settings_category_appearance_subtitle">Language, units, body model, colors</string>
+    <string name="settings_category_training_subtitle">Weekly goal, lock screen, timer audio</string>
+    <string name="settings_category_health_subtitle">Connection, permissions, health data</string>
+    <string name="settings_category_backup">Data &amp; backup</string>
+    <string name="settings_category_backup_subtitle">Export and restore your data</string>
+    <string name="settings_category_account">Account &amp; membership</string>
+    <string name="settings_category_account_subtitle">Account, Pro plan, Founding Tester</string>
+    <string name="settings_category_about_subtitle">Version, help, feedback, privacy</string>
     <string name="latest_weight_label">Latest body weight</string>
     <string name="change_from_previous_value">Compared with previous measurement: %1$s</string>
     <string name="no_previous_measurement">No earlier measurement to compare with</string>

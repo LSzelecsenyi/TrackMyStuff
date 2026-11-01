@@ -127,8 +127,14 @@ import app.mymusclemap.ui.health.RefreshHealthConnectOnResume
 import app.mymusclemap.ui.health.openHealthConnectManageAccess
 import app.mymusclemap.ui.health.openHealthConnectProviderInstall
 import app.mymusclemap.ui.health.rememberHealthConnectPermissionLaunch
+import app.mymusclemap.ui.settings.AboutStrictScreen
+import app.mymusclemap.ui.settings.AccountMembershipScreen
+import app.mymusclemap.ui.settings.AppearancePreferencesScreen
+import app.mymusclemap.ui.settings.DataBackupScreen
+import app.mymusclemap.ui.settings.HealthConnectSettingsPage
 import app.mymusclemap.ui.settings.SettingsScreen
 import app.mymusclemap.ui.settings.SettingsViewModel
+import app.mymusclemap.ui.settings.TrainingSettingsScreen
 import app.mymusclemap.ui.reports.ReportDetailScreen
 import app.mymusclemap.ui.reports.ReportsScreen
 import app.mymusclemap.ui.reports.ReportsViewModel
@@ -531,7 +537,9 @@ fun WeightTrackerNavHost(
                     onSetWeeklyGoal = viewModel::setWeeklyGoal,
                     onDisableWeeklyGoal = viewModel::disableWeeklyGoal,
                     health = health,
-                    onOpenHealthSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
+                    onOpenHealthSettings = {
+                        navController.openSettingsCategory(AppRoutes.SETTINGS_HEALTH)
+                    },
                     onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) },
                     onOpenWorkout = { id ->
                         viewModel.dismissDaySheet()
@@ -718,35 +726,20 @@ fun WeightTrackerNavHost(
                 )
             }
             composable(AppRoutes.SETTINGS) {
-                val viewModel: SettingsViewModel = viewModel(factory = factory)
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-                val healthViewModel: HealthConnectViewModel = viewModel(factory = factory)
-                val health by healthViewModel.settings.collectAsStateWithLifecycle()
-                SettingsRoute(
-                    viewModel = viewModel,
-                    state = state,
-                    today = dateProvider.today(),
-                    health = health,
-                    showFounderProgram = app.mymusclemap.ui.founder.founderSettingsEntryVisible(
-                        availability = founderAvailability,
-                        status = founder.status,
-                        programReady = !founder.loading
-                    ),
-                    showFounderBadge = founder.founderBadge,
-                    onHealthRefresh = healthViewModel::refresh,
+                SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenHelp = { navController.navigateInternal(AppRoutes.HELP) },
-                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) },
-                    onOpenFounderProgram = {
-                        navController.navigateInternal(AppRoutes.FOUNDER_PROGRAM)
-                    },
-                    onOpenProPlan = {
-                        navController.navigateInternal(AppRoutes.PRO_BENEFITS)
-                    },
-                    accountName = accountName,
-                    accountEmail = accountEmail,
-                    onSignOut = onSignOut,
-                    onOpenDeleteAccount = { navController.navigateInternal(AppRoutes.DELETE_ACCOUNT) },
+                    onOpenAppearance = { navController.navigateInternal(AppRoutes.SETTINGS_APPEARANCE) },
+                    onOpenTraining = { navController.navigateInternal(AppRoutes.SETTINGS_TRAINING) },
+                    onOpenHealth = { navController.navigateInternal(AppRoutes.SETTINGS_HEALTH) },
+                    onOpenBackup = { navController.navigateInternal(AppRoutes.SETTINGS_BACKUP) },
+                    onOpenAccount = { navController.navigateInternal(AppRoutes.SETTINGS_ACCOUNT) },
+                    onOpenAbout = { navController.navigateInternal(AppRoutes.SETTINGS_ABOUT) }
+                )
+            }
+            composable(AppRoutes.SETTINGS_APPEARANCE) {
+                AppearanceSettingsDestination(
+                    navController = navController,
+                    factory = factory,
                     showLanguageSetting = showLanguageSetting,
                     selectedLanguage = selectedLanguage,
                     onLanguageSelected = onLanguageSelected,
@@ -754,7 +747,59 @@ fun WeightTrackerNavHost(
                     onUnitSystemSelected = onUnitSystemSelected,
                     selectedBodyModel = selectedBodyModel,
                     onBodyModelSelected = onBodyModelSelected,
-                    onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) }
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(AppRoutes.SETTINGS_TRAINING) {
+                TrainingSettingsDestination(
+                    navController = navController,
+                    factory = factory,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(AppRoutes.SETTINGS_HEALTH) {
+                HealthSettingsDestination(
+                    navController = navController,
+                    factory = factory,
+                    onOpenHealthDetails = { navController.navigateInternal(AppRoutes.HEALTH_CONNECT) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(AppRoutes.SETTINGS_BACKUP) {
+                BackupSettingsDestination(
+                    navController = navController,
+                    factory = factory,
+                    today = dateProvider.today(),
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(AppRoutes.SETTINGS_ACCOUNT) {
+                AccountMembershipScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenProPlan = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) },
+                    accountName = accountName,
+                    accountEmail = accountEmail,
+                    onSignOut = onSignOut,
+                    onOpenDeleteAccount = { navController.navigateInternal(AppRoutes.DELETE_ACCOUNT) },
+                    showFounderProgram = app.mymusclemap.ui.founder.founderSettingsEntryVisible(
+                        availability = founderAvailability,
+                        status = founder.status,
+                        programReady = !founder.loading
+                    ),
+                    showFounderBadge = founder.founderBadge,
+                    onOpenFounderProgram = {
+                        navController.navigateInternal(AppRoutes.FOUNDER_PROGRAM)
+                    }
+                )
+            }
+            composable(AppRoutes.SETTINGS_ABOUT) {
+                AboutSettingsDestination(
+                    navController = navController,
+                    factory = factory,
+                    showFounderBadge = founder.founderBadge,
+                    onOpenHelp = { navController.navigateInternal(AppRoutes.HELP) },
+                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) },
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(AppRoutes.DELETE_ACCOUNT) {
@@ -1759,21 +1804,27 @@ fun WeightTrackerNavHost(
 }
 
 @Composable
-private fun SettingsRoute(
-    viewModel: SettingsViewModel,
-    state: app.mymusclemap.ui.settings.SettingsUiState,
-    today: LocalDate,
-    health: app.mymusclemap.domain.health.HealthSettingsState,
-    onHealthRefresh: () -> Unit,
-    onBack: () -> Unit,
-    onOpenHelp: () -> Unit,
-    onOpenPrivacy: () -> Unit,
-    onOpenFounderProgram: () -> Unit,
-    onOpenProPlan: () -> Unit,
-    accountName: String?,
-    accountEmail: String?,
-    onSignOut: () -> Unit,
-    onOpenDeleteAccount: () -> Unit,
+private fun settingsGraphViewModel(
+    navController: NavHostController,
+    factory: WeightViewModelFactory
+): SettingsViewModel {
+    val owner = remember(navController) { navController.getBackStackEntry(AppRoutes.SETTINGS) }
+    return viewModel<SettingsViewModel>(viewModelStoreOwner = owner, factory = factory)
+}
+
+@Composable
+private fun settingsHealthViewModel(
+    navController: NavHostController,
+    factory: WeightViewModelFactory
+): HealthConnectViewModel {
+    val owner = remember(navController) { navController.getBackStackEntry(AppRoutes.SETTINGS) }
+    return viewModel<HealthConnectViewModel>(viewModelStoreOwner = owner, factory = factory)
+}
+
+@Composable
+private fun AppearanceSettingsDestination(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
     showLanguageSetting: Boolean,
     selectedLanguage: app.mymusclemap.domain.locale.AppLanguage,
     onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit,
@@ -1781,49 +1832,42 @@ private fun SettingsRoute(
     onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit,
     selectedBodyModel: app.mymusclemap.domain.musclemap.MuscleMapBodyModel,
     onBodyModelSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit,
-    showFounderProgram: Boolean,
-    showFounderBadge: Boolean,
-    onOpenHealthDetails: () -> Unit
+    onBack: () -> Unit
 ) {
-    val healthPermissions = HealthConnectGateway.readPermissions(
-        includeHistory = health.historyAccess != HealthHistoryAccess.Unsupported
+    val viewModel = settingsGraphViewModel(navController, factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    AppearancePreferencesScreen(
+        state = state,
+        onSelectDefaultPalette = viewModel::selectDefaultPalette,
+        onSelectCustomPalette = viewModel::selectCustomPalette,
+        onEditingDarkChange = viewModel::setEditingDark,
+        onDraftFieldChange = viewModel::onDraftFieldChange,
+        onDraftColorPicked = viewModel::onDraftColorPicked,
+        onGenerateDark = viewModel::generateDarkFromLight,
+        onSaveDraft = viewModel::saveDraft,
+        onCancelDraft = viewModel::cancelDraft,
+        onResetCustomDraft = viewModel::resetCustomDraft,
+        onMessageConsumed = viewModel::consumeMessage,
+        onBack = onBack,
+        showLanguageSetting = showLanguageSetting,
+        selectedLanguage = selectedLanguage,
+        onLanguageSelected = onLanguageSelected,
+        selectedUnitSystem = selectedUnitSystem,
+        onUnitSystemSelected = onUnitSystemSelected,
+        selectedBodyModel = selectedBodyModel,
+        onBodyModelSelected = onBodyModelSelected
     )
-    val launchHealthPermissions = rememberHealthConnectPermissionLaunch(healthPermissions, onHealthRefresh)
-    RefreshHealthConnectOnResume(onHealthRefresh)
+}
+
+@Composable
+private fun TrainingSettingsDestination(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    onBack: () -> Unit
+) {
+    val viewModel = settingsGraphViewModel(navController, factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val resources = LocalResources.current
-    val scope = rememberCoroutineScope()
-    val appBackupExportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip")
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val source = AppBackupSource(
-                applicationId = context.packageName,
-                versionName = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-            )
-            val result = withContext(Dispatchers.IO) {
-                try {
-                    context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        viewModel.writeAppBackup(source, stream)
-                    } ?: AppBackupWriteResult.Failed
-                } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    AppBackupWriteResult.Failed
-                }
-            }
-            viewModel.onAppBackupExportFinished(result)
-        }
-    }
-    val appBackupImportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        viewModel.restoreAppBackup {
-            context.contentResolver.openInputStream(uri) ?: error("missing stream")
-        }
-    }
     var lockScreenPrompt by remember { mutableStateOf<LockScreenEnablePrompt?>(null) }
     var requestedPermissionLocally by remember { mutableStateOf(false) }
     var awaitingSettingsGrant by remember { mutableStateOf(false) }
@@ -1863,76 +1907,8 @@ private fun SettingsRoute(
             }
         }
     }
-    SettingsScreen(
+    TrainingSettingsScreen(
         state = state,
-        onSelectDefaultPalette = viewModel::selectDefaultPalette,
-        onSelectCustomPalette = viewModel::selectCustomPalette,
-        onEditingDarkChange = viewModel::setEditingDark,
-        onDraftFieldChange = viewModel::onDraftFieldChange,
-        onDraftColorPicked = viewModel::onDraftColorPicked,
-        onGenerateDark = viewModel::generateDarkFromLight,
-        onSaveDraft = viewModel::saveDraft,
-        onCancelDraft = viewModel::cancelDraft,
-        onResetCustomDraft = viewModel::resetCustomDraft,
-        onAppBackupExportClick = {
-            appBackupExportLauncher.launch("strict-backup-$today.zip")
-        },
-        onRestoreClick = viewModel::onRestoreClicked,
-        onConfirmRestoreExplanation = {
-            viewModel.confirmRestoreExplanation()
-            appBackupImportLauncher.launch(
-                arrayOf(
-                    "application/zip",
-                    "application/json",
-                    "application/octet-stream",
-                    "text/*",
-                    "*/*"
-                )
-            )
-        },
-        onDismissRestoreExplanation = viewModel::dismissRestoreExplanation,
-        onDismissRestoreErrors = viewModel::dismissRestoreErrors,
-        onSendFeedback = {
-            val subject = resources.getString(R.string.feedback_email_subject, state.appVersionName)
-            val body = resources.getString(
-                R.string.feedback_email_body,
-                state.appVersionName,
-                Build.VERSION.RELEASE,
-                "${Build.MANUFACTURER}/${Build.MODEL}"
-            )
-            val intent = FeedbackComposer.createIntent(subject = subject, body = body)
-            if (!FeedbackComposer.launch(context, intent)) {
-                viewModel.onFeedbackEmailUnavailable()
-            }
-        },
-        onOpenPrivacyPolicy = {
-            val url = state.privacyPolicyUrl
-            if (!url.isNullOrBlank()) {
-                try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                } catch (_: ActivityNotFoundException) {
-                }
-            } else {
-                onOpenPrivacy()
-            }
-        },
-        onOpenHelp = onOpenHelp,
-        onOpenFounderProgram = onOpenFounderProgram,
-        onOpenProPlan = onOpenProPlan,
-        accountName = accountName,
-        accountEmail = accountEmail,
-        onSignOut = onSignOut,
-        onOpenDeleteAccount = onOpenDeleteAccount,
-        showLanguageSetting = showLanguageSetting,
-        selectedLanguage = selectedLanguage,
-        onLanguageSelected = onLanguageSelected,
-        selectedUnitSystem = selectedUnitSystem,
-        onUnitSystemSelected = onUnitSystemSelected,
-        selectedBodyModel = selectedBodyModel,
-        onBodyModelSelected = onBodyModelSelected,
-        showFounderProgram = showFounderProgram,
-        showFounderBadge = showFounderBadge,
-        onMessageConsumed = viewModel::consumeMessage,
         onSetWeeklyGoal = viewModel::setWeeklyGoal,
         onDisableWeeklyGoal = viewModel::disableWeeklyGoal,
         onBack = onBack,
@@ -1993,8 +1969,36 @@ private fun SettingsRoute(
             }
         },
         onDismissLockScreenEnable = { lockScreenPrompt = null },
+        onMessageConsumed = viewModel::consumeMessage
+    )
+}
+
+@Composable
+private fun HealthSettingsDestination(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    onOpenHealthDetails: () -> Unit,
+    onBack: () -> Unit
+) {
+    val viewModel = settingsGraphViewModel(navController, factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val healthViewModel = settingsHealthViewModel(navController, factory)
+    val health by healthViewModel.settings.collectAsStateWithLifecycle()
+    val healthPermissions = HealthConnectGateway.readPermissions(
+        includeHistory = health.historyAccess != HealthHistoryAccess.Unsupported
+    )
+    val launchHealthPermissions = rememberHealthConnectPermissionLaunch(
+        healthPermissions,
+        healthViewModel::refresh
+    )
+    RefreshHealthConnectOnResume(healthViewModel::refresh)
+    val context = LocalContext.current
+    HealthConnectSettingsPage(
         health = health,
+        onBack = onBack,
         onOpenHealthDetails = onOpenHealthDetails,
+        userMessage = state.userMessage,
+        onMessageConsumed = viewModel::consumeMessage,
         onHealthAction = {
             val opened = when (health.action) {
                 HealthSettingsAction.InstallOrUpdate -> openHealthConnectProviderInstall(context)
@@ -2012,6 +2016,118 @@ private fun SettingsRoute(
         onRequestExerciseHistory = { launchHealthPermissions() }
     )
 }
+
+@Composable
+private fun BackupSettingsDestination(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    today: LocalDate,
+    onBack: () -> Unit
+) {
+    val viewModel = settingsGraphViewModel(navController, factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val appBackupExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val source = AppBackupSource(
+                applicationId = context.packageName,
+                versionName = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+            )
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        viewModel.writeAppBackup(source, stream)
+                    } ?: AppBackupWriteResult.Failed
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    AppBackupWriteResult.Failed
+                }
+            }
+            viewModel.onAppBackupExportFinished(result)
+        }
+    }
+    val appBackupImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        viewModel.restoreAppBackup {
+            context.contentResolver.openInputStream(uri) ?: error("missing stream")
+        }
+    }
+    DataBackupScreen(
+        state = state,
+        onBack = onBack,
+        onExportClick = { appBackupExportLauncher.launch("strict-backup-$today.zip") },
+        onRestoreClick = viewModel::onRestoreClicked,
+        onConfirmRestoreExplanation = {
+            viewModel.confirmRestoreExplanation()
+            appBackupImportLauncher.launch(
+                arrayOf(
+                    "application/zip",
+                    "application/json",
+                    "application/octet-stream",
+                    "text/*",
+                    "*/*"
+                )
+            )
+        },
+        onDismissRestoreExplanation = viewModel::dismissRestoreExplanation,
+        onDismissRestoreErrors = viewModel::dismissRestoreErrors,
+        onMessageConsumed = viewModel::consumeMessage
+    )
+}
+
+@Composable
+private fun AboutSettingsDestination(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    showFounderBadge: Boolean,
+    onOpenHelp: () -> Unit,
+    onOpenPrivacy: () -> Unit,
+    onBack: () -> Unit
+) {
+    val viewModel = settingsGraphViewModel(navController, factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    AboutStrictScreen(
+        state = state,
+        onBack = onBack,
+        showFounderBadge = showFounderBadge,
+        onSendFeedback = {
+            val subject = resources.getString(R.string.feedback_email_subject, state.appVersionName)
+            val body = resources.getString(
+                R.string.feedback_email_body,
+                state.appVersionName,
+                Build.VERSION.RELEASE,
+                "${Build.MANUFACTURER}/${Build.MODEL}"
+            )
+            val intent = FeedbackComposer.createIntent(subject = subject, body = body)
+            if (!FeedbackComposer.launch(context, intent)) {
+                viewModel.onFeedbackEmailUnavailable()
+            }
+        },
+        onOpenPrivacyPolicy = {
+            val url = state.privacyPolicyUrl
+            if (!url.isNullOrBlank()) {
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (_: ActivityNotFoundException) {
+                }
+            } else {
+                onOpenPrivacy()
+            }
+        },
+        onOpenHelp = onOpenHelp,
+        onMessageConsumed = viewModel::consumeMessage
+    )
+}
+
 
 private fun openLockScreenSettings(context: Context, note: LockScreenAccessNote) {
     val intent = when (note) {
@@ -2153,6 +2269,13 @@ internal fun NavHostController.navigateInternal(route: String) {
     navigate(route) {
         launchSingleTop = true
     }
+}
+
+internal fun NavHostController.openSettingsCategory(route: String) {
+    if (currentDestination?.route != AppRoutes.SETTINGS) {
+        navigate(AppRoutes.SETTINGS) { launchSingleTop = true }
+    }
+    navigate(route) { launchSingleTop = true }
 }
 
 internal fun NavHostController.openWorkoutComplete(summary: WorkoutCompletionSummary) {

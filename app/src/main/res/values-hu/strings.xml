@@ -7,6 +7,15 @@
     <string name="nav_journal">Napló</string>
     <string name="history_title">Napló</string>
     <string name="settings_title">Beállítások</string>
+    <string name="settings_category_appearance">Megjelenés és beállítások</string>
+    <string name="settings_category_appearance_subtitle">Nyelv, mértékegységek, testmodell, színek</string>
+    <string name="settings_category_training_subtitle">Heti cél, zárolási képernyő, időzítő hangja</string>
+    <string name="settings_category_health_subtitle">Kapcsolat, engedélyek, egészségügyi adatok</string>
+    <string name="settings_category_backup">Adatok és biztonsági mentés</string>
+    <string name="settings_category_backup_subtitle">Adatok exportálása és visszaállítása</string>
+    <string name="settings_category_account">Fiók és tagság</string>
+    <string name="settings_category_account_subtitle">Fiók, Pro-csomag, Founding Tester</string>
+    <string name="settings_category_about_subtitle">Verzió, súgó, visszajelzés, adatvédelem</string>
     <string name="latest_weight_label">Legutóbbi testsúly</string>
     <string name="change_from_previous_value">Az előző méréshez képest: %1$s</string>
     <string name="no_previous_measurement">Nincs korábbi mérés az összehasonlításhoz</string>

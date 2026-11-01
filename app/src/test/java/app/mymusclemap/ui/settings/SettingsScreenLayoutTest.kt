@@ -65,7 +65,10 @@ class SettingsScreenLayoutTest {
     @Test
     fun lockScreenCompletionIsOffByDefaultAndDoesNotExplainUntilRequested() {
         var enabled: Boolean? = null
-        render(onLockScreenSetCompletionChange = { enabled = it })
+        render(
+            page = SettingsSurface.Training,
+            onLockScreenSetCompletionChange = { enabled = it }
+        )
         composeRule.onNodeWithTag(SETTINGS_LOCK_SCREEN_SETS).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.settings_lock_screen_sets_body)).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.settings_lock_screen_sets_permission_reason)).assertCountEquals(0)
@@ -76,7 +79,7 @@ class SettingsScreenLayoutTest {
     @Test
     fun timerAudioOffersVoiceBeepsAndSilent() {
         var selected: app.mymusclemap.domain.workout.TimerAudioMode? = null
-        render(onTimerAudioChange = { selected = it })
+        render(page = SettingsSurface.Training, onTimerAudioChange = { selected = it })
         composeRule.onNodeWithTag("settings_timer_audio").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.settings_timer_audio_beeps_body)).assertIsDisplayed()
         composeRule.onNodeWithTag("settings_timer_audio_voice").performClick()
@@ -90,6 +93,7 @@ class SettingsScreenLayoutTest {
         var confirmed = false
         var dismissed = false
         render(
+            page = SettingsSurface.Training,
             lockScreenEnablePrompt = LockScreenEnablePrompt.RequestPermission,
             onConfirmLockScreenEnable = { confirmed = true },
             onDismissLockScreenEnable = { dismissed = true }
@@ -103,7 +107,7 @@ class SettingsScreenLayoutTest {
 
     @Test
     fun weeklyGoalRowShowsNotSetWhenNothingIsConfigured() {
-        render()
+        render(page = SettingsSurface.Training)
         composeRule.onNodeWithTag(SETTINGS_WEEKLY_GOAL).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.weekly_goal_not_set)).assertIsDisplayed()
     }
@@ -119,7 +123,7 @@ class SettingsScreenLayoutTest {
             emptyMap(),
             today
         )
-        render(state = SettingsUiState(weeklyGoal = status))
+        render(page = SettingsSurface.Training, state = SettingsUiState(weeklyGoal = status))
         composeRule.onNodeWithText(testString(R.string.weekly_goal_pending_summary, 5))
             .performScrollTo()
             .assertIsDisplayed()
@@ -135,7 +139,7 @@ class SettingsScreenLayoutTest {
             emptyMap(),
             LocalDate.of(2026, 3, 12)
         )
-        render(state = SettingsUiState(weeklyGoal = status))
+        render(page = SettingsSurface.Training, state = SettingsUiState(weeklyGoal = status))
         composeRule.onNodeWithText(testString(R.string.weekly_goal_turns_off_next_monday))
             .performScrollTo()
             .assertIsDisplayed()
@@ -287,6 +291,7 @@ class SettingsScreenLayoutTest {
         val exports = intArrayOf(0)
         val restores = intArrayOf(0)
         render(
+            page = SettingsSurface.Backup,
             onAppBackupExportClick = { exports[0] += 1 },
             onRestoreClick = { restores[0] += 1 }
         )
@@ -348,25 +353,8 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithTag(SETTINGS_EDITOR_MODE).assertIsDisplayed()
         composeRule.onAllNodesWithText("Export body-weight data").assertCountEquals(0)
         composeRule.onAllNodesWithText("Import body-weight data").assertCountEquals(0)
-        composeRule.onNodeWithText(testString(R.string.app_backup_title).uppercase()).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.action_export_app_backup)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.action_export_app_backup_subtitle)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.action_restore_app_backup)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.action_restore_app_backup_subtitle)).performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText("Export full backup").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Restore full backup").assertCountEquals(0)
         composeRule.onAllNodesWithText("My Muscle Map").assertCountEquals(0)
         composeRule.onAllNodesWithText("ABOUT MY MUSCLE MAP").assertCountEquals(0)
-        composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_EXPORT).assertIsDisplayed()
-        composeRule.onNodeWithTag(SETTINGS_APP_BACKUP_RESTORE).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(testString(R.string.app_name)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.brand_tagline)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.about_product)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(SETTINGS_HELP_TIPS).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(SETTINGS_PRIVACY_POLICY).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SAVE).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_CANCEL).assertIsDisplayed()
         val save = composeRule.onNodeWithTag(SETTINGS_SAVE).getBoundsInRoot()
@@ -383,7 +371,7 @@ class SettingsScreenLayoutTest {
 
     @Test
     fun aboutDarkThemeUsesTheDarkWordmark() {
-        render(darkTheme = true)
+        render(page = SettingsSurface.About, darkTheme = true)
         composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(STRICT_WORDMARK_DARK).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
@@ -394,7 +382,7 @@ class SettingsScreenLayoutTest {
     @Test
     fun givenHelpAndTipsWhenTappedThenCallbackRunsOnce() {
         val opens = intArrayOf(0)
-        render(onOpenHelp = { opens[0] += 1 })
+        render(page = SettingsSurface.About, onOpenHelp = { opens[0] += 1 })
         composeRule.onNodeWithTag(SETTINGS_HELP_TIPS).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.action_help_tips)).assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_HELP_TIPS).performClick()
@@ -403,7 +391,7 @@ class SettingsScreenLayoutTest {
 
     @Test
     fun givenFounderProgramHiddenThenAboutHasNoEnrollmentRow() {
-        render(showFounderProgram = false)
+        render(page = SettingsSurface.Account, showFounderProgram = false)
         composeRule.onNodeWithTag("settings-founder-program").assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.founder_open)).assertDoesNotExist()
     }
@@ -411,35 +399,34 @@ class SettingsScreenLayoutTest {
     @Test
     fun givenAboutSectionThenFounderProgramEntryOpensOnce() {
         val opens = intArrayOf(0)
-        render(onOpenFounderProgram = { opens[0] += 1 })
+        render(page = SettingsSurface.Account, onOpenFounderProgram = { opens[0] += 1 })
         composeRule.onNodeWithTag("settings-founder-program").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_open)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_open_subtitle)).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.founder_open)).assertCountEquals(1)
         val founder = composeRule.onNodeWithTag("settings-founder-program").getBoundsInRoot()
-        val about = composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).getBoundsInRoot()
-        val palette = composeRule.onNodeWithText(testString(R.string.palette_title).uppercase()).getBoundsInRoot()
-        assertTrue(palette.bottom < founder.top)
-        assertTrue(founder.bottom < about.top)
+        val pro = composeRule.onNodeWithTag(SETTINGS_PRO_PLAN).getBoundsInRoot()
+        assertTrue(pro.bottom < founder.top)
         composeRule.onNodeWithTag("settings-founder-program").performClick()
         assertEquals(1, opens[0])
     }
 
     @Test
     fun givenFoundingMemberThenSettingsShowsMemberStatusOnce() {
-        render(state = SettingsUiState(appVersionName = "0.1.0-debug"), showFounderBadge = true)
+        render(
+            page = SettingsSurface.Account,
+            state = SettingsUiState(appVersionName = "0.1.0-debug"),
+            showFounderBadge = true
+        )
         composeRule.onNodeWithText(testString(R.string.founder_badge)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_member_subtitle)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.founder_open)).assertDoesNotExist()
-        composeRule.onNodeWithText(
-            testString(R.string.about_version_status, "0.1.0-debug", testString(R.string.founder_badge))
-        ).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.founder_member_subtitle)).assertCountEquals(1)
     }
 
     @Test
     fun lockScreenRowKeepsItsCopyClearOfTheSwitch() {
-        render(width = 320.dp, fontScale = 1.3f)
+        render(page = SettingsSurface.Training, width = 320.dp, fontScale = 1.3f)
         val title = composeRule.onNodeWithText(testString(R.string.settings_lock_screen_sets_title)).getBoundsInRoot()
         val body = composeRule.onNodeWithText(testString(R.string.settings_lock_screen_sets_body)).getBoundsInRoot()
         val toggle = composeRule.onNodeWithTag(SETTINGS_LOCK_SCREEN_SETS).getBoundsInRoot()
@@ -450,16 +437,28 @@ class SettingsScreenLayoutTest {
 
     @Test
     fun givenAppVersionThenAboutSectionShowsDynamicVersion() {
-        render(state = SettingsUiState(appVersionName = "9.9.9-debug"))
+        render(page = SettingsSurface.About, state = SettingsUiState(appVersionName = "9.9.9-debug"))
         composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.about_version, "9.9.9-debug")).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_APP_VERSION).performScrollTo().assertIsDisplayed()
     }
 
     @Test
+    fun foundingMemberVersionStaysOnAbout() {
+        render(
+            page = SettingsSurface.About,
+            state = SettingsUiState(appVersionName = "0.1.0-debug"),
+            showFounderBadge = true
+        )
+        composeRule.onNodeWithText(
+            testString(R.string.about_version_status, "0.1.0-debug", testString(R.string.founder_badge))
+        ).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
     fun givenSendFeedbackWhenTappedThenCallbackRunsOnce() {
         val feedback = intArrayOf(0)
-        render(onSendFeedback = { feedback[0] += 1 })
+        render(page = SettingsSurface.About, onSendFeedback = { feedback[0] += 1 })
         composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_SEND_FEEDBACK).performClick()
         assertEquals(1, feedback[0])
@@ -469,6 +468,7 @@ class SettingsScreenLayoutTest {
     fun givenNullPrivacyUrlThenPrivacyRowOpensInAppPolicy() {
         val opens = intArrayOf(0)
         render(
+            page = SettingsSurface.About,
             state = SettingsUiState(privacyPolicyUrl = null),
             onOpenPrivacyPolicy = { opens[0] += 1 }
         )
@@ -483,6 +483,7 @@ class SettingsScreenLayoutTest {
     fun givenPrivacyUrlThenPrivacyRowIsEnabledAndOpensOnce() {
         val opens = intArrayOf(0)
         render(
+            page = SettingsSurface.About,
             state = SettingsUiState(privacyPolicyUrl = "https://example.com/privacy"),
             onOpenPrivacyPolicy = { opens[0] += 1 }
         )
@@ -495,7 +496,7 @@ class SettingsScreenLayoutTest {
 
     @Test
     fun givenRestoreExplanationThenReplaceWarningIsShown() {
-        render(state = SettingsUiState(showRestoreExplanation = true))
+        render(page = SettingsSurface.Backup, state = SettingsUiState(showRestoreExplanation = true))
         composeRule.onAllNodesWithText(testString(R.string.restore_app_backup_title)).assertCountEquals(2)
         composeRule.onNodeWithText(testString(R.string.restore_app_backup_body)).assertIsDisplayed()
     }
@@ -553,7 +554,7 @@ class SettingsScreenLayoutTest {
             ) {
                 WeightTrackerThemeForPreview {
                     Box(modifier = Modifier.width(360.dp).fillMaxSize()) {
-                        SettingsScreen(
+                        AppearancePreferencesScreen(
                             state = SettingsUiState(appearance = appearance, draft = draft),
                             onSelectDefaultPalette = {
                                 val next = PaletteSessionLogic.selectDefault(
@@ -595,14 +596,6 @@ class SettingsScreenLayoutTest {
                                 )
                                 draft = next.draft
                             },
-                            onAppBackupExportClick = {},
-                            onRestoreClick = {},
-                            onConfirmRestoreExplanation = {},
-                            onDismissRestoreExplanation = {},
-                            onDismissRestoreErrors = {},
-                            onSendFeedback = {},
-                            onOpenPrivacyPolicy = {},
-                            onOpenHelp = {},
                             onMessageConsumed = {},
                             onBack = onBack
                         )
@@ -616,14 +609,17 @@ class SettingsScreenLayoutTest {
     @Test
     fun proPlanStaysAvailableWhenTheFounderEntryIsHidden() {
         var opens = 0
-        render(showFounderProgram = false, onOpenProPlan = { opens += 1 })
+        render(page = SettingsSurface.Account, showFounderProgram = false, onOpenProPlan = { opens += 1 })
         composeRule.onNodeWithTag(SETTINGS_PRO_PLAN).performScrollTo().performClick()
         org.junit.Assert.assertEquals(1, opens)
         composeRule.onNodeWithText(testString(R.string.settings_pro_plan)).assertExists()
     }
 
+    private enum class SettingsSurface { Appearance, Training, Backup, Account, About }
+
     private fun render(
         state: SettingsUiState = SettingsUiState(),
+        page: SettingsSurface = SettingsSurface.Appearance,
         width: Dp = 360.dp,
         height: Dp = 2000.dp,
         fontScale: Float = 1f,
@@ -646,7 +642,8 @@ class SettingsScreenLayoutTest {
         onDismissLockScreenEnable: () -> Unit = {},
         accountName: String? = null,
         accountEmail: String? = null,
-        onSignOut: () -> Unit = {}
+        onSignOut: () -> Unit = {},
+        onOpenDeleteAccount: () -> Unit = {}
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -663,40 +660,47 @@ class SettingsScreenLayoutTest {
                             .height(height)
                             .fillMaxSize()
                     ) {
-                        SettingsScreen(
-                            state = state,
-                            onSelectDefaultPalette = {},
-                            onSelectCustomPalette = {},
-                            onEditingDarkChange = {},
-                            onDraftFieldChange = { _, _ -> },
-                            onDraftColorPicked = { _, _ -> },
-                            onGenerateDark = {},
-                            onSaveDraft = onSaveDraft,
-                            onCancelDraft = {},
-                            onResetCustomDraft = {},
-                            onAppBackupExportClick = onAppBackupExportClick,
-                            onRestoreClick = onRestoreClick,
-                            onConfirmRestoreExplanation = {},
-                            onDismissRestoreExplanation = {},
-                            onDismissRestoreErrors = {},
-                            onSendFeedback = onSendFeedback,
-                            onOpenPrivacyPolicy = onOpenPrivacyPolicy,
-                            onOpenHelp = onOpenHelp,
-                            onOpenFounderProgram = onOpenFounderProgram,
-                            onOpenProPlan = onOpenProPlan,
-                            showFounderProgram = showFounderProgram,
-                            showFounderBadge = showFounderBadge,
-                            onMessageConsumed = {},
-                            onBack = onBack,
-                            onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
-                            onTimerAudioChange = onTimerAudioChange,
-                            lockScreenEnablePrompt = lockScreenEnablePrompt,
-                            onConfirmLockScreenEnable = onConfirmLockScreenEnable,
-                            onDismissLockScreenEnable = onDismissLockScreenEnable,
-                            accountName = accountName,
-                            accountEmail = accountEmail,
-                            onSignOut = onSignOut
-                        )
+                        when (page) {
+                            SettingsSurface.Appearance -> AppearancePreferencesScreen(
+                                state = state,
+                                onSaveDraft = onSaveDraft,
+                                onBack = onBack
+                            )
+                            SettingsSurface.Training -> TrainingSettingsScreen(
+                                state = state,
+                                onBack = onBack,
+                                onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
+                                onTimerAudioChange = onTimerAudioChange,
+                                lockScreenEnablePrompt = lockScreenEnablePrompt,
+                                onConfirmLockScreenEnable = onConfirmLockScreenEnable,
+                                onDismissLockScreenEnable = onDismissLockScreenEnable
+                            )
+                            SettingsSurface.Backup -> DataBackupScreen(
+                                state = state,
+                                onBack = onBack,
+                                onExportClick = onAppBackupExportClick,
+                                onRestoreClick = onRestoreClick
+                            )
+                            SettingsSurface.Account -> AccountMembershipScreen(
+                                onBack = onBack,
+                                onOpenProPlan = onOpenProPlan,
+                                accountName = accountName,
+                                accountEmail = accountEmail,
+                                onSignOut = onSignOut,
+                                onOpenDeleteAccount = onOpenDeleteAccount,
+                                showFounderProgram = showFounderProgram,
+                                showFounderBadge = showFounderBadge,
+                                onOpenFounderProgram = onOpenFounderProgram
+                            )
+                            SettingsSurface.About -> AboutStrictScreen(
+                                state = state,
+                                onBack = onBack,
+                                showFounderBadge = showFounderBadge,
+                                onSendFeedback = onSendFeedback,
+                                onOpenPrivacyPolicy = onOpenPrivacyPolicy,
+                                onOpenHelp = onOpenHelp
+                            )
+                        }
                     }
                 }
             }
@@ -707,7 +711,12 @@ class SettingsScreenLayoutTest {
     @Test
     fun accountSectionShowsTheSignedInGoogleAccountAndConfirmsSignOut() {
         var signedOut = 0
-        render(accountName = "Ada", accountEmail = "ada@example.com", onSignOut = { signedOut += 1 })
+        render(
+            page = SettingsSurface.Account,
+            accountName = "Ada",
+            accountEmail = "ada@example.com",
+            onSignOut = { signedOut += 1 }
+        )
         composeRule.onNodeWithTag(SETTINGS_ACCOUNT).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Ada").assertIsDisplayed()
         composeRule.onNodeWithText("ada@example.com").assertIsDisplayed()
@@ -715,5 +724,20 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.settings_sign_out_title)).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.settings_sign_out))[1].performClick()
         assertEquals(1, signedOut)
+    }
+
+    @Test
+    fun deleteAccountStaysSeparateFromSignOut() {
+        var deletes = 0
+        var signedOut = 0
+        render(
+            page = SettingsSurface.Account,
+            onSignOut = { signedOut += 1 },
+            onOpenDeleteAccount = { deletes += 1 }
+        )
+        composeRule.onNodeWithTag(SETTINGS_DELETE_ACCOUNT).performScrollTo().performClick()
+        assertEquals(1, deletes)
+        assertEquals(0, signedOut)
+        composeRule.onNodeWithText(testString(R.string.settings_sign_out_title)).assertDoesNotExist()
     }
 }

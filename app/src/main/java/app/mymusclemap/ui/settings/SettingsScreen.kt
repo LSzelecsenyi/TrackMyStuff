@@ -1,9 +1,9 @@
 package app.mymusclemap.ui.settings
 
 import android.content.res.Configuration
-import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,8 +36,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material3.AlertDialog
@@ -85,31 +91,35 @@ import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
 import app.mymusclemap.data.appbackup.AppBackupError
 import app.mymusclemap.data.appbackup.AppBackupErrorCode
-import app.mymusclemap.domain.theme.AppearanceSettings
 import app.mymusclemap.domain.theme.PaletteDraft
 import app.mymusclemap.domain.theme.PaletteDraftLogic
 import app.mymusclemap.domain.theme.PaletteSaveResult
 import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.PaletteValidationError
 import app.mymusclemap.domain.theme.SeedField
-import app.mymusclemap.domain.health.HealthSettingsState
 import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.StrictBrandLockup
 import app.mymusclemap.domain.workout.PendingWeeklyGoal
-import app.mymusclemap.ui.components.WeeklyGoalEditorSheet
-import app.mymusclemap.ui.health.HealthConnectSettingsSection
 import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.PaletteSwatch
+import app.mymusclemap.ui.components.UserMessage
 import app.mymusclemap.ui.components.UserMessageEffect
 import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.workout.TimerAudioMode
 import app.mymusclemap.ui.components.SegmentedControl
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 import app.mymusclemap.ui.theme.WeightTrackerTheme
 import java.util.Locale
 
 internal const val SETTINGS_ROOT = "settings-root"
+internal const val SETTINGS_CATEGORY_APPEARANCE = "settings-category-appearance"
+internal const val SETTINGS_CATEGORY_TRAINING = "settings-category-training"
+internal const val SETTINGS_CATEGORY_HEALTH = "settings-category-health"
+internal const val SETTINGS_CATEGORY_BACKUP = "settings-category-backup"
+internal const val SETTINGS_CATEGORY_ACCOUNT = "settings-category-account"
+internal const val SETTINGS_CATEGORY_ABOUT = "settings-category-about"
 internal const val SETTINGS_THEME_SYSTEM = "settings-theme-system"
 internal const val SETTINGS_THEME_LIGHT = "settings-theme-light"
 internal const val SETTINGS_THEME_DARK = "settings-theme-dark"
@@ -163,90 +173,155 @@ internal fun settingsPreviewPrimaryTag(hex: String): String = "settings-preview-
 
 @Composable
 fun SettingsScreen(
-    state: SettingsUiState,
-    onSelectDefaultPalette: () -> Unit,
-    onSelectCustomPalette: () -> Unit,
-    onEditingDarkChange: (Boolean) -> Unit,
-    onDraftFieldChange: (SeedField, String) -> Unit,
-    onDraftColorPicked: (SeedField, Int) -> Unit,
-    onGenerateDark: () -> Unit,
-    onSaveDraft: () -> Unit,
-    onCancelDraft: () -> Unit,
-    onResetCustomDraft: () -> Unit,
-    onAppBackupExportClick: () -> Unit,
-    onRestoreClick: () -> Unit,
-    onConfirmRestoreExplanation: () -> Unit,
-    onDismissRestoreExplanation: () -> Unit,
-    onDismissRestoreErrors: () -> Unit,
-    onSendFeedback: () -> Unit,
-    onOpenPrivacyPolicy: () -> Unit,
-    onOpenHelp: () -> Unit,
-    onOpenFounderProgram: () -> Unit = {},
-    showFounderProgram: Boolean = true,
-    showFounderBadge: Boolean = false,
-    onMessageConsumed: () -> Unit,
     onBack: () -> Unit,
-    health: HealthSettingsState = HealthSettingsState.NotConnected,
-    onHealthAction: () -> Unit = {},
-    onOpenHealthDetails: () -> Unit = {},
-    onRequestExerciseHistory: () -> Unit = {},
-    onSetWeeklyGoal: (Int) -> Unit = {},
-    onDisableWeeklyGoal: () -> Unit = {},
-    lockScreenSetCompletion: Boolean = false,
-    lockScreenAccessNote: LockScreenAccessNote? = null,
-    onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
-    onTimerAudioChange: (TimerAudioMode) -> Unit = {},
-    onOpenLockScreenAccessSettings: () -> Unit = {},
-    lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
-    onConfirmLockScreenEnable: () -> Unit = {},
-    onDismissLockScreenEnable: () -> Unit = {},
-    onOpenProPlan: () -> Unit = {},
-    accountName: String? = null,
-    accountEmail: String? = null,
-    onSignOut: () -> Unit = {},
-    onOpenDeleteAccount: () -> Unit = {},
-    showLanguageSetting: Boolean = false,
-    selectedLanguage: app.mymusclemap.domain.locale.AppLanguage =
-        app.mymusclemap.domain.locale.AppLanguage.EN,
-    onLanguageSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit = {},
-    selectedUnitSystem: app.mymusclemap.domain.units.UnitSystem =
-        app.mymusclemap.domain.units.UnitSystem.METRIC,
-    onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit = {},
-    selectedBodyModel: app.mymusclemap.domain.musclemap.MuscleMapBodyModel =
-        app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE,
-    onBodyModelSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit = {}
+    onOpenAppearance: () -> Unit,
+    onOpenTraining: () -> Unit,
+    onOpenHealth: () -> Unit,
+    onOpenBackup: () -> Unit,
+    onOpenAccount: () -> Unit,
+    onOpenAbout: () -> Unit
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
-    var weeklyGoalEditorOpen by remember { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
-    var lastSaveAt by remember { mutableLongStateOf(Long.MIN_VALUE / 2) }
-    val saveOnce: () -> Unit = {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastSaveAt >= 700L) {
-            lastSaveAt = now
-            onSaveDraft()
-        }
-    }
-    UserMessageEffect(state.userMessage, snackbarHostState, onMessageConsumed)
-    val customEditorVisible = state.draft != null && state.appearance.paletteType == PaletteType.Custom
-    val saveEnabled = state.draft != null &&
-        SeedField.entries.all { PaletteDraftLogic.fieldError(state.draft.valueFor(it)) == null }
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(SETTINGS_ROOT),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            if (customEditorVisible) {
-                SettingsSaveBar(
-                    saveEnabled = saveEnabled,
-                    onSave = saveOnce,
-                    onCancel = onCancelDraft
+    val categories = listOf(
+        SettingsCategory(
+            title = stringResource(R.string.settings_category_appearance),
+            subtitle = stringResource(R.string.settings_category_appearance_subtitle),
+            icon = Icons.Outlined.Palette,
+            testTag = SETTINGS_CATEGORY_APPEARANCE,
+            onClick = onOpenAppearance
+        ),
+        SettingsCategory(
+            title = stringResource(R.string.training_title),
+            subtitle = stringResource(R.string.settings_category_training_subtitle),
+            icon = Icons.Outlined.FitnessCenter,
+            testTag = SETTINGS_CATEGORY_TRAINING,
+            onClick = onOpenTraining
+        ),
+        SettingsCategory(
+            title = stringResource(R.string.health_connect_title),
+            subtitle = stringResource(R.string.settings_category_health_subtitle),
+            icon = Icons.Outlined.Favorite,
+            testTag = SETTINGS_CATEGORY_HEALTH,
+            onClick = onOpenHealth
+        ),
+        SettingsCategory(
+            title = stringResource(R.string.settings_category_backup),
+            subtitle = stringResource(R.string.settings_category_backup_subtitle),
+            icon = Icons.Outlined.CloudSync,
+            testTag = SETTINGS_CATEGORY_BACKUP,
+            onClick = onOpenBackup
+        ),
+        SettingsCategory(
+            title = stringResource(R.string.settings_category_account),
+            subtitle = stringResource(R.string.settings_category_account_subtitle),
+            icon = Icons.Outlined.Person,
+            testTag = SETTINGS_CATEGORY_ACCOUNT,
+            onClick = onOpenAccount
+        ),
+        SettingsCategory(
+            title = stringResource(R.string.about_title),
+            subtitle = stringResource(R.string.settings_category_about_subtitle),
+            icon = Icons.Outlined.Info,
+            testTag = SETTINGS_CATEGORY_ABOUT,
+            onClick = onOpenAbout
+        )
+    )
+    SettingsPage(
+        title = stringResource(R.string.settings_title),
+        onBack = onBack,
+        modifier = Modifier.testTag(SETTINGS_ROOT)
+    ) {
+        categories.forEachIndexed { index, category ->
+            SettingsCategoryRow(category)
+            if (index < categories.lastIndex) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = AppDimens.strokeThin
                 )
             }
         }
+    }
+}
+
+private data class SettingsCategory(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val testTag: String,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun SettingsCategoryRow(category: SettingsCategory) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 72.dp)
+            .clickable(onClick = category.onClick, role = Role.Button)
+            .testTag(category.testTag)
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    StrictBrand.blue.copy(alpha = 0.22f),
+                    RoundedCornerShape(AppDimens.cornerCompact)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = category.icon,
+                contentDescription = null,
+                tint = StrictBrand.lime,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = category.title,
+                style = AppTypeTokens.sectionTitle,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = category.subtitle,
+                style = AppTypeTokens.sectionSubtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+internal fun SettingsPage(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    userMessage: UserMessage? = null,
+    onMessageConsumed: () -> Unit = {},
+    bottomBar: @Composable () -> Unit = {},
+    padForNavigationBars: Boolean = true,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    UserMessageEffect(userMessage, snackbarHostState, onMessageConsumed)
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = bottomBar
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -254,194 +329,29 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .statusBarsPadding()
         ) {
-            SettingsHeader(onBack = onBack)
+            SettingsHeader(title = title, onBack = onBack)
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(scrollState)
                     .then(
-                        if (customEditorVisible) {
-                            Modifier
-                        } else {
+                        if (padForNavigationBars) {
                             Modifier.navigationBarsPadding()
+                        } else {
+                            Modifier
                         }
                     )
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = AppDimens.screenPadding)
-                    .padding(
-                        top = AppDimens.headerStackGap,
-                        bottom = if (customEditorVisible) AppDimens.itemGap else AppDimens.scrollEndPadding
-                    )
-            ) {
-                if (showLanguageSetting) {
-                    LanguageSection(
-                        selected = selectedLanguage,
-                        onSelected = onLanguageSelected
-                    )
-                    CompactEditorDivider()
-                }
-                MeasurementUnitsSection(
-                    selected = selectedUnitSystem,
-                    onSelected = onUnitSystemSelected
-                )
-                CompactEditorDivider()
-                MuscleMapBodyModelSection(
-                    selected = selectedBodyModel,
-                    onSelected = onBodyModelSelected
-                )
-                CompactEditorDivider()
-                AppearanceSection(
-                    state = state,
-                    customEditorVisible = customEditorVisible,
-                    onSelectDefaultPalette = onSelectDefaultPalette,
-                    onSelectCustomPalette = onSelectCustomPalette,
-                    onEditingDarkChange = onEditingDarkChange,
-                    onDraftFieldChange = onDraftFieldChange,
-                    onDraftColorPicked = onDraftColorPicked,
-                    onGenerateDark = onGenerateDark,
-                    onResetCustomDraft = onResetCustomDraft
-                )
-                CompactEditorDivider()
-                ProPlanSection(onOpenProPlan = onOpenProPlan)
-                CompactEditorDivider()
-                AccountSection(
-                    name = accountName,
-                    email = accountEmail,
-                    onSignOut = onSignOut,
-                    onOpenDeleteAccount = onOpenDeleteAccount
-                )
-                if (showFounderProgram) {
-                    CompactEditorDivider()
-                    FounderSection(
-                        foundingMember = showFounderBadge,
-                        onOpenFounderProgram = onOpenFounderProgram
-                    )
-                }
-                CompactEditorDivider()
-                TrainingSection(
-                    state = state,
-                    onOpenGoal = { weeklyGoalEditorOpen = true },
-                    lockScreenSetCompletion = lockScreenSetCompletion,
-                    lockScreenAccessNote = lockScreenAccessNote,
-                    onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
-                    onOpenLockScreenAccessSettings = onOpenLockScreenAccessSettings,
-                    timerAudio = state.timerAudio,
-                    onTimerAudioChange = onTimerAudioChange
-                )
-                CompactEditorDivider()
-                HealthConnectSettingsSection(
-                    state = health,
-                    onAction = onHealthAction,
-                    onOpenDetails = onOpenHealthDetails,
-                    onRequestHistory = onRequestExerciseHistory
-                )
-                CompactEditorDivider()
-                AppBackupSection(
-                    onExportClick = onAppBackupExportClick,
-                    onRestoreClick = onRestoreClick
-                )
-                CompactEditorDivider()
-                AboutSection(
-                    state = state,
-                    showFounderBadge = showFounderBadge,
-                    onSendFeedback = onSendFeedback,
-                    onOpenPrivacyPolicy = onOpenPrivacyPolicy,
-                    onOpenHelp = onOpenHelp
-                )
-                DeveloperToolsSection()
-            }
+                    .padding(top = AppDimens.headerStackGap, bottom = AppDimens.sectionGap),
+                content = content
+            )
         }
-    }
-    if (weeklyGoalEditorOpen) {
-        WeeklyGoalEditorSheet(
-            status = state.weeklyGoal,
-            onSave = onSetWeeklyGoal,
-            onDisable = onDisableWeeklyGoal,
-            onDismiss = { weeklyGoalEditorOpen = false }
-        )
-    }
-    val enablePrompt = lockScreenEnablePrompt
-    if (enablePrompt != null) {
-        AlertDialog(
-            onDismissRequest = onDismissLockScreenEnable,
-            title = { Text(stringResource(R.string.settings_lock_screen_sets_title)) },
-            text = {
-                Text(
-                    stringResource(R.string.settings_lock_screen_sets_explain) + "\n\n" +
-                        stringResource(
-                            if (enablePrompt == LockScreenEnablePrompt.OpenSettings) {
-                                R.string.settings_lock_screen_sets_open_settings_body
-                            } else {
-                                R.string.settings_lock_screen_sets_permission_reason
-                            }
-                        )
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = onConfirmLockScreenEnable,
-                    modifier = Modifier.testTag(SETTINGS_LOCK_SCREEN_ENABLE)
-                ) {
-                    Text(
-                        stringResource(
-                            if (enablePrompt == LockScreenEnablePrompt.OpenSettings) {
-                                R.string.action_open_settings
-                            } else {
-                                R.string.settings_lock_screen_enable
-                            }
-                        )
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = onDismissLockScreenEnable,
-                    modifier = Modifier.testTag(SETTINGS_LOCK_SCREEN_NOT_NOW)
-                ) {
-                    Text(stringResource(R.string.settings_lock_screen_not_now))
-                }
-            }
-        )
-    }
-    if (state.showRestoreExplanation) {
-        AlertDialog(
-            onDismissRequest = onDismissRestoreExplanation,
-            title = { Text(stringResource(R.string.restore_app_backup_title)) },
-            text = { Text(stringResource(R.string.restore_app_backup_body)) },
-            confirmButton = {
-                TextButton(onClick = onConfirmRestoreExplanation) {
-                    Text(stringResource(R.string.restore_app_backup_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissRestoreExplanation) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
-    if (state.restoreErrors.isNotEmpty()) {
-        AlertDialog(
-            onDismissRequest = onDismissRestoreErrors,
-            title = { Text(stringResource(R.string.restore_app_backup_error_title)) },
-            text = {
-                Column {
-                    state.restoreErrors.take(8).forEach { error ->
-                        Text(text = restoreErrorText(error))
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onDismissRestoreErrors) {
-                    Text(stringResource(R.string.action_ok))
-                }
-            }
-        )
     }
 }
 
 @Composable
-private fun SettingsHeader(onBack: () -> Unit) {
+private fun SettingsHeader(title: String, onBack: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -459,7 +369,7 @@ private fun SettingsHeader(onBack: () -> Unit) {
             )
         }
         Text(
-            text = stringResource(R.string.settings_title),
+            text = title,
             style = AppTypeTokens.sectionTitle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -469,7 +379,7 @@ private fun SettingsHeader(onBack: () -> Unit) {
 }
 
 @Composable
-private fun SettingsSaveBar(
+internal fun SettingsSaveBar(
     saveEnabled: Boolean,
     onSave: () -> Unit,
     onCancel: () -> Unit
@@ -518,7 +428,7 @@ private fun SettingsSaveBar(
 }
 
 @Composable
-private fun LanguageSection(
+internal fun LanguageSection(
     selected: app.mymusclemap.domain.locale.AppLanguage,
     onSelected: (app.mymusclemap.domain.locale.AppLanguage) -> Unit
 ) {
@@ -548,7 +458,7 @@ private fun LanguageSection(
 }
 
 @Composable
-private fun MeasurementUnitsSection(
+internal fun MeasurementUnitsSection(
     selected: app.mymusclemap.domain.units.UnitSystem,
     onSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit
 ) {
@@ -580,7 +490,7 @@ private fun MeasurementUnitsSection(
 }
 
 @Composable
-private fun MuscleMapBodyModelSection(
+internal fun MuscleMapBodyModelSection(
     selected: app.mymusclemap.domain.musclemap.MuscleMapBodyModel,
     onSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit
 ) {
@@ -610,7 +520,7 @@ private fun MuscleMapBodyModelSection(
 }
 
 @Composable
-private fun AppearanceSection(
+internal fun AppearanceSection(
     state: SettingsUiState,
     customEditorVisible: Boolean,
     onSelectDefaultPalette: () -> Unit,
@@ -991,7 +901,7 @@ private fun ChoiceRow(
 }
 
 @Composable
-private fun TrainingSection(
+internal fun TrainingSection(
     state: SettingsUiState,
     onOpenGoal: () -> Unit,
     lockScreenSetCompletion: Boolean,
@@ -1143,7 +1053,7 @@ private fun LockScreenSetCompletionRow(
 }
 
 @Composable
-private fun AppBackupSection(
+internal fun AppBackupSection(
     onExportClick: () -> Unit,
     onRestoreClick: () -> Unit
 ) {
@@ -1172,7 +1082,7 @@ private fun AppBackupSection(
 }
 
 @Composable
-private fun AccountSection(
+internal fun AccountSection(
     name: String?,
     email: String?,
     onSignOut: () -> Unit,
@@ -1201,12 +1111,15 @@ private fun AccountSection(
             testTag = SETTINGS_SIGN_OUT,
             onClick = { confirm = true }
         )
+        Spacer(Modifier.height(AppDimens.sectionGap))
+        HorizontalDivider(color = MaterialTheme.colorScheme.error.copy(alpha = 0.35f))
         DataActionRow(
             icon = Icons.Outlined.Delete,
             title = stringResource(R.string.settings_delete_account),
             subtitle = stringResource(R.string.settings_delete_account_subtitle),
             testTag = SETTINGS_DELETE_ACCOUNT,
-            onClick = onOpenDeleteAccount
+            onClick = onOpenDeleteAccount,
+            destructive = true
         )
     }
     if (confirm) {
@@ -1232,7 +1145,7 @@ private fun AccountSection(
 }
 
 @Composable
-private fun ProPlanSection(onOpenProPlan: () -> Unit) {
+internal fun ProPlanSection(onOpenProPlan: () -> Unit) {
     CompactEditorSection(title = settingsKicker(stringResource(R.string.settings_pro_plan))) {
         DataActionRow(
             icon = Icons.Filled.Star,
@@ -1245,7 +1158,7 @@ private fun ProPlanSection(onOpenProPlan: () -> Unit) {
 }
 
 @Composable
-private fun FounderSection(
+internal fun FounderSection(
     foundingMember: Boolean,
     onOpenFounderProgram: () -> Unit
 ) {
@@ -1265,7 +1178,7 @@ private fun FounderSection(
 }
 
 @Composable
-private fun AboutSection(
+internal fun AboutSection(
     state: SettingsUiState,
     showFounderBadge: Boolean,
     onSendFeedback: () -> Unit,
@@ -1337,18 +1250,20 @@ private fun DataActionRow(
     subtitle: String,
     testTag: String,
     onClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    destructive: Boolean = false
 ) {
-    val titleColor = if (enabled) {
-        MaterialTheme.colorScheme.onBackground
-    } else {
-        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
+    val titleColor = when {
+        !enabled -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
+        destructive -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onBackground
     }
     val secondaryColor = if (enabled) {
         MaterialTheme.colorScheme.onSurfaceVariant
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
     }
+    val iconTint = if (destructive && enabled) titleColor else secondaryColor
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1360,7 +1275,7 @@ private fun DataActionRow(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = secondaryColor,
+            tint = iconTint,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(AppDimens.itemGap))
@@ -1390,7 +1305,7 @@ private fun DataActionRow(
 }
 
 @Composable
-private fun restoreErrorText(error: AppBackupError): String {
+internal fun restoreErrorText(error: AppBackupError): String {
     val reason = when (error.code) {
         AppBackupErrorCode.UnsupportedFormatVersion,
         AppBackupErrorCode.UnsupportedSchemaVersion,
@@ -1435,7 +1350,7 @@ private fun settingsKicker(text: String): String {
     return text.uppercase(AppLocale.UI)
 }
 
-private fun PaletteDraft.valueFor(field: SeedField): String {
+internal fun PaletteDraft.valueFor(field: SeedField): String {
     return if (editingDark) {
         when (field) {
             SeedField.Background -> darkBackground
@@ -1490,26 +1405,13 @@ private fun PaletteValidationError.messageRes(): Int {
 private fun SettingsPreview() {
     WeightTrackerTheme {
         SettingsScreen(
-            state = SettingsUiState(appearance = AppearanceSettings.Default),
-            onSelectDefaultPalette = {},
-            onSelectCustomPalette = {},
-            onEditingDarkChange = {},
-            onDraftFieldChange = { _, _ -> },
-            onDraftColorPicked = { _, _ -> },
-            onGenerateDark = {},
-            onSaveDraft = {},
-            onCancelDraft = {},
-            onResetCustomDraft = {},
-            onAppBackupExportClick = {},
-            onRestoreClick = {},
-            onConfirmRestoreExplanation = {},
-            onDismissRestoreExplanation = {},
-            onDismissRestoreErrors = {},
-            onSendFeedback = {},
-            onOpenPrivacyPolicy = {},
-            onOpenHelp = {},
-            onMessageConsumed = {},
-            onBack = {}
+            onBack = {},
+            onOpenAppearance = {},
+            onOpenTraining = {},
+            onOpenHealth = {},
+            onOpenBackup = {},
+            onOpenAccount = {},
+            onOpenAbout = {}
         )
     }
 }
