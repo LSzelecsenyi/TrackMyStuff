@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,7 @@ import app.mymusclemap.ui.theme.StrictBrand
 
 internal const val BOTTOM_BAR = "app-bottom-bar"
 internal const val BOTTOM_OVERVIEW = "app-bottom-overview"
+internal const val BOTTOM_LIBRARY = "app-bottom-library"
 internal const val BOTTOM_WORKOUT_ACTION = "app-bottom-workout-action"
 internal const val BOTTOM_STATISTICS = "app-bottom-statistics"
 internal const val BOTTOM_JOURNAL = "app-bottom-journal"
@@ -64,6 +66,7 @@ fun AppBottomBar(
     selectedRoute: String?,
     hasActiveSession: Boolean,
     onOverview: () -> Unit,
+    onLibrary: () -> Unit,
     onStatistics: () -> Unit,
     onJournal: () -> Unit,
     onWorkoutAction: () -> Unit,
@@ -107,6 +110,15 @@ fun AppBottomBar(
                 modifier = Modifier
                     .weight(1f)
                     .testTag(BOTTOM_OVERVIEW)
+            )
+            BottomTab(
+                label = stringResource(R.string.nav_library),
+                icon = Icons.AutoMirrored.Outlined.LibraryBooks,
+                selected = selectedRoute == AppRoutes.LIBRARY,
+                onClick = onLibrary,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(BOTTOM_LIBRARY)
             )
             WorkoutActionButton(
                 label = workoutLabel,
@@ -164,9 +176,9 @@ private fun WorkoutActionButton(
         } else {
             MaterialTheme.colorScheme.primary
         }
-        Box(
+            Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(56.dp)
                 .onGloballyPositioned { coordinates ->
                     onBoundsInRoot(coordinates.boundsInRoot())
                 }
@@ -185,7 +197,7 @@ private fun WorkoutActionButton(
                 imageVector = Icons.Outlined.FitnessCenter,
                 contentDescription = null,
                 tint = actionContent,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(32.dp)
             )
         }
     }

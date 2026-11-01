@@ -21,7 +21,7 @@ object AppDimens {
     val headerStackGap = 6.dp
     val statSecondaryGap = 2.dp
     val sectionDividerSpace = 16.dp
-    val navBarHeight = 56.dp
+    val navBarHeight = 64.dp
     val navIndicatorThickness = 2.dp
     val navIndicatorWidth = 28.dp
 }

@@ -21,14 +21,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -75,7 +72,6 @@ import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.domain.DashboardSnapshot
 import app.mymusclemap.domain.WeeklyOverview
 import app.mymusclemap.domain.WeeklyOverviewLogic
-import app.mymusclemap.domain.achievements.AchievementId
 import app.mymusclemap.domain.achievements.OverviewAchievements
 import app.mymusclemap.ui.achievements.OverviewAchievementsCard
 import app.mymusclemap.domain.calendar.MonthGridCalculator
@@ -109,13 +105,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import app.mymusclemap.ui.units.LocalUnitSystem
 
-internal const val OVERVIEW_OVERFLOW_ANCHOR = "overview-overflow-anchor"
-internal const val OVERVIEW_OVERFLOW_BUTTON = "overview-overflow-button"
-internal const val OVERVIEW_OVERFLOW_MENU = "overview-overflow-menu"
-internal const val OVERVIEW_OVERFLOW_TEMPLATES = "overview-overflow-templates"
-internal const val OVERVIEW_OVERFLOW_EXERCISES = "overview-overflow-exercises"
-internal const val OVERVIEW_OVERFLOW_SETTINGS = "overview-overflow-settings"
-internal const val OVERVIEW_OVERFLOW_ACHIEVEMENTS = "overview-overflow-achievements"
+internal const val OVERVIEW_SETTINGS = "overview-settings"
 internal const val OVERVIEW_MEMBERSHIP_BADGE = "overview-membership-badge"
 internal const val OVERVIEW_MEMBERSHIP_INFO = "overview-membership-info"
 private val HeatmapCoachCalloutSpace = 176.dp
@@ -144,8 +134,6 @@ fun DashboardScreen(
     onDeleteConfirm: () -> Unit,
     onMessageConsumed: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenTemplates: () -> Unit,
-    onOpenCatalog: () -> Unit,
     onOpenWorkout: (Long) -> Unit,
     onOpenWeightDetails: () -> Unit,
     onOpenMuscleInsights: (app.mymusclemap.domain.exercise.MuscleGroup) -> Unit = {},
@@ -185,7 +173,6 @@ fun DashboardScreen(
     showTrainingCompleteMilestone: Boolean = false,
     onAcknowledgeTrainingComplete: () -> Unit = {},
     overviewAchievements: OverviewAchievements? = null,
-    onOpenAchievement: (AchievementId) -> Unit = {},
     onOpenAchievements: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -262,10 +249,7 @@ fun DashboardScreen(
                 today = state.today,
                 membership = membership,
                 onMembershipClick = { membershipInfoOpen = true },
-                onOpenSettings = onOpenSettings,
-                onOpenTemplates = onOpenTemplates,
-                onOpenCatalog = onOpenCatalog,
-                onOpenAchievements = onOpenAchievements
+                onOpenSettings = onOpenSettings
             )
             if (state.onboarding.reminderVisible) {
                 OverviewSectionDivider()
@@ -311,8 +295,7 @@ fun DashboardScreen(
                 OverviewAchievementsCard(
                     achievements = overviewAchievements,
                     today = state.today,
-                    onViewAll = onOpenAchievements,
-                    onOpenAchievement = onOpenAchievement
+                    onViewAll = onOpenAchievements
                 )
             }
             OverviewSectionDivider()
@@ -563,10 +546,7 @@ private fun OverviewHeader(
     today: LocalDate,
     membership: MembershipPresentation,
     onMembershipClick: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenTemplates: () -> Unit,
-    onOpenCatalog: () -> Unit,
-    onOpenAchievements: () -> Unit
+    onOpenSettings: () -> Unit
 ) {
     val dateRange = UiFormatters.inclusiveDateRange(
         WeeklyOverviewLogic.windowStart(today),
@@ -625,12 +605,19 @@ private fun OverviewHeader(
                     presentation = membership,
                     onClick = onMembershipClick
                 )
-                OverviewOverflowMenu(
-                    onOpenTemplates = onOpenTemplates,
-                    onOpenCatalog = onOpenCatalog,
-                    onOpenSettings = onOpenSettings,
-                    onOpenAchievements = onOpenAchievements
-                )
+                IconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier
+                        .size(AppDimens.minTouch)
+                        .testTag(OVERVIEW_SETTINGS)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = stringResource(R.string.settings_title),
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
         Row(
@@ -737,75 +724,6 @@ private fun MembershipInfoDialog(
 }
 
 @Composable
-private fun OverviewOverflowMenu(
-    onOpenTemplates: () -> Unit,
-    onOpenCatalog: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenAchievements: () -> Unit
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    Box(
-        modifier = Modifier
-            .wrapContentSize(Alignment.TopEnd)
-            .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
-            .testTag(OVERVIEW_OVERFLOW_ANCHOR),
-        contentAlignment = Alignment.TopEnd
-    ) {
-        IconButton(
-            onClick = { menuOpen = true },
-            modifier = Modifier
-                .size(AppDimens.minTouch)
-                .testTag(OVERVIEW_OVERFLOW_BUTTON)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.MoreVert,
-                contentDescription = stringResource(R.string.action_more_overview),
-                modifier = Modifier.size(22.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
-            modifier = Modifier.testTag(OVERVIEW_OVERFLOW_MENU)
-        ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.templates_title)) },
-                onClick = {
-                    menuOpen = false
-                    onOpenTemplates()
-                },
-                modifier = Modifier.testTag(OVERVIEW_OVERFLOW_TEMPLATES)
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.exercises_title)) },
-                onClick = {
-                    menuOpen = false
-                    onOpenCatalog()
-                },
-                modifier = Modifier.testTag(OVERVIEW_OVERFLOW_EXERCISES)
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.achievements_title)) },
-                onClick = {
-                    menuOpen = false
-                    onOpenAchievements()
-                },
-                modifier = Modifier.testTag(OVERVIEW_OVERFLOW_ACHIEVEMENTS)
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.settings_title)) },
-                onClick = {
-                    menuOpen = false
-                    onOpenSettings()
-                },
-                modifier = Modifier.testTag(OVERVIEW_OVERFLOW_SETTINGS)
-            )
-        }
-    }
-}
-
-@Composable
 private fun WeeklyStatDivider() {
     Box(
         modifier = Modifier
@@ -900,8 +818,6 @@ private fun DashboardPreview() {
             onDeleteConfirm = {},
             onMessageConsumed = {},
             onOpenSettings = {},
-            onOpenTemplates = {},
-            onOpenCatalog = {},
             onOpenWorkout = {},
             onOpenWeightDetails = {}
         )
@@ -938,8 +854,6 @@ private fun EmptyDashboardPreview() {
             onDeleteConfirm = {},
             onMessageConsumed = {},
             onOpenSettings = {},
-            onOpenTemplates = {},
-            onOpenCatalog = {},
             onOpenWorkout = {},
             onOpenWeightDetails = {}
         )

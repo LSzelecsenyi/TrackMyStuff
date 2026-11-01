@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Strict</string>
     <string name="nav_dashboard">Áttekintés</string>
+    <string name="nav_library">Könyvtár</string>
     <string name="nav_workout">Edzés</string>
     <string name="nav_journal">Napló</string>
     <string name="history_title">Napló</string>

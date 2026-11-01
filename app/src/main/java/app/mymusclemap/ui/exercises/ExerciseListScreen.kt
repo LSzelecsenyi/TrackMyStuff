@@ -115,7 +115,8 @@ fun ExerciseListScreen(
     onExplorePro: () -> Unit = {},
     onRequestRelease: (Exercise) -> Unit = {},
     onDismissRelease: () -> Unit = {},
-    onConfirmRelease: () -> Unit = {}
+    onConfirmRelease: () -> Unit = {},
+    embedded: Boolean = false
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -146,7 +147,7 @@ fun ExerciseListScreen(
         Column(
             modifier = Modifier
                 .padding(innerPadding)
-                .statusBarsPadding()
+                .then(if (embedded) Modifier else Modifier.statusBarsPadding())
                 .fillMaxSize()
                 .padding(horizontal = AppDimens.screenPadding)
         ) {
@@ -156,22 +157,26 @@ fun ExerciseListScreen(
                     .defaultMinSize(minHeight = AppDimens.minTouch),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(AppDimens.minTouch)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.action_back)
+                if (!embedded) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(AppDimens.minTouch)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.exercises_title),
+                        style = AppTypeTokens.sectionTitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
-                Text(
-                    text = stringResource(R.string.exercises_title),
-                    style = AppTypeTokens.sectionTitle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
                 IconButton(
                     onClick = { navigateOnce(onAdd) },
                     modifier = Modifier

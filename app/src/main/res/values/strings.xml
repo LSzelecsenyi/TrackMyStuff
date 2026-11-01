@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Strict</string>
     <string name="nav_dashboard">Overview</string>
+    <string name="nav_library">Library</string>
     <string name="nav_workout">Workout</string>
     <string name="nav_journal">Journal</string>
     <string name="history_title">Journal</string>

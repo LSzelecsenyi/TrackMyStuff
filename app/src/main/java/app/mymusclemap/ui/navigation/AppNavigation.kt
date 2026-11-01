@@ -28,6 +28,7 @@ object AppRoutes {
     const val REPORTS = "reports"
     const val REPORT_DETAIL = "report_detail"
     const val REPORT_DETAIL_PATTERN = "report_detail?kind={kind}&start={start}"
+    const val LIBRARY = "library"
     const val EXERCISES = "exercises"
     const val EXERCISE_EDITOR = "exercise_editor"
     const val EXERCISE_EDITOR_PATTERN = "exercise_editor?exerciseId={exerciseId}"
@@ -68,6 +69,7 @@ data class InternalNavigation(
 object AppNavigation {
     val rootTabs: List<RootTab> = listOf(
         RootTab(AppRoutes.OVERVIEW, R.string.nav_dashboard),
+        RootTab(AppRoutes.LIBRARY, R.string.nav_library),
         RootTab(AppRoutes.STATISTICS_GRAPH, R.string.statistics_title),
         RootTab(AppRoutes.JOURNAL, R.string.nav_journal)
     )
@@ -76,6 +78,7 @@ object AppNavigation {
 
     private val bottomBarRoutes: Set<String> = setOf(
         AppRoutes.OVERVIEW,
+        AppRoutes.LIBRARY,
         AppRoutes.JOURNAL,
         AppRoutes.STATISTICS,
         AppRoutes.EXERCISES,
@@ -97,6 +100,7 @@ object AppNavigation {
     fun bottomTabRoute(route: String?): String? {
         return when (val canonical = canonicalRoute(route)) {
             AppRoutes.STATISTICS, AppRoutes.STATISTICS_GRAPH -> AppRoutes.STATISTICS
+            AppRoutes.LIBRARY, AppRoutes.TEMPLATES, AppRoutes.EXERCISES -> AppRoutes.LIBRARY
             else -> canonical
         }
     }
@@ -106,7 +110,7 @@ object AppNavigation {
     }
 
     fun catalogEntryPoint(): String {
-        return AppRoutes.OVERVIEW
+        return AppRoutes.LIBRARY
     }
 
     fun settingsContainsCatalog(): Boolean {
@@ -243,7 +247,10 @@ object AppNavigation {
 
     fun backFromRootTab(currentRoute: String?): String? {
         return when (canonicalRoute(currentRoute)) {
-            AppRoutes.JOURNAL, AppRoutes.STATISTICS, AppRoutes.STATISTICS_GRAPH -> AppRoutes.OVERVIEW
+            AppRoutes.LIBRARY,
+            AppRoutes.JOURNAL,
+            AppRoutes.STATISTICS,
+            AppRoutes.STATISTICS_GRAPH -> AppRoutes.OVERVIEW
             else -> null
         }
     }

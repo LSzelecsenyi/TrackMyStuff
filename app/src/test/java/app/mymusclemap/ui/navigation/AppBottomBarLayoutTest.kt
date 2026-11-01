@@ -45,6 +45,7 @@ class AppBottomBarLayoutTest {
         var workouts = 0
         render(hasActiveSession = false, onWorkoutAction = { workouts += 1 })
         composeRule.onNodeWithText(testString(R.string.nav_dashboard)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.nav_library)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.statistics_title)).assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.nav_journal)).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.nav_workout)).assertCountEquals(0)
@@ -76,18 +77,60 @@ class AppBottomBarLayoutTest {
     fun given360DpAndLargeFontWhenBarAppearsThenItemsDoNotOverlapAndStay48Dp() {
         render(fontScale = 1.3f)
         val overview = composeRule.onNodeWithTag(BOTTOM_OVERVIEW).getBoundsInRoot()
+        val library = composeRule.onNodeWithTag(BOTTOM_LIBRARY).getBoundsInRoot()
         val action = composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).getBoundsInRoot()
         val statistics = composeRule.onNodeWithTag(BOTTOM_STATISTICS).getBoundsInRoot()
         val journal = composeRule.onNodeWithTag(BOTTOM_JOURNAL).getBoundsInRoot()
-        assertFalse("overview and action overlap $overview $action", overlaps(overview, action))
+        assertTrue(overview.left < library.left)
+        assertTrue(library.left < action.left)
+        assertTrue(action.left < statistics.left)
+        assertTrue(statistics.left < journal.left)
+        val center = (action.left + action.right) / 2
+        assertTrue("workout should sit in the center", center > 160.dp && center < 200.dp)
+        assertFalse("overview and library overlap $overview $library", overlaps(overview, library))
+        assertFalse("library and action overlap $library $action", overlaps(library, action))
         assertFalse("action and statistics overlap $action $statistics", overlaps(action, statistics))
         assertFalse("statistics and journal overlap $statistics $journal", overlaps(statistics, journal))
-        listOf(overview, action, statistics, journal).forEach { bounds ->
+        listOf(overview, library, action, statistics, journal).forEach { bounds ->
             assertTrue("touch width $bounds", bounds.right - bounds.left >= 48.dp)
             assertTrue("touch height $bounds", bounds.bottom - bounds.top >= 48.dp)
             assertTrue("stays on 360dp $bounds", bounds.right <= 360.dp + 1.dp)
             assertTrue("stays on screen $bounds", bounds.left >= (-1).dp)
         }
+    }
+
+    @Test
+    fun fiveItemsStayApartOnANarrowScreen() {
+        render(width = 320.dp)
+        val overview = composeRule.onNodeWithTag(BOTTOM_OVERVIEW).getBoundsInRoot()
+        val library = composeRule.onNodeWithTag(BOTTOM_LIBRARY).getBoundsInRoot()
+        val action = composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).getBoundsInRoot()
+        val statistics = composeRule.onNodeWithTag(BOTTOM_STATISTICS).getBoundsInRoot()
+        val journal = composeRule.onNodeWithTag(BOTTOM_JOURNAL).getBoundsInRoot()
+        listOf(
+            overview to library,
+            library to action,
+            action to statistics,
+            statistics to journal
+        ).forEach { (first, second) ->
+            assertFalse("overlap $first $second", overlaps(first, second))
+        }
+        listOf(overview, library, action, statistics, journal).forEach { bounds ->
+            assertTrue("touch width $bounds", bounds.right - bounds.left >= 48.dp)
+            assertTrue("stays on 320dp $bounds", bounds.right <= 320.dp + 1.dp)
+        }
+    }
+
+    @Test
+    fun libraryTabSelectsTheLibraryDestination() {
+        var opened = 0
+        render(selectedRoute = AppRoutes.LIBRARY, onLibrary = { opened += 1 })
+        composeRule.onNodeWithTag(BOTTOM_LIBRARY).performClick()
+        assertEquals(1, opened)
+        composeRule.onNodeWithTag(BOTTOM_LIBRARY)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        composeRule.onNodeWithTag(BOTTOM_OVERVIEW)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, false))
     }
 
     @Test
@@ -107,6 +150,8 @@ class AppBottomBarLayoutTest {
         fontScale: Float = 1f,
         highlightWorkoutAction: Boolean = false,
         selectedRoute: String = AppRoutes.OVERVIEW,
+        width: androidx.compose.ui.unit.Dp = 360.dp,
+        onLibrary: () -> Unit = {},
         onStatistics: () -> Unit = {},
         onWorkoutAction: () -> Unit = {}
     ) {
@@ -118,7 +163,7 @@ class AppBottomBarLayoutTest {
                 WeightTrackerThemeForPreview {
                     Box(
                         modifier = Modifier
-                            .width(360.dp)
+                            .width(width)
                             .fillMaxSize()
                     ) {
                         AppBottomBar(
@@ -126,6 +171,7 @@ class AppBottomBarLayoutTest {
                             hasActiveSession = hasActiveSession,
                             highlightWorkoutAction = highlightWorkoutAction,
                             onOverview = {},
+                            onLibrary = onLibrary,
                             onStatistics = onStatistics,
                             onJournal = {},
                             onWorkoutAction = onWorkoutAction

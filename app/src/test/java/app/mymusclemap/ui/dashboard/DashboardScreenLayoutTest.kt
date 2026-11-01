@@ -149,20 +149,23 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun weeklyOverviewKeepsOverflowOnTheHeaderRight() {
-        render()
+    fun weeklyOverviewKeepsSettingsOnTheHeaderRight() {
+        var settings = 0
+        render(onOpenSettings = { settings += 1 })
         val header = composeRule.onNodeWithTag("dashboard_weekly_header").getBoundsInRoot()
         val kicker = composeRule.onNodeWithTag("dashboard_weekly_kicker").getBoundsInRoot()
-        val overflow = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_BUTTON).getBoundsInRoot()
+        val gear = composeRule.onNodeWithTag(OVERVIEW_SETTINGS).getBoundsInRoot()
         val stats = composeRule.onNodeWithTag("dashboard_weekly_stats").getBoundsInRoot()
-        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).assertIsDisplayed()
-        assertTrue("overflow should sit right of the title", overflow.left >= kicker.right - 1.dp)
-        assertTrue("overflow should stay in the header row", overflow.top >= header.top - 1.dp)
-        assertTrue("overflow should stay in the header row", overflow.bottom <= header.bottom + 1.dp)
-        assertTrue("overflow should not float into the stats band", overflow.bottom <= stats.top + 1.dp)
-        assertTrue("overflow should stay on screen", overflow.right <= 360.dp + 1.dp)
-        assertTrue(overflow.right - overflow.left >= 48.dp)
-        assertTrue(overflow.bottom - overflow.top >= 48.dp)
+        composeRule.onNodeWithContentDescription(testString(R.string.settings_title)).assertIsDisplayed()
+        composeRule.onNodeWithTag(OVERVIEW_SETTINGS).performClick()
+        assertEquals(1, settings)
+        assertTrue("settings should sit right of the title", gear.left >= kicker.right - 1.dp)
+        assertTrue("settings should stay in the header row", gear.top >= header.top - 1.dp)
+        assertTrue("settings should stay in the header row", gear.bottom <= header.bottom + 1.dp)
+        assertTrue("settings should not float into the stats band", gear.bottom <= stats.top + 1.dp)
+        assertTrue("settings should stay on screen", gear.right <= 360.dp + 1.dp)
+        assertTrue(gear.right - gear.left >= 48.dp)
+        assertTrue(gear.bottom - gear.top >= 48.dp)
     }
 
     @Test
@@ -226,61 +229,14 @@ class DashboardScreenLayoutTest {
     }
 
     @Test
-    fun givenOverflowMenuWhenOpenedThenItStaysOnTheRightAndRoutesFireOnce() {
-        var templates = 0
-        var catalog = 0
+    fun settingsGearOpensSettingsWithoutAnOverflowMenu() {
         var settings = 0
-        var achievements = 0
-        render(
-            onOpenTemplates = { templates += 1 },
-            onOpenCatalog = { catalog += 1 },
-            onOpenSettings = { settings += 1 },
-            onOpenAchievements = { achievements += 1 }
-        )
-        val header = composeRule.onNodeWithTag("dashboard_weekly_header").getBoundsInRoot()
-        val anchor = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_ANCHOR, useUnmergedTree = true).getBoundsInRoot()
-        val button = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_BUTTON).getBoundsInRoot()
-        assertTrue(
-            "anchor should wrap the overflow icon, not the header: anchor=$anchor header=$header",
-            anchor.right - anchor.left < (header.right - header.left) / 2
-        )
-        assertTrue(
-            "anchor should sit on the right of the header: anchor=$anchor header=$header",
-            anchor.left > (header.left + header.right) / 2
-        )
-        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_MENU).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.templates_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.exercises_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.achievements_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.settings_title)).assertIsDisplayed()
-        composeRule.onAllNodesWithText(testString(R.string.nav_journal)).assertCountEquals(0)
-        val menu = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_MENU).getBoundsInRoot()
-        val popup = popupWindowLayoutParams().maxByOrNull { params -> params.x }
-            ?: error("expected a DropdownMenu popup window")
-        val density = composeRule.density.density
-        val popupLeft = (popup.x / density).dp
-        val popupRight = popupLeft + (menu.right - menu.left)
-        assertTrue(
-            "menu must not open at the left edge: popupLeft=$popupLeft popupRight=$popupRight button=$button",
-            popupLeft > 40.dp
-        )
-        assertTrue(
-            "menu should stay on the right near the overflow icon: popupRight=$popupRight header=$header",
-            popupRight > (header.left + header.right) / 2
-        )
-        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_TEMPLATES).performClick()
-        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
-        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_EXERCISES).performClick()
-        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
-        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_ACHIEVEMENTS).performClick()
-        composeRule.onNodeWithContentDescription(testString(R.string.action_more_overview)).performClick()
-        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_SETTINGS).performClick()
-        assertEquals(1, templates)
-        assertEquals(1, catalog)
-        assertEquals(1, achievements)
+        render(onOpenSettings = { settings += 1 })
+        composeRule.onNodeWithContentDescription(testString(R.string.settings_title)).performClick()
         assertEquals(1, settings)
+        composeRule.onNodeWithText(testString(R.string.templates_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.exercises_title)).assertDoesNotExist()
+        composeRule.onAllNodesWithText(testString(R.string.achievements_title)).assertCountEquals(0)
     }
 
     @Test
@@ -420,7 +376,7 @@ class DashboardScreenLayoutTest {
     private fun assertWeeklyOverviewFitsWithoutClipOrOverlap() {
         val header = composeRule.onNodeWithTag("dashboard_weekly_header").getBoundsInRoot()
         val kicker = composeRule.onNodeWithTag("dashboard_weekly_kicker").getBoundsInRoot()
-        val overflow = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_BUTTON).getBoundsInRoot()
+        val overflow = composeRule.onNodeWithTag(OVERVIEW_SETTINGS).getBoundsInRoot()
         val workouts = composeRule.onNodeWithTag("dashboard_stat_workouts").getBoundsInRoot()
         val sets = composeRule.onNodeWithTag("dashboard_stat_sets").getBoundsInRoot()
         val weight = composeRule.onNodeWithTag("dashboard_stat_weight").getBoundsInRoot()
@@ -429,7 +385,7 @@ class DashboardScreenLayoutTest {
             "dashboard_weekly_header",
             "dashboard_weekly_kicker",
             "dashboard_weekly_range",
-            OVERVIEW_OVERFLOW_BUTTON,
+            OVERVIEW_SETTINGS,
             "dashboard_weekly_stats",
             "dashboard_stat_workouts",
             "dashboard_stat_sets",
@@ -917,8 +873,6 @@ class DashboardScreenLayoutTest {
         monthGrid: MonthGrid? = null,
         onDaySelected: (LocalDate) -> Unit = {},
         onOpenWeightDetails: () -> Unit = {},
-        onOpenTemplates: () -> Unit = {},
-        onOpenCatalog: () -> Unit = {},
         onOpenSettings: () -> Unit = {},
         onOpenAchievements: () -> Unit = {},
         entitlements: FeatureEntitlements = OpenFeatureEntitlements,
@@ -1002,8 +956,6 @@ class DashboardScreenLayoutTest {
                             onMessageConsumed = {},
                             onOpenSettings = onOpenSettings,
                             onOpenAchievements = onOpenAchievements,
-                            onOpenTemplates = onOpenTemplates,
-                            onOpenCatalog = onOpenCatalog,
                             onOpenWorkout = {},
                             onOpenWeightDetails = onOpenWeightDetails,
                             onContinueOnboarding = onContinueOnboarding,
@@ -1021,22 +973,5 @@ class DashboardScreenLayoutTest {
             }
         }
         composeRule.waitForIdle()
-    }
-
-    private fun popupWindowLayoutParams(): List<android.view.WindowManager.LayoutParams> {
-        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
-        val wm = context.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
-        val shadow = org.robolectric.Shadows.shadowOf(wm)
-        val viewsMethod = generateSequence(shadow.javaClass as Class<*>?) { type -> type.superclass }
-            .mapNotNull { type ->
-                type.methods.firstOrNull { method ->
-                    method.name == "getViews" && method.parameterCount == 0
-                }
-            }
-            .firstOrNull()
-        val views = viewsMethod?.invoke(shadow) as? List<*> ?: emptyList<Any>()
-        return views.mapNotNull { view ->
-            (view as? android.view.View)?.layoutParams as? android.view.WindowManager.LayoutParams
-        }
     }
 }

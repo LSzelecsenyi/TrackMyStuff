@@ -15,7 +15,9 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
@@ -72,8 +74,6 @@ class OverviewAchievementsCardTest {
                     onDeleteConfirm = {},
                     onMessageConsumed = {},
                     onOpenSettings = {},
-                    onOpenTemplates = {},
-                    onOpenCatalog = {},
                     onOpenWorkout = {},
                     onOpenWeightDetails = {}
                 )
@@ -91,8 +91,7 @@ class OverviewAchievementsCardTest {
                 OverviewAchievementsCard(
                     achievements = BadgeWallPresenter.overview(board()),
                     today = today,
-                    onViewAll = {},
-                    onOpenAchievement = {}
+                    onViewAll = {}
                 )
             }
         }
@@ -119,8 +118,7 @@ class OverviewAchievementsCardTest {
                 OverviewAchievementsCard(
                     achievements = counted,
                     today = today,
-                    onViewAll = {},
-                    onOpenAchievement = {}
+                    onViewAll = {}
                 )
             }
         }
@@ -149,8 +147,7 @@ class OverviewAchievementsCardTest {
                 OverviewAchievementsCard(
                     achievements = overview,
                     today = today,
-                    onViewAll = {},
-                    onOpenAchievement = {}
+                    onViewAll = {}
                 )
             }
         }
@@ -173,8 +170,7 @@ class OverviewAchievementsCardTest {
                 OverviewAchievementsCard(
                     achievements = overview,
                     today = today,
-                    onViewAll = {},
-                    onOpenAchievement = {}
+                    onViewAll = {}
                 )
             }
         }
@@ -187,9 +183,8 @@ class OverviewAchievementsCardTest {
     }
 
     @Test
-    fun headerAndAchievementAreasAreSeparateTargets() {
+    fun theWholeCardOpensTheBadgeWallOncePerTap() {
         var viewed = 0
-        var opened: AchievementId? = null
         val today = LocalDate.of(2026, 10, 20)
         composeRule.setContent {
             WeightTrackerThemeForPreview(seeds = ThemeSeeds.DefaultLight, darkTheme = true) {
@@ -201,19 +196,18 @@ class OverviewAchievementsCardTest {
                         )
                     ),
                     today = today,
-                    onViewAll = { viewed += 1 },
-                    onOpenAchievement = { opened = it }
+                    onViewAll = { viewed += 1 }
                 )
             }
         }
-        composeRule.onNodeWithTag(OVERVIEW_ACHIEVEMENTS_VIEW_ALL).performClick()
-        assertEquals(1, viewed)
-        assertNull(opened)
-        composeRule.onNodeWithTag(OVERVIEW_ACHIEVEMENTS_LATEST).performClick()
-        assertEquals(AchievementId.FIRST_PR, opened)
-        composeRule.onNodeWithTag(OVERVIEW_ACHIEVEMENTS_UPCOMING).performClick()
-        assertEquals(AchievementId.WORKOUTS_10, opened)
-        assertEquals(1, viewed)
+        composeRule.onNodeWithTag(OVERVIEW_ACHIEVEMENTS).performClick()
+        composeRule.onNodeWithTag(OVERVIEW_ACHIEVEMENTS_VIEW_ALL, useUnmergedTree = true)
+            .performTouchInput { click() }
+        composeRule.onNodeWithTag(OVERVIEW_ACHIEVEMENTS_LATEST, useUnmergedTree = true)
+            .performTouchInput { click() }
+        composeRule.onNodeWithTag(OVERVIEW_ACHIEVEMENTS_UPCOMING, useUnmergedTree = true)
+            .performTouchInput { click() }
+        assertEquals(4, viewed)
     }
 
     @Test
@@ -225,8 +219,7 @@ class OverviewAchievementsCardTest {
                 OverviewAchievementsCard(
                     achievements = achievements,
                     today = today,
-                    onViewAll = {},
-                    onOpenAchievement = {}
+                    onViewAll = {}
                 )
             }
         }
@@ -250,7 +243,6 @@ class OverviewAchievementsCardTest {
                         ),
                         today = today,
                         onViewAll = {},
-                        onOpenAchievement = {},
                         modifier = Modifier.width(320.dp)
                     )
                 }

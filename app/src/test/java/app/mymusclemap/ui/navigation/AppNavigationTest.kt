@@ -9,19 +9,33 @@ import org.junit.Test
 
 class AppNavigationTest {
     @Test
-    fun bottomNavigationContainsOverviewStatisticsAndJournal() {
-        assertEquals(3, AppNavigation.rootTabs.size)
+    fun bottomNavigationContainsOverviewLibraryStatisticsAndJournal() {
+        assertEquals(4, AppNavigation.rootTabs.size)
         assertEquals(
-            listOf(R.string.nav_dashboard, R.string.statistics_title, R.string.nav_journal),
+            listOf(
+                R.string.nav_dashboard,
+                R.string.nav_library,
+                R.string.statistics_title,
+                R.string.nav_journal
+            ),
             AppNavigation.rootTabs.map { it.labelRes }
         )
         assertEquals(
-            listOf(AppRoutes.OVERVIEW, AppRoutes.STATISTICS_GRAPH, AppRoutes.JOURNAL),
+            listOf(
+                AppRoutes.OVERVIEW,
+                AppRoutes.LIBRARY,
+                AppRoutes.STATISTICS_GRAPH,
+                AppRoutes.JOURNAL
+            ),
             AppNavigation.rootTabs.map { it.route }
         )
         assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.TEMPLATES })
         assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.EXERCISES })
         assertFalse(AppNavigation.rootTabs.any { it.route == AppRoutes.SETTINGS })
+        assertTrue(AppNavigation.showsBottomBar(AppRoutes.LIBRARY))
+        assertEquals(AppRoutes.LIBRARY, AppNavigation.bottomTabRoute(AppRoutes.LIBRARY))
+        assertEquals(AppRoutes.LIBRARY, AppNavigation.bottomTabRoute(AppRoutes.TEMPLATES))
+        assertEquals(AppRoutes.LIBRARY, AppNavigation.bottomTabRoute(AppRoutes.EXERCISES))
     }
 
     @Test
@@ -144,7 +158,7 @@ class AppNavigationTest {
         val catalog = AppNavigation.openCatalog(AppRoutes.OVERVIEW)
         assertEquals(AppRoutes.EXERCISES, catalog.targetRoute)
         assertEquals(AppRoutes.OVERVIEW, catalog.backTarget)
-        assertEquals(AppRoutes.OVERVIEW, AppNavigation.catalogEntryPoint())
+        assertEquals(AppRoutes.LIBRARY, AppNavigation.catalogEntryPoint())
         assertFalse(AppNavigation.openCatalog(AppRoutes.EXERCISES).shouldPush)
         val templates = AppNavigation.openTemplates(AppRoutes.OVERVIEW)
         assertEquals(AppRoutes.TEMPLATES, templates.targetRoute)
@@ -177,6 +191,7 @@ class AppNavigationTest {
     @Test
     fun bottomBarIsVisibleOnOverviewJournalAndRootLists() {
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.OVERVIEW))
+        assertTrue(AppNavigation.showsBottomBar(AppRoutes.LIBRARY))
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.STATISTICS))
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.JOURNAL))
         assertTrue(AppNavigation.showsBottomBar(AppRoutes.EXERCISES))
@@ -269,7 +284,7 @@ class AppNavigationTest {
         assertFalse(AppNavigation.showsBottomBar(AppRoutes.WORKOUT_IMPORT))
         assertFalse(AppNavigation.openWorkoutImport(AppRoutes.WORKOUT_IMPORT).shouldPush)
         assertEquals(AppRoutes.JOURNAL, AppNavigation.openWorkoutImport(AppRoutes.WORKOUT_IMPORT).backTarget)
-        assertEquals(AppRoutes.OVERVIEW, AppNavigation.catalogEntryPoint())
+        assertEquals(AppRoutes.LIBRARY, AppNavigation.catalogEntryPoint())
         assertTrue(AppNavigation.catalogEntryPoint() != AppRoutes.WORKOUT_IMPORT)
     }
 
@@ -297,6 +312,7 @@ class AppNavigationTest {
 
     @Test
     fun backFromNonDefaultRootReturnsToOverview() {
+        assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.LIBRARY))
         assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.JOURNAL))
         assertEquals(AppRoutes.OVERVIEW, AppNavigation.backFromRootTab(AppRoutes.STATISTICS))
         assertNull(AppNavigation.backFromRootTab(AppRoutes.OVERVIEW))

@@ -10,7 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
@@ -27,6 +28,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
@@ -59,7 +62,6 @@ internal fun OverviewAchievementsCard(
     achievements: OverviewAchievements,
     today: LocalDate,
     onViewAll: () -> Unit,
-    onOpenAchievement: (AchievementId) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val upcoming = achievements.upcoming
@@ -67,6 +69,16 @@ internal fun OverviewAchievementsCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
+            .pointerInput(onViewAll) {
+                detectTapGestures(onTap = { onViewAll() })
+            }
+            .semantics {
+                role = Role.Button
+                onClick {
+                    onViewAll()
+                    true
+                }
+            }
             .testTag(OVERVIEW_ACHIEVEMENTS),
         shape = AppShapeTokens.surface,
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -86,7 +98,6 @@ internal fun OverviewAchievementsCard(
                 Row(
                     modifier = Modifier
                         .defaultMinSize(minHeight = 48.dp)
-                        .clickable(role = Role.Button, onClick = onViewAll)
                         .testTag(OVERVIEW_ACHIEVEMENTS_VIEW_ALL),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -109,8 +120,7 @@ internal fun OverviewAchievementsCard(
                 LatestUnlock(
                     id = latest.id,
                     unlockedAtEpochMillis = latest.unlockedAtEpochMillis,
-                    today = today,
-                    onClick = { onOpenAchievement(latest.id) }
+                    today = today
                 )
             } else {
                 Text(
@@ -132,8 +142,7 @@ internal fun OverviewAchievementsCard(
                 )
                 UpcomingMilestone(
                     id = upcoming.id,
-                    progress = upcoming.progress,
-                    onClick = { onOpenAchievement(upcoming.id) }
+                    progress = upcoming.progress
                 )
             }
         }
@@ -144,8 +153,7 @@ internal fun OverviewAchievementsCard(
 private fun LatestUnlock(
     id: AchievementId,
     unlockedAtEpochMillis: Long,
-    today: LocalDate,
-    onClick: () -> Unit
+    today: LocalDate
 ) {
     val earnedDate = Instant.ofEpochMilli(unlockedAtEpochMillis)
         .atZone(ZoneId.systemDefault())
@@ -159,7 +167,6 @@ private fun LatestUnlock(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 48.dp)
-            .clickable(role = Role.Button, onClick = onClick)
             .testTag(OVERVIEW_ACHIEVEMENTS_LATEST),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -207,8 +214,7 @@ private fun LatestUnlock(
 @Composable
 private fun UpcomingMilestone(
     id: AchievementId,
-    progress: OverviewProgress,
-    onClick: () -> Unit
+    progress: OverviewProgress
 ) {
     val detail = upcomingDetail(progress, id)
     val bar = progressBarFraction(progress)
@@ -216,7 +222,6 @@ private fun UpcomingMilestone(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 48.dp)
-            .clickable(role = Role.Button, onClick = onClick)
             .testTag(OVERVIEW_ACHIEVEMENTS_UPCOMING),
         verticalAlignment = Alignment.CenterVertically
     ) {

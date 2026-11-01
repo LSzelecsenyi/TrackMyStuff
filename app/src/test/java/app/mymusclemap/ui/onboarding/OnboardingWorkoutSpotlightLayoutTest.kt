@@ -258,6 +258,7 @@ class OnboardingWorkoutSpotlightLayoutTest {
                                 selectedRoute = AppRoutes.OVERVIEW,
                                 hasActiveSession = false,
                                 onOverview = {},
+                                onLibrary = {},
                                 onStatistics = {},
                                 onJournal = {},
                                 onWorkoutAction = {

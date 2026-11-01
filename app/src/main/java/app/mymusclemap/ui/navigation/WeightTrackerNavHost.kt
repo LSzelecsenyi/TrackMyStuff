@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,6 +64,7 @@ import app.mymusclemap.domain.entitlement.EntitlementTier
 import app.mymusclemap.data.preferences.FounderMilestoneAcknowledgements
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.FounderProgramStatus
+import app.mymusclemap.ui.library.LibraryScreen
 import app.mymusclemap.ui.founder.FounderMilestone
 import app.mymusclemap.ui.founder.overviewFounderMilestone
 import app.mymusclemap.ui.founder.FounderProgramUiState
@@ -471,6 +473,7 @@ fun WeightTrackerNavHost(
                     selectedRoute = AppNavigation.bottomTabRoute(currentRoute),
                     hasActiveSession = hubState.activeSession != null,
                     onOverview = { navController.navigateRoot(AppRoutes.OVERVIEW) },
+                    onLibrary = { navController.navigateRoot(AppRoutes.LIBRARY) },
                     onStatistics = { navController.navigateRoot(AppRoutes.STATISTICS_GRAPH) },
                     onJournal = { navController.navigateRoot(AppRoutes.JOURNAL) },
                     onWorkoutAction = onPrimaryWorkoutClick,
@@ -519,14 +522,8 @@ fun WeightTrackerNavHost(
                     onDeleteConfirm = viewModel::confirmDelete,
                     onMessageConsumed = viewModel::consumeMessage,
                     onOpenSettings = { navController.navigateInternal(AppRoutes.SETTINGS) },
-                    onOpenTemplates = { navController.navigateInternal(AppRoutes.TEMPLATES) },
-                    onOpenCatalog = { navController.navigateInternal(AppRoutes.EXERCISES) },
                     onOpenAchievements = {
                         achievementsViewModel.closeBadge()
-                        navController.navigateInternal(AppRoutes.ACHIEVEMENTS)
-                    },
-                    onOpenAchievement = { id ->
-                        achievementsViewModel.openBadge(id)
                         navController.navigateInternal(AppRoutes.ACHIEVEMENTS)
                     },
                     overviewAchievements = overviewAchievements,
@@ -1224,47 +1221,32 @@ fun WeightTrackerNavHost(
                     }
                 }
             }
-            composable(AppRoutes.EXERCISES) { entry ->
-                val viewModel: ExerciseListViewModel = viewModel(factory = factory)
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-                val saved by entry.savedStateHandle
-                    .getStateFlow(KEY_CATALOG_SAVED, "")
-                    .collectAsStateWithLifecycle()
-                LaunchedEffect(saved) {
-                    when (saved) {
-                        "created" -> viewModel.showSaved(true)
-                        "updated" -> viewModel.showSaved(false)
-                    }
-                    if (saved.isNotEmpty()) {
-                        entry.savedStateHandle[KEY_CATALOG_SAVED] = ""
-                    }
-                }
-                ExerciseListScreen(
-                    state = state,
-                    onBack = { navController.popBackStack() },
-                    onAdd = {
-                        viewModel.requestCreate {
-                            navController.navigate(editorRoute(null))
-                        }
+            composable(AppRoutes.LIBRARY) { entry ->
+                LibraryScreen(
+                    plans = {
+                        TemplateListDestination(
+                            navController = navController,
+                            factory = factory,
+                            savedStateHandle = entry.savedStateHandle,
+                            embedded = true
+                        )
                     },
-                    onEdit = { id -> navController.navigate(editorRoute(id)) },
-                    onQueryChange = viewModel::onQueryChange,
-                    onCategoryFilter = viewModel::onCategoryFilter,
-                    onMuscleFilter = viewModel::onMuscleFilter,
-                    onArchiveFilter = viewModel::onArchiveFilter,
-                    onClearFilters = viewModel::clearFilters,
-                    onArchive = viewModel::archive,
-                    onRestore = viewModel::restore,
-                    onRequestDelete = viewModel::requestDelete,
-                    onDismissDelete = viewModel::dismissDelete,
-                    onConfirmDelete = viewModel::confirmDelete,
-                    onMessageConsumed = viewModel::consumeMessage,
-                    onDismissLocked = viewModel::consumeLockedFeature,
-                    onChooseFreeAccess = { navController.navigateInternal(AppRoutes.FREE_ACCESS) },
-                    onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) },
-                    onRequestRelease = viewModel::requestRelease,
-                    onDismissRelease = viewModel::dismissRelease,
-                    onConfirmRelease = viewModel::confirmRelease
+                    exercises = {
+                        ExerciseCatalogDestination(
+                            navController = navController,
+                            factory = factory,
+                            savedStateHandle = entry.savedStateHandle,
+                            embedded = true
+                        )
+                    }
+                )
+            }
+            composable(AppRoutes.EXERCISES) { entry ->
+                ExerciseCatalogDestination(
+                    navController = navController,
+                    factory = factory,
+                    savedStateHandle = entry.savedStateHandle,
+                    embedded = false
                 )
             }
             composable(
@@ -1306,46 +1288,11 @@ fun WeightTrackerNavHost(
                 )
             }
             composable(AppRoutes.TEMPLATES) { entry ->
-                val viewModel: TemplateListViewModel = viewModel(factory = factory)
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-                val saved by entry.savedStateHandle
-                    .getStateFlow(KEY_TEMPLATE_SAVED, "")
-                    .collectAsStateWithLifecycle()
-                LaunchedEffect(saved) {
-                    when (saved) {
-                        "created" -> viewModel.showSaved(true)
-                        "updated" -> viewModel.showSaved(false)
-                    }
-                    if (saved.isNotEmpty()) {
-                        entry.savedStateHandle[KEY_TEMPLATE_SAVED] = ""
-                    }
-                }
-                TemplateListScreen(
-                    state = state,
-                    onBack = { navController.popBackStack() },
-                    onAdd = {
-                        viewModel.requestCreate {
-                            navController.navigate(templateEditorRoute(null)) {
-                                launchSingleTop = true
-                            }
-                        }
-                    },
-                    onDismissLocked = viewModel::consumeLockedFeature,
-                    onEdit = { id ->
-                        navController.navigate(templateEditorRoute(id)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onQueryChange = viewModel::onQueryChange,
-                    onArchiveFilter = viewModel::onArchiveFilter,
-                    onArchive = viewModel::archive,
-                    onRestore = viewModel::restore,
-                    onRequestDelete = viewModel::requestDelete,
-                    onDismissDelete = viewModel::dismissDelete,
-                    onConfirmDelete = viewModel::confirmDelete,
-                    onMessageConsumed = viewModel::consumeMessage,
-                    onChooseFreeAccess = { navController.navigateInternal(AppRoutes.FREE_ACCESS) },
-                    onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) }
+                TemplateListDestination(
+                    navController = navController,
+                    factory = factory,
+                    savedStateHandle = entry.savedStateHandle,
+                    embedded = false
                 )
             }
             composable(
@@ -2075,6 +2022,108 @@ private fun openLockScreenSettings(context: Context, note: LockScreenAccessNote)
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
     }
+}
+
+@Composable
+private fun ExerciseCatalogDestination(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    savedStateHandle: SavedStateHandle,
+    embedded: Boolean
+) {
+    val viewModel: ExerciseListViewModel = viewModel(factory = factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val saved by savedStateHandle
+        .getStateFlow(KEY_CATALOG_SAVED, "")
+        .collectAsStateWithLifecycle()
+    LaunchedEffect(saved) {
+        when (saved) {
+            "created" -> viewModel.showSaved(true)
+            "updated" -> viewModel.showSaved(false)
+        }
+        if (saved.isNotEmpty()) {
+            savedStateHandle[KEY_CATALOG_SAVED] = ""
+        }
+    }
+    ExerciseListScreen(
+        state = state,
+        onBack = { navController.popBackStack() },
+        onAdd = {
+            viewModel.requestCreate {
+                navController.navigate(editorRoute(null))
+            }
+        },
+        onEdit = { id -> navController.navigate(editorRoute(id)) },
+        onQueryChange = viewModel::onQueryChange,
+        onCategoryFilter = viewModel::onCategoryFilter,
+        onMuscleFilter = viewModel::onMuscleFilter,
+        onArchiveFilter = viewModel::onArchiveFilter,
+        onClearFilters = viewModel::clearFilters,
+        onArchive = viewModel::archive,
+        onRestore = viewModel::restore,
+        onRequestDelete = viewModel::requestDelete,
+        onDismissDelete = viewModel::dismissDelete,
+        onConfirmDelete = viewModel::confirmDelete,
+        onMessageConsumed = viewModel::consumeMessage,
+        onDismissLocked = viewModel::consumeLockedFeature,
+        onChooseFreeAccess = { navController.navigateInternal(AppRoutes.FREE_ACCESS) },
+        onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) },
+        onRequestRelease = viewModel::requestRelease,
+        onDismissRelease = viewModel::dismissRelease,
+        onConfirmRelease = viewModel::confirmRelease,
+        embedded = embedded
+    )
+}
+
+@Composable
+private fun TemplateListDestination(
+    navController: NavHostController,
+    factory: WeightViewModelFactory,
+    savedStateHandle: SavedStateHandle,
+    embedded: Boolean
+) {
+    val viewModel: TemplateListViewModel = viewModel(factory = factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val saved by savedStateHandle
+        .getStateFlow(KEY_TEMPLATE_SAVED, "")
+        .collectAsStateWithLifecycle()
+    LaunchedEffect(saved) {
+        when (saved) {
+            "created" -> viewModel.showSaved(true)
+            "updated" -> viewModel.showSaved(false)
+        }
+        if (saved.isNotEmpty()) {
+            savedStateHandle[KEY_TEMPLATE_SAVED] = ""
+        }
+    }
+    TemplateListScreen(
+        state = state,
+        onBack = { navController.popBackStack() },
+        onAdd = {
+            viewModel.requestCreate {
+                navController.navigate(templateEditorRoute(null)) {
+                    launchSingleTop = true
+                }
+            }
+        },
+        onDismissLocked = viewModel::consumeLockedFeature,
+        onEdit = { id ->
+            navController.navigate(templateEditorRoute(id)) {
+                launchSingleTop = true
+            }
+        },
+        onQueryChange = viewModel::onQueryChange,
+        onArchiveFilter = viewModel::onArchiveFilter,
+        onArchive = viewModel::archive,
+        onRestore = viewModel::restore,
+        onRequestDelete = viewModel::requestDelete,
+        onDismissDelete = viewModel::dismissDelete,
+        onConfirmDelete = viewModel::confirmDelete,
+        onMessageConsumed = viewModel::consumeMessage,
+        onChooseFreeAccess = { navController.navigateInternal(AppRoutes.FREE_ACCESS) },
+        onExplorePro = { navController.navigateInternal(AppRoutes.PRO_BENEFITS) },
+        embedded = embedded
+    )
 }
 
 internal fun NavHostController.navigateRoot(route: String) {

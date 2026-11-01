@@ -39,7 +39,7 @@ class OverviewMembershipUiTest {
     fun freeShowsNoMembershipBadge() {
         show(MembershipPresentation.None)
         composeRule.onNodeWithTag(OVERVIEW_MEMBERSHIP_BADGE).assertDoesNotExist()
-        composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_BUTTON).assertIsDisplayed()
+        composeRule.onNodeWithTag(OVERVIEW_SETTINGS).assertIsDisplayed()
         composeRule.onNodeWithTag(BOTTOM_WORKOUT_ACTION).assertDoesNotExist()
     }
 
@@ -54,7 +54,7 @@ class OverviewMembershipUiTest {
         )
         val header = composeRule.onNodeWithTag("dashboard_weekly_header").getBoundsInRoot()
         val badge = composeRule.onNodeWithTag(OVERVIEW_MEMBERSHIP_BADGE).getBoundsInRoot()
-        val overflow = composeRule.onNodeWithTag(OVERVIEW_OVERFLOW_ANCHOR).getBoundsInRoot()
+        val overflow = composeRule.onNodeWithTag(OVERVIEW_SETTINGS).getBoundsInRoot()
         composeRule.onAllNodesWithTag(OVERVIEW_MEMBERSHIP_BADGE).assertCountEquals(1)
         composeRule.onNodeWithText(testString(R.string.membership_badge_pro)).assertIsDisplayed()
         composeRule.onAllNodesWithText(testString(R.string.membership_badge_founder)).assertCountEquals(0)
@@ -134,8 +134,6 @@ class OverviewMembershipUiTest {
                         onDeleteConfirm = {},
                         onMessageConsumed = {},
                         onOpenSettings = {},
-                        onOpenTemplates = {},
-                        onOpenCatalog = {},
                         onOpenWorkout = {},
                         onOpenWeightDetails = {},
                         showTemporaryProMilestone = showMilestone,
@@ -187,8 +185,6 @@ class OverviewMembershipUiTest {
                     onDeleteConfirm = {},
                     onMessageConsumed = {},
                     onOpenSettings = {},
-                    onOpenTemplates = {},
-                    onOpenCatalog = {},
                     onOpenWorkout = {},
                     onOpenWeightDetails = {},
                     membership = membership
