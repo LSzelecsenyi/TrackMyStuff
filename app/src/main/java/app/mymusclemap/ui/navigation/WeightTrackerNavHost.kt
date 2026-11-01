@@ -118,6 +118,7 @@ import app.mymusclemap.ui.pro.ProInfoSheet
 import app.mymusclemap.data.health.HealthConnectGateway
 import app.mymusclemap.domain.health.HealthHistoryAccess
 import app.mymusclemap.domain.health.HealthSettingsAction
+import app.mymusclemap.ui.health.ExerciseHistoryScreen
 import app.mymusclemap.ui.health.HealthConnectDetailScreen
 import app.mymusclemap.ui.health.HealthConnectViewModel
 import app.mymusclemap.ui.health.RefreshHealthConnectOnResume
@@ -806,8 +807,34 @@ fun WeightTrackerNavHost(
                     state = detail,
                     exerciseHistory = exerciseHistory,
                     onBack = { navController.popBackStack() },
-                    onLoadMore = healthViewModel::loadMoreExerciseHistory,
+                    onOpenHistory = { navController.navigateInternal(AppRoutes.EXERCISE_HISTORY) },
                     onRetryHistory = healthViewModel::reloadExerciseHistory,
+                    onRequestHistory = launchHistoryPermissions
+                )
+            }
+            composable(AppRoutes.EXERCISE_HISTORY) {
+                val healthViewModel: HealthConnectViewModel = viewModel(factory = factory)
+                val exerciseHistory by healthViewModel.exerciseHistory.collectAsStateWithLifecycle()
+                val healthSettings by healthViewModel.settings.collectAsStateWithLifecycle()
+                val historyPermissions = HealthConnectGateway.readPermissions(
+                    includeHistory = healthSettings.historyAccess != HealthHistoryAccess.Unsupported
+                )
+                val launchHistoryPermissions = rememberHealthConnectPermissionLaunch(
+                    historyPermissions,
+                    healthViewModel::refreshAndReloadHistory
+                )
+                LaunchedEffect(Unit) {
+                    val current = healthViewModel.exerciseHistory.value
+                    if (current.entries.isEmpty() && !current.loading && !current.failed) {
+                        healthViewModel.reloadExerciseHistory()
+                    }
+                }
+                ExerciseHistoryScreen(
+                    history = exerciseHistory,
+                    onBack = { navController.popBackStack() },
+                    onLoadMore = healthViewModel::loadMoreExerciseHistory,
+                    onRetryInitial = healthViewModel::reloadExerciseHistory,
+                    onRetryPage = healthViewModel::loadMoreExerciseHistory,
                     onRequestHistory = launchHistoryPermissions
                 )
             }

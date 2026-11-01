@@ -215,6 +215,32 @@
     <string name="health_connect_history_limited">The wider read was rejected, so this shows the last 30 days.</string>
     <string name="health_connect_duration_s">%1$ds</string>
     <string name="health_connect_duration_ms">%1$dm %2$ds</string>
+    <string name="health_connect_history_view_all">View all</string>
+    <string name="health_connect_history_total">Total</string>
+    <string name="health_connect_history_loaded_label">Loaded</string>
+    <string name="health_connect_history_loaded_note">Counts are for sessions loaded so far.</string>
+    <string name="health_connect_history_filter_all">All</string>
+    <string name="health_connect_history_filter_searching">Looking through earlier sessions.</string>
+    <string name="health_connect_history_filter_older">Earlier sessions may still include this activity.</string>
+    <string name="health_connect_history_filter_none_running">No running sessions in this history.</string>
+    <string name="health_connect_history_filter_none_cycling">No cycling sessions in this history.</string>
+    <string name="health_connect_history_filter_none_strength">No strength sessions in this history.</string>
+    <plurals name="health_connect_history_activities">
+        <item quantity="one">%1$d activity</item>
+        <item quantity="other">%1$d activities</item>
+    </plurals>
+    <plurals name="health_connect_history_activities_from_source">
+        <item quantity="one">%1$d activity from %2$s</item>
+        <item quantity="other">%1$d activities from %2$s</item>
+    </plurals>
+    <plurals name="health_connect_history_activities_connected">
+        <item quantity="one">%1$d activity from connected apps</item>
+        <item quantity="other">%1$d activities from connected apps</item>
+    </plurals>
+    <plurals name="health_connect_history_activities_loaded">
+        <item quantity="one">%1$d activity loaded</item>
+        <item quantity="other">%1$d activities loaded</item>
+    </plurals>
     <string name="about_title">About Strict</string>
     <string name="about_product">Strict</string>
     <string name="about_version">Version %1$s</string>

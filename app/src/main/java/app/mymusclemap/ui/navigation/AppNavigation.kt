@@ -9,6 +9,7 @@ object AppRoutes {
     const val DELETE_ACCOUNT = "delete_account"
     const val FOUNDER_PROGRAM = "founder_program"
     const val HEALTH_CONNECT = "health_connect"
+    const val EXERCISE_HISTORY = "exercise_history"
     const val HELP = "help"
     const val PRIVACY = "privacy"
     const val PRO_INFO = "pro_info"

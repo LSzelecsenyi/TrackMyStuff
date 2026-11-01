@@ -215,6 +215,32 @@
     <string name="health_connect_history_limited">A tágabb olvasás nem sikerült, ezért az elmúlt 30 nap látható.</string>
     <string name="health_connect_duration_s">%1$d mp</string>
     <string name="health_connect_duration_ms">%1$d p %2$d mp</string>
+    <string name="health_connect_history_view_all">Összes</string>
+    <string name="health_connect_history_total">Összesen</string>
+    <string name="health_connect_history_loaded_label">Betöltve</string>
+    <string name="health_connect_history_loaded_note">A számok az eddig betöltött munkamenetekre vonatkoznak.</string>
+    <string name="health_connect_history_filter_all">Mind</string>
+    <string name="health_connect_history_filter_searching">Korábbi munkamenetek keresése.</string>
+    <string name="health_connect_history_filter_older">A korábbi munkamenetek között még lehet ilyen tevékenység.</string>
+    <string name="health_connect_history_filter_none_running">Ebben az előzményben nincs futás.</string>
+    <string name="health_connect_history_filter_none_cycling">Ebben az előzményben nincs kerékpározás.</string>
+    <string name="health_connect_history_filter_none_strength">Ebben az előzményben nincs erőedzés.</string>
+    <plurals name="health_connect_history_activities">
+        <item quantity="one">%1$d tevékenység</item>
+        <item quantity="other">%1$d tevékenység</item>
+    </plurals>
+    <plurals name="health_connect_history_activities_from_source">
+        <item quantity="one">%1$d tevékenység innen: %2$s</item>
+        <item quantity="other">%1$d tevékenység innen: %2$s</item>
+    </plurals>
+    <plurals name="health_connect_history_activities_connected">
+        <item quantity="one">%1$d tevékenység a csatlakoztatott alkalmazásokból</item>
+        <item quantity="other">%1$d tevékenység a csatlakoztatott alkalmazásokból</item>
+    </plurals>
+    <plurals name="health_connect_history_activities_loaded">
+        <item quantity="one">%1$d tevékenység betöltve</item>
+        <item quantity="other">%1$d tevékenység betöltve</item>
+    </plurals>
     <string name="about_title">A Strictről</string>
     <string name="about_product">Strict</string>
     <string name="about_version">Verzió: %1$s</string>

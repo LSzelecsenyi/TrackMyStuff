@@ -1,12 +1,18 @@
 package app.mymusclemap.ui.health
 
+import android.graphics.Insets
+import android.view.WindowInsets
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import app.mymusclemap.R
 import app.mymusclemap.domain.health.ExerciseHistoryEntry
 import app.mymusclemap.domain.health.ExerciseHistorySnapshot
@@ -24,10 +30,12 @@ import app.mymusclemap.domain.health.HealthDetailState
 import app.mymusclemap.domain.health.HealthMetric
 import app.mymusclemap.domain.health.HealthQuietStatus
 import app.mymusclemap.domain.health.HealthReadings
+import app.mymusclemap.testQuantity
 import app.mymusclemap.testString
 import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -46,6 +54,45 @@ class HealthConnectDetailScreenTest {
     val composeRule = createComposeRule()
 
     private val today = LocalDate.of(2026, 9, 29)
+
+    @Test
+    fun headerClearsTheStatusBarAndContentClearsTheNavigationBar() {
+        val statusPx = 90
+        val navigationPx = 70
+        lateinit var host: android.view.View
+        composeRule.setContent {
+            host = LocalView.current
+            WeightTrackerThemeForPreview {
+                HealthConnectDetailScreen(
+                    state = HealthDetailState.Quiet(HealthQuietStatus.Unavailable),
+                    onBack = {}
+                )
+            }
+        }
+        composeRule.runOnIdle {
+            val insets = WindowInsets.Builder()
+                .setInsets(WindowInsets.Type.statusBars(), Insets.of(0, statusPx, 0, 0))
+                .setInsets(WindowInsets.Type.navigationBars(), Insets.of(0, 0, 0, navigationPx))
+                .build()
+            ViewCompat.dispatchApplyWindowInsets(host, WindowInsetsCompat.toWindowInsetsCompat(insets))
+        }
+        composeRule.waitForIdle()
+        val density = host.resources.displayMetrics.density
+        val headerTop = composeRule.onNodeWithContentDescription(testString(R.string.action_back))
+            .getUnclippedBoundsInRoot()
+            .top
+            .value
+        val contentBottom = composeRule.onNodeWithTag(HEALTH_DETAIL)
+            .getUnclippedBoundsInRoot()
+            .bottom
+            .value
+        val screenBottom = host.height / density
+        assertTrue("header top $headerTop should clear ${statusPx / density}dp", headerTop + 0.5f >= statusPx / density)
+        assertTrue(
+            "content bottom $contentBottom should stop ${navigationPx / density}dp above $screenBottom",
+            contentBottom <= screenBottom - (navigationPx / density) + 0.5f
+        )
+    }
 
     @Test
     fun activityAndRecoveryShowIndependentMetrics() {
@@ -113,35 +160,32 @@ class HealthConnectDetailScreenTest {
     }
 
     @Test
-    fun historyListsMonthsSeparatelyFromTheSevenDaySummary() {
-        val loads = intArrayOf(0)
+    fun historyEntryShowsALoadedCountAndOpensTheFullList() {
+        val opens = intArrayOf(0)
         val allows = intArrayOf(0)
-        val october = LocalDate.of(2026, 10, 31)
-        val september = LocalDate.of(2026, 9, 30)
         render(
             state = sample(),
             exerciseHistory = ExerciseHistorySnapshot(
                 visible = true,
                 access = HealthHistoryAccess.NotGranted,
                 entries = listOf(
-                    historyEntry("new", HealthExerciseKind.RUNNING, october, LocalTime.of(15, 22), Duration.ofMinutes(39)),
-                    historyEntry("old", HealthExerciseKind.CYCLING, september, LocalTime.of(8, 8), Duration.ofSeconds(30))
+                    historyEntry("new", HealthExerciseKind.RUNNING, LocalDate.of(2026, 10, 31), LocalTime.of(15, 22), Duration.ofMinutes(39)),
+                    historyEntry("old", HealthExerciseKind.CYCLING, LocalDate.of(2026, 9, 30), LocalTime.of(8, 8), Duration.ofSeconds(30))
                 ),
                 canLoadMore = true
             ),
-            onLoadMore = { loads[0] += 1 },
+            onOpenHistory = { opens[0] += 1 },
             onRequestHistory = { allows[0] += 1 }
         )
         composeRule.onNodeWithText("1 session · 32m").assertIsDisplayed()
         composeRule.onNodeWithText(testString(R.string.health_connect_history_title)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(UiFormatters.monthTitle(YearMonth.from(october))).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(UiFormatters.monthTitle(YearMonth.from(september))).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.health_connect_duration_s, 30), substring = true)
+        composeRule.onNodeWithText(testQuantity(R.plurals.health_connect_history_activities_loaded, 2))
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithTag(HEALTH_DETAIL_HISTORY_MORE).performScrollTo().performClick()
+        composeRule.onNodeWithText(UiFormatters.monthTitle(java.time.YearMonth.of(2026, 10))).assertDoesNotExist()
+        composeRule.onNodeWithTag(HEALTH_DETAIL_HISTORY_OPEN).performScrollTo().performClick()
         composeRule.onNodeWithTag(HEALTH_DETAIL_HISTORY_ALLOW).performScrollTo().performClick()
-        assertEquals(1, loads[0])
+        assertEquals(1, opens[0])
         assertEquals(1, allows[0])
     }
 
@@ -219,7 +263,7 @@ class HealthConnectDetailScreenTest {
         state: HealthDetailState,
         onBack: () -> Unit = {},
         exerciseHistory: ExerciseHistorySnapshot = ExerciseHistorySnapshot(),
-        onLoadMore: () -> Unit = {},
+        onOpenHistory: () -> Unit = {},
         onRequestHistory: () -> Unit = {}
     ) {
         composeRule.setContent {
@@ -228,7 +272,7 @@ class HealthConnectDetailScreenTest {
                     state = state,
                     onBack = onBack,
                     exerciseHistory = exerciseHistory,
-                    onLoadMore = onLoadMore,
+                    onOpenHistory = onOpenHistory,
                     onRequestHistory = onRequestHistory
                 )
             }

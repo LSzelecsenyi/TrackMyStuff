@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,16 +26,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
-import app.mymusclemap.domain.health.ExerciseHistoryEntry
+import app.mymusclemap.domain.health.ExerciseHistoryPresentation
 import app.mymusclemap.domain.health.ExerciseHistorySnapshot
 import app.mymusclemap.domain.health.HealthDetailState
-import app.mymusclemap.domain.health.HealthExerciseKind
 import app.mymusclemap.domain.health.HealthExerciseLine
 import app.mymusclemap.domain.health.HealthHistoryAccess
 import app.mymusclemap.domain.health.HealthLine
@@ -47,9 +47,6 @@ import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import java.text.NumberFormat
 import java.time.Duration
-import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 internal const val HEALTH_DETAIL = "health-detail"
 internal const val HEALTH_DETAIL_ACTIVITY = "health-detail-activity"
@@ -66,7 +63,7 @@ internal const val HEALTH_DETAIL_HEART_CHART = "health-detail-heart-chart-"
 internal const val HEALTH_DETAIL_HRV_CHART = "health-detail-hrv-chart-"
 internal const val HEALTH_DETAIL_SLEEP_CHART = "health-detail-sleep-chart-"
 internal const val HEALTH_DETAIL_HISTORY = "health-detail-history"
-internal const val HEALTH_DETAIL_HISTORY_MORE = "health-detail-history-more"
+internal const val HEALTH_DETAIL_HISTORY_OPEN = "health-detail-history-open"
 internal const val HEALTH_DETAIL_HISTORY_ALLOW = "health-detail-history-allow"
 internal const val HEALTH_DETAIL_HISTORY_RETRY = "health-detail-history-retry"
 
@@ -75,7 +72,7 @@ fun HealthConnectDetailScreen(
     state: HealthDetailState,
     onBack: () -> Unit,
     exerciseHistory: ExerciseHistorySnapshot = ExerciseHistorySnapshot(),
-    onLoadMore: () -> Unit = {},
+    onOpenHistory: () -> Unit = {},
     onRetryHistory: () -> Unit = {},
     onRequestHistory: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -83,8 +80,10 @@ fun HealthConnectDetailScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .testTag(HEALTH_DETAIL)
+            .verticalScroll(rememberScrollState())
     ) {
         Row(
             modifier = Modifier
@@ -112,7 +111,7 @@ fun HealthConnectDetailScreen(
             is HealthDetailState.Connected -> ConnectedDetail(
                 state = state,
                 exerciseHistory = exerciseHistory,
-                onLoadMore = onLoadMore,
+                onOpenHistory = onOpenHistory,
                 onRetryHistory = onRetryHistory,
                 onRequestHistory = onRequestHistory
             )
@@ -140,7 +139,7 @@ private fun QuietDetail(status: HealthQuietStatus) {
 private fun ConnectedDetail(
     state: HealthDetailState.Connected,
     exerciseHistory: ExerciseHistorySnapshot,
-    onLoadMore: () -> Unit,
+    onOpenHistory: () -> Unit,
     onRetryHistory: () -> Unit,
     onRequestHistory: () -> Unit
 ) {
@@ -192,7 +191,7 @@ private fun ConnectedDetail(
             Spacer(Modifier.height(AppDimens.itemGap))
             ExerciseHistorySection(
                 history = exerciseHistory,
-                onLoadMore = onLoadMore,
+                onOpenHistory = onOpenHistory,
                 onRetry = onRetryHistory,
                 onRequestHistory = onRequestHistory
             )
@@ -437,17 +436,41 @@ private fun ExerciseBlock(
 @Composable
 private fun ExerciseHistorySection(
     history: ExerciseHistorySnapshot,
-    onLoadMore: () -> Unit,
+    onOpenHistory: () -> Unit,
     onRetry: () -> Unit,
     onRequestHistory: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val resolveSource = remember(context) { { packageName: String -> healthSourceLabel(context, packageName) } }
+    val preview = ExerciseHistoryPresentation.preview(history.entries, history.canLoadMore)
+    val summary = exerciseHistoryPreviewText(preview, resolveSource)
     SectionLabel(stringResource(R.string.health_connect_history_title), HEALTH_DETAIL_HISTORY)
-    Text(
-        text = stringResource(R.string.health_connect_history_subtitle),
-        style = AppTypeTokens.statCaption,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = AppDimens.statSecondaryGap)
-    )
+    when {
+        history.loading && history.entries.isEmpty() -> {
+            Text(
+                text = stringResource(R.string.health_connect_history_loading),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        history.entries.isEmpty() && history.failed -> {
+            HistoryProblem(onRetry)
+        }
+        summary != null -> {
+            Text(
+                text = summary,
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        else -> {
+            Text(
+                text = stringResource(R.string.health_connect_history_empty),
+                style = AppTypeTokens.statSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
     val note = when {
         history.limitedToRecentWindow -> stringResource(R.string.health_connect_history_limited)
         history.access == HealthHistoryAccess.Unsupported ->
@@ -461,153 +484,54 @@ private fun ExerciseHistorySection(
             text = note,
             style = AppTypeTokens.statCaption,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = AppDimens.statSecondaryGap)
+            modifier = Modifier.padding(top = AppDimens.statSecondaryGap)
         )
     }
     if (history.access == HealthHistoryAccess.NotGranted) {
-        Text(
+        HistoryAction(
             text = stringResource(R.string.health_connect_history_allow),
-            style = AppTypeTokens.sectionTitle,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .defaultMinSize(minHeight = AppDimens.minTouch)
-                .clickable(onClick = onRequestHistory)
-                .testTag(HEALTH_DETAIL_HISTORY_ALLOW)
-                .padding(vertical = AppDimens.statSecondaryGap)
+            tag = HEALTH_DETAIL_HISTORY_ALLOW,
+            onClick = onRequestHistory
         )
     }
-    when {
-        history.loading && history.entries.isEmpty() -> {
-            Text(
-                text = stringResource(R.string.health_connect_history_loading),
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        history.entries.isEmpty() && history.failed -> {
-            HistoryProblem(stringResource(R.string.health_connect_history_failed), onRetry)
-        }
-        history.entries.isEmpty() && !history.loading -> {
-            Text(
-                text = stringResource(R.string.health_connect_history_empty),
-                style = AppTypeTokens.statSecondary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        else -> {
-            MetricSurface {
-                var shownMonth: YearMonth? = null
-                history.entries.forEach { entry ->
-                    val month = YearMonth.from(entry.date)
-                    if (month != shownMonth) {
-                        if (shownMonth != null) MetricDivider()
-                        Text(
-                            text = UiFormatters.monthTitle(month),
-                            style = AppTypeTokens.statCaption,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(AppDimens.statSecondaryGap))
-                        shownMonth = month
-                    } else {
-                        Spacer(Modifier.height(AppDimens.itemGap))
-                    }
-                    ExerciseHistoryRow(entry)
-                }
-            }
-            if (history.failed) {
-                Spacer(Modifier.height(AppDimens.statSecondaryGap))
-                HistoryProblem(stringResource(R.string.health_connect_history_failed), onRetry)
-            }
-            if (history.canLoadMore) {
-                Text(
-                    text = if (history.loading) {
-                        stringResource(R.string.health_connect_history_loading)
-                    } else {
-                        stringResource(R.string.health_connect_history_more)
-                    },
-                    style = AppTypeTokens.sectionTitle,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = AppDimens.minTouch)
-                        .clickable(enabled = !history.loading, onClick = onLoadMore)
-                        .testTag(HEALTH_DETAIL_HISTORY_MORE)
-                        .padding(vertical = AppDimens.statSecondaryGap)
-                )
-            }
-        }
-    }
+    HistoryAction(
+        text = stringResource(R.string.health_connect_history_view_all),
+        tag = HEALTH_DETAIL_HISTORY_OPEN,
+        onClick = onOpenHistory
+    )
 }
 
 @Composable
-private fun HistoryProblem(message: String, onRetry: () -> Unit) {
+private fun HistoryProblem(onRetry: () -> Unit) {
     Text(
-        text = message,
+        text = stringResource(R.string.health_connect_history_failed),
         style = AppTypeTokens.statSecondary,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
-    Text(
+    HistoryAction(
         text = stringResource(R.string.health_connect_history_retry),
+        tag = HEALTH_DETAIL_HISTORY_RETRY,
+        onClick = onRetry
+    )
+}
+
+@Composable
+private fun HistoryAction(text: String, tag: String, onClick: () -> Unit) {
+    Text(
+        text = text,
         style = AppTypeTokens.sectionTitle,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .defaultMinSize(minHeight = AppDimens.minTouch)
-            .clickable(onClick = onRetry)
-            .testTag(HEALTH_DETAIL_HISTORY_RETRY)
+            .clickable(onClick = onClick)
+            .testTag(tag)
             .padding(vertical = AppDimens.statSecondaryGap)
     )
 }
 
 @Composable
-private fun ExerciseHistoryRow(entry: ExerciseHistoryEntry) {
-    val kind = stringResource(
-        when (entry.kind) {
-            HealthExerciseKind.STRENGTH -> R.string.health_connect_strength
-            HealthExerciseKind.CYCLING -> R.string.health_connect_cycling
-            HealthExerciseKind.RUNNING -> R.string.health_connect_running
-            HealthExerciseKind.OTHER -> R.string.health_connect_exercise_sessions
-        }
-    )
-    val whenLabel = stringResource(
-        R.string.health_connect_dated_value,
-        UiFormatters.compactDate(entry.date),
-        entry.startTime.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(AppLocale.UI))
-    )
-    val duration = historyDuration(entry.duration)
-    val source = sourceLabel(entry.sourcePackage)
-    Column(modifier = Modifier.testTag(HEALTH_DETAIL_HISTORY + "-" + entry.id)) {
-        Text(text = kind, style = AppTypeTokens.sectionTitle, color = MaterialTheme.colorScheme.onBackground)
-        Text(
-            text = stringResource(R.string.health_connect_dated_value, whenLabel, duration),
-            style = AppTypeTokens.statSecondary,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (source != null) {
-            Text(
-                text = source,
-                style = AppTypeTokens.statCaption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun sourceLabel(packageName: String?): String? {
-    if (packageName.isNullOrBlank()) return null
-    val context = LocalContext.current
-    return remember(packageName) {
-        try {
-            val info = context.packageManager.getApplicationInfo(packageName, 0)
-            context.packageManager.getApplicationLabel(info).toString()
-        } catch (_: Exception) {
-            null
-        }
-    }
-}
-
-@Composable
 private fun sessionSummary(sessions: Int, duration: Duration): String {
-    val formatted = formatDuration(duration)
+    val formatted = healthSessionDuration(duration)
     return if (sessions == 1) {
         stringResource(R.string.health_connect_one_session, formatted)
     } else {
@@ -624,29 +548,6 @@ private fun formatMinutes(minutes: Double): String {
         stringResource(R.string.health_connect_duration_hm, hours, remainder)
     } else {
         stringResource(R.string.health_connect_duration_m, remainder)
-    }
-}
-
-@Composable
-private fun formatDuration(duration: Duration): String {
-    return historyDuration(duration)
-}
-
-@Composable
-private fun historyDuration(duration: Duration): String {
-    val totalSeconds = duration.seconds.coerceAtLeast(0)
-    if (totalSeconds < 60) {
-        val shown = if (totalSeconds == 0L && duration > Duration.ZERO) 1L else totalSeconds
-        return stringResource(R.string.health_connect_duration_s, shown)
-    }
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    val hours = minutes / 60
-    val minutePart = minutes % 60
-    return when {
-        hours > 0 -> stringResource(R.string.health_connect_duration_hm, hours, minutePart)
-        seconds == 0L -> stringResource(R.string.health_connect_duration_m, minutes)
-        else -> stringResource(R.string.health_connect_duration_ms, minutes, seconds)
     }
 }
 
