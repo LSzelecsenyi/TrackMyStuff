@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import app.mymusclemap.R
+import app.mymusclemap.domain.health.ExerciseHistoryEntry
+import app.mymusclemap.domain.health.ExerciseHistorySnapshot
 import app.mymusclemap.domain.health.DailyExercise
 import app.mymusclemap.domain.health.DailyHrv
 import app.mymusclemap.domain.health.DailySleep
@@ -15,12 +17,15 @@ import app.mymusclemap.domain.health.DailyStepTotal
 import app.mymusclemap.domain.health.ExerciseTotal
 import app.mymusclemap.domain.health.HealthAccess
 import app.mymusclemap.domain.health.HealthAvailability
+import app.mymusclemap.domain.health.HealthExerciseKind
+import app.mymusclemap.domain.health.HealthHistoryAccess
 import app.mymusclemap.domain.health.HealthDetailPresentation
 import app.mymusclemap.domain.health.HealthDetailState
 import app.mymusclemap.domain.health.HealthMetric
 import app.mymusclemap.domain.health.HealthQuietStatus
 import app.mymusclemap.domain.health.HealthReadings
 import app.mymusclemap.testString
+import app.mymusclemap.ui.components.UiFormatters
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -29,7 +34,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.YearMonth
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w360dp-h800dp")
@@ -97,6 +105,47 @@ class HealthConnectDetailScreenTest {
     }
 
     @Test
+    fun hiddenHistoryDoesNotReplaceTheSevenDaySummary() {
+        render(sample())
+        composeRule.onNodeWithText(testString(R.string.health_connect_history_title)).assertDoesNotExist()
+        composeRule.onNodeWithText("1 session · 45m").assertIsDisplayed()
+        composeRule.onNodeWithText("1 session · 32m").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun historyListsMonthsSeparatelyFromTheSevenDaySummary() {
+        val loads = intArrayOf(0)
+        val allows = intArrayOf(0)
+        val october = LocalDate.of(2026, 10, 31)
+        val september = LocalDate.of(2026, 9, 30)
+        render(
+            state = sample(),
+            exerciseHistory = ExerciseHistorySnapshot(
+                visible = true,
+                access = HealthHistoryAccess.NotGranted,
+                entries = listOf(
+                    historyEntry("new", HealthExerciseKind.RUNNING, october, LocalTime.of(15, 22), Duration.ofMinutes(39)),
+                    historyEntry("old", HealthExerciseKind.CYCLING, september, LocalTime.of(8, 8), Duration.ofSeconds(30))
+                ),
+                canLoadMore = true
+            ),
+            onLoadMore = { loads[0] += 1 },
+            onRequestHistory = { allows[0] += 1 }
+        )
+        composeRule.onNodeWithText("1 session · 32m").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.health_connect_history_title)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(UiFormatters.monthTitle(YearMonth.from(october))).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(UiFormatters.monthTitle(YearMonth.from(september))).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.health_connect_duration_s, 30), substring = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(HEALTH_DETAIL_HISTORY_MORE).performScrollTo().performClick()
+        composeRule.onNodeWithTag(HEALTH_DETAIL_HISTORY_ALLOW).performScrollTo().performClick()
+        assertEquals(1, loads[0])
+        assertEquals(1, allows[0])
+    }
+
+    @Test
     fun backClosesTheDetailScreen() {
         val backs = intArrayOf(0)
         render(sample(), onBack = { backs[0] += 1 })
@@ -147,10 +196,41 @@ class HealthConnectDetailScreenTest {
         )
     }
 
-    private fun render(state: HealthDetailState, onBack: () -> Unit = {}) {
+    private fun historyEntry(
+        id: String,
+        kind: HealthExerciseKind,
+        date: LocalDate,
+        time: LocalTime,
+        duration: Duration
+    ): ExerciseHistoryEntry {
+        val start = Instant.parse("2026-10-31T13:22:00Z")
+        return ExerciseHistoryEntry(
+            id = id,
+            kind = kind,
+            start = start,
+            date = date,
+            startTime = time,
+            duration = duration,
+            sourcePackage = null
+        )
+    }
+
+    private fun render(
+        state: HealthDetailState,
+        onBack: () -> Unit = {},
+        exerciseHistory: ExerciseHistorySnapshot = ExerciseHistorySnapshot(),
+        onLoadMore: () -> Unit = {},
+        onRequestHistory: () -> Unit = {}
+    ) {
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                HealthConnectDetailScreen(state = state, onBack = onBack)
+                HealthConnectDetailScreen(
+                    state = state,
+                    onBack = onBack,
+                    exerciseHistory = exerciseHistory,
+                    onLoadMore = onLoadMore,
+                    onRequestHistory = onRequestHistory
+                )
             }
         }
     }

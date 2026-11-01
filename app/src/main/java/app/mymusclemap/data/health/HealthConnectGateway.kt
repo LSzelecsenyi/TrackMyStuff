@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
@@ -14,11 +15,12 @@ import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import app.mymusclemap.domain.health.ExerciseHistoryQuery
+import app.mymusclemap.domain.health.ExerciseHistoryRawPage
 import app.mymusclemap.domain.health.HealthAvailability
-import app.mymusclemap.domain.health.HealthExerciseClassifier
-import app.mymusclemap.domain.health.HealthExerciseKind
 import app.mymusclemap.domain.health.HealthExerciseSession
 import app.mymusclemap.domain.health.HealthGrants
+import app.mymusclemap.domain.health.HealthHistoryAccess
 import app.mymusclemap.domain.health.HealthHrvSample
 import app.mymusclemap.domain.health.HealthMetricBucket
 import app.mymusclemap.domain.health.HealthSleepSpan
@@ -28,6 +30,8 @@ import java.time.Period
 import java.time.ZoneId
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.reflect.KClass
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The only production type that talks to [HealthConnectClient].
@@ -63,6 +67,7 @@ class HealthConnectGateway(
                 HealthPermission.getReadPermission(RestingHeartRateRecord::class)
             ),
             exercise = granted.contains(HealthPermission.getReadPermission(ExerciseSessionRecord::class)),
+            history = historyAccess(granted),
             hrv = granted.contains(
                 HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class)
             ),
@@ -112,16 +117,34 @@ class HealthConnectGateway(
         startInclusive: LocalDateTime,
         endExclusive: LocalDateTime
     ): List<HealthExerciseSession> {
-        return readAll(ExerciseSessionRecord::class, startInclusive, endExclusive).mapNotNull { record ->
-            val kind = HealthExerciseClassifier.classify(record.exerciseType)
-            if (kind == HealthExerciseKind.OTHER) return@mapNotNull null
-            HealthExerciseSession(
-                start = record.startTime,
-                end = record.endTime,
-                zone = zoneOf(record.startZoneOffset),
-                kind = kind
-            )
+        return readAll(ExerciseSessionRecord::class, startInclusive, endExclusive)
+            .mapNotNull(HealthExerciseMapper::session)
+    }
+
+    override suspend fun readExerciseHistoryPage(
+        query: ExerciseHistoryQuery,
+        pageToken: String?,
+        pageSize: Int
+    ): ExerciseHistoryRawPage = withContext(Dispatchers.IO) {
+        val filter = if (query.start == null) {
+            TimeRangeFilter.before(query.end)
+        } else {
+            TimeRangeFilter.between(query.start, query.end)
         }
+        val response = client().readRecords(
+            ReadRecordsRequest(
+                recordType = ExerciseSessionRecord::class,
+                timeRangeFilter = filter,
+                ascendingOrder = false,
+                pageSize = pageSize,
+                pageToken = pageToken
+            )
+        )
+        val next = response.pageToken?.takeIf { it.isNotBlank() && it != pageToken }
+        ExerciseHistoryRawPage(
+            sessions = response.records.mapNotNull(HealthExerciseMapper::session),
+            nextPageToken = next
+        )
     }
 
     override suspend fun readHrvSamples(
@@ -190,6 +213,29 @@ class HealthConnectGateway(
             stage == SleepSessionRecord.STAGE_TYPE_OUT_OF_BED
     }
 
+    private suspend fun historyAccess(granted: Set<String>): HealthHistoryAccess {
+        if (!historyFeatureAvailable()) return HealthHistoryAccess.Unsupported
+        return if (granted.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY)) {
+            HealthHistoryAccess.Granted
+        } else {
+            HealthHistoryAccess.NotGranted
+        }
+    }
+
+    private suspend fun historyFeatureAvailable(): Boolean {
+        return try {
+            withContext(Dispatchers.IO) {
+                client().features.getFeatureStatus(
+                    HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_HISTORY
+                ) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun client(): HealthConnectClient = HealthConnectClient.getOrCreate(context)
 
     companion object {
@@ -197,13 +243,19 @@ class HealthConnectGateway(
         const val VIEW_PERMISSION_USAGE = "android.intent.action.VIEW_PERMISSION_USAGE"
         private const val MAX_RECORD_PAGES = 20
 
-        fun readPermissions(): Set<String> = linkedSetOf(
-            HealthPermission.getReadPermission(StepsRecord::class),
-            HealthPermission.getReadPermission(RestingHeartRateRecord::class),
-            HealthPermission.getReadPermission(ExerciseSessionRecord::class),
-            HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
-            HealthPermission.getReadPermission(SleepSessionRecord::class)
-        )
+        fun readPermissions(includeHistory: Boolean = false): Set<String> {
+            val permissions = linkedSetOf(
+                HealthPermission.getReadPermission(StepsRecord::class),
+                HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+                HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+                HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+                HealthPermission.getReadPermission(SleepSessionRecord::class)
+            )
+            if (includeHistory) {
+                permissions.add(HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY)
+            }
+            return permissions
+        }
 
         fun isPermissionUsage(intent: Intent?): Boolean {
             return intent?.action == VIEW_PERMISSION_USAGE

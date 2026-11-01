@@ -25,7 +25,7 @@ import java.time.Period
 class HealthConnectPermissionSetTest {
     @Test
     fun requestedPermissionsAreTheFiveRecentReads() {
-        val requested = HealthConnectGateway.readPermissions()
+        val requested = HealthConnectGateway.readPermissions(includeHistory = false)
         assertEquals(
             setOf(
                 HealthPermission.getReadPermission(StepsRecord::class),
@@ -50,6 +50,22 @@ class HealthConnectPermissionSetTest {
         assertTrue(joined.contains("READ_EXERCISE"))
         assertTrue(joined.contains("READ_HEART_RATE_VARIABILITY"))
         assertTrue(joined.contains("READ_SLEEP"))
+        assertEquals(5, requested.size)
+    }
+
+    @Test
+    fun historyPermissionIsRequestedOnlyWhenTheFeatureShouldBeIncluded() {
+        val requested = HealthConnectGateway.readPermissions(includeHistory = true)
+        assertTrue(requested.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY))
+        assertEquals(6, requested.size)
+        val joined = requested.joinToString(" ")
+        assertFalse(joined.contains("WRITE"))
+        assertFalse(joined.contains("BACKGROUND"))
+        assertFalse(joined.contains("READ_DISTANCE"))
+        assertTrue(
+            HealthConnectGateway.readPermissions(includeHistory = false)
+                .none { it.contains("HISTORY") }
+        )
     }
 
     @Test

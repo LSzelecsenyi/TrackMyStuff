@@ -52,7 +52,8 @@ data class HealthSettingsState(
     val action: HealthSettingsAction,
     val exerciseGranted: Boolean = false,
     val hrvGranted: Boolean = false,
-    val sleepGranted: Boolean = false
+    val sleepGranted: Boolean = false,
+    val historyAccess: HealthHistoryAccess = HealthHistoryAccess.Unsupported
 ) {
     companion object {
         val NotConnected = HealthSettingsState(
@@ -140,7 +141,8 @@ object HealthPresentation {
                     },
                     exerciseGranted = access.exerciseGranted,
                     hrvGranted = access.hrvGranted,
-                    sleepGranted = access.sleepGranted
+                    sleepGranted = access.sleepGranted,
+                    historyAccess = access.history
                 )
             }
         }

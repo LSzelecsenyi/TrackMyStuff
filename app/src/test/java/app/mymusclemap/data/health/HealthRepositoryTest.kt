@@ -4,10 +4,15 @@ import app.mymusclemap.domain.FixedDateProvider
 import app.mymusclemap.domain.entitlement.CompletedWorkout
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.WorkoutOrigin
+import app.mymusclemap.domain.health.ExerciseHistory
+import app.mymusclemap.domain.health.ExerciseHistoryBoundary
+import app.mymusclemap.domain.health.ExerciseHistoryQuery
+import app.mymusclemap.domain.health.ExerciseHistoryRawPage
 import app.mymusclemap.domain.health.HealthAvailability
 import app.mymusclemap.domain.health.HealthExerciseKind
 import app.mymusclemap.domain.health.HealthExerciseSession
 import app.mymusclemap.domain.health.HealthGrants
+import app.mymusclemap.domain.health.HealthHistoryAccess
 import app.mymusclemap.domain.health.HealthHrvSample
 import app.mymusclemap.domain.health.HealthMetric
 import app.mymusclemap.domain.health.HealthMetricBucket
@@ -24,6 +29,7 @@ import java.io.IOException
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 class HealthRepositoryTest {
@@ -382,6 +388,203 @@ class HealthRepositoryTest {
         assertEquals(0, qualification.distinctNativeWorkoutDays)
     }
 
+    @Test
+    fun refreshKeepsTheThirtyDayMetricWindowAndDoesNotReadExerciseHistory() = runTest {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(
+            steps = true,
+            restingHeartRate = true,
+            exercise = true,
+            history = HealthHistoryAccess.Granted
+        )
+        source.steps = listOf(HealthMetricBucket(today, 4_000))
+        source.heart = listOf(HealthMetricBucket(today, 55))
+        source.exercise = listOf(session(today, "today"))
+        source.historySessions = listOf(session(today.minusDays(40), "old"))
+        repository.refresh()
+        assertEquals(HealthWindow.queryRange(today), source.stepStart to source.stepEnd)
+        assertEquals(HealthWindow.recentExerciseRange(today), source.exerciseStart to source.exerciseEnd)
+        assertEquals(0, source.historyReads)
+        assertEquals(1, repository.readings.value.exercise.single().running.sessions)
+        assertTrue(repository.exerciseHistory.value.entries.isEmpty())
+    }
+
+    @Test
+    fun historyReloadKeepsSessionsOlderThanThirtyDaysOutOfTheSevenDaySummary() = runTest {
+        connectExercise(HealthHistoryAccess.Granted)
+        source.exercise = listOf(session(today, "today"))
+        source.historySessions = listOf(session(today.minusDays(40), "old"), session(today, "today"))
+        repository.refresh()
+        repository.reloadExerciseHistory()
+        val history = repository.exerciseHistory.value
+        assertEquals(listOf(today, today.minusDays(40)), history.entries.map { it.date })
+        assertTrue(history.entries.all { it.sourcePackage == "com.strava" })
+        assertNull(source.historyQueries.single().start)
+        assertTrue(source.historyQueries.single().fullHistory)
+        assertEquals(ExerciseHistory.PAGE_SIZE, source.historyPageSizes.single())
+        assertEquals(1, repository.readings.value.exercise.size)
+        assertEquals(1, repository.readings.value.exercise.single().running.sessions)
+    }
+
+    @Test
+    fun unsupportedHistoryStillUsesAnOpenStartWhenTheReadSucceeds() = runTest {
+        connectExercise(HealthHistoryAccess.Unsupported)
+        source.historySessions = listOf(session(today.minusDays(10), "recent"))
+        repository.refresh()
+        repository.reloadExerciseHistory()
+        val query = source.historyQueries.single()
+        assertFalse(query.fullHistory)
+        assertNull(query.start)
+        assertFalse(repository.exerciseHistory.value.limitedToRecentWindow)
+        assertFalse(repository.exerciseHistory.value.failed)
+        assertEquals(1, repository.exerciseHistory.value.entries.size)
+    }
+
+    @Test
+    fun rejectedOpenReadFallsBackToTheSafeRecentWindowAndKeepsSteps() = runTest {
+        connectExercise(HealthHistoryAccess.NotGranted)
+        source.steps = listOf(HealthMetricBucket(today, 3_300))
+        source.failWideHistory = true
+        source.historySessions = listOf(session(today.minusDays(2), "recent"))
+        repository.refresh()
+        repository.reloadExerciseHistory()
+        assertEquals(2, source.historyReads)
+        assertNull(source.historyQueries[0].start)
+        val fallbackStart = source.historyQueries[1].start
+        val now = today.atTime(java.time.LocalTime.NOON).atZone(ZoneId.systemDefault()).toInstant()
+        assertEquals(ExerciseHistoryBoundary.safeRecentStart(now), fallbackStart)
+        val history = repository.exerciseHistory.value
+        assertTrue(history.limitedToRecentWindow)
+        assertFalse(history.failed)
+        assertEquals(HealthHistoryAccess.NotGranted, history.access)
+        assertEquals(1, history.entries.size)
+        assertEquals(3_300L, repository.readings.value.steps.single().steps)
+    }
+
+    @Test
+    fun grantedHistoryFailureDoesNotPretendTheWindowIsThirtyDays() = runTest {
+        connectExercise(HealthHistoryAccess.Granted)
+        source.steps = listOf(HealthMetricBucket(today, 2_200))
+        source.failHistory = true
+        source.historySessions = listOf(session(today.minusDays(40), "old"))
+        repository.refresh()
+        repository.reloadExerciseHistory()
+        assertEquals(1, source.historyReads)
+        val history = repository.exerciseHistory.value
+        assertTrue(history.failed)
+        assertTrue(history.entries.isEmpty())
+        assertFalse(history.limitedToRecentWindow)
+        assertEquals(2_200L, repository.readings.value.steps.single().steps)
+    }
+
+    @Test
+    fun laterPagesAppendAndARepeatedSessionIsNotMerged() = runTest {
+        connectExercise(HealthHistoryAccess.Granted)
+        val older = session(today.minusDays(40), "old")
+        val newer = session(today, "new")
+        source.historyPages = listOf(
+            ExerciseHistoryRawPage(listOf(newer, newer), "page-2"),
+            ExerciseHistoryRawPage(listOf(newer, older), null)
+        )
+        repository.refresh()
+        repository.reloadExerciseHistory()
+        assertEquals(listOf("id:new"), repository.exerciseHistory.value.entries.map { it.id })
+        assertTrue(repository.exerciseHistory.value.canLoadMore)
+        repository.loadMoreExerciseHistory()
+        assertEquals(listOf("id:new", "id:old"), repository.exerciseHistory.value.entries.map { it.id })
+        assertFalse(repository.exerciseHistory.value.canLoadMore)
+        assertEquals(listOf(null, "page-2"), source.historyTokens)
+    }
+
+    @Test
+    fun aFailedLaterPageKeepsTheSessionsAlreadyShown() = runTest {
+        connectExercise(HealthHistoryAccess.NotGranted)
+        source.historyPages = listOf(ExerciseHistoryRawPage(listOf(session(today, "kept")), "page-2"))
+        source.failHistoryAfter = 1
+        repository.refresh()
+        repository.reloadExerciseHistory()
+        repository.loadMoreExerciseHistory()
+        val history = repository.exerciseHistory.value
+        assertEquals(listOf("id:kept"), history.entries.map { it.id })
+        assertTrue(history.failed)
+        assertTrue(history.canLoadMore)
+        assertEquals(2, source.historyReads)
+    }
+
+    @Test
+    fun emptyHistoryIsVisibleAndNotAFailure() = runTest {
+        connectExercise(HealthHistoryAccess.Granted)
+        repository.refresh()
+        repository.reloadExerciseHistory()
+        val history = repository.exerciseHistory.value
+        assertTrue(history.visible)
+        assertTrue(history.entries.isEmpty())
+        assertFalse(history.failed)
+        assertFalse(history.loading)
+    }
+
+    @Test
+    fun revokingExerciseClearsHistoryWithoutClearingSteps() = runTest {
+        connectExercise(HealthHistoryAccess.Granted)
+        source.steps = listOf(HealthMetricBucket(today, 9_100))
+        source.historySessions = listOf(session(today.minusDays(40), "old"))
+        repository.refresh()
+        repository.reloadExerciseHistory()
+        assertEquals(1, repository.exerciseHistory.value.entries.size)
+        source.grants = HealthGrants(steps = true, restingHeartRate = false, exercise = false)
+        repository.refresh()
+        assertFalse(repository.exerciseHistory.value.visible)
+        assertTrue(repository.exerciseHistory.value.entries.isEmpty())
+        assertEquals(9_100L, repository.readings.value.steps.single().steps)
+        assertEquals(1, source.historyReads)
+    }
+
+    @Test
+    fun freeAccessDoesNotReadExerciseHistory() = runTest {
+        val gated = HealthRepository(source, FixedDateProvider(today)) { false }
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(
+            steps = true,
+            restingHeartRate = true,
+            exercise = true,
+            hrv = true,
+            sleep = true,
+            history = HealthHistoryAccess.Granted
+        )
+        source.steps = listOf(HealthMetricBucket(today, 4_200))
+        source.heart = listOf(HealthMetricBucket(today, 58))
+        source.historySessions = listOf(session(today.minusDays(40), "old"))
+        gated.refresh()
+        gated.reloadExerciseHistory()
+        assertEquals(0, source.historyReads)
+        assertEquals(0, source.exerciseReads)
+        assertFalse(gated.exerciseHistory.value.visible)
+        assertEquals(4_200L, gated.readings.value.steps.single().steps)
+        assertEquals(58L, gated.readings.value.restingHeartRate.single().beatsPerMinute)
+    }
+
+    private fun connectExercise(history: HealthHistoryAccess) {
+        source.availability = HealthAvailability.Available
+        source.grants = HealthGrants(
+            steps = true,
+            restingHeartRate = false,
+            exercise = true,
+            history = history
+        )
+    }
+
+    private fun session(date: LocalDate, id: String): HealthExerciseSession {
+        val start = date.atTime(8, 0).toInstant(ZoneOffset.UTC)
+        return HealthExerciseSession(
+            start = start,
+            end = start.plus(Duration.ofMinutes(20)),
+            zone = ZoneOffset.UTC,
+            kind = HealthExerciseKind.RUNNING,
+            id = id,
+            sourcePackage = "com.strava"
+        )
+    }
+
     private class FakeHealthSource : HealthSource {
         var availability: HealthAvailability = HealthAvailability.Unavailable
         var grants = HealthGrants(steps = false, restingHeartRate = false)
@@ -405,6 +608,18 @@ class HealthRepositoryTest {
         var stepEnd: LocalDateTime? = null
         var heartStart: LocalDateTime? = null
         var heartEnd: LocalDateTime? = null
+        var exerciseStart: LocalDateTime? = null
+        var exerciseEnd: LocalDateTime? = null
+        var historySessions: List<HealthExerciseSession> = emptyList()
+        var historyPages: List<ExerciseHistoryRawPage> = emptyList()
+        var historyReads = 0
+        val historyQueries = mutableListOf<ExerciseHistoryQuery>()
+        val historyTokens = mutableListOf<String?>()
+        val historyPageSizes = mutableListOf<Int>()
+        var failHistory = false
+        var failWideHistory = false
+        var failHistoryAfter = Int.MAX_VALUE
+        private var historyCursor = 0
 
         override fun availability(): HealthAvailability = availability
 
@@ -440,8 +655,29 @@ class HealthRepositoryTest {
             endExclusive: LocalDateTime
         ): List<HealthExerciseSession> {
             exerciseReads += 1
+            exerciseStart = startInclusive
+            exerciseEnd = endExclusive
             if (failReads || failExercise) throw IOException("health read failed")
             return exercise
+        }
+
+        override suspend fun readExerciseHistoryPage(
+            query: ExerciseHistoryQuery,
+            pageToken: String?,
+            pageSize: Int
+        ): ExerciseHistoryRawPage {
+            historyReads += 1
+            historyQueries += query
+            historyTokens += pageToken
+            historyPageSizes += pageSize
+            if (failHistory || historyReads > failHistoryAfter) throw IOException("history")
+            if (failWideHistory && query.start == null) throw IOException("wide")
+            if (historyPages.isNotEmpty()) {
+                val page = historyPages.getOrElse(historyCursor) { ExerciseHistoryRawPage() }
+                historyCursor += 1
+                return page
+            }
+            return ExerciseHistoryRawPage(historySessions)
         }
 
         override suspend fun readHrvSamples(

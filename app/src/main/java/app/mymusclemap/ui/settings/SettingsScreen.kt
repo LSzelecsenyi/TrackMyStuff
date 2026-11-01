@@ -189,6 +189,7 @@ fun SettingsScreen(
     health: HealthSettingsState = HealthSettingsState.NotConnected,
     onHealthAction: () -> Unit = {},
     onOpenHealthDetails: () -> Unit = {},
+    onRequestExerciseHistory: () -> Unit = {},
     onSetWeeklyGoal: (Int) -> Unit = {},
     onDisableWeeklyGoal: () -> Unit = {},
     lockScreenSetCompletion: Boolean = false,
@@ -331,7 +332,8 @@ fun SettingsScreen(
                 HealthConnectSettingsSection(
                     state = health,
                     onAction = onHealthAction,
-                    onOpenDetails = onOpenHealthDetails
+                    onOpenDetails = onOpenHealthDetails,
+                    onRequestHistory = onRequestExerciseHistory
                 )
                 CompactEditorDivider()
                 AppBackupSection(

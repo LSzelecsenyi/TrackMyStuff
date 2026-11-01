@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.mymusclemap.data.health.HealthRepository
 import app.mymusclemap.domain.DateProvider
+import app.mymusclemap.domain.health.ExerciseHistorySnapshot
 import app.mymusclemap.domain.health.HealthCardState
 import app.mymusclemap.domain.health.HealthDetailPresentation
 import app.mymusclemap.domain.health.HealthDetailState
@@ -36,6 +37,13 @@ class HealthConnectViewModel(
         HealthDetailPresentation.detail(access, readings, today)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HealthDetailState.Checking)
 
+    val exerciseHistory: StateFlow<ExerciseHistorySnapshot> = repository.exerciseHistory
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            repository.exerciseHistory.value
+        )
+
     val settings: StateFlow<HealthSettingsState> = repository.access
         .map { HealthPresentation.settings(it) }
         .stateIn(
@@ -51,6 +59,25 @@ class HealthConnectViewModel(
     fun refresh() {
         viewModelScope.launch {
             repository.refresh()
+        }
+    }
+
+    fun refreshAndReloadHistory() {
+        viewModelScope.launch {
+            repository.refresh()
+            repository.reloadExerciseHistory()
+        }
+    }
+
+    fun reloadExerciseHistory() {
+        viewModelScope.launch {
+            repository.reloadExerciseHistory()
+        }
+    }
+
+    fun loadMoreExerciseHistory() {
+        viewModelScope.launch {
+            repository.loadMoreExerciseHistory()
         }
     }
 }

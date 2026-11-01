@@ -115,6 +115,8 @@ import app.mymusclemap.ui.pro.ProDiscoveryOfferDialog
 import app.mymusclemap.ui.pro.ProDiscoveryWarningDialog
 import app.mymusclemap.ui.pro.ProInfoScreen
 import app.mymusclemap.ui.pro.ProInfoSheet
+import app.mymusclemap.data.health.HealthConnectGateway
+import app.mymusclemap.domain.health.HealthHistoryAccess
 import app.mymusclemap.domain.health.HealthSettingsAction
 import app.mymusclemap.ui.health.HealthConnectDetailScreen
 import app.mymusclemap.ui.health.HealthConnectViewModel
@@ -787,10 +789,26 @@ fun WeightTrackerNavHost(
             composable(AppRoutes.HEALTH_CONNECT) {
                 val healthViewModel: HealthConnectViewModel = viewModel(factory = factory)
                 val detail by healthViewModel.detail.collectAsStateWithLifecycle()
-                RefreshHealthConnectOnResume(healthViewModel::refresh)
+                val healthSettings by healthViewModel.settings.collectAsStateWithLifecycle()
+                val exerciseHistory by healthViewModel.exerciseHistory.collectAsStateWithLifecycle()
+                val historyPermissions = HealthConnectGateway.readPermissions(
+                    includeHistory = healthSettings.historyAccess != HealthHistoryAccess.Unsupported
+                )
+                val launchHistoryPermissions = rememberHealthConnectPermissionLaunch(
+                    historyPermissions,
+                    healthViewModel::refreshAndReloadHistory
+                )
+                LaunchedEffect(Unit) {
+                    healthViewModel.refreshAndReloadHistory()
+                }
+                RefreshHealthConnectOnResume(healthViewModel::refreshAndReloadHistory)
                 HealthConnectDetailScreen(
                     state = detail,
-                    onBack = { navController.popBackStack() }
+                    exerciseHistory = exerciseHistory,
+                    onBack = { navController.popBackStack() },
+                    onLoadMore = healthViewModel::loadMoreExerciseHistory,
+                    onRetryHistory = healthViewModel::reloadExerciseHistory,
+                    onRequestHistory = launchHistoryPermissions
                 )
             }
             composable(AppRoutes.HELP) {
@@ -1793,7 +1811,10 @@ private fun SettingsRoute(
     showFounderBadge: Boolean,
     onOpenHealthDetails: () -> Unit
 ) {
-    val launchHealthPermissions = rememberHealthConnectPermissionLaunch(onHealthRefresh)
+    val healthPermissions = HealthConnectGateway.readPermissions(
+        includeHistory = health.historyAccess != HealthHistoryAccess.Unsupported
+    )
+    val launchHealthPermissions = rememberHealthConnectPermissionLaunch(healthPermissions, onHealthRefresh)
     RefreshHealthConnectOnResume(onHealthRefresh)
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -2013,7 +2034,8 @@ private fun SettingsRoute(
             if (!opened) {
                 viewModel.onHealthConnectOpenFailed()
             }
-        }
+        },
+        onRequestExerciseHistory = { launchHealthPermissions() }
     )
 }
 

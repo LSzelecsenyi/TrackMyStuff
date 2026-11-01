@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import app.mymusclemap.R
+import app.mymusclemap.domain.health.HealthHistoryAccess
 import app.mymusclemap.domain.health.HealthSettingsAction
 import app.mymusclemap.domain.health.HealthSettingsState
 import app.mymusclemap.domain.health.HealthSettingsStatus
@@ -78,6 +79,51 @@ class HealthConnectSettingsSectionTest {
             )
         )
         composeRule.onNodeWithText(testString(R.string.health_connect_partial_heart)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_HEALTH_HISTORY).assertDoesNotExist()
+    }
+
+    @Test
+    fun notGrantedHistoryOffersAllowWithoutChangingTheConnectedMetrics() {
+        val requests = intArrayOf(0)
+        render(
+            HealthSettingsState(
+                ready = true,
+                status = HealthSettingsStatus.Connected,
+                stepsGranted = true,
+                restingHeartRateGranted = true,
+                action = HealthSettingsAction.ManageAccess,
+                exerciseGranted = true,
+                historyAccess = HealthHistoryAccess.NotGranted
+            ),
+            onRequestHistory = { requests[0] += 1 }
+        )
+        composeRule.onNodeWithText(testString(R.string.health_connect_status_connected)).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            listOf(
+                testString(R.string.health_connect_steps),
+                testString(R.string.health_connect_settings_workouts),
+                testString(R.string.health_connect_settings_heart)
+            ).joinToString(", ")
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_HEALTH_HISTORY).performClick()
+        assertEquals(1, requests[0])
+    }
+
+    @Test
+    fun unsupportedHistoryExplainsTheLimitAndDoesNotAskAgain() {
+        render(
+            HealthSettingsState(
+                ready = true,
+                status = HealthSettingsStatus.Connected,
+                stepsGranted = true,
+                restingHeartRateGranted = true,
+                action = HealthSettingsAction.ManageAccess,
+                exerciseGranted = true,
+                historyAccess = HealthHistoryAccess.Unsupported
+            )
+        )
+        composeRule.onNodeWithText(testString(R.string.health_connect_history_unsupported)).assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_HEALTH_HISTORY).assertDoesNotExist()
     }
 
     @Test
@@ -130,14 +176,16 @@ class HealthConnectSettingsSectionTest {
     private fun render(
         state: HealthSettingsState,
         onAction: () -> Unit = {},
-        onOpenDetails: () -> Unit = {}
+        onOpenDetails: () -> Unit = {},
+        onRequestHistory: () -> Unit = {}
     ) {
         composeRule.setContent {
             WeightTrackerThemeForPreview {
                 HealthConnectSettingsSection(
                     state = state,
                     onAction = onAction,
-                    onOpenDetails = onOpenDetails
+                    onOpenDetails = onOpenDetails,
+                    onRequestHistory = onRequestHistory
                 )
             }
         }

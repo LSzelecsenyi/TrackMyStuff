@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.domain.health.HealthHistoryAccess
 import app.mymusclemap.domain.health.HealthSettingsAction
 import app.mymusclemap.domain.health.HealthSettingsState
 import app.mymusclemap.domain.health.HealthSettingsStatus
@@ -36,12 +37,14 @@ import app.mymusclemap.ui.theme.AppTypeTokens
 internal const val SETTINGS_HEALTH = "settings-health"
 internal const val SETTINGS_HEALTH_ACTION = "settings-health-action"
 internal const val SETTINGS_HEALTH_DETAILS = "settings-health-details"
+internal const val SETTINGS_HEALTH_HISTORY = "settings-health-history"
 
 @Composable
 fun HealthConnectSettingsSection(
     state: HealthSettingsState,
     onAction: () -> Unit,
     onOpenDetails: () -> Unit = {},
+    onRequestHistory: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     CompactEditorSection(
@@ -75,6 +78,24 @@ fun HealthConnectSettingsSection(
                     title = stringResource(R.string.health_connect_view_data),
                     onClick = onOpenDetails,
                     tag = SETTINGS_HEALTH_DETAILS
+                )
+                if (state.historyAccess == HealthHistoryAccess.NotGranted) {
+                    HealthActionRow(
+                        icon = Icons.Outlined.MonitorHeart,
+                        title = stringResource(R.string.health_connect_history_allow),
+                        onClick = onRequestHistory,
+                        tag = SETTINGS_HEALTH_HISTORY
+                    )
+                }
+            }
+            if (state.status == HealthSettingsStatus.Connected &&
+                state.historyAccess == HealthHistoryAccess.Unsupported &&
+                state.exerciseGranted
+            ) {
+                Text(
+                    text = stringResource(R.string.health_connect_history_unsupported),
+                    style = AppTypeTokens.statCaption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

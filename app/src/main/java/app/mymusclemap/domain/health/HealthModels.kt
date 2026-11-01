@@ -14,7 +14,8 @@ data class HealthGrants(
     val restingHeartRate: Boolean,
     val exercise: Boolean = false,
     val hrv: Boolean = false,
-    val sleep: Boolean = false
+    val sleep: Boolean = false,
+    val history: HealthHistoryAccess = HealthHistoryAccess.Unsupported
 ) {
     fun any(): Boolean = steps || restingHeartRate || exercise || hrv || sleep
 }
@@ -26,7 +27,8 @@ data class HealthAccess(
     val checked: Boolean = false,
     val exerciseGranted: Boolean = false,
     val hrvGranted: Boolean = false,
-    val sleepGranted: Boolean = false
+    val sleepGranted: Boolean = false,
+    val history: HealthHistoryAccess = HealthHistoryAccess.Unsupported
 ) {
     fun anyGranted(): Boolean {
         return stepsGranted || restingHeartRateGranted || exerciseGranted || hrvGranted || sleepGranted
@@ -82,6 +84,16 @@ interface HealthSource {
         startInclusive: LocalDateTime,
         endExclusive: LocalDateTime
     ): List<HealthExerciseSession>
+
+    /**
+     * One page of exercise history. [ExerciseHistoryQuery.start] null means an open start,
+     * so Health Connect applies its own history boundary.
+     */
+    suspend fun readExerciseHistoryPage(
+        query: ExerciseHistoryQuery,
+        pageToken: String?,
+        pageSize: Int
+    ): ExerciseHistoryRawPage = ExerciseHistoryRawPage()
 
     suspend fun readHrvSamples(
         startInclusive: LocalDateTime,

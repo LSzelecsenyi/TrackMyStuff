@@ -7,6 +7,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -14,14 +16,17 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.mymusclemap.data.health.HealthConnectGateway
 
 @Composable
-fun rememberHealthConnectPermissionLaunch(onFinished: () -> Unit): () -> Unit {
+fun rememberHealthConnectPermissionLaunch(
+    permissions: Set<String>,
+    onFinished: () -> Unit
+): () -> Unit {
     val launcher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) {
         onFinished()
     }
-    val permissions = HealthConnectGateway.readPermissions()
-    return { launcher.launch(permissions) }
+    val current by rememberUpdatedState(permissions)
+    return { launcher.launch(current) }
 }
 
 @Composable

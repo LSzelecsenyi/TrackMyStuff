@@ -50,7 +50,9 @@ data class HealthExerciseSession(
     val start: Instant,
     val end: Instant,
     val zone: ZoneId,
-    val kind: HealthExerciseKind
+    val kind: HealthExerciseKind,
+    val id: String = "",
+    val sourcePackage: String? = null
 )
 
 data class ExerciseTotal(
