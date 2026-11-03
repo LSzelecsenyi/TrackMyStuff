@@ -1548,7 +1548,7 @@
     <string name="founder_report_share_subject">Strict Tester Analytics Report</string>
     <string name="notification_channel_active_workout">Active workout</string>
     <string name="notification_channel_active_workout_description">Shows the current set while a workout is in progress.</string>
-    <string name="notification_complete_set">Complete set</string>
+    <string name="notification_complete_set">Complete Set</string>
     <string name="notification_set_of">Set %1$d of %2$d</string>
     <string name="notification_reps">%1$d reps</string>
     <string name="notification_distance_meters">%1$s m</string>
@@ -1556,6 +1556,9 @@
     <string name="notification_all_sets_logged">All sets logged</string>
     <string name="notification_finish_in_app">Finish workout in Strict</string>
     <string name="notification_workout_in_progress">Workout in progress</string>
+    <string name="notification_compact_progress">%1$s %2$d/%3$d</string>
+    <string name="notification_compact_needs_input">%1$s · %2$s</string>
+    <string name="notification_compact_complete">Complete</string>
     <string name="settings_lock_screen_sets_title">Complete sets from lock screen</string>
     <string name="settings_lock_screen_sets_body">Mark sets complete without unlocking your phone.</string>
     <string name="settings_lock_screen_sets_explain">Strict can show your current set on the lock screen so you can mark it complete without unlocking your phone.</string>

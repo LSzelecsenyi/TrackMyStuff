@@ -1548,7 +1548,7 @@
     <string name="founder_report_share_subject">Strict tesztelői elemzési jelentés</string>
     <string name="notification_channel_active_workout">Aktív edzés</string>
     <string name="notification_channel_active_workout_description">Az aktuális sorozatot mutatja, amíg az edzés folyamatban van.</string>
-    <string name="notification_complete_set">Sorozat befejezése</string>
+    <string name="notification_complete_set">Sorozat kész</string>
     <string name="notification_set_of">%1$d. / %2$d. sorozat</string>
     <string name="notification_reps">%1$d ismétlés</string>
     <string name="notification_distance_meters">%1$s m</string>
@@ -1556,6 +1556,9 @@
     <string name="notification_all_sets_logged">Minden sorozat rögzítve</string>
     <string name="notification_finish_in_app">Fejezd be az edzést a Strictben</string>
     <string name="notification_workout_in_progress">Edzés folyamatban</string>
+    <string name="notification_compact_progress">%1$s %2$d/%3$d</string>
+    <string name="notification_compact_needs_input">%1$s · %2$s</string>
+    <string name="notification_compact_complete">Kész</string>
     <string name="settings_lock_screen_sets_title">Sorozatok befejezése a zárolási képernyőn</string>
     <string name="settings_lock_screen_sets_body">Jelöld késznek a sorozatokat a telefon feloldása nélkül.</string>
     <string name="settings_lock_screen_sets_explain">A Strict megjelenítheti az aktuális sorozatot a zárolási képernyőn, hogy a telefon feloldása nélkül késznek jelölhesd.</string>

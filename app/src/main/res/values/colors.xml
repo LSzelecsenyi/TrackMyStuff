@@ -3,4 +3,6 @@
     <color name="ic_launcher_background">#FFFFFF</color>
     <color name="splash_background">#0C121C</color>
     <color name="window_background">#0C121C</color>
+    <color name="notification_complete_background">#E2FD6D</color>
+    <color name="notification_complete_text">#0C121C</color>
 </resources>

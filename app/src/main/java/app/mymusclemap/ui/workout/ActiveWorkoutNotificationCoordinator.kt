@@ -1,6 +1,5 @@
 package app.mymusclemap.ui.workout
 
-import android.content.BroadcastReceiver
 import android.content.Context
 import app.mymusclemap.data.preferences.LockScreenSetCompletionStore
 import app.mymusclemap.data.repository.WorkoutSessionRepository
@@ -42,13 +41,13 @@ class ActiveWorkoutNotificationCoordinator(
     fun completeFromAction(
         sessionId: Long,
         setId: Long,
-        pending: BroadcastReceiver.PendingResult
+        onFinished: () -> Unit
     ) {
         scope.launch {
             try {
                 performAction(sessionId, setId)
             } finally {
-                pending.finish()
+                onFinished()
             }
         }
     }
@@ -73,9 +72,16 @@ class ActiveWorkoutNotificationCoordinator(
                 return@withLock
             }
             val aggregate = repository.activeAggregate()
+            val locked = if (aggregate == null) {
+                emptySet()
+            } else {
+                repository.notificationLockedExerciseIds(
+                    aggregate.exercises.map { it.exercise.exerciseId }
+                )
+            }
             ActiveWorkoutNotifications.publish(
                 context,
-                ActiveWorkoutNotificationLogic.project(aggregate),
+                ActiveWorkoutNotificationLogic.project(aggregate, locked),
                 notificationId
             )
         }

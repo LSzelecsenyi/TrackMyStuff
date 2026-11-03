@@ -97,6 +97,7 @@ class ActiveWorkoutNotificationLogicTest {
         assertEquals(4L, body.setId)
         assertEquals(3, body.setNumber)
         assertFalse(body.completable)
+        assertTrue(body.needsInAppInput)
         assertNull(body.reps)
         assertNull(body.weightKg)
     }
@@ -162,12 +163,84 @@ class ActiveWorkoutNotificationLogicTest {
         )
         val timedBody = ActiveWorkoutNotificationLogic.project(timed)!!.body as ActiveWorkoutNotificationBody.CurrentSet
         assertTrue(timedBody.completable)
+        assertFalse(timedBody.needsInAppInput)
         assertEquals(45, timedBody.durationSeconds)
+    }
+
+    @Test
+    fun timedWorkAndAnActiveWorkPhaseOmitCompletion() {
+        val timed = aggregate(
+            item(
+                id = 2L,
+                name = "Plank",
+                measurement = MeasurementType.DURATION,
+                resistance = ResistanceBasis.NONE,
+                sets = listOf(
+                    set(
+                        id = 8L,
+                        position = 0,
+                        reps = null,
+                        minReps = null,
+                        maxReps = null,
+                        load = PlannedLoadKind.NONE,
+                        durationSeconds = 45,
+                        timedWork = true
+                    )
+                )
+            )
+        )
+        val timedBody = ActiveWorkoutNotificationLogic.project(timed)!!.body as ActiveWorkoutNotificationBody.CurrentSet
+        assertFalse(timedBody.completable)
+        assertFalse(timedBody.needsInAppInput)
+        assertEquals(45, timedBody.durationSeconds)
+        assertFalse(ActiveWorkoutNotificationLogic.completes(timed, 8L))
+
+        val running = aggregate(
+            item(id = 10L, name = "Dips", sets = listOf(set(id = 3L, position = 0))),
+            workPhase = "RUNNING"
+        )
+        val runningBody = ActiveWorkoutNotificationLogic.project(running)!!.body as ActiveWorkoutNotificationBody.CurrentSet
+        assertFalse(runningBody.completable)
+        assertFalse(runningBody.needsInAppInput)
+        assertEquals(3L, runningBody.setId)
+        assertFalse(ActiveWorkoutNotificationLogic.completes(running, 3L))
+    }
+
+    @Test
+    fun lockedExercisesDoNotAdvertiseCompletion() {
+        val lockedExercise = item(
+            id = 10L,
+            name = "Dip",
+            sets = listOf(set(id = 3L, position = 0))
+        )
+        val openExercise = item(
+            id = 11L,
+            name = "Row",
+            sets = listOf(set(id = 9L, position = 0))
+        )
+        val mixed = WorkoutSessionAggregate(
+            session = aggregate(lockedExercise).session,
+            exercises = listOf(lockedExercise, openExercise)
+        )
+        val moved = ActiveWorkoutNotificationLogic.project(mixed, setOf(10L))!!.body as ActiveWorkoutNotificationBody.CurrentSet
+        assertEquals(9L, moved.setId)
+        assertEquals("Row", moved.exerciseName)
+        assertTrue(moved.completable)
+        assertFalse(ActiveWorkoutNotificationLogic.completes(mixed, 3L, setOf(10L)))
+        assertTrue(ActiveWorkoutNotificationLogic.completes(mixed, 9L, setOf(10L)))
+
+        val blocked = ActiveWorkoutNotificationLogic.project(aggregate(lockedExercise), setOf(10L))!!
+        assertTrue(blocked.body is ActiveWorkoutNotificationBody.CurrentSet)
+        val blockedBody = blocked.body as ActiveWorkoutNotificationBody.CurrentSet
+        assertEquals(3L, blockedBody.setId)
+        assertFalse(blockedBody.completable)
+        assertTrue(blockedBody.needsInAppInput)
     }
 
     private fun aggregate(
         item: SessionExerciseItem,
-        status: SessionStatus = SessionStatus.IN_PROGRESS
+        status: SessionStatus = SessionStatus.IN_PROGRESS,
+        workPhase: String? = null
     ): WorkoutSessionAggregate {
         return WorkoutSessionAggregate(
             session = WorkoutSession(
@@ -184,7 +257,8 @@ class ActiveWorkoutNotificationLogicTest {
                 bodyWeightSource = BodyWeightSource.UNKNOWN,
                 bodyWeightSourceDate = null,
                 createdAt = 1_000L,
-                updatedAt = 1_000L
+                updatedAt = 1_000L,
+                workPhase = workPhase
             ),
             exercises = listOf(item)
         )
@@ -227,7 +301,8 @@ class ActiveWorkoutNotificationLogicTest {
         load: PlannedLoadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
         weightKg: Double? = null,
         durationSeconds: Int? = null,
-        draft: ActualSetDraft? = null
+        draft: ActualSetDraft? = null,
+        timedWork: Boolean = false
     ): SessionSet {
         return SessionSet(
             id = id,
@@ -247,7 +322,8 @@ class ActiveWorkoutNotificationLogicTest {
             status = status,
             completedAt = null,
             addedDuringWorkout = false,
-            draft = draft
+            draft = draft,
+            timedWork = timedWork
         )
     }
 }

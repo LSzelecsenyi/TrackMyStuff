@@ -17,6 +17,8 @@ import app.mymusclemap.domain.exercise.MuscleGroup
 import app.mymusclemap.domain.exercise.ResistanceBasis
 import app.mymusclemap.domain.exercise.WeightInterpretation
 import app.mymusclemap.domain.workout.AbandonWorkoutResult
+import app.mymusclemap.domain.workout.ActiveWorkoutNotificationBody
+import app.mymusclemap.domain.workout.ActiveWorkoutNotificationLogic
 import app.mymusclemap.domain.workout.ActualSetDraft
 import app.mymusclemap.domain.workout.ActualSetLogic
 import app.mymusclemap.domain.workout.FinishWorkoutResult
@@ -34,6 +36,7 @@ import app.mymusclemap.domain.workout.TemplateSaveResult
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -227,6 +230,36 @@ class NotificationSetCompletionTest {
         )
         assertNull(sessions.getAggregate(other))
         assertNull(sessions.activeAggregate())
+    }
+
+    @Test
+    fun lockedExerciseIsNotCompletableFromTheNotification() = runTest {
+        val sessionId = start(repsExercise("Dips") to listOf(reps("8")))
+        val aggregate = sessions.getAggregate(sessionId)!!
+        val exerciseId = aggregate.exercises.single().exercise.exerciseId
+        val setId = aggregate.exercises.single().sets.single().id
+        val clock = Clock.fixed(Instant.ofEpochMilli(1_000L), ZoneOffset.UTC)
+        val guarded = WorkoutSessionRepository(
+            database.workoutSessionDao(),
+            database.workoutTemplateDao(),
+            database.exerciseDao(),
+            WeightRepository(database.weightMeasurementDao(), clock),
+            clock,
+            FixedDateProvider(LocalDate.parse("2026-09-16")),
+            exerciseMayExecute = { false }
+        )
+        val locked = guarded.notificationLockedExerciseIds(listOf(exerciseId))
+        val body = ActiveWorkoutNotificationLogic.project(
+            guarded.activeAggregate(),
+            locked
+        )!!.body as ActiveWorkoutNotificationBody.CurrentSet
+        assertFalse(body.completable)
+        assertTrue(body.needsInAppInput)
+        assertEquals(
+            NotificationSetCompletion.Stale,
+            guarded.completeCurrentPendingSetFromNotification(sessionId, setId)
+        )
+        assertEquals(SessionSetStatus.PENDING, sessions.getAggregate(sessionId)!!.exercises.single().sets.single().status)
     }
 
     @Test

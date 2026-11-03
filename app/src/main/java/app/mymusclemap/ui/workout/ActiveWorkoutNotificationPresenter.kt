@@ -10,6 +10,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.view.View
+import android.widget.RemoteViews
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -33,6 +35,40 @@ internal fun shouldRequestPromotedOngoing(
     if (sdkInt < Build.VERSION_CODES.BAKLAVA) return false
     if (sdkIntFull < Build.VERSION_CODES_FULL.BAKLAVA_1) return false
     return canPostPromoted
+}
+
+internal enum class LockScreenNotificationStrategy {
+    /** Compact RemoteViews. Used only when a Live Update cannot be requested. */
+    CompactCustom,
+    /** Standard promotable notification. Custom views are omitted so they cannot disqualify promotion. */
+    PromotedStandard
+}
+
+/**
+ * Selects the presentation from platform capability, not from lock-screen rendering.
+ *
+ * [LockScreenNotificationStrategy.PromotedStandard] is used only when
+ * [shouldRequestPromotedOngoing] is true. Every other case, including Android 14,
+ * Android 16.0, and API 36.1+ when [canPostPromoted] is false, uses the compact
+ * custom notification. [android.app.Notification.FLAG_PROMOTED_ONGOING] is not
+ * consulted: the system assigns it after posting, and it does not describe what
+ * the lock screen will draw.
+ */
+internal data class CompactNotificationCopy(
+    val title: String,
+    val detail: String
+)
+
+internal fun lockScreenNotificationStrategy(
+    sdkInt: Int,
+    sdkIntFull: Int,
+    canPostPromoted: Boolean
+): LockScreenNotificationStrategy {
+    return if (shouldRequestPromotedOngoing(sdkInt, sdkIntFull, canPostPromoted)) {
+        LockScreenNotificationStrategy.PromotedStandard
+    } else {
+        LockScreenNotificationStrategy.CompactCustom
+    }
 }
 
 enum class LockScreenDeliveryBlock {
@@ -140,9 +176,14 @@ internal object ActiveWorkoutNotifications {
         model: ActiveWorkoutNotificationModel,
         requestPromotion: Boolean = promotionAvailable(context)
     ): android.app.Notification {
+        val strategy = if (requestPromotion) {
+            LockScreenNotificationStrategy.PromotedStandard
+        } else {
+            LockScreenNotificationStrategy.CompactCustom
+        }
         val current = model.body as? ActiveWorkoutNotificationBody.CurrentSet
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_workout)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -157,26 +198,31 @@ internal object ActiveWorkoutNotifications {
                     body.setNumber,
                     body.setCount
                 )
-                if (body.completable) {
-                    val detail = currentSetLine(setLabel, valueLabel(context, body))
-                    builder
-                        .setContentTitle(app.mymusclemap.domain.exercise.StarterExerciseNames.display(context.resources, body.exerciseName))
-                        .setContentText(detail)
-                        .setStyle(
-                            NotificationCompat.BigTextStyle()
-                                .bigText(detail)
-                                .setBigContentTitle(app.mymusclemap.domain.exercise.StarterExerciseNames.display(context.resources, body.exerciseName))
-                        )
-                } else {
+                val title = exerciseTitle(context, body.exerciseName)
+                if (body.needsInAppInput) {
                     val open = context.getString(R.string.notification_open_to_enter_set)
                     builder
-                        .setContentTitle(app.mymusclemap.domain.exercise.StarterExerciseNames.display(context.resources, body.exerciseName))
+                        .setContentTitle(title)
                         .setContentText(open)
-                        .setStyle(
+                    if (strategy == LockScreenNotificationStrategy.PromotedStandard) {
+                        builder.setStyle(
                             NotificationCompat.BigTextStyle()
                                 .bigText("$setLabel\n$open")
-                                .setBigContentTitle(app.mymusclemap.domain.exercise.StarterExerciseNames.display(context.resources, body.exerciseName))
+                                .setBigContentTitle(title)
                         )
+                    }
+                } else {
+                    val detail = currentSetLine(setLabel, valueLabel(context, body))
+                    builder
+                        .setContentTitle(title)
+                        .setContentText(detail)
+                    if (strategy == LockScreenNotificationStrategy.PromotedStandard) {
+                        builder.setStyle(
+                            NotificationCompat.BigTextStyle()
+                                .bigText(detail)
+                                .setBigContentTitle(title)
+                        )
+                    }
                 }
             }
             ActiveWorkoutNotificationBody.ReadyToFinish -> {
@@ -185,19 +231,26 @@ internal object ActiveWorkoutNotifications {
                 builder
                     .setContentTitle(title)
                     .setContentText(text)
-                    .setStyle(
+                if (strategy == LockScreenNotificationStrategy.PromotedStandard) {
+                    builder.setStyle(
                         NotificationCompat.BigTextStyle()
                             .bigText(text)
                             .setBigContentTitle(title)
                     )
+                }
             }
         }
         val actionable = current?.takeIf { it.completable }
         if (actionable != null) {
             builder.addAction(completeAction(context, model.sessionId, actionable.setId))
         }
-        if (requestPromotion) {
-            builder.setRequestPromotedOngoing(true)
+        when (strategy) {
+            LockScreenNotificationStrategy.PromotedStandard -> builder.setRequestPromotedOngoing(true)
+            LockScreenNotificationStrategy.CompactCustom -> {
+                builder
+                    .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                    .setCustomContentView(compactContent(context, model))
+            }
         }
         return builder.build()
     }
@@ -243,17 +296,92 @@ internal object ActiveWorkoutNotifications {
         sessionId: Long,
         setId: Long
     ): NotificationCompat.Action {
-        val pending = PendingIntent.getBroadcast(
+        return NotificationCompat.Action.Builder(
+            R.drawable.ic_launcher_monochrome,
+            context.getString(R.string.notification_complete_set),
+            completePendingIntent(context, sessionId, setId)
+        ).build()
+    }
+
+    private fun completePendingIntent(
+        context: Context,
+        sessionId: Long,
+        setId: Long
+    ): PendingIntent {
+        return PendingIntent.getBroadcast(
             context,
             completeRequestCode(setId),
             completeIntent(context, sessionId, setId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return NotificationCompat.Action.Builder(
-            R.drawable.ic_notification_workout,
-            context.getString(R.string.notification_complete_set),
-            pending
-        ).build()
+    }
+
+    private fun compactContent(
+        context: Context,
+        model: ActiveWorkoutNotificationModel
+    ): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.notification_active_workout_compact)
+        val copy = compactCopy(context, model)
+        views.setTextViewText(R.id.active_workout_notification_summary, copy.title)
+        if (copy.detail.isBlank()) {
+            views.setViewVisibility(R.id.active_workout_notification_detail, View.GONE)
+        } else {
+            views.setViewVisibility(R.id.active_workout_notification_detail, View.VISIBLE)
+            views.setTextViewText(R.id.active_workout_notification_detail, copy.detail)
+        }
+        val current = (model.body as? ActiveWorkoutNotificationBody.CurrentSet)?.takeIf { it.completable }
+        if (current == null) {
+            views.setViewVisibility(R.id.active_workout_notification_complete, View.GONE)
+        } else {
+            val label = context.getString(R.string.notification_compact_complete)
+            views.setViewVisibility(R.id.active_workout_notification_complete, View.VISIBLE)
+            views.setTextViewText(R.id.active_workout_notification_complete_label, label)
+            views.setContentDescription(R.id.active_workout_notification_complete, label)
+            views.setOnClickPendingIntent(
+                R.id.active_workout_notification_complete,
+                completePendingIntent(context, model.sessionId, current.setId)
+            )
+        }
+        return views
+    }
+
+    internal fun compactCopy(context: Context, model: ActiveWorkoutNotificationModel): CompactNotificationCopy {
+        return when (val body = model.body) {
+            is ActiveWorkoutNotificationBody.CurrentSet -> {
+                val name = exerciseTitle(context, body.exerciseName)
+                if (body.needsInAppInput) {
+                    CompactNotificationCopy(
+                        title = context.getString(
+                            R.string.notification_compact_needs_input,
+                            name,
+                            context.getString(R.string.notification_open_to_enter_set)
+                        ),
+                        detail = ""
+                    )
+                } else {
+                    CompactNotificationCopy(
+                        title = context.getString(
+                            R.string.notification_compact_progress,
+                            name,
+                            body.setNumber,
+                            body.setCount
+                        ),
+                        detail = valueLabel(context, body)
+                    )
+                }
+            }
+            ActiveWorkoutNotificationBody.ReadyToFinish -> CompactNotificationCopy(
+                title = context.getString(R.string.notification_all_sets_logged),
+                detail = ""
+            )
+        }
+    }
+
+    private fun exerciseTitle(context: Context, exerciseName: String): String {
+        return app.mymusclemap.domain.exercise.StarterExerciseNames.display(
+            context.resources,
+            exerciseName
+        )
     }
 
     private fun openWorkoutIntent(context: Context, sessionId: Long): PendingIntent {
@@ -277,7 +405,7 @@ internal object ActiveWorkoutNotifications {
         current: ActiveWorkoutNotificationBody.CurrentSet?
     ): android.app.Notification {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_workout)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -292,7 +420,7 @@ internal object ActiveWorkoutNotifications {
     }
 
     internal fun valueLabel(context: Context, body: ActiveWorkoutNotificationBody.CurrentSet): String {
-        if (!body.completable) return ""
+        if (body.needsInAppInput) return ""
         val reps = body.reps?.let { context.getString(R.string.notification_reps, it) }
         val units = DisplayedUnitSystem.current
         val load = body.loadKind?.let { kind ->

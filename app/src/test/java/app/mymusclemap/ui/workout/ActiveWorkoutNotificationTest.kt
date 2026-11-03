@@ -3,9 +3,18 @@ package app.mymusclemap.ui.workout
 import android.Manifest
 import android.app.Application
 import android.app.Notification
+import android.app.PendingIntent
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.RemoteViews
+import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -137,7 +146,9 @@ class ActiveWorkoutNotificationTest {
         assertEquals(Notification.VISIBILITY_PRIVATE, firstNotification.visibility)
         assertTrue(firstNotification.flags and Notification.FLAG_ONGOING_EVENT != 0)
         assertEquals(1, firstNotification.actions.size)
+        assertEquals("Complete Set", context.getString(R.string.notification_complete_set))
         assertEquals(context.getString(R.string.notification_complete_set), firstNotification.actions[0].title)
+        assertEquals(R.drawable.ic_launcher_monochrome, firstNotification.smallIcon.resId)
         val firstAction = shadowOf(firstNotification.actions[0].actionIntent).savedIntent
         val secondAction = shadowOf(secondNotification.actions[0].actionIntent).savedIntent
         assertEquals(7L to 3L, ActiveWorkoutNotifications.completionIds(firstAction))
@@ -154,6 +165,54 @@ class ActiveWorkoutNotificationTest {
         assertFalse(NotificationCompat.isRequestPromotedOngoing(firstNotification))
         assertFalse(NotificationCompat.isRequestPromotedOngoing(redacted))
         assertFalse(ActiveWorkoutNotifications.promotionAvailable(context))
+        assertEquals(
+            R.layout.notification_active_workout_compact,
+            firstNotification.contentView.layoutId
+        )
+        assertNull(redacted.contentView)
+        val compactIntent = clickPendingIntent(
+            firstNotification.contentView,
+            R.id.active_workout_notification_complete
+        )
+        assertEquals(7L to 3L, ActiveWorkoutNotifications.completionIds(shadowOf(compactIntent).savedIntent))
+        val inflated = firstNotification.contentView.apply(context, FrameLayout(context))
+        val summary = inflated.findViewById<TextView>(R.id.active_workout_notification_summary)
+        val detail = inflated.findViewById<TextView>(R.id.active_workout_notification_detail)
+        val target = inflated.findViewById<View>(R.id.active_workout_notification_complete)
+        val label = inflated.findViewById<TextView>(R.id.active_workout_notification_complete_label)
+        assertEquals("Dips 3/4", summary.text.toString())
+        assertEquals(TextUtils.TruncateAt.END, summary.ellipsize)
+        assertEquals(View.VISIBLE, detail.visibility)
+        assertTrue(detail.text.toString().contains("8 reps"))
+        assertTrue(detail.text.toString().contains("+15 kg"))
+        assertEquals(View.VISIBLE, target.visibility)
+        assertEquals("Complete", label.text.toString())
+        assertEquals(context.getString(R.string.notification_compact_complete), label.text.toString())
+        assertFalse(label.text.toString().contains("✓"))
+        assertNull(
+            clickPendingIntent(
+                firstNotification.contentView,
+                R.id.active_workout_notification_complete_label
+            )
+        )
+        assertFalse(label.isClickable)
+        val density = context.resources.displayMetrics.density
+        assertEquals((48 * density).toInt(), target.layoutParams.height)
+        assertTrue(target.minimumWidth >= (48 * density).toInt())
+        assertEquals((8 * density).toInt(), target.paddingEnd)
+        assertEquals((36 * density).toInt(), label.layoutParams.height)
+        assertEquals((12 * density).toInt(), label.paddingStart)
+        assertEquals((12 * density).toInt(), label.paddingEnd)
+        val textColumn = summary.parent as View
+        val textMargins = textColumn.layoutParams as ViewGroup.MarginLayoutParams
+        assertEquals((12 * density).toInt(), textMargins.marginEnd)
+        assertEquals((48 * density).toInt(), inflated.layoutParams.height)
+        assertNull(inflated.background)
+        val pill = label.background as GradientDrawable
+        assertEquals(18f * density, pill.cornerRadius, 0.5f)
+        assertTrue(summary.typeface.style and Typeface.BOLD != 0)
+        assertTrue(label.typeface.style and Typeface.BOLD != 0)
+        assertEquals(Typeface.NORMAL, detail.typeface?.style ?: Typeface.NORMAL)
     }
 
     @Test
@@ -182,6 +241,12 @@ class ActiveWorkoutNotificationTest {
         )
         assertFalse(NotificationCompat.isRequestPromotedOngoing(needsInput))
         assertFalse(NotificationCompat.isRequestPromotedOngoing(ready))
+        assertNull(
+            clickPendingIntent(needsInput.contentView, R.id.active_workout_notification_complete)
+        )
+        assertNull(
+            clickPendingIntent(ready.contentView, R.id.active_workout_notification_complete)
+        )
     }
 
     @Test
@@ -192,6 +257,8 @@ class ActiveWorkoutNotificationTest {
             requestPromotion = true
         )
         assertTrue(NotificationCompat.isRequestPromotedOngoing(detailed))
+        assertNull(detailed.contentView)
+        assertNull(detailed.bigContentView)
         assertEquals(NotificationCompat.CATEGORY_WORKOUT, detailed.category)
         assertEquals(Notification.VISIBILITY_PRIVATE, detailed.visibility)
         assertTrue(detailed.flags and Notification.FLAG_ONGOING_EVENT != 0)
@@ -209,6 +276,7 @@ class ActiveWorkoutNotificationTest {
             requestPromotion = true
         )
         assertTrue(NotificationCompat.isRequestPromotedOngoing(needsInput))
+        assertNull(needsInput.contentView)
         assertNull(needsInput.actions)
         assertTrue(
             needsInput.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
@@ -221,6 +289,7 @@ class ActiveWorkoutNotificationTest {
             requestPromotion = true
         )
         assertTrue(NotificationCompat.isRequestPromotedOngoing(ready))
+        assertNull(ready.contentView)
         assertNull(ready.actions)
         assertEquals(
             context.getString(R.string.notification_all_sets_logged),
@@ -239,6 +308,59 @@ class ActiveWorkoutNotificationTest {
         assertEquals(1, notification.actions.size)
         assertEquals(Notification.VISIBILITY_PRIVATE, notification.visibility)
         assertTrue(notification.flags and Notification.FLAG_ONGOING_EVENT != 0)
+        assertEquals(R.layout.notification_active_workout_compact, notification.contentView.layoutId)
+    }
+
+    @Test
+    fun blockedSetKeepsItsDetailAndOmitsBothCompletionControls() {
+        val blocked = ActiveWorkoutNotifications.build(
+            context,
+            model(
+                current(
+                    setId = 3L,
+                    reps = 8,
+                    weightKg = 15.0,
+                    completable = false,
+                    needsInAppInput = false
+                )
+            )
+        )
+        assertNull(blocked.actions)
+        assertTrue(blocked.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("8 reps"))
+        assertNull(clickPendingIntent(blocked.contentView, R.id.active_workout_notification_complete))
+        assertEquals(Notification.VISIBILITY_PRIVATE, blocked.visibility)
+        assertNull(blocked.publicVersion.contentView)
+        assertNull(blocked.publicVersion.actions)
+    }
+
+    @Test
+    fun receiverDoesNotStartAsyncWorkWithoutAContainerOrAValidSet() {
+        val valid = ActiveWorkoutNotifications.completeIntent(context, 7L, 3L)
+        assertNull(acceptedSetCompletion(valid, containerAvailable = false))
+        assertNull(acceptedSetCompletion(Intent("other"), containerAvailable = true))
+        assertNull(acceptedSetCompletion(null, containerAvailable = true))
+        assertEquals(AcceptedSetCompletion(7L, 3L), acceptedSetCompletion(valid, containerAvailable = true))
+    }
+
+    @Test
+    fun completionSignalFinishesAfterTheSetIsRecorded() {
+        runBlocking {
+            preferences.setEnabled(true)
+            coordinator.start()
+            val sessionId = startWorkout()
+            awaitNotification()
+            val setId = sessions.getAggregate(sessionId)!!.exercises.single().sets[0].id
+            val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+            coordinator.completeFromAction(sessionId, setId) { finished.set(true) }
+            awaitText { text -> text.contains("Set 2 of") }
+            withContext(Dispatchers.Default) {
+                withTimeout(5_000) {
+                    while (!finished.get()) delay(20)
+                }
+            }
+            assertEquals(SessionSetStatus.COMPLETED, sessions.getAggregate(sessionId)!!.exercises.single().sets[0].status)
+            assertEquals(SessionSetStatus.PENDING, sessions.getAggregate(sessionId)!!.exercises.single().sets[1].status)
+        }
     }
 
     @Test
@@ -407,7 +529,8 @@ class ActiveWorkoutNotificationTest {
         setId: Long,
         reps: Int?,
         weightKg: Double?,
-        completable: Boolean = true
+        completable: Boolean = true,
+        needsInAppInput: Boolean = !completable
     ): ActiveWorkoutNotificationBody.CurrentSet {
         return ActiveWorkoutNotificationBody.CurrentSet(
             setId = setId,
@@ -419,8 +542,81 @@ class ActiveWorkoutNotificationTest {
             weightKg = weightKg,
             durationSeconds = null,
             distanceMeters = null,
-            completable = completable
+            completable = completable,
+            needsInAppInput = needsInAppInput
         )
+    }
+
+    private fun clickPendingIntent(views: RemoteViews?, viewId: Int): PendingIntent? {
+        if (views == null) return null
+        val actions = readField(views, "mActions") as? Iterable<*> ?: return null
+        for (action in actions) {
+            if (action == null) continue
+            val id = intField(action, "mViewId", "viewId")
+            if (id != viewId) continue
+            findPendingIntent(action)?.let { return it }
+        }
+        return null
+    }
+
+    private fun readField(target: Any, name: String): Any? {
+        var type: Class<*>? = target.javaClass
+        while (type != null) {
+            val field = type.declaredFields.firstOrNull { it.name == name } ?: run {
+                type = type.superclass
+                return@run null
+            }
+            if (field != null) {
+                field.isAccessible = true
+                return field.get(target)
+            }
+        }
+        return null
+    }
+
+    private fun intField(target: Any, vararg names: String): Int? {
+        var type: Class<*>? = target.javaClass
+        while (type != null && type != Any::class.java) {
+            for (field in type.declaredFields) {
+                if (field.name !in names || field.type != Int::class.javaPrimitiveType) continue
+                field.isAccessible = true
+                return field.getInt(target)
+            }
+            type = type.superclass
+        }
+        return null
+    }
+
+    private fun findPendingIntent(value: Any?, seen: MutableSet<Int> = mutableSetOf()): PendingIntent? {
+        if (value == null) return null
+        if (value is PendingIntent) return value
+        if (value.javaClass.isPrimitive || value is String || value is Number || value is Boolean || value is CharSequence) {
+            return null
+        }
+        val className = value.javaClass.name
+        if (className.startsWith("java.") || className.startsWith("jdk.") || className.startsWith("sun.") || className.startsWith("kotlin.")) {
+            return null
+        }
+        if (!seen.add(System.identityHashCode(value))) return null
+        var type: Class<*>? = value.javaClass
+        while (type != null && type != Any::class.java) {
+            for (field in type.declaredFields) {
+                if (field.type.isPrimitive || java.lang.reflect.Modifier.isStatic(field.modifiers)) continue
+                val fieldName = field.type.name
+                if (fieldName.startsWith("java.") || fieldName.startsWith("jdk.") || fieldName.startsWith("sun.") || fieldName.startsWith("kotlin.")) {
+                    continue
+                }
+                val child = try {
+                    field.isAccessible = true
+                    field.get(value)
+                } catch (_: ReflectiveOperationException) {
+                    null
+                } ?: continue
+                findPendingIntent(child, seen)?.let { return it }
+            }
+            type = type.superclass
+        }
+        return null
     }
 
     private companion object {

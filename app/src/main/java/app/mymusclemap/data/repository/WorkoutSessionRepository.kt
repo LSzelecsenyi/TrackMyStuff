@@ -1306,6 +1306,10 @@ class WorkoutSessionRepository(
         return catalogIds.distinct().filter { !exerciseMayExecute(it) }.toSet()
     }
 
+    internal suspend fun notificationLockedExerciseIds(exerciseIds: Collection<Long>): Set<Long> {
+        return lockedCatalogIds(exerciseIds.toList())
+    }
+
     private suspend fun releaseLockedPending(sessionId: Long) {
         val session = sessionDao.getById(sessionId) ?: return
         val workSetId = session.workSetId
