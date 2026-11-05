@@ -29,4 +29,8 @@
         domain="file"
         path="datastore/muscle_map_body_model.preferences_pb"
         requireFlags="clientSideEncryption" />
+    <include
+        domain="file"
+        path="datastore/weight_adjustment_step.preferences_pb"
+        requireFlags="clientSideEncryption" />
 </full-backup-content>

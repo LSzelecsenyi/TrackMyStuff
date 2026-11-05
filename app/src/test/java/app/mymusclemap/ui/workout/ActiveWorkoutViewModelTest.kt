@@ -48,6 +48,8 @@ import app.mymusclemap.domain.workout.PlannedLoadKind
 import app.mymusclemap.domain.workout.PlannedSetDraft
 import app.mymusclemap.domain.workout.SessionSetStatus
 import app.mymusclemap.domain.workout.SessionStatus
+import app.mymusclemap.domain.units.UnitSystem
+import app.mymusclemap.domain.units.WorkoutWeightInput
 import app.mymusclemap.domain.workout.StartWorkoutResult
 import app.mymusclemap.domain.workout.TemplateDraft
 import app.mymusclemap.domain.workout.TemplateExerciseDraft
@@ -75,6 +77,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -1195,6 +1198,77 @@ class ActiveWorkoutViewModelTest {
         assertEquals(2, done.aggregate!!.exercises.size)
     }
 
+    @Test
+    fun adjustingActualWeightChangesOnlyThatDraft() = runOnMain {
+        // Given an active workout with planned and actual weight values
+        val bench = saveBench()
+        val templateId = saveTemplate(
+            "Push A",
+            listOf(
+                bench to listOf(
+                    PlannedSetDraft(
+                        localId = -1L,
+                        minRepsText = "8",
+                        loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                        weightText = "16.25"
+                    ),
+                    PlannedSetDraft(
+                        localId = -2L,
+                        minRepsText = "8",
+                        loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                        weightText = "20"
+                    )
+                )
+            )
+        )
+        val historyId = insertWeightedHistory(bench, templateId)
+        val started = sessions.start(templateId) as StartWorkoutResult.Started
+        sessionId = started.sessionId
+        val viewModel = active(started.sessionId)
+        val loaded = viewModel.loaded()
+        val sets = loaded.aggregate!!.exercises.single().sets
+        val completedId = sets[0].id
+        val adjustedId = sets[1].id
+        val planBefore = database.workoutTemplateDao().getExercises(templateId)
+        val historyBefore = database.workoutSessionDao().getSetsForSession(historyId)
+        viewModel.completeSet(completedId)
+        val completed = awaitReal {
+            viewModel.uiState.first { state ->
+                state.aggregate!!.exercises.single().sets[0].status == SessionSetStatus.COMPLETED &&
+                    completedId !in state.completingSetIds
+            }
+        }
+        val finished = completed.aggregate!!.exercises.single().sets[0]
+        val plannedOther = completed.aggregate!!.exercises.single().sets[1]
+        assertEquals(16.25, finished.plannedWeightKg!!, 0.0001)
+        assertEquals(16.25, finished.actualWeightKg!!, 0.0001)
+        assertEquals(20.0, plannedOther.plannedWeightKg!!, 0.0001)
+        val otherActualBefore = plannedOther.actualWeightKg
+        val finishedDraft = completed.drafts.getValue(completedId)
+        val otherRowBefore = database.workoutSessionDao().getSet(adjustedId)!!
+
+        // When the user adjusts the other set's actual weight
+        viewModel.onWeight(adjustedId, "16.25")
+        val stepped = WorkoutWeightInput.step("16.25", UnitSystem.METRIC, 1, BigDecimal("2.5"))
+        viewModel.onWeight(adjustedId, stepped)
+
+        // Then only that actual weight draft changes
+        val after = viewModel.uiState.value
+        val afterSets = after.aggregate!!.exercises.single().sets
+        assertEquals("18.75", stepped)
+        assertEquals("18.75", after.drafts.getValue(adjustedId).weightText)
+        assertEquals(finishedDraft, after.drafts.getValue(completedId))
+        assertEquals(16.25, afterSets[0].plannedWeightKg!!, 0.0001)
+        assertEquals(16.25, afterSets[0].actualWeightKg!!, 0.0001)
+        assertEquals(20.0, afterSets[1].plannedWeightKg!!, 0.0001)
+        assertEquals(otherActualBefore, afterSets[1].actualWeightKg)
+        val otherRowAfter = database.workoutSessionDao().getSet(adjustedId)!!
+        assertEquals(otherRowBefore.plannedWeightKg, otherRowAfter.plannedWeightKg)
+        assertEquals(otherRowBefore.actualWeightKg, otherRowAfter.actualWeightKg)
+        assertEquals(planBefore, database.workoutTemplateDao().getExercises(templateId))
+        assertEquals(historyBefore, database.workoutSessionDao().getSetsForSession(historyId))
+    }
+
     private suspend fun startTwoExercises(): ActiveWorkoutViewModel {
         val pull = savePull()
         val dip = saveDip()
@@ -1345,6 +1419,80 @@ class ActiveWorkoutViewModelTest {
         return withContext(Dispatchers.Default.limitedParallelism(1)) {
             withTimeout(5_000) { block() }
         }
+    }
+
+    private suspend fun saveBench(): Long {
+        return (exercises.save(
+            ExerciseDraft(
+                name = "Bench press",
+                category = ExerciseCategory.STRENGTH,
+                movementPattern = MovementPattern.HORIZONTAL_PUSH,
+                measurementType = MeasurementType.REPETITIONS_AND_WEIGHT,
+                resistanceBasis = ResistanceBasis.EXTERNAL,
+                weightInterpretation = WeightInterpretation.TOTAL,
+                primaryMuscle = MuscleGroup.CHEST
+            )
+        ) as ExerciseSaveResult.Created).id
+    }
+
+    private suspend fun insertWeightedHistory(exerciseId: Long, templateId: Long): Long {
+        return database.workoutSessionDao().insertAggregate(
+            WorkoutSessionEntity(
+                templateId = templateId,
+                templateName = "Earlier",
+                status = SessionStatus.COMPLETED.name,
+                workoutDate = "2026-09-01",
+                startedAt = 50L,
+                finishedAt = 80L,
+                abandonedAt = null,
+                notes = null,
+                bodyWeightKg = null,
+                bodyWeightSource = BodyWeightSource.UNKNOWN.name,
+                bodyWeightSourceDate = null,
+                createdAt = 50L,
+                updatedAt = 80L,
+                activeLock = null,
+                clientWorkoutId = UUID.randomUUID().toString()
+            ),
+            listOf(
+                Triple(
+                    WorkoutSessionExerciseEntity(
+                        sessionId = 0L,
+                        exerciseId = exerciseId,
+                        position = 0,
+                        name = "Bench press",
+                        category = ExerciseCategory.STRENGTH.name,
+                        movementPattern = MovementPattern.HORIZONTAL_PUSH.name,
+                        measurementType = MeasurementType.REPETITIONS_AND_WEIGHT.name,
+                        resistanceBasis = ResistanceBasis.EXTERNAL.name,
+                        weightInterpretation = WeightInterpretation.TOTAL.name,
+                        primaryMuscle = MuscleGroup.CHEST.name,
+                        notes = null
+                    ),
+                    emptyList(),
+                    listOf(
+                        WorkoutSessionSetEntity(
+                            sessionExerciseId = 0L,
+                            position = 0,
+                            plannedMinReps = 8,
+                            plannedMaxReps = 8,
+                            plannedLoadKind = PlannedLoadKind.EXTERNAL_WEIGHT.name,
+                            plannedWeightKg = 12.0,
+                            plannedDurationSeconds = null,
+                            plannedDistanceMeters = null,
+                            actualReps = 8,
+                            actualLoadKind = PlannedLoadKind.EXTERNAL_WEIGHT.name,
+                            actualWeightKg = 12.0,
+                            actualDurationSeconds = null,
+                            actualDistanceMeters = null,
+                            status = SessionSetStatus.COMPLETED.name,
+                            completedAt = 70L,
+                            addedDuringWorkout = false
+                        )
+                    )
+                )
+            )
+        )
     }
 
     private suspend fun savePull(): Long {

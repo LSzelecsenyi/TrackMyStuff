@@ -1,12 +1,7 @@
 package app.mymusclemap.ui.units
 
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,22 +11,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import app.mymusclemap.R
 import app.mymusclemap.domain.units.DistanceDisplay
+import app.mymusclemap.domain.units.MeasurementInput
 import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.units.WorkoutDistanceInput
 import app.mymusclemap.domain.units.WorkoutWeightInput
 import app.mymusclemap.domain.workout.DistanceUnit
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.StrictBrand
 
 data class WeightDraftBinding(
     val text: String,
     val onText: (String) -> Unit,
-    val step: (direction: Int, fine: Boolean) -> Unit
+    val step: (direction: Int) -> Unit
 )
 
 /**
@@ -47,6 +40,7 @@ fun rememberWeightDraftBinding(
     enabled: Boolean = true
 ): WeightDraftBinding {
     val system = LocalUnitSystem.current
+    val increment = LocalWeightAdjustment.current.stepFor(system)
     var editing by remember(fieldKey) { mutableStateOf<String?>(null) }
     var editingSystem by remember(fieldKey) { mutableStateOf(system) }
     LaunchedEffect(system, fieldKey) {
@@ -68,11 +62,16 @@ fun rememberWeightDraftBinding(
             val next = WorkoutWeightInput.commit(canonicalText, raw, system)
             if (next != canonicalText) onCanonicalText(next)
         },
-        step = { direction, fine ->
+        step = { direction ->
             if (!enabled) return@WeightDraftBinding
-            val stepped = WorkoutWeightInput.step(shown, system, direction, fine)
-            editing = null
+            val stepped = WorkoutWeightInput.step(shown, system, direction, increment)
             val next = WorkoutWeightInput.commit(canonicalText, stepped, system)
+            if (MeasurementInput.sameText(stepped, WorkoutWeightInput.displayOf(next, system))) {
+                editing = null
+            } else {
+                editing = stepped
+                editingSystem = system
+            }
             if (next != canonicalText) onCanonicalText(next)
         }
     )
@@ -80,60 +79,47 @@ fun rememberWeightDraftBinding(
 
 @Composable
 fun WeightStepButtons(
-    onStep: (direction: Int, fine: Boolean) -> Unit,
+    text: String,
+    onStep: (direction: Int) -> Unit,
     enabled: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    minusTag: String = "weight-step-minus",
+    plusTag: String = "weight-step-plus",
+    minusCircleTag: String = "weight-step-minus-circle",
+    plusCircleTag: String = "weight-step-plus-circle",
+    minusTraversalIndex: Float? = null,
+    plusTraversalIndex: Float? = null
 ) {
+    val system = LocalUnitSystem.current
+    val increment = LocalWeightAdjustment.current.stepFor(system)
+    val decreaseEnabled = enabled &&
+        WorkoutWeightInput.step(text, system, -1, increment) != text
+    val increaseEnabled = enabled &&
+        WorkoutWeightInput.step(text, system, 1, increment) != text
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        WeightStepButton(
+        OutlinedQuantityStepButton(
             symbol = "−",
-            enabled = enabled,
+            enabled = decreaseEnabled,
+            accent = StrictBrand.lime,
             contentDescription = stringResource(R.string.action_decrease_weight_a11y),
-            onClick = { onStep(-1, false) },
-            onLongClick = { onStep(-1, true) }
+            testTag = minusTag,
+            circleTag = minusCircleTag,
+            traversalIndex = minusTraversalIndex,
+            onClick = { onStep(-1) }
         )
-        WeightStepButton(
+        OutlinedQuantityStepButton(
             symbol = "+",
-            enabled = enabled,
+            enabled = increaseEnabled,
+            accent = StrictBrand.lime,
             contentDescription = stringResource(R.string.action_increase_weight_a11y),
-            onClick = { onStep(1, false) },
-            onLongClick = { onStep(1, true) }
-        )
-    }
-}
-
-@Composable
-private fun WeightStepButton(
-    symbol: String,
-    enabled: Boolean,
-    contentDescription: String,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
-            .combinedClickable(
-                enabled = enabled,
-                onClick = onClick,
-                onLongClick = onLongClick,
-                role = Role.Button
-            )
-            .semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = symbol,
-            style = MaterialTheme.typography.titleMedium,
-            color = if (enabled) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-            }
+            testTag = plusTag,
+            circleTag = plusCircleTag,
+            traversalIndex = plusTraversalIndex,
+            onClick = { onStep(1) }
         )
     }
 }

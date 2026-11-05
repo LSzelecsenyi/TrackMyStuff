@@ -2,6 +2,7 @@ package app.mymusclemap.ui.settings
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +52,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -68,6 +70,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -76,6 +79,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -85,6 +89,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -99,6 +104,9 @@ import app.mymusclemap.domain.theme.PaletteValidationError
 import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.StrictBrandLockup
+import app.mymusclemap.domain.units.UnitSystem
+import app.mymusclemap.domain.units.WeightAdjustmentConfiguration
+import app.mymusclemap.domain.units.WeightAdjustmentStep
 import app.mymusclemap.domain.workout.PendingWeeklyGoal
 import app.mymusclemap.ui.components.CompactEditorSection
 import app.mymusclemap.ui.components.PaletteSwatch
@@ -108,9 +116,11 @@ import app.mymusclemap.domain.locale.AppLocale
 import app.mymusclemap.domain.workout.TimerAudioMode
 import app.mymusclemap.ui.components.SegmentedControl
 import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.AppTypeTokens
 import app.mymusclemap.ui.theme.StrictBrand
 import app.mymusclemap.ui.theme.WeightTrackerTheme
+import java.math.BigDecimal
 import java.util.Locale
 
 internal const val SETTINGS_ROOT = "settings-root"
@@ -152,6 +162,13 @@ internal const val SETTINGS_WEEKLY_GOAL = "settings-weekly-goal"
 internal const val SETTINGS_LOCK_SCREEN_SETS = "settings-lock-screen-sets"
 internal const val SETTINGS_LOCK_SCREEN_ENABLE = "settings-lock-screen-enable"
 internal const val SETTINGS_LOCK_SCREEN_NOT_NOW = "settings-lock-screen-not-now"
+internal const val SETTINGS_WEIGHT_STEP = "settings-weight-step"
+internal const val SETTINGS_WEIGHT_STEP_CUSTOM = "settings-weight-step-custom"
+internal const val SETTINGS_WEIGHT_STEP_CUSTOM_INPUT = "settings-weight-step-custom-input"
+internal const val SETTINGS_WEIGHT_STEP_SAVE = "settings-weight-step-save"
+internal const val SETTINGS_WEIGHT_STEP_ERROR = "settings-weight-step-error"
+
+internal fun settingsWeightStepPresetTag(value: String): String = "settings-weight-step-$value"
 
 enum class LockScreenEnablePrompt {
     RequestPermission,
@@ -909,7 +926,10 @@ internal fun TrainingSection(
     onLockScreenSetCompletionChange: (Boolean) -> Unit,
     onOpenLockScreenAccessSettings: () -> Unit,
     timerAudio: TimerAudioMode,
-    onTimerAudioChange: (TimerAudioMode) -> Unit
+    onTimerAudioChange: (TimerAudioMode) -> Unit,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
+    weightAdjustment: WeightAdjustmentConfiguration = WeightAdjustmentConfiguration(),
+    onWeightAdjustmentStep: (String) -> Unit = {}
 ) {
     val subtitle = when (val pending = state.weeklyGoal.pending) {
         is PendingWeeklyGoal.Update -> stringResource(
@@ -939,7 +959,230 @@ internal fun TrainingSection(
             mode = timerAudio,
             onModeChange = onTimerAudioChange
         )
+        Spacer(Modifier.height(AppDimens.sectionGap))
+        WeightAdjustmentSection(
+            unitSystem = unitSystem,
+            configuration = weightAdjustment,
+            onStepSelected = onWeightAdjustmentStep
+        )
     }
+}
+
+@Composable
+private fun WeightAdjustmentSection(
+    unitSystem: UnitSystem,
+    configuration: WeightAdjustmentConfiguration,
+    onStepSelected: (String) -> Unit
+) {
+    val step = configuration.stepFor(unitSystem)
+    val unit = stringResource(
+        if (unitSystem == UnitSystem.IMPERIAL) R.string.unit_lb else R.string.unit_kg
+    )
+    val storedIsPreset = WeightAdjustmentStep.isPreset(step, unitSystem)
+    var customOpen by remember(unitSystem) { mutableStateOf(!storedIsPreset) }
+    var customText by remember(unitSystem, step) {
+        mutableStateOf(if (storedIsPreset) "" else WeightAdjustmentStep.storedText(step))
+    }
+    var customError by remember(unitSystem, step) { mutableStateOf(false) }
+    LaunchedEffect(unitSystem, step) {
+        if (WeightAdjustmentStep.isPreset(step, unitSystem)) {
+            customOpen = false
+        }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(SETTINGS_WEIGHT_STEP)
+    ) {
+        Text(
+            text = stringResource(R.string.settings_weight_step_title),
+            style = AppTypeTokens.sectionTitle,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(Modifier.height(AppDimens.headerStackGap))
+        Text(
+            text = stringResource(R.string.settings_weight_step_body),
+            style = AppTypeTokens.statSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        WeightStepGrid(
+            unitSystem = unitSystem,
+            step = step,
+            unit = unit,
+            storedIsPreset = storedIsPreset,
+            onPresetSelected = { labelText ->
+                customError = false
+                onStepSelected(labelText)
+            },
+            onCustomSelected = { customOpen = true }
+        )
+        if (customOpen || !storedIsPreset) {
+            Spacer(Modifier.height(AppDimens.itemGap))
+            OutlinedTextField(
+                value = customText,
+                onValueChange = {
+                    customText = it
+                    customError = false
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(SETTINGS_WEIGHT_STEP_CUSTOM_INPUT),
+                label = { Text(stringResource(R.string.settings_weight_step_custom_label)) },
+                suffix = { Text(unit) },
+                isError = customError,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        submitCustomWeightStep(customText, unitSystem, onStepSelected) { rejected ->
+                            customError = rejected
+                        }
+                    }
+                )
+            )
+            TextButton(
+                onClick = {
+                    submitCustomWeightStep(customText, unitSystem, onStepSelected) { rejected ->
+                        customError = rejected
+                    }
+                },
+                modifier = Modifier.testTag(SETTINGS_WEIGHT_STEP_SAVE)
+            ) {
+                Text(stringResource(R.string.action_save))
+            }
+            if (customError) {
+                Text(
+                    text = stringResource(R.string.settings_weight_step_invalid),
+                    style = AppTypeTokens.statSecondary,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(SETTINGS_WEIGHT_STEP_ERROR)
+                )
+            }
+        }
+    }
+}
+
+internal val WeightStepFillColorKey = SemanticsPropertyKey<Color>("WeightStepFillColor")
+internal val WeightStepBorderColorKey = SemanticsPropertyKey<Color>("WeightStepBorderColor")
+internal val WeightStepContentColorKey = SemanticsPropertyKey<Color>("WeightStepContentColor")
+
+private val WeightStepPillGap = 8.dp
+
+@Composable
+private fun WeightStepGrid(
+    unitSystem: UnitSystem,
+    step: BigDecimal,
+    unit: String,
+    storedIsPreset: Boolean,
+    onPresetSelected: (String) -> Unit,
+    onCustomSelected: () -> Unit
+) {
+    val choices = WeightAdjustmentStep.presets(unitSystem).map { preset ->
+        val labelText = WeightAdjustmentStep.storedText(preset)
+        WeightStepChoice(
+            label = stringResource(R.string.settings_weight_step_value, labelText, unit),
+            selected = preset.compareTo(step) == 0,
+            testTag = settingsWeightStepPresetTag(labelText),
+            onClick = { onPresetSelected(labelText) }
+        )
+    } + WeightStepChoice(
+        label = stringResource(R.string.settings_weight_step_custom),
+        selected = !storedIsPreset,
+        testTag = SETTINGS_WEIGHT_STEP_CUSTOM,
+        onClick = onCustomSelected
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectableGroup(),
+        verticalArrangement = Arrangement.spacedBy(WeightStepPillGap)
+    ) {
+        choices.chunked(3).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(WeightStepPillGap)
+            ) {
+                row.forEach { choice ->
+                    WeightStepPill(
+                        choice = choice,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private data class WeightStepChoice(
+    val label: String,
+    val selected: Boolean,
+    val testTag: String,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun WeightStepPill(
+    choice: WeightStepChoice,
+    modifier: Modifier = Modifier
+) {
+    val shape = AppShapeTokens.chip
+    val accent = StrictBrand.actionContainer()
+    val fill = if (choice.selected) accent else Color.Transparent
+    val content = if (choice.selected) {
+        StrictBrand.onAction()
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val borderColor = if (choice.selected) accent else MaterialTheme.colorScheme.outline
+    Box(
+        modifier = modifier
+            .defaultMinSize(minHeight = AppDimens.minTouch)
+            .clip(shape)
+            .border(AppDimens.strokeThin, borderColor, shape)
+            .background(fill, shape)
+            .selectable(
+                selected = choice.selected,
+                onClick = choice.onClick,
+                role = Role.RadioButton
+            )
+            .semantics {
+                selected = choice.selected
+                set(WeightStepFillColorKey, fill)
+                set(WeightStepBorderColorKey, borderColor)
+                set(WeightStepContentColorKey, content)
+            }
+            .testTag(choice.testTag)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = choice.label,
+            style = MaterialTheme.typography.labelLarge,
+            color = content,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+private fun submitCustomWeightStep(
+    raw: String,
+    unitSystem: UnitSystem,
+    onStepSelected: (String) -> Unit,
+    onRejected: (Boolean) -> Unit
+) {
+    val parsed = WeightAdjustmentStep.parse(raw, unitSystem)
+    if (parsed == null) {
+        onRejected(true)
+        return
+    }
+    onRejected(false)
+    onStepSelected(WeightAdjustmentStep.storedText(parsed))
 }
 
 @Composable

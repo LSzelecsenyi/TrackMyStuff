@@ -803,7 +803,11 @@ private fun SetCard(
                     colors = lockedFieldColors(fieldsLocked),
                     singleLine = true
                 )
-                WeightStepButtons(onStep = weightDraft.step, enabled = !fieldsLocked)
+                WeightStepButtons(
+                    text = weightDraft.text,
+                    onStep = weightDraft.step,
+                    enabled = !fieldsLocked
+                )
             }
             if (PlannedSetLogic.requiresDuration(exercise.measurementType) || displayTimed) {
                 val (minutesShown, secondsShown) = if (displayTimed && !set.timedWork) {

@@ -23,7 +23,8 @@ class AutoBackupRulesTest {
         "file" to "datastore/weight_tracker_settings.preferences_pb",
         "file" to "datastore/app_language.preferences_pb",
         "file" to "datastore/unit_system.preferences_pb",
-        "file" to "datastore/muscle_map_body_model.preferences_pb"
+        "file" to "datastore/muscle_map_body_model.preferences_pb",
+        "file" to "datastore/weight_adjustment_step.preferences_pb"
     )
 
     @Test

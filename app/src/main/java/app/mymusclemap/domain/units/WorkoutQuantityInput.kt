@@ -9,10 +9,6 @@ object WeightIncrements {
     fun defaultStep(system: UnitSystem): BigDecimal {
         return if (system == UnitSystem.IMPERIAL) BigDecimal("5") else BigDecimal("2.5")
     }
-
-    fun fineStep(system: UnitSystem): BigDecimal {
-        return if (system == UnitSystem.IMPERIAL) BigDecimal.ONE else BigDecimal("0.5")
-    }
 }
 
 /**
@@ -35,27 +31,31 @@ object WorkoutWeightInput {
             return canonicalText
         }
         if (system == UnitSystem.METRIC) return displayText
-        val pounds = MeasurementInput.parseDecimal(displayText, 1) ?: return displayText
+        val pounds = MeasurementInput.parseDecimal(displayText, QuantityParser.WEIGHT_MAX_DECIMALS)
+            ?: return displayText
         if (pounds <= BigDecimal.ZERO || pounds > MAX_LB) return displayText
         val kilograms = pounds.divide(UnitConversions.KG_TO_LB, 2, RoundingMode.HALF_UP)
         if (!MeasurementInput.workoutKgAcceptable(kilograms) || kilograms > MAX_KG) return displayText
         return formatNumber(kilograms, 2)
     }
 
-    fun step(displayText: String, system: UnitSystem, direction: Int, fine: Boolean): String {
-        val increment = if (fine) WeightIncrements.fineStep(system) else WeightIncrements.defaultStep(system)
-        val scale = if (system == UnitSystem.IMPERIAL) 1 else 2
-        val current = MeasurementInput.parseDecimal(displayText, scale)
-        val base = when {
-            current != null -> current
-            direction > 0 && displayText.isBlank() -> BigDecimal.ZERO
-            else -> return displayText
-        }
-        val next = base.add(increment.multiply(BigDecimal.valueOf(direction.toLong())))
-        if (next <= BigDecimal.ZERO) return displayText
+    /**
+     * Adds [increment] in the displayed unit. The result is the current value
+     * plus or minus that increment. It is not rounded onto a multiple of the step.
+     * An empty, malformed, or non-positive value is left unchanged, and a step
+     * that would reach zero or below is not applied.
+     */
+    fun step(displayText: String, system: UnitSystem, direction: Int, increment: BigDecimal): String {
+        if (direction != 1 && direction != -1) return displayText
+        if (increment.signum() <= 0) return displayText
+        val current = MeasurementInput.parseDecimal(displayText, QuantityParser.WEIGHT_MAX_DECIMALS)
+            ?: return displayText
+        if (current.signum() <= 0) return displayText
+        val next = current.add(increment.multiply(BigDecimal.valueOf(direction.toLong())))
+        if (next.signum() <= 0) return displayText
         val max = if (system == UnitSystem.IMPERIAL) MAX_LB else MAX_KG
-        if (next > max) return displayText
-        return formatNumber(next, scale)
+        if (next.compareTo(max) > 0) return displayText
+        return formatExact(next)
     }
 
     fun reexpress(displayText: String, from: UnitSystem, to: UnitSystem): String {
@@ -76,6 +76,15 @@ object WorkoutWeightInput {
 
     private fun formatNumber(value: BigDecimal, scale: Int): String {
         return value.setScale(scale, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+    }
+
+    private fun formatExact(value: BigDecimal): String {
+        val stripped = value.stripTrailingZeros()
+        val scale = stripped.scale()
+        if (scale > QuantityParser.WEIGHT_MAX_DECIMALS) {
+            return formatNumber(value, QuantityParser.WEIGHT_MAX_DECIMALS)
+        }
+        return stripped.toPlainString()
     }
 }
 

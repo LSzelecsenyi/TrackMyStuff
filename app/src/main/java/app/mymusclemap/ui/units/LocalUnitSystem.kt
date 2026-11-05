@@ -6,8 +6,11 @@ import androidx.compose.ui.res.stringResource
 import app.mymusclemap.R
 import app.mymusclemap.domain.units.DistanceWord
 import app.mymusclemap.domain.units.UnitSystem
+import app.mymusclemap.domain.units.WeightAdjustmentConfiguration
 
 val LocalUnitSystem = compositionLocalOf { UnitSystem.METRIC }
+
+val LocalWeightAdjustment = compositionLocalOf { WeightAdjustmentConfiguration() }
 
 @Composable
 fun weightUnitLabel(): String {

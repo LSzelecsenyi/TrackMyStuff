@@ -371,7 +371,10 @@ fun WeightTrackerNavHost(
     onUnitSystemSelected: (app.mymusclemap.domain.units.UnitSystem) -> Unit = {},
     selectedBodyModel: app.mymusclemap.domain.musclemap.MuscleMapBodyModel =
         app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE,
-    onBodyModelSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit = {}
+    onBodyModelSelected: (app.mymusclemap.domain.musclemap.MuscleMapBodyModel) -> Unit = {},
+    weightAdjustment: app.mymusclemap.domain.units.WeightAdjustmentConfiguration =
+        app.mymusclemap.domain.units.WeightAdjustmentConfiguration(),
+    onWeightAdjustmentStep: (String) -> Unit = {}
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -754,6 +757,9 @@ fun WeightTrackerNavHost(
                 TrainingSettingsDestination(
                     navController = navController,
                     factory = factory,
+                    unitSystem = selectedUnitSystem,
+                    weightAdjustment = weightAdjustment,
+                    onWeightAdjustmentStep = onWeightAdjustmentStep,
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -1863,6 +1869,9 @@ private fun AppearanceSettingsDestination(
 private fun TrainingSettingsDestination(
     navController: NavHostController,
     factory: WeightViewModelFactory,
+    unitSystem: app.mymusclemap.domain.units.UnitSystem,
+    weightAdjustment: app.mymusclemap.domain.units.WeightAdjustmentConfiguration,
+    onWeightAdjustmentStep: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val viewModel = settingsGraphViewModel(navController, factory)
@@ -1914,6 +1923,9 @@ private fun TrainingSettingsDestination(
         onBack = onBack,
         lockScreenSetCompletion = state.lockScreenSetCompletionEnabled,
         onTimerAudioChange = viewModel::setTimerAudio,
+        unitSystem = unitSystem,
+        weightAdjustment = weightAdjustment,
+        onWeightAdjustmentStep = onWeightAdjustmentStep,
         lockScreenAccessNote = lockScreenAccessNote,
         onLockScreenSetCompletionChange = { enabled ->
             if (!enabled) {

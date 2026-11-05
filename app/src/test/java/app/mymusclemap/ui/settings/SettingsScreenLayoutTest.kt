@@ -13,12 +13,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -29,9 +33,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.mymusclemap.domain.units.UnitSystem
+import app.mymusclemap.domain.units.WeightAdjustmentConfiguration
+import app.mymusclemap.domain.units.WeightAdjustmentStep
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.domain.workout.WeeklyGoalRevision
 import app.mymusclemap.domain.theme.AppearanceSettings
@@ -40,8 +48,10 @@ import app.mymusclemap.domain.theme.PaletteSession
 import app.mymusclemap.domain.theme.PaletteSessionLogic
 import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.SeedField
+import app.mymusclemap.domain.theme.StrictBrandTokens
 import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.theme.ThemeSeeds
+import app.mymusclemap.ui.theme.toComposeColorScheme
 import app.mymusclemap.ui.components.STRICT_WORDMARK_DARK
 import app.mymusclemap.ui.components.STRICT_WORDMARK_LIGHT
 import app.mymusclemap.ui.theme.AppDimens
@@ -103,6 +113,108 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithTag(SETTINGS_LOCK_SCREEN_NOT_NOW).performClick()
         assertTrue(dismissed)
         assertFalse(confirmed)
+    }
+
+    @Test
+    fun weightAdjustmentStepShowsTheMetricDefaultAndRejectsAnInvalidCustomValue() {
+        val saved = mutableListOf<String>()
+        render(
+            page = SettingsSurface.Training,
+            onWeightAdjustmentStep = { saved += it }
+        )
+        composeRule.onNodeWithTag(SETTINGS_WEIGHT_STEP).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.settings_weight_step_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag(settingsWeightStepPresetTag("2.5")).assertIsSelected()
+        composeRule.onNodeWithTag(settingsWeightStepPresetTag("1.25")).performScrollTo().performClick()
+        assertEquals(listOf("1.25"), saved)
+        composeRule.onNodeWithTag(SETTINGS_WEIGHT_STEP_CUSTOM).performClick()
+        composeRule.onNodeWithTag(SETTINGS_WEIGHT_STEP_CUSTOM_INPUT).performTextReplacement("0")
+        composeRule.onNodeWithTag(SETTINGS_WEIGHT_STEP_SAVE).performClick()
+        assertEquals(listOf("1.25"), saved)
+        composeRule.onNodeWithTag(SETTINGS_WEIGHT_STEP_ERROR).assertIsDisplayed()
+        composeRule.onNodeWithTag(settingsWeightStepPresetTag("2.5")).assertIsSelected()
+    }
+
+    @Test
+    fun weightAdjustmentStepUsesImperialPresetsWhenPoundsAreSelected() {
+        render(
+            page = SettingsSurface.Training,
+            unitSystem = UnitSystem.IMPERIAL,
+            weightAdjustment = WeightAdjustmentConfiguration()
+        )
+        composeRule.onNodeWithTag(settingsWeightStepPresetTag("10")).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(settingsWeightStepPresetTag("5")).assertIsSelected()
+        composeRule.onNodeWithText("1.25 lb").assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.settings_weight_step_value, "5", "lb")).assertIsDisplayed()
+        assertEquals("5", WeightAdjustmentStep.storedText(WeightAdjustmentConfiguration().imperial))
+        assertWeightStepGrid(
+            firstRow = listOf("0.5", "1", "2.5"),
+            secondRow = listOf("5", "10", SETTINGS_WEIGHT_STEP_CUSTOM),
+            maxRight = 360.dp
+        )
+    }
+
+    @Test
+    fun weightAdjustmentStepUsesAThreeByTwoPillGridAndTheActiveAccent() {
+        val config = mutableStateOf(WeightAdjustmentConfiguration())
+        val seeds = ThemeSeeds.DefaultDark
+        render(
+            page = SettingsSurface.Training,
+            darkTheme = true,
+            seeds = seeds,
+            width = 320.dp,
+            weightAdjustmentSource = { config.value },
+            onWeightAdjustmentStep = { raw ->
+                val parsed = WeightAdjustmentStep.parse(raw, UnitSystem.METRIC)
+                if (parsed != null) {
+                    config.value = config.value.withStep(UnitSystem.METRIC, parsed)
+                }
+            }
+        )
+        assertWeightStepGrid(
+            firstRow = listOf("0.5", "1", "1.25"),
+            secondRow = listOf("2.5", "5", SETTINGS_WEIGHT_STEP_CUSTOM),
+            maxRight = 320.dp
+        )
+        val accent = Color(StrictBrandTokens.actionContainer(seeds.background, seeds.primary))
+        val content = Color(StrictBrandTokens.onAction(seeds.background, seeds.primary))
+        val selected = composeRule.onNodeWithTag(settingsWeightStepPresetTag("2.5"))
+        val unselected = composeRule.onNodeWithTag(settingsWeightStepPresetTag("1"))
+        selected.performScrollTo().assertIsSelected()
+        unselected.assertIsNotSelected()
+        assertPillColors(selected, fill = accent, border = accent, content = content)
+        assertPillOutlined(unselected, seeds)
+
+        unselected.performClick()
+        composeRule.waitForIdle()
+        unselected.assertIsSelected()
+        selected.assertIsNotSelected()
+        assertPillColors(unselected, fill = accent, border = accent, content = content)
+        assertPillOutlined(selected, seeds)
+        composeRule.onNodeWithText("1.25 kg").assertIsDisplayed()
+    }
+
+    @Test
+    fun weightAdjustmentStepFollowsACustomThemeAccent() {
+        val seeds = ThemeSeeds(
+            background = 0xFF101418.toInt(),
+            primary = 0xFFCC44AA.toInt(),
+            secondary = ThemeSeeds.DefaultDark.secondary,
+            tertiary = ThemeSeeds.DefaultDark.tertiary
+        )
+        render(
+            page = SettingsSurface.Training,
+            darkTheme = true,
+            seeds = seeds
+        )
+        val accent = Color(StrictBrandTokens.actionContainer(seeds.background, seeds.primary))
+        val content = Color(StrictBrandTokens.onAction(seeds.background, seeds.primary))
+        assertEquals(Color(seeds.primary), accent)
+        assertTrue(accent != Color(StrictBrandTokens.LIME))
+        val selected = composeRule.onNodeWithTag(settingsWeightStepPresetTag("2.5"))
+        selected.performScrollTo()
+        assertPillColors(selected, fill = accent, border = accent, content = content)
+        assertPillOutlined(composeRule.onNodeWithTag(settingsWeightStepPresetTag("0.5")), seeds)
     }
 
     @Test
@@ -615,6 +727,52 @@ class SettingsScreenLayoutTest {
         composeRule.onNodeWithText(testString(R.string.settings_pro_plan)).assertExists()
     }
 
+    private fun assertWeightStepGrid(firstRow: List<String>, secondRow: List<String>, maxRight: Dp) {
+        val top = firstRow.map { boundsFor(it) }
+        val bottom = secondRow.map { boundsFor(it) }
+        assertTrue(top[0].left < top[1].left && top[1].left < top[2].left)
+        assertTrue(bottom[0].left < bottom[1].left && bottom[1].left < bottom[2].left)
+        assertTrue(top.all { it.top == top[0].top })
+        assertTrue(bottom.all { it.top == bottom[0].top })
+        assertTrue(bottom[0].top >= top[0].bottom)
+        val widths = (top + bottom).map { (it.right - it.left).value }
+        assertTrue("widths=$widths", widths.all { kotlin.math.abs(it - widths[0]) <= 1f })
+        assertTrue(top.all { it.bottom - it.top >= AppDimens.minTouch - 1.dp })
+        val horizontalGap = top[1].left - top[0].right
+        val verticalGap = bottom[0].top - top[0].bottom
+        assertTrue(horizontalGap in 6.dp..14.dp)
+        assertTrue(kotlin.math.abs(horizontalGap.value - verticalGap.value) < 1f)
+        assertTrue(kotlin.math.abs((top[2].left - top[1].right).value - horizontalGap.value) < 1f)
+        assertTrue(top[2].right <= maxRight)
+        assertTrue(widths[0] >= 64f)
+    }
+
+    private fun boundsFor(value: String) = composeRule.onNodeWithTag(stepTag(value)).performScrollTo().getBoundsInRoot()
+
+    private fun stepTag(value: String): String {
+        return if (value == SETTINGS_WEIGHT_STEP_CUSTOM) value else settingsWeightStepPresetTag(value)
+    }
+
+    private fun assertPillColors(
+        node: SemanticsNodeInteraction,
+        fill: Color,
+        border: Color,
+        content: Color
+    ) {
+        node.assert(SemanticsMatcher.expectValue(WeightStepFillColorKey, fill))
+        node.assert(SemanticsMatcher.expectValue(WeightStepBorderColorKey, border))
+        node.assert(SemanticsMatcher.expectValue(WeightStepContentColorKey, content))
+    }
+
+    private fun assertPillOutlined(node: SemanticsNodeInteraction, seeds: ThemeSeeds) {
+        val scheme = app.mymusclemap.domain.theme.ColorSchemeFactory
+            .derive(seeds, isDark = true)
+            .toComposeColorScheme(isDark = true)
+        node.assert(SemanticsMatcher.expectValue(WeightStepFillColorKey, Color.Transparent))
+        node.assert(SemanticsMatcher.expectValue(WeightStepBorderColorKey, scheme.outline))
+        node.assert(SemanticsMatcher.expectValue(WeightStepContentColorKey, scheme.onSurface))
+    }
+
     private enum class SettingsSurface { Appearance, Training, Backup, Account, About }
 
     private fun render(
@@ -634,9 +792,14 @@ class SettingsScreenLayoutTest {
         showFounderProgram: Boolean = true,
         showFounderBadge: Boolean = false,
         darkTheme: Boolean = false,
+        seeds: ThemeSeeds? = null,
         onBack: () -> Unit = {},
         onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
         onTimerAudioChange: (app.mymusclemap.domain.workout.TimerAudioMode) -> Unit = {},
+        unitSystem: UnitSystem = UnitSystem.METRIC,
+        weightAdjustment: WeightAdjustmentConfiguration = WeightAdjustmentConfiguration(),
+        weightAdjustmentSource: () -> WeightAdjustmentConfiguration = { weightAdjustment },
+        onWeightAdjustmentStep: (String) -> Unit = {},
         lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
         onConfirmLockScreenEnable: () -> Unit = {},
         onDismissLockScreenEnable: () -> Unit = {},
@@ -651,7 +814,7 @@ class SettingsScreenLayoutTest {
                 LocalDensity provides Density(density = density.density, fontScale = fontScale)
             ) {
                 WeightTrackerThemeForPreview(
-                    seeds = if (darkTheme) ThemeSeeds.DefaultDark else ThemeSeeds.DefaultLight,
+                    seeds = seeds ?: if (darkTheme) ThemeSeeds.DefaultDark else ThemeSeeds.DefaultLight,
                     darkTheme = darkTheme
                 ) {
                     Box(
@@ -671,6 +834,9 @@ class SettingsScreenLayoutTest {
                                 onBack = onBack,
                                 onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
                                 onTimerAudioChange = onTimerAudioChange,
+                                unitSystem = unitSystem,
+                                weightAdjustment = weightAdjustmentSource(),
+                                onWeightAdjustmentStep = onWeightAdjustmentStep,
                                 lockScreenEnablePrompt = lockScreenEnablePrompt,
                                 onConfirmLockScreenEnable = onConfirmLockScreenEnable,
                                 onDismissLockScreenEnable = onDismissLockScreenEnable

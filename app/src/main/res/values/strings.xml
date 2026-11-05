@@ -1811,6 +1811,12 @@
     <string name="rest_complete">Rest complete</string>
     <string name="rest_next_set">Next Set</string>
     <string name="rest_next">NEXT: %1$s — Set %2$d/%3$d</string>
+    <string name="settings_weight_step_title">Weight adjustment step</string>
+    <string name="settings_weight_step_body">Choose how much the weight changes when tapping + or − during a workout.</string>
+    <string name="settings_weight_step_value">%1$s %2$s</string>
+    <string name="settings_weight_step_custom">Custom</string>
+    <string name="settings_weight_step_custom_label">Custom step</string>
+    <string name="settings_weight_step_invalid">Enter a positive number.</string>
     <string name="settings_timer_audio_title">Timer audio</string>
     <string name="settings_timer_audio_voice">Voice</string>
     <string name="settings_timer_audio_beeps">Beeps</string>

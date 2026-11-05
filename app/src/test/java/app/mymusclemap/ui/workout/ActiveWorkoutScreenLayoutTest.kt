@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasStateDescription
@@ -56,7 +57,10 @@ import app.mymusclemap.domain.workout.SessionStatus
 import app.mymusclemap.domain.workout.WorkoutFocusTarget
 import app.mymusclemap.domain.workout.WorkoutSession
 import app.mymusclemap.domain.workout.WorkoutSessionAggregate
+import app.mymusclemap.domain.units.WeightAdjustmentConfiguration
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
+import app.mymusclemap.ui.units.LocalWeightAdjustment
+import java.math.BigDecimal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -636,6 +640,187 @@ class ActiveWorkoutScreenLayoutTest {
     }
 
     @Test
+    fun weightSteppersShowWhenTheSetHasAnEditableExternalWeight() {
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.REPETITIONS_AND_WEIGHT,
+                resistance = ResistanceBasis.EXTERNAL,
+                loadKind = PlannedLoadKind.EXTERNAL_WEIGHT
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_MINUS).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_WEIGHT_PLUS).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_decrease_weight_a11y)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(testString(R.string.action_increase_weight_a11y)).assertIsDisplayed()
+    }
+
+    @Test
+    fun addedExternalWeightShowsWeightSteppers() {
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.REPETITIONS,
+                resistance = ResistanceBasis.BODYWEIGHT,
+                loadKind = PlannedLoadKind.ADDED_WEIGHT,
+                weightText = "5"
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_PLUS).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertIsDisplayed()
+    }
+
+    @Test
+    fun bodyweightOnlyHasNoWeightSteppers() {
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.REPETITIONS,
+                resistance = ResistanceBasis.BODYWEIGHT,
+                loadKind = PlannedLoadKind.BODYWEIGHT_ONLY,
+                weightText = ""
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_MINUS).assertDoesNotExist()
+        composeRule.onNodeWithTag(SET_WEIGHT_PLUS).assertDoesNotExist()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertIsDisplayed()
+    }
+
+    @Test
+    fun durationWithoutWeightHasNoWeightSteppers() {
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.DURATION,
+                resistance = ResistanceBasis.NONE,
+                loadKind = PlannedLoadKind.NONE,
+                weightText = ""
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_PLUS).assertDoesNotExist()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertDoesNotExist()
+    }
+
+    @Test
+    fun durationAndWeightShowsWeightSteppersWithoutRepetitionSteppers() {
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.DURATION_AND_WEIGHT,
+                resistance = ResistanceBasis.EXTERNAL,
+                loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                weightText = "12"
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_PLUS).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_REPS_PLUS).assertDoesNotExist()
+    }
+
+    @Test
+    fun assistanceWeightUsesTheSameAdjustmentControlsAsTheWeightField() {
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.REPETITIONS,
+                resistance = ResistanceBasis.BODYWEIGHT,
+                loadKind = PlannedLoadKind.ASSISTANCE,
+                weightText = "8"
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_MINUS).assertIsDisplayed()
+        composeRule.onNodeWithTag(SET_WEIGHT_PLUS).assertIsDisplayed()
+    }
+
+    @Test
+    fun completedExternalWeightSetDoesNotShowAdjustmentControls() {
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.REPETITIONS_AND_WEIGHT,
+                resistance = ResistanceBasis.EXTERNAL,
+                loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                status = SessionSetStatus.COMPLETED
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_MINUS).assertDoesNotExist()
+        composeRule.onNodeWithTag(SET_WEIGHT_PLUS).assertDoesNotExist()
+    }
+
+    @Test
+    fun weightStepperCirclesMatchRepetitionCirclesAndSitOnTheWeightRow() {
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.REPETITIONS_AND_WEIGHT,
+                resistance = ResistanceBasis.EXTERNAL,
+                loadKind = PlannedLoadKind.EXTERNAL_WEIGHT
+            ),
+            width = 360.dp,
+            fontScale = 1f
+        )
+        val repsCircle = composeRule.onNodeWithTag(SET_REPS_MINUS_CIRCLE, useUnmergedTree = true).getBoundsInRoot()
+        val weightCircle = composeRule.onNodeWithTag(SET_WEIGHT_MINUS_CIRCLE, useUnmergedTree = true).getBoundsInRoot()
+        val weightPlusCircle = composeRule.onNodeWithTag(SET_WEIGHT_PLUS_CIRCLE, useUnmergedTree = true).getBoundsInRoot()
+        val weightMinus = composeRule.onNodeWithTag(SET_WEIGHT_MINUS).getBoundsInRoot()
+        val weightPlus = composeRule.onNodeWithTag(SET_WEIGHT_PLUS).getBoundsInRoot()
+        val weightField = composeRule.onAllNodesWithTag("set-numeric-field")[1].getBoundsInRoot()
+        assertEquals(repsCircle.right - repsCircle.left, weightCircle.right - weightCircle.left)
+        assertEquals(repsCircle.bottom - repsCircle.top, weightCircle.bottom - weightCircle.top)
+        assertEquals(weightCircle.right - weightCircle.left, weightPlusCircle.right - weightPlusCircle.left)
+        assertTrue(weightMinus.right - weightMinus.left >= 48.dp)
+        assertTrue(weightMinus.bottom - weightMinus.top >= 48.dp)
+        assertTrue(weightPlus.left - weightMinus.right >= 12.dp)
+        assertTrue("field=$weightField minus=$weightMinus", weightField.right <= weightMinus.left + 1.dp)
+    }
+
+    @Test
+    fun weightPlusAndMinusApplyTheConfiguredIncrementToTheEnteredWeight() {
+        val updates = mutableListOf<String>()
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.REPETITIONS_AND_WEIGHT,
+                resistance = ResistanceBasis.EXTERNAL,
+                loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                weightText = "16.25"
+            ),
+            width = 360.dp,
+            fontScale = 1f,
+            weightAdjustment = WeightAdjustmentConfiguration(metric = BigDecimal("2.5")),
+            onWeight = { _, value -> updates += value }
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_PLUS).performClick()
+        assertEquals(listOf("18.75"), updates)
+        updates.clear()
+        composeRule.onNodeWithTag(SET_WEIGHT_MINUS).performClick()
+        assertEquals(listOf("13.75"), updates)
+    }
+
+    @Test
+    fun weightMinusDoesNotApplyAStepThatWouldBecomeNegative() {
+        val updates = mutableListOf<String>()
+        render(
+            state = weightLoggingState(
+                measurement = MeasurementType.REPETITIONS_AND_WEIGHT,
+                resistance = ResistanceBasis.EXTERNAL,
+                loadKind = PlannedLoadKind.EXTERNAL_WEIGHT,
+                weightText = "1"
+            ),
+            width = 360.dp,
+            fontScale = 1f,
+            weightAdjustment = WeightAdjustmentConfiguration(metric = BigDecimal("2.5")),
+            onWeight = { _, value -> updates += value }
+        )
+        composeRule.onNodeWithTag(SET_WEIGHT_MINUS).assertIsNotEnabled()
+        assertTrue(updates.isEmpty())
+    }
+
+    @Test
     fun repsStepperCirclesMatchCompleteCircleAndTouchTargets() {
         render(state = pendingNamedState("Vádli"), width = 360.dp, fontScale = 1f)
         val completeCircle = composeRule.onNodeWithTag(SET_COMPLETE_CIRCLE, useUnmergedTree = true).getBoundsInRoot()
@@ -796,6 +981,8 @@ class ActiveWorkoutScreenLayoutTest {
         onExploreProBenefits: () -> Unit = {},
         onRequestFinish: () -> Unit = {},
         onReps: (Long, String) -> Unit = { _, _ -> },
+        onWeight: (Long, String) -> Unit = { _, _ -> },
+        weightAdjustment: WeightAdjustmentConfiguration = WeightAdjustmentConfiguration(),
         onFinished: (WorkoutCompletionSummary) -> Unit = {},
         backDispatcher: AtomicReference<OnBackPressedDispatcher?>? = null
     ): MutableState<ActiveWorkoutUiState> {
@@ -807,7 +994,8 @@ class ActiveWorkoutScreenLayoutTest {
                 SideEffect { backDispatcher.set(owner?.onBackPressedDispatcher) }
             }
             CompositionLocalProvider(
-                LocalDensity provides Density(density = density.density, fontScale = fontScale)
+                LocalDensity provides Density(density = density.density, fontScale = fontScale),
+                LocalWeightAdjustment provides weightAdjustment
             ) {
                 WeightTrackerThemeForPreview {
                     Box(
@@ -821,7 +1009,7 @@ class ActiveWorkoutScreenLayoutTest {
                             onReps = onReps,
                             onStepReps = { _, _ -> },
                             onLoadKind = { _, _ -> },
-                            onWeight = { _, _ -> },
+                            onWeight = onWeight,
                             onMinutes = { _, _ -> },
                             onSeconds = { _, _ -> },
                             onDistance = { _, _ -> },
@@ -1126,6 +1314,70 @@ class ActiveWorkoutScreenLayoutTest {
             bodyWeightSourceDate = null,
             createdAt = 1_000L,
             updatedAt = 1_000L
+        )
+    }
+
+    private fun weightLoggingState(
+        measurement: MeasurementType,
+        resistance: ResistanceBasis,
+        loadKind: PlannedLoadKind,
+        weightText: String = "16.25",
+        status: SessionSetStatus = SessionSetStatus.PENDING
+    ): ActiveWorkoutUiState {
+        val current = set(2L, 10L, 0, status).copy(
+            plannedLoadKind = loadKind,
+            plannedWeightKg = weightText.toDoubleOrNull(),
+            actualLoadKind = if (status == SessionSetStatus.COMPLETED) loadKind else null,
+            actualWeightKg = if (status == SessionSetStatus.COMPLETED) weightText.toDoubleOrNull() else null,
+            actualReps = if (status == SessionSetStatus.COMPLETED &&
+                (measurement == MeasurementType.REPETITIONS || measurement == MeasurementType.REPETITIONS_AND_WEIGHT)
+            ) {
+                8
+            } else {
+                null
+            }
+        )
+        val exercise = item(10L, "Bench press", 0, listOf(current), measurement).exercise.copy(
+            resistanceBasis = resistance,
+            weightInterpretation = if (resistance == ResistanceBasis.EXTERNAL &&
+                (measurement == MeasurementType.REPETITIONS_AND_WEIGHT ||
+                    measurement == MeasurementType.DURATION_AND_WEIGHT)
+            ) {
+                WeightInterpretation.TOTAL
+            } else {
+                WeightInterpretation.NOT_APPLICABLE
+            }
+        )
+        val draft = ActualSetDraft(
+            repsText = if (measurement == MeasurementType.REPETITIONS ||
+                measurement == MeasurementType.REPETITIONS_AND_WEIGHT
+            ) {
+                "8"
+            } else {
+                ""
+            },
+            loadKind = loadKind,
+            weightText = weightText,
+            minutesText = if (measurement == MeasurementType.DURATION ||
+                measurement == MeasurementType.DURATION_AND_WEIGHT
+            ) {
+                "1"
+            } else {
+                "0"
+            },
+            secondsText = "0"
+        )
+        return ActiveWorkoutUiState(
+            loading = false,
+            aggregate = WorkoutSessionAggregate(
+                session(),
+                listOf(SessionExerciseItem(exercise = exercise, sets = listOf(current)))
+            ),
+            currentExerciseId = 10L,
+            currentSetId = current.id,
+            focusedSetId = current.id,
+            expandedExerciseIds = setOf(10L),
+            drafts = mapOf(current.id to draft)
         )
     }
 

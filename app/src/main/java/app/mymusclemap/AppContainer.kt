@@ -50,6 +50,7 @@ import app.mymusclemap.data.preferences.FounderRecognitionStore
 import app.mymusclemap.data.preferences.FounderProgramStore
 import app.mymusclemap.data.preferences.LockScreenSetCompletionPreferences
 import app.mymusclemap.data.preferences.TimerSoundPreferences
+import app.mymusclemap.data.preferences.WeightAdjustmentPreferences
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.preferences.MuscleMapBodyModelPreferences
 import app.mymusclemap.data.preferences.UnitSystemPreferences
@@ -109,7 +110,8 @@ class AppContainer(
     context: Context,
     val accountUserId: String,
     val unitSystems: UnitSystemPreferences,
-    val bodyModels: MuscleMapBodyModelPreferences
+    val bodyModels: MuscleMapBodyModelPreferences,
+    val weightAdjustment: WeightAdjustmentPreferences
 ) {
     private val appContext = context.applicationContext
     private val clock: Clock = SystemWallClock()
@@ -221,6 +223,7 @@ class AppContainer(
         themePreferences,
         unitSystems = unitSystems,
         bodyModels = bodyModels,
+        weightAdjustment = weightAdjustment,
         progressPhotoStore = progressPhotoStore,
         onHeatmapDataChanged = { HeatmapWidgetUpdater.update(appContext) },
         onAfterRestore = {

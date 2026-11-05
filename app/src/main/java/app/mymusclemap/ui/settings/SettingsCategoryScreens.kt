@@ -22,6 +22,7 @@ import app.mymusclemap.domain.theme.PaletteDraftLogic
 import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.domain.units.UnitSystem
+import app.mymusclemap.domain.units.WeightAdjustmentConfiguration
 import app.mymusclemap.domain.workout.TimerAudioMode
 import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.UserMessage
@@ -110,6 +111,9 @@ fun TrainingSettingsScreen(
     onLockScreenSetCompletionChange: (Boolean) -> Unit = {},
     onOpenLockScreenAccessSettings: () -> Unit = {},
     onTimerAudioChange: (TimerAudioMode) -> Unit = {},
+    unitSystem: UnitSystem = UnitSystem.METRIC,
+    weightAdjustment: WeightAdjustmentConfiguration = WeightAdjustmentConfiguration(),
+    onWeightAdjustmentStep: (String) -> Unit = {},
     lockScreenEnablePrompt: LockScreenEnablePrompt? = null,
     onConfirmLockScreenEnable: () -> Unit = {},
     onDismissLockScreenEnable: () -> Unit = {},
@@ -130,7 +134,10 @@ fun TrainingSettingsScreen(
             onLockScreenSetCompletionChange = onLockScreenSetCompletionChange,
             onOpenLockScreenAccessSettings = onOpenLockScreenAccessSettings,
             timerAudio = state.timerAudio,
-            onTimerAudioChange = onTimerAudioChange
+            onTimerAudioChange = onTimerAudioChange,
+            unitSystem = unitSystem,
+            weightAdjustment = weightAdjustment,
+            onWeightAdjustmentStep = onWeightAdjustmentStep
         )
     }
     if (weeklyGoalEditorOpen) {

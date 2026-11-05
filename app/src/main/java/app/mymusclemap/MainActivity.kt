@@ -63,6 +63,7 @@ import app.mymusclemap.ui.founder.FounderProgramViewModel
 import app.mymusclemap.ui.navigation.WeightTrackerNavHost
 import app.mymusclemap.ui.components.musclemap.LocalMuscleMapBodyModel
 import app.mymusclemap.ui.units.LocalUnitSystem
+import app.mymusclemap.ui.units.LocalWeightAdjustment
 import app.mymusclemap.ui.widget.HeatmapWidgetUpdater
 import app.mymusclemap.ui.onboarding.OnboardingExit
 import app.mymusclemap.ui.onboarding.OnboardingScreen
@@ -126,6 +127,7 @@ class MainActivity : AppCompatActivity() {
             )
             val units by app.unitSystems.system.collectAsStateWithLifecycle()
             val bodyModel by app.bodyModels.model.collectAsStateWithLifecycle()
+            val weightAdjustment by app.weightAdjustment.configuration.collectAsStateWithLifecycle()
             LaunchedEffect(units) {
                 container.activeWorkoutNotifications.refresh()
             }
@@ -155,6 +157,7 @@ class MainActivity : AppCompatActivity() {
             CompositionLocalProvider(
                 LocalFeatureEntitlements provides container.featureEntitlements,
                 LocalUnitSystem provides units,
+                LocalWeightAdjustment provides weightAdjustment,
                 LocalMuscleMapBodyModel provides bodyModel
             ) {
                 WeightTrackerTheme(appearance = appearance) {
@@ -313,6 +316,12 @@ class MainActivity : AppCompatActivity() {
                                     lifecycleScope.launch {
                                         app.bodyModels.write(model)
                                         HeatmapWidgetUpdater.update(this@MainActivity)
+                                    }
+                                },
+                                weightAdjustment = weightAdjustment,
+                                onWeightAdjustmentStep = { raw ->
+                                    lifecycleScope.launch {
+                                        app.weightAdjustment.write(units, raw)
                                     }
                                 },
                                 onSignOut = {

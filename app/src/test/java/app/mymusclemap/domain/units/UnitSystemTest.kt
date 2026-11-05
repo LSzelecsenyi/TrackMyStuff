@@ -155,9 +155,7 @@ class UnitSystemTest {
     @Test
     fun incrementsFollowTheSelectedSystem() {
         assertEquals(BigDecimal("2.5"), WeightIncrements.defaultStep(UnitSystem.METRIC))
-        assertEquals(BigDecimal("0.5"), WeightIncrements.fineStep(UnitSystem.METRIC))
         assertEquals(BigDecimal("5"), WeightIncrements.defaultStep(UnitSystem.IMPERIAL))
-        assertEquals(BigDecimal.ONE, WeightIncrements.fineStep(UnitSystem.IMPERIAL))
     }
 
     @Test

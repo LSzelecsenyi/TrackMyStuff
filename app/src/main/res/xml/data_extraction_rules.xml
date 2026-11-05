@@ -25,6 +25,9 @@
         <include
             domain="file"
             path="datastore/muscle_map_body_model.preferences_pb" />
+        <include
+            domain="file"
+            path="datastore/weight_adjustment_step.preferences_pb" />
     </cloud-backup>
     <device-transfer>
         <include
@@ -42,6 +45,9 @@
         <include
             domain="file"
             path="datastore/muscle_map_body_model.preferences_pb" />
+        <include
+            domain="file"
+            path="datastore/weight_adjustment_step.preferences_pb" />
     </device-transfer>
     <cross-platform-transfer platform="ios">
         <exclude domain="root" path="." />

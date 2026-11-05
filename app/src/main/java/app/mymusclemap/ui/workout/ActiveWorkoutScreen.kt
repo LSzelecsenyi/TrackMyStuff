@@ -5,6 +5,8 @@ import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.units.WorkoutWeightInput
 import app.mymusclemap.ui.exercises.starterExerciseLabel
 import app.mymusclemap.ui.units.LocalUnitSystem
+import app.mymusclemap.ui.units.OutlinedQuantityStepButton
+import app.mymusclemap.ui.units.QuantityStepCircleSize
 import app.mymusclemap.ui.units.WeightStepButtons
 import app.mymusclemap.ui.units.rememberDistanceDraftBinding
 import app.mymusclemap.ui.units.rememberWeightDraftBinding
@@ -145,10 +147,14 @@ internal const val SET_REPS_MINUS = "set-reps-minus"
 internal const val SET_REPS_PLUS = "set-reps-plus"
 internal const val SET_REPS_MINUS_CIRCLE = "set-reps-minus-circle"
 internal const val SET_REPS_PLUS_CIRCLE = "set-reps-plus-circle"
+internal const val SET_WEIGHT_MINUS = "set-weight-minus"
+internal const val SET_WEIGHT_PLUS = "set-weight-plus"
+internal const val SET_WEIGHT_MINUS_CIRCLE = "set-weight-minus-circle"
+internal const val SET_WEIGHT_PLUS_CIRCLE = "set-weight-plus-circle"
 internal const val SET_HEADER_TITLE = "set-header-title"
 internal const val SET_HEADER_COUNT = "set-header-count"
 internal const val SET_HEADER_STATUS = "set-header-status"
-private val SetActionCircleSize = 32.dp
+private val SetActionCircleSize = QuantityStepCircleSize
 internal const val WORKOUT_TOP_BAR = "workout-top-bar"
 internal const val WORKOUT_OVERFLOW_ANCHOR = "workout-overflow-anchor"
 internal const val WORKOUT_OVERFLOW_BUTTON = "workout-overflow-button"
@@ -1678,48 +1684,16 @@ private fun RepsStepButton(
     traversalIndex: Float,
     onClick: () -> Unit
 ) {
-    val stroke = if (enabled) {
-        StrictBrand.blue
-    } else {
-        MaterialTheme.colorScheme.outline
-    }
-    val glyph = if (enabled) {
-        StrictBrand.blue
-    } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-    }
-    val fill = if (enabled) {
-        StrictBrand.blue.copy(alpha = 0.08f)
-    } else {
-        Color.Transparent
-    }
-    Box(
-        modifier = Modifier
-            .defaultMinSize(minWidth = AppDimens.minTouch, minHeight = AppDimens.minTouch)
-            .testTag(testTag)
-            .clickable(enabled = enabled, onClick = onClick)
-            .semantics {
-                role = Role.Button
-                this.contentDescription = contentDescription
-                this.traversalIndex = traversalIndex
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(SetActionCircleSize)
-                .background(fill, CircleShape)
-                .border(AppDimens.strokeThin, stroke, CircleShape)
-                .testTag(circleTag),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = symbol,
-                style = AppTypeTokens.statValue,
-                color = glyph
-            )
-        }
-    }
+    OutlinedQuantityStepButton(
+        symbol = symbol,
+        enabled = enabled,
+        accent = StrictBrand.blue,
+        contentDescription = contentDescription,
+        testTag = testTag,
+        circleTag = circleTag,
+        traversalIndex = traversalIndex,
+        onClick = onClick
+    )
 }
 
 @Composable
@@ -2005,20 +1979,31 @@ private fun ActualFields(
             onCanonicalText = onWeight,
             enabled = steppersEnabled
         )
-        ConsoleNumericField(
-            value = weightDraft.text,
-            onValueChange = weightDraft.onText,
-            label = weightFieldLabel(),
-            unit = weightUnitLabel(),
-            supportingText = hint,
-            isError = errors.any { it.name.startsWith("Weight") },
-            decimal = true,
-            traversalIndex = 4f
-        )
-        WeightStepButtons(
-            onStep = weightDraft.step,
-            enabled = steppersEnabled
-        )
+        Row(verticalAlignment = Alignment.Top) {
+            ConsoleNumericField(
+                value = weightDraft.text,
+                onValueChange = weightDraft.onText,
+                label = weightFieldLabel(),
+                unit = weightUnitLabel(),
+                supportingText = hint,
+                isError = errors.any { it.name.startsWith("Weight") },
+                decimal = true,
+                traversalIndex = 4f,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(AppDimens.itemGap))
+            WeightStepButtons(
+                text = weightDraft.text,
+                onStep = weightDraft.step,
+                enabled = steppersEnabled,
+                minusTag = SET_WEIGHT_MINUS,
+                plusTag = SET_WEIGHT_PLUS,
+                minusCircleTag = SET_WEIGHT_MINUS_CIRCLE,
+                plusCircleTag = SET_WEIGHT_PLUS_CIRCLE,
+                minusTraversalIndex = 5f,
+                plusTraversalIndex = 6f
+            )
+        }
         Spacer(Modifier.height(AppDimens.headerStackGap))
     }
     if (PlannedSetLogic.requiresDuration(measurement)) {
