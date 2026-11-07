@@ -95,10 +95,10 @@ public class ProgramAdminController {
                     lifecycle,
                     lifecycle == ProgramLifecycle.ACTIVE,
                     discovery
-                            ? "One 14-day Pro trial after six calendar months, 24 distinct native workout days, and two of those days in the last 30."
+                            ? "A Pro offer two calendar months after registration, then every two calendar months after the offer was shown. The first offer can start one 14-day trial. Later offers lead to subscription."
                             : "A 7-day Pro grant after a qualifying return workout, followed by a 180-day cooldown.",
                     discovery
-                            ? "A new trial is issued only while this program is Active and the account meets those activity rules. An existing trial keeps its original expiry. One trial per Google account."
+                            ? "A new trial is issued only while this program is Active, the account is two calendar months old, and that Google account has not used the trial. An existing trial keeps its original expiry. No workout upload is required."
                             : "A new grant is issued only while this program is Active, and not while Founder Pro, paid Pro, or Pro Discovery is already active. An existing grant stays in place."
             );
         }

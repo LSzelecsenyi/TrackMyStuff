@@ -96,11 +96,7 @@ class JdbcAccountDeletionStore implements AccountDeletionStore {
                 userId
         );
         jdbc.update("delete from founder_application where user_id = ?", userId);
-        jdbc.update("delete from pro_discovery_device_day where user_id = ?", userId);
-        jdbc.update("delete from pro_discovery_device where user_id = ?", userId);
-        jdbc.update("delete from pro_discovery_activity_permission where user_id = ?", userId);
-        jdbc.update("delete from pro_discovery_activity_day where user_id = ?", userId);
-        jdbc.update("delete from pro_discovery_activity_sync where user_id = ?", userId);
+        jdbc.update("delete from pro_discovery_offer where user_id = ?", userId);
         jdbc.update("delete from promotional_trial where user_id = ?", userId);
         jdbc.update("delete from welcome_back_grant where user_id = ?", userId);
         jdbc.update("delete from account_status_grant where user_id = ?", userId);

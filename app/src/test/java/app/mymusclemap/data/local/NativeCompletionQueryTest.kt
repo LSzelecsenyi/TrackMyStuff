@@ -31,7 +31,6 @@ class NativeCompletionQueryTest {
         insert(status = SessionStatus.ABANDONED, finishedAt = null, fingerprint = null)
         insert(status = SessionStatus.IN_PROGRESS, finishedAt = null, fingerprint = null)
         assertEquals(listOf(1_000L), database.workoutSessionDao().nativeCompletionEpochMillis())
-        assertEquals(listOf("2026-06-09"), database.workoutSessionDao().qualifyingWorkoutDates())
     }
 
     @Test

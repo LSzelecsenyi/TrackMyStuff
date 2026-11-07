@@ -35,7 +35,7 @@ class ProDiscoveryCoordinator(
 ) {
     private var history: List<Instant> = emptyList()
     private var server = ProDiscoveryServerView()
-    private var activitySyncPending = false
+    private var dismissedCycle: String? = null
 
     fun snapshot(): ProDiscoverySnapshot {
         return ProDiscoveryPolicy.evaluate(facts())
@@ -61,22 +61,6 @@ class ProDiscoveryCoordinator(
         ) {
             real.adoptServerTrial(activatedAt, expiresAt)
         }
-        onChanged()
-    }
-
-    fun markActivitySyncPending() {
-        if (activitySyncPending) {
-            return
-        }
-        activitySyncPending = true
-        onChanged()
-    }
-
-    fun clearActivitySyncPending() {
-        if (!activitySyncPending) {
-            return
-        }
-        activitySyncPending = false
         onChanged()
     }
 
@@ -136,10 +120,10 @@ class ProDiscoveryCoordinator(
         if (existingExpiry != null && start.isBefore(existingExpiry)) {
             return ProDiscoveryActivation.AlreadyActive(existingExpiry)
         }
-        if (record.activatedAt != null) {
+        if (config.usesSimulationStore && record.activatedAt != null) {
             return ProDiscoveryActivation.AlreadyUsed
         }
-        if (!snapshot().offerAvailable) {
+        if (!snapshot().offerAvailable || snapshot().offerKind != app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.TRIAL) {
             return ProDiscoveryActivation.NotEligible
         }
         if (!config.usesSimulationStore) {
@@ -160,7 +144,9 @@ class ProDiscoveryCoordinator(
     }
 
     suspend fun dismissOffer() {
+        dismissedCycle = server.nextOfferAt?.takeIf { it.isNotBlank() } ?: server.offer.name
         storeFor(debugConfig()).dismissPopup()
+        onChanged()
     }
 
     suspend fun dismissWarning() {
@@ -184,7 +170,7 @@ class ProDiscoveryCoordinator(
             record = record,
             debug = config,
             server = server,
-            activitySyncPending = activitySyncPending
+            dismissedCycle = dismissedCycle
         )
     }
 

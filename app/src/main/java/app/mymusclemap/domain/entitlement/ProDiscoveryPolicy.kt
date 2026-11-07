@@ -86,18 +86,19 @@ enum class ProDiscoveryServerStatus {
     INCOMPATIBLE
 }
 
+enum class ProDiscoveryOfferKind {
+    NONE,
+    TRIAL,
+    SUBSCRIPTION
+}
+
 /** Last server decision. UNKNOWN is not a confirmed eligibility. */
 data class ProDiscoveryServerView(
     val status: ProDiscoveryServerStatus = ProDiscoveryServerStatus.UNKNOWN,
+    val offer: ProDiscoveryOfferKind = ProDiscoveryOfferKind.NONE,
     val activatedAt: Instant? = null,
     val expiresAt: Instant? = null,
-    val qualifyingDays: Int = 0,
-    val remainingDays: Int = 0,
-    val recentDays: Int = 0,
-    val remainingRecentDays: Int = 0,
-    val requiredDays: Int = 24,
-    val requiredRecentDays: Int = 2,
-    val matureOn: String? = null
+    val nextOfferAt: String? = null
 )
 
 data class ProDiscoveryFacts(
@@ -110,7 +111,7 @@ data class ProDiscoveryFacts(
     val record: ProDiscoveryRecord,
     val debug: ProDiscoveryDebugConfig = ProDiscoveryDebugConfig(),
     val server: ProDiscoveryServerView = ProDiscoveryServerView(),
-    val activitySyncPending: Boolean = false
+    val dismissedCycle: String? = null
 )
 
 data class ProDiscoverySnapshot(
@@ -124,14 +125,7 @@ data class ProDiscoverySnapshot(
     val subscriptionsAvailable: Boolean = false,
     val nextBoundary: Instant? = null,
     val serverStatus: ProDiscoveryServerStatus = ProDiscoveryServerStatus.UNKNOWN,
-    val activitySyncPending: Boolean = false,
-    val qualifyingDays: Int = 0,
-    val remainingDays: Int = 0,
-    val recentDays: Int = 0,
-    val remainingRecentDays: Int = 0,
-    val requiredDays: Int = 24,
-    val requiredRecentDays: Int = 2,
-    val matureOn: String? = null
+    val offerKind: ProDiscoveryOfferKind = ProDiscoveryOfferKind.NONE
 )
 
 /**
@@ -243,24 +237,27 @@ object ProDiscoveryPolicy {
         val alreadyUsed = facts.record.activatedAt != null
         val active = trialIsActive(facts.record.expiresAt, facts.now)
         val expired = alreadyUsed && !active
-        val serverEligible = facts.server.status == ProDiscoveryServerStatus.ELIGIBLE &&
-            !facts.activitySyncPending
-        val offerEligible = when (debug.mode) {
+        val offerKind = when (debug.mode) {
             ProDiscoveryDebugMode.ACTIVE,
-            ProDiscoveryDebugMode.EXPIRED -> false
-            ProDiscoveryDebugMode.ELIGIBLE -> facts.currentlyFree && !alreadyUsed
+            ProDiscoveryDebugMode.EXPIRED -> ProDiscoveryOfferKind.NONE
+            ProDiscoveryDebugMode.ELIGIBLE ->
+                if (facts.currentlyFree && !alreadyUsed) ProDiscoveryOfferKind.TRIAL else ProDiscoveryOfferKind.NONE
             ProDiscoveryDebugMode.REAL ->
-                serverEligible &&
-                    facts.currentlyFree &&
-                    !alreadyUsed
+                if (facts.currentlyFree) facts.server.offer else ProDiscoveryOfferKind.NONE
         }
+        val offerEligible = offerKind != ProDiscoveryOfferKind.NONE
+        val cycle = facts.server.nextOfferAt?.takeIf { it.isNotBlank() } ?: facts.server.offer.name
+        val hiddenThisCycle = debug.mode == ProDiscoveryDebugMode.REAL &&
+            facts.dismissedCycle != null &&
+            facts.dismissedCycle == cycle
         val expiresAt = facts.record.expiresAt
         val lead = debug.warningLead()
         val inWindow = active && expiresAt != null && inWarningWindow(expiresAt, facts.now, lead)
         val suppressWarning = facts.continuedProBeyondTrial
         return ProDiscoverySnapshot(
             offerAvailable = offerEligible,
-            showAutomaticOffer = offerEligible && !facts.record.popupDismissed,
+            showAutomaticOffer = offerEligible && !hiddenThisCycle &&
+                (debug.mode == ProDiscoveryDebugMode.REAL || !facts.record.popupDismissed),
             trialActive = active,
             trialExpiresAt = expiresAt?.takeIf { active || expired },
             showAutomaticWarning = inWindow && !facts.record.warningDismissed && !suppressWarning,
@@ -268,14 +265,7 @@ object ProDiscoveryPolicy {
             trialExpired = expired,
             nextBoundary = nextBoundary(expiresAt, facts.now, lead),
             serverStatus = facts.server.status,
-            activitySyncPending = facts.activitySyncPending,
-            qualifyingDays = facts.server.qualifyingDays,
-            remainingDays = facts.server.remainingDays,
-            recentDays = facts.server.recentDays,
-            remainingRecentDays = facts.server.remainingRecentDays,
-            requiredDays = facts.server.requiredDays,
-            requiredRecentDays = facts.server.requiredRecentDays,
-            matureOn = facts.server.matureOn?.takeIf { it.isNotBlank() }
+            offerKind = offerKind
         )
     }
 }

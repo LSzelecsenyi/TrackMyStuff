@@ -24,10 +24,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -57,144 +54,255 @@ class ProDiscoveryEligibilityIT {
     @Autowired
     private JdbcTemplate jdbc;
 
-    @Autowired
-    private ProDiscoveryActivityCleanup cleanup;
-
     @BeforeEach
     void proDiscoveryIsOpen() {
         jdbc.update("update promotional_program set lifecycle = 'ACTIVE' where program = 'PRO_DISCOVERY'");
     }
 
     @Test
-    @DisplayName("Given a user with no completed native workouts, when activation is attempted directly, then the backend rejects the grant")
-    void noWorkoutsCannotActivate() {
-        String token = login("none-" + UUID.randomUUID());
-        ResponseEntity<String> activation = post("/api/v1/promotions/pro-discovery/activate", "{}", token);
-        assertEquals(HttpStatus.CONFLICT, activation.getStatusCode());
-        assertEquals("NOT_ELIGIBLE", parse(activation).get("status"));
-        assertEquals(0, trials(token));
-    }
-
-    @Test
-    @DisplayName("Given one native workout older than six months, when eligibility is evaluated, then the user is not eligible")
-    void oneOldWorkoutIsNotEnough() {
-        String token = login("one-" + UUID.randomUUID());
-        union(token, List.of(today().minusYears(2).toString()));
-        assertEquals("NOT_ELIGIBLE", status(token).get("status"));
-        assertEquals(1, number(status(token), "qualifyingDays"));
-    }
-
-    @Test
-    @DisplayName("Given 24 distinct workout days but the first workout is younger than six calendar months, when eligibility is evaluated, then the user is not eligible")
-    void twentyFourYoungDaysAreNotEnough() {
+    @DisplayName("Given an account younger than two months, when eligibility is checked, then no offer is available")
+    void aYoungAccountHasNoOffer() {
         String token = login("young-" + UUID.randomUUID());
-        LocalDate first = today().minusDays(40);
-        List<String> dates = new ArrayList<>();
-        for (int index = 0; index < 24; index++) {
-            dates.add(first.plusDays(index).toString());
-        }
-        union(token, dates);
         Map<String, Object> body = status(token);
         assertEquals("NOT_ELIGIBLE", body.get("status"));
-        assertEquals(24, number(body, "qualifyingDays"));
-        assertTrue(LocalDate.parse(String.valueOf(body.get("matureOn"))).isAfter(today()));
+        assertEquals("NONE", body.get("offer"));
+        assertEquals(0, offers(token));
     }
 
     @Test
-    @DisplayName("Given 24 distinct workout days older than six months but no workout in the last 30 days, when eligibility is evaluated, then the user is not eligible")
-    void noRecentActivityIsNotEnough() {
-        String token = login("stale-" + UUID.randomUUID());
-        union(token, oldDays(24));
-        Map<String, Object> body = status(token);
-        assertEquals("NOT_ELIGIBLE", body.get("status"));
-        assertEquals(0, number(body, "recentDays"));
-    }
-
-    @Test
-    @DisplayName("Given at least six calendar months, 24 distinct workout days, and two distinct recent days, when eligibility is evaluated, then the user is eligible")
-    void aQualifyingHistoryIsEligible() {
-        String token = login("ready-" + UUID.randomUUID());
-        union(token, qualifyingDays());
+    @DisplayName("Given an account exactly two calendar months old with no Pro, when eligibility is checked, then a trial offer is available")
+    void twoMonthsOpensTheTrialOffer() {
+        String token = login("mature-" + UUID.randomUUID());
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(2).minusSeconds(1).toInstant());
         Map<String, Object> body = status(token);
         assertEquals("ELIGIBLE", body.get("status"));
-        assertEquals(24, number(body, "qualifyingDays"));
-        assertTrue(number(body, "recentDays") >= 2);
+        assertEquals("TRIAL", body.get("offer"));
+        assertEquals(0, offers(token));
     }
 
     @Test
-    @DisplayName("Given two completed workouts on the same date, when activity is synchronized, then they count as one qualifying workout day")
-    void theSameDateCountsOnce() {
-        String token = login("same-" + UUID.randomUUID());
-        union(token, List.of("2020-01-01", "2020-01-01"));
-        assertEquals(1, number(status(token), "qualifyingDays"));
-        assertEquals(1, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-    }
-
-    @Test
-    @DisplayName("Given a completed workout is deleted, when activity is synchronized, then the corresponding day disappears if no other qualifying workout exists on that date")
-    void aDeletedDayIsRemoved() {
-        String token = login("delete-day-" + UUID.randomUUID());
-        long revision = revision(union(token, List.of("2020-01-01", "2020-01-02")));
-        replace(token, revision, List.of("2020-01-01"));
-        assertEquals(1, number(status(token), "qualifyingDays"));
+    @DisplayName("Given an eligible account with zero workouts, when eligibility is checked, then the offer does not depend on workout history")
+    void zeroWorkoutsStillQualify() {
+        String token = login("empty-" + UUID.randomUUID());
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(2).minusSeconds(1).toInstant());
+        assertEquals("TRIAL", status(token).get("offer"));
         assertEquals(0, count(
-                "select count(*) from pro_discovery_device_day where user_id = ?::uuid and workout_date = '2020-01-02'",
-                userId(token)
+                "select count(*) from information_schema.tables where table_name = 'pro_discovery_activity_day'"
         ));
     }
 
     @Test
-    @DisplayName("Given a qualifying user, when they manually activate Pro Discovery, then exactly one 14-day grant is created")
-    void manualActivationCreatesOneGrant() {
-        String token = login("grant-" + UUID.randomUUID());
-        union(token, qualifyingDays());
-        Instant before = Instant.now();
-        ResponseEntity<String> activation = post("/api/v1/promotions/pro-discovery/activate", "{}", token);
-        assertEquals(HttpStatus.OK, activation.getStatusCode(), activation.getBody());
-        assertEquals("ACTIVE", parse(activation).get("status"));
-        Instant expires = Instant.parse(String.valueOf(parse(activation).get("expiresAt")));
-        assertFalse(expires.isBefore(before.plus(PromotionalTrialService.LENGTH).minusSeconds(5)));
-        assertFalse(expires.isAfter(Instant.now().plus(PromotionalTrialService.LENGTH).plusSeconds(5)));
-        assertEquals(1, trials(token));
-        assertEquals(0, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-        assertEquals(0, count("select count(*) from pro_discovery_device where user_id = ?::uuid", userId(token)));
+    @DisplayName("Given an eligible account that never used Pro Discovery, when the offer is acknowledged, then the trial variant was the one available")
+    void theFirstOfferIsTheFreeTrial() {
+        String token = login("first-" + UUID.randomUUID());
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        assertEquals("TRIAL", status(token).get("offer"));
+        Map<String, Object> shown = presented(token);
+        assertTrue(Boolean.parseBoolean(String.valueOf(shown.get("recorded"))));
+        assertEquals("NONE", shown.get("offer"));
+        assertEquals(1, offers(token));
     }
 
     @Test
-    @DisplayName("Given two concurrent activation requests, when both reach the backend, then the original grant is returned without extension")
-    void concurrentActivationDoesNotExtend() throws Exception {
-        String token = login("race-" + UUID.randomUUID());
-        union(token, qualifyingDays());
+    @DisplayName("Given the free trial was consumed and two months have passed since it was shown, when eligibility is checked, then the subscription variant is shown and a second trial is refused")
+    void aUsedTrialBecomesASubscriptionOffer() {
+        String token = login("used-" + UUID.randomUUID());
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(4).toInstant());
+        assertEquals(HttpStatus.OK, post("/api/v1/promotions/pro-discovery/activate", "{}", token).getStatusCode());
+        jdbc.update(
+                "update promotional_trial set expires_at = now() - interval '1 hour' where user_id = ?::uuid",
+                userId(token)
+        );
+        jdbc.update(
+                """
+                insert into pro_discovery_offer (user_id, presented_at, updated_at)
+                values (?::uuid, now() - interval '2 months' - interval '1 minute', now())
+                """,
+                userId(token)
+        );
+        Map<String, Object> body = status(token);
+        assertEquals("ALREADY_USED", body.get("status"));
+        assertEquals("SUBSCRIPTION", body.get("offer"));
+        ResponseEntity<String> again = post("/api/v1/promotions/pro-discovery/activate", "{}", token);
+        assertEquals(HttpStatus.CONFLICT, again.getStatusCode(), again.getBody());
+        assertEquals("ALREADY_USED", parse(again).get("status"));
+        assertEquals(1, trials(token));
+    }
+
+    @Test
+    @DisplayName("Given an offer was shown, when another acknowledgement arrives before two months, then the schedule does not move")
+    void aSecondAcknowledgementDoesNotMoveTheSchedule() throws Exception {
+        String token = login("once-" + UUID.randomUUID());
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        assertTrue(Boolean.parseBoolean(String.valueOf(presented(token).get("recorded"))));
+        String first = presentedAt(token);
+        Thread.sleep(1100);
+        Map<String, Object> second = presented(token);
+        assertFalse(Boolean.parseBoolean(String.valueOf(second.get("recorded"))));
+        assertEquals("NONE", second.get("offer"));
+        assertEquals(first, presentedAt(token));
+    }
+
+    @Test
+    @DisplayName("Given two calendar months have passed since the previous offer, when eligibility is checked, then the next variant is available")
+    void theNextCycleOpensAfterTwoMonths() {
+        String token = login("cycle-" + UUID.randomUUID());
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(6).toInstant());
+        jdbc.update(
+                """
+                insert into pro_discovery_offer (user_id, presented_at, updated_at)
+                values (?::uuid, now() - interval '2 months' - interval '1 minute', now())
+                """,
+                userId(token)
+        );
+        assertEquals("TRIAL", status(token).get("offer"));
+    }
+
+    @Test
+    @DisplayName("Given active Pro from Play, Founder, Welcome Back, or a running trial, when an offer would otherwise be due, then no offer is displayed")
+    void activeProSuppressesTheOffer() {
+        String play = login("play-" + UUID.randomUUID());
+        registered(play, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        jdbc.update(
+                """
+                insert into play_subscription (
+                    token_hash, purchase_token, package_name, product_id, subscription_state,
+                    expiry_time, auto_renewing, entitled, linked_user_id, updated_at
+                ) values (?, 'token', 'com.strictworkout.app', 'strict_pro', 'ACTIVE',
+                          now() + interval '10 days', true, true, ?::uuid, now())
+                """,
+                "a".repeat(64),
+                userId(play)
+        );
+        assertEquals("NONE", status(play).get("offer"));
+
+        String founder = login("founder-" + UUID.randomUUID());
+        registered(founder, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        jdbc.update(
+                """
+                insert into founder_application (
+                    id, user_id, status, enrolled_at, deadline_at, created_at, updated_at
+                ) values (?, ?::uuid, 'PENDING_APPROVAL', now(), now() + interval '30 days', now(), now())
+                """,
+                UUID.randomUUID(),
+                userId(founder)
+        );
+        assertEquals("INCOMPATIBLE", status(founder).get("status"));
+        assertEquals("NONE", status(founder).get("offer"));
+
+        String welcome = login("welcome-" + UUID.randomUUID());
+        registered(welcome, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        jdbc.update(
+                """
+                insert into welcome_back_grant (
+                    user_id, qualifying_workout_id, activated_at, expires_at, cooldown_until
+                ) values (?::uuid, 'workout-1', now(), now() + interval '3 days', now() + interval '180 days')
+                """,
+                userId(welcome)
+        );
+        assertEquals("NONE", status(welcome).get("offer"));
+        assertEquals(1, count("select count(*) from welcome_back_grant where user_id = ?::uuid", userId(welcome)));
+
+        String running = login("running-" + UUID.randomUUID());
+        registered(running, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        assertEquals(HttpStatus.OK, post("/api/v1/promotions/pro-discovery/activate", "{}", running).getStatusCode());
+        assertEquals("ACTIVE_TRIAL", status(running).get("status"));
+        assertEquals("NONE", status(running).get("offer"));
+    }
+
+    @Test
+    @DisplayName("Given the program is INACTIVE or RETIRED, when eligibility is checked, then no offer is displayed")
+    void aClosedProgramShowsNoOffer() {
+        String inactive = login("inactive-" + UUID.randomUUID());
+        registered(inactive, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        jdbc.update("update promotional_program set lifecycle = 'INACTIVE' where program = 'PRO_DISCOVERY'");
+        assertEquals("PROGRAM_CLOSED", status(inactive).get("status"));
+        assertEquals("NONE", status(inactive).get("offer"));
+        jdbc.update("update promotional_program set lifecycle = 'RETIRED' where program = 'PRO_DISCOVERY'");
+        String retired = login("retired-" + UUID.randomUUID());
+        registered(retired, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        assertEquals("NONE", status(retired).get("offer"));
+        assertEquals(HttpStatus.FORBIDDEN, post("/api/v1/promotions/pro-discovery/activate", "{}", retired).getStatusCode());
+    }
+
+    @Test
+    @DisplayName("Given the account signs in again after the offer was recorded, when status is read, then the reminder schedule is unchanged")
+    void reinstallKeepsTheServerSchedule() {
+        String subject = "reinstall-" + UUID.randomUUID();
+        String token = login(subject);
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        presented(token);
+        String stamp = presentedAt(token);
+        String again = login(subject + "-phone", subject);
+        Map<String, Object> body = status(again);
+        assertEquals("NONE", body.get("offer"));
+        assertEquals(stamp, presentedAt(again));
+    }
+
+    @Test
+    @DisplayName("Given two accounts, when one is eligible, then the other account is unaffected")
+    void accountsStayIsolated() {
+        String older = login("older-" + UUID.randomUUID());
+        String younger = login("younger-" + UUID.randomUUID());
+        registered(older, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        assertEquals("TRIAL", status(older).get("offer"));
+        assertEquals("NONE", status(younger).get("offer"));
+        presented(older);
+        assertEquals(0, offers(younger));
+    }
+
+    @Test
+    @DisplayName("Given two devices acknowledge the same due offer, when both finish, then one presentation timestamp remains")
+    void twoDevicesDoNotCreateTwoCycles() throws Exception {
+        String subject = "devices-" + UUID.randomUUID();
+        String first = login(subject);
+        String second = login(subject + "-other", subject);
+        registered(first, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<ResponseEntity<String>> first = pool.submit(() -> post("/api/v1/promotions/pro-discovery/activate", "{}", token));
-            Future<ResponseEntity<String>> second = pool.submit(() -> post("/api/v1/promotions/pro-discovery/activate", "{}", token));
-            String expires = String.valueOf(parse(first.get()).get("expiresAt"));
-            String again = String.valueOf(parse(second.get()).get("expiresAt"));
-            assertEquals(expires, again);
-            assertEquals(1, trials(token));
+            Future<ResponseEntity<String>> left = pool.submit(() ->
+                    post("/api/v1/promotions/pro-discovery/presented", "{}", first));
+            Future<ResponseEntity<String>> right = pool.submit(() ->
+                    post("/api/v1/promotions/pro-discovery/presented", "{}", second));
+            assertEquals(HttpStatus.OK, left.get().getStatusCode());
+            assertEquals(HttpStatus.OK, right.get().getStatusCode());
         } finally {
             pool.shutdownNow();
         }
+        assertEquals(1, offers(first));
+        assertNotEquals("", presentedAt(first));
+        String stamp = presentedAt(second);
+        Thread.sleep(1100);
+        presented(first);
+        assertEquals(stamp, presentedAt(second));
     }
 
     @Test
-    @DisplayName("Given an active trial and a fresh installation, when the user signs in, then the original trial is restored with its original expiry")
-    void statusRestoresTheOriginalExpiry() {
-        String token = login("restore-" + UUID.randomUUID());
-        union(token, qualifyingDays());
-        String expires = String.valueOf(parse(post("/api/v1/promotions/pro-discovery/activate", "{}", token)).get("expiresAt"));
-        Map<String, Object> restored = status(token);
-        assertEquals("ACTIVE_TRIAL", restored.get("status"));
-        assertEquals(expires, restored.get("expiresAt"));
+    @DisplayName("Given two activation attempts, when they race, then one trial is stored")
+    void concurrentActivationDoesNotExtend() throws Exception {
+        String token = login("race-" + UUID.randomUUID());
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ResponseEntity<String>> left = pool.submit(() ->
+                    post("/api/v1/promotions/pro-discovery/activate", "{}", token));
+            Future<ResponseEntity<String>> right = pool.submit(() ->
+                    post("/api/v1/promotions/pro-discovery/activate", "{}", token));
+            ResponseEntity<String> leftBody = left.get();
+            ResponseEntity<String> rightBody = right.get();
+            assertTrue(leftBody.getStatusCode().is2xxSuccessful() || rightBody.getStatusCode().is2xxSuccessful());
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1, trials(token));
     }
 
     @Test
-    @DisplayName("Given a used trial followed by account deletion and re-registration with the same Google identity, when activation is attempted, then the user cannot claim another trial")
+    @DisplayName("Given a used trial and account deletion, when the same Google account returns, then another free trial is refused")
     void deletionDoesNotAllowAnotherTrial() {
         String subject = "reuse-" + UUID.randomUUID();
         String token = login(subject);
-        union(token, qualifyingDays());
+        registered(token, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
         assertEquals(HttpStatus.OK, post("/api/v1/promotions/pro-discovery/activate", "{}", token).getStatusCode());
         identities.accept("delete-" + subject, subject, subject + "@example.com", true);
         ResponseEntity<String> deleted = send(
@@ -205,113 +313,40 @@ class ProDiscoveryEligibilityIT {
         );
         assertEquals(HttpStatus.NO_CONTENT, deleted.getStatusCode(), deleted.getBody());
         String returned = login(subject + "-again", subject);
-        union(returned, qualifyingDays());
+        registered(returned, Instant.now().atZone(ZoneOffset.UTC).minusMonths(3).toInstant());
         ResponseEntity<String> activation = post("/api/v1/promotions/pro-discovery/activate", "{}", returned);
         assertEquals(HttpStatus.CONFLICT, activation.getStatusCode(), activation.getBody());
         assertEquals("ALREADY_USED", parse(activation).get("status"));
+        assertEquals("SUBSCRIPTION", status(returned).get("offer"));
         assertEquals(0, trials(returned));
     }
 
     @Test
-    @DisplayName("Given a program in INACTIVE or RETIRED, when activation is attempted, then no new grant is issued")
-    void closedProgramsDoNotGrant() {
-        String inactive = login("inactive-" + UUID.randomUUID());
-        union(inactive, qualifyingDays());
-        jdbc.update("update promotional_program set lifecycle = 'INACTIVE' where program = 'PRO_DISCOVERY'");
-        ResponseEntity<String> paused = post("/api/v1/promotions/pro-discovery/activate", "{}", inactive);
-        assertEquals(HttpStatus.FORBIDDEN, paused.getStatusCode());
-        assertEquals("CLOSED", parse(paused).get("status"));
-        jdbc.update("update promotional_program set lifecycle = 'RETIRED' where program = 'PRO_DISCOVERY'");
-        String retired = login("retired-" + UUID.randomUUID());
-        union(retired, qualifyingDays());
-        ResponseEntity<String> closed = post("/api/v1/promotions/pro-discovery/activate", "{}", retired);
-        assertEquals(HttpStatus.FORBIDDEN, closed.getStatusCode());
-        assertEquals("CLOSED", parse(closed).get("status"));
-        assertEquals(0, trials(inactive) + trials(retired));
-    }
-
-    @Test
-    @DisplayName("Given an existing legitimate trial, when the new implementation is deployed, then its original expiry remains unchanged")
-    void anExistingTrialKeepsItsExpiry() {
-        String token = login("legacy-row-" + UUID.randomUUID());
-        Instant expires = Instant.parse("2026-12-01T00:00:00Z");
-        jdbc.update(
-                "insert into promotional_trial (user_id, promotion_type, activated_at, expires_at) values (?::uuid, 'PRO_DISCOVERY', ?::timestamptz, ?::timestamptz)",
-                userId(token),
-                "2026-11-17T00:00:00Z",
-                "2026-12-01T00:00:00Z"
-        );
-        assertEquals(expires.toString(), status(token).get("expiresAt"));
-        cleanup.cleanup();
-        assertEquals("2026-12-01T00:00:00Z", jdbc.queryForObject(
-                "select to_char(expires_at at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') from promotional_trial where user_id = ?::uuid",
-                String.class,
-                userId(token)
-        ));
-    }
-
-    @Test
-    @DisplayName("Given a stale activity synchronization request, when a newer state has already been applied, then the stale request cannot resurrect deleted days")
-    void aStaleSnapshotCannotResurrectADay() {
-        String token = login("stale-sync-" + UUID.randomUUID());
-        long first = revision(union(token, List.of("2020-03-01", "2020-03-02")));
-        long second = revision(replace(token, first, List.of("2020-03-01")));
-        ResponseEntity<String> stale = put(token, deviceBody(first, List.of("2020-03-01", "2020-03-02")));
-        assertEquals(HttpStatus.CONFLICT, stale.getStatusCode(), stale.getBody());
-        assertEquals("ACTIVITY_REVISION_STALE", parse(stale).get("errorCode"));
-        assertEquals(second, number(parse(stale), "activityRevision"));
-        assertEquals(0, count(
-                "select count(*) from pro_discovery_device_day where user_id = ?::uuid and workout_date = '2020-03-02'",
-                userId(token)
-        ));
-    }
-
-    @Test
-    @DisplayName("Given the account is deleted, when deletion completes, then Pro Discovery activity data is removed")
-    void accountDeletionRemovesActivity() {
-        String subject = "activity-delete-" + UUID.randomUUID();
-        String token = login(subject);
-        union(token, List.of("2020-04-01", "2020-04-02"));
-        String userId = userId(token);
-        identities.accept("delete-" + subject, subject, subject + "@example.com", true);
-        ResponseEntity<String> deleted = send(
-                HttpMethod.DELETE,
-                "/api/v1/account",
-                "{\"idToken\":\"delete-" + subject + "\",\"confirmed\":true}",
+    @DisplayName("Given an installed client still calls the V2 activity endpoints, when the server answers, then nothing is stored")
+    void obsoleteActivityEndpointsStoreNothing() {
+        String token = login("legacy-" + UUID.randomUUID());
+        ResponseEntity<String> permission = post(
+                "/api/v1/promotions/pro-discovery/activity/permission",
+                "{\"enabled\":true,\"scopeVersion\":1}",
                 token
         );
-        assertEquals(HttpStatus.NO_CONTENT, deleted.getStatusCode(), deleted.getBody());
-        assertEquals(0, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId));
-        assertEquals(0, count("select count(*) from pro_discovery_device where user_id = ?::uuid", userId));
-        assertEquals(0, count("select count(*) from pro_discovery_activity_permission where user_id = ?::uuid", userId));
-        assertEquals(0, count("select count(*) from pro_discovery_activity_day where user_id = ?::uuid", userId));
-        assertEquals(0, count("select count(*) from pro_discovery_activity_sync where user_id = ?::uuid", userId));
+        assertEquals(HttpStatus.OK, permission.getStatusCode(), permission.getBody());
+        assertFalse(Boolean.parseBoolean(String.valueOf(parse(permission).get("enabled"))));
+        ResponseEntity<String> upload = send(
+                HttpMethod.PUT,
+                "/api/v1/promotions/pro-discovery/activity",
+                "{\"installationId\":\"" + UUID.randomUUID() + "\",\"baseRevision\":0,\"generation\":1,\"dates\":[\"2020-01-01\"]}",
+                token
+        );
+        assertEquals(HttpStatus.FORBIDDEN, upload.getStatusCode(), upload.getBody());
+        assertEquals("ACTIVITY_NOT_PERMITTED", parse(upload).get("errorCode"));
+        assertEquals(0, count(
+                "select count(*) from information_schema.tables where table_name in ('pro_discovery_device', 'pro_discovery_activity_day')"
+        ));
     }
 
     @Test
-    @DisplayName("Given a trial has been activated and its activity records are no longer needed, when cleanup runs, then detailed activity data is removed while the trial remains")
-    void cleanupRemovesActivityAfterATrial() {
-        String token = login("cleanup-" + UUID.randomUUID());
-        jdbc.update(
-                "insert into promotional_trial (user_id, promotion_type, activated_at, expires_at) values (?::uuid, 'PRO_DISCOVERY', now(), now() + interval '14 days')",
-                userId(token)
-        );
-        jdbc.update(
-                "insert into pro_discovery_activity_day (user_id, workout_date, historical, server_first_observed_at) values (?::uuid, '2020-05-01', true, now())",
-                userId(token)
-        );
-        jdbc.update(
-                "insert into pro_discovery_activity_sync (user_id, revision, updated_at) values (?::uuid, 4, now())",
-                userId(token)
-        );
-        assertTrue(cleanup.cleanup() >= 2);
-        assertEquals(1, trials(token));
-        assertEquals(0, count("select count(*) from pro_discovery_activity_day where user_id = ?::uuid", userId(token)));
-        assertEquals(0, count("select count(*) from pro_discovery_activity_sync where user_id = ?::uuid", userId(token)));
-    }
-
-    @Test
-    @DisplayName("Given a legacy device-trial migration request, when it attempts to bypass entitlement conflicts or create a fresh unauthorized grant, then it cannot issue unauthorized Pro access")
+    @DisplayName("Given a legacy migration of a still-running trial, when it is submitted, then it does not mint Pro")
     void migrateCannotMintAFreshGrant() {
         String token = login("migrate-" + UUID.randomUUID());
         Instant now = Instant.now();
@@ -320,321 +355,31 @@ class ProDiscoveryEligibilityIT {
         assertEquals(HttpStatus.CONFLICT, fresh.getStatusCode(), fresh.getBody());
         assertEquals("INVALID", parse(fresh).get("status"));
         assertEquals(0, trials(token));
-
-        jdbc.update(
-                """
-                insert into founder_application (
-                    id, user_id, status, enrolled_at, deadline_at, created_at, updated_at
-                ) values (?, ?::uuid, 'PENDING_APPROVAL', now(), now() + interval '30 days', now(), now())
-                """,
-                UUID.randomUUID(),
-                userId(token)
-        );
-        ResponseEntity<String> blocked = post("/api/v1/promotions/pro-discovery/migrate", body, token);
-        assertEquals(HttpStatus.CONFLICT, blocked.getStatusCode(), blocked.getBody());
-        assertEquals("INCOMPATIBLE", parse(blocked).get("status"));
-        assertEquals(0, trials(token));
     }
 
-    @Test
-    @DisplayName("Given an invalid future date or oversized activity payload, when synchronization is attempted, then validation rejects it safely")
-    void invalidActivityIsRejected() {
-        String token = login("invalid-" + UUID.randomUUID());
-        ResponseEntity<String> future = put(token, "{\"baseRevision\":0,\"mode\":\"UNION\",\"dates\":[\"" + today().plusDays(5) + "\"]}");
-        assertEquals(HttpStatus.BAD_REQUEST, future.getStatusCode(), future.getBody());
-        assertEquals("ACTIVITY_INVALID", parse(future).get("errorCode"));
-        StringBuilder dates = new StringBuilder("[");
-        for (int index = 0; index < ProDiscoveryEligibility.MAX_DATES + 1; index++) {
-            if (index > 0) {
-                dates.append(',');
-            }
-            dates.append('"').append(LocalDate.of(2010, 1, 1).plusDays(index)).append('"');
-        }
-        dates.append(']');
-        ResponseEntity<String> oversized = put(token, "{\"baseRevision\":0,\"mode\":\"UNION\",\"dates\":" + dates + "}");
-        assertEquals(HttpStatus.BAD_REQUEST, oversized.getStatusCode());
-        assertEquals(0, count("select count(*) from pro_discovery_activity_day where user_id = ?::uuid", userId(token)));
-    }
-
-    @Test
-    @DisplayName("Given a device timezone or clock manipulation, when eligibility is evaluated, then server-side evaluation cannot be bypassed solely by changing the device clock")
-    void theDeviceClockDoesNotDecideEligibility() {
-        String token = login("clock-" + UUID.randomUUID());
-        ResponseEntity<String> shifted = put(
-                token,
-                "{\"baseRevision\":0,\"mode\":\"UNION\",\"dates\":[\"" + today().plusYears(1) + "\"]}"
-        );
-        assertEquals(HttpStatus.BAD_REQUEST, shifted.getStatusCode(), shifted.getBody());
-        union(token, List.of(today().toString()));
-        Map<String, Object> body = status(token);
-        assertEquals("NOT_ELIGIBLE", body.get("status"));
-        assertEquals(today().toString(), body.get("evaluationDate"));
-        assertNotEquals(today().plusYears(1).toString(), body.get("evaluationDate"));
-    }
-
-    private final UUID installation = UUID.randomUUID();
-    private final UUID otherInstallation = UUID.randomUUID();
-    private long generation;
-
-    @Test
-    @DisplayName("Given a new account with default settings, when activity synchronization is attempted, then no activity dates are stored")
-    void aNewAccountDoesNotUploadActivity() {
-        String token = login("default-off-" + UUID.randomUUID());
-        ResponseEntity<String> rejected = put(token, deviceBody(0, List.of("2020-06-01")));
-        assertEquals(HttpStatus.FORBIDDEN, rejected.getStatusCode(), rejected.getBody());
-        assertEquals("ACTIVITY_NOT_PERMITTED", parse(rejected).get("errorCode"));
-        assertEquals(0, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-    }
-
-    @Test
-    @DisplayName("Given synchronization is enabled, when the user withdraws permission, then backend activity data is deleted and future uploads are rejected")
-    void withdrawalDeletesActivityAndRejectsUploads() {
-        String token = login("withdraw-" + UUID.randomUUID());
-        union(token, List.of("2020-06-01", "2020-06-02"));
-        long grantedGeneration = generation;
-        ResponseEntity<String> withdrawn = post(
-                "/api/v1/promotions/pro-discovery/activity/permission",
-                "{\"enabled\":false,\"scopeVersion\":1}",
-                token
-        );
-        assertEquals(HttpStatus.OK, withdrawn.getStatusCode(), withdrawn.getBody());
-        assertEquals(false, Boolean.parseBoolean(String.valueOf(parse(withdrawn).get("enabled"))));
-        assertEquals(0, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-        assertEquals(0, count("select count(*) from pro_discovery_device where user_id = ?::uuid", userId(token)));
-        generation = grantedGeneration;
-        ResponseEntity<String> replay = put(token, deviceBody(1, List.of("2020-06-01", "2020-06-02")));
-        assertEquals(HttpStatus.FORBIDDEN, replay.getStatusCode(), replay.getBody());
-        assertEquals(0, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-        ResponseEntity<String> again = post(
-                "/api/v1/promotions/pro-discovery/activity/permission",
-                "{\"enabled\":false,\"scopeVersion\":1}",
-                token
-        );
-        assertEquals(HttpStatus.OK, again.getStatusCode(), again.getBody());
-        assertEquals(number(parse(withdrawn), "generation"), number(parse(again), "generation"));
-    }
-
-    @Test
-    @DisplayName("Given an old upload request races with withdrawal, when withdrawal completes, then the old request cannot recreate activity data")
-    void anOldGenerationCannotRecreateWithdrawnActivity() {
-        String token = login("generation-race-" + UUID.randomUUID());
-        union(token, List.of("2020-07-01"));
-        long oldGeneration = generation;
-        post("/api/v1/promotions/pro-discovery/activity/permission", "{\"enabled\":false,\"scopeVersion\":1}", token);
-        generation = oldGeneration;
-        ResponseEntity<String> late = put(token, deviceBody(0, List.of("2020-07-01")));
-        assertEquals(HttpStatus.FORBIDDEN, late.getStatusCode(), late.getBody());
-        assertEquals(0, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-    }
-
-    @Test
-    @DisplayName("Given the user enables synchronization again, when a new synchronization generation starts, then old requests cannot overwrite the new state")
-    void aNewGenerationRejectsThePreviousGeneration() {
-        String token = login("generation-restart-" + UUID.randomUUID());
-        union(token, List.of("2020-08-01"));
-        long firstGeneration = generation;
-        post("/api/v1/promotions/pro-discovery/activity/permission", "{\"enabled\":false,\"scopeVersion\":1}", token);
-        permit(token);
-        assertNotEquals(firstGeneration, generation);
-        Map<String, Object> fresh = sync(token, 0, List.of("2021-01-01"));
-        generation = firstGeneration;
-        ResponseEntity<String> old = put(token, deviceBody(1, List.of("2020-08-01")));
-        assertEquals(HttpStatus.CONFLICT, old.getStatusCode(), old.getBody());
-        assertEquals("ACTIVITY_GENERATION_STALE", parse(old).get("errorCode"));
-        assertEquals(1, count(
-                "select count(*) from pro_discovery_device_day where user_id = ?::uuid and workout_date = '2021-01-01'",
-                userId(token)
-        ));
-        assertEquals(0, count(
-                "select count(*) from pro_discovery_device_day where user_id = ?::uuid and workout_date = '2020-08-01'",
-                userId(token)
-        ));
-        assertTrue(revision(fresh) >= 1);
-    }
-
-    @Test
-    @DisplayName("Given two devices have different workout dates, when both synchronize, then eligibility uses the union of both sets")
-    void twoDevicesContributeAUnion() {
-        String token = login("two-devices-" + UUID.randomUUID());
-        permit(token);
-        syncInstallation(token, installation, 0, List.of("2019-01-01"));
-        syncInstallation(token, otherInstallation, 0, List.of("2019-02-01"));
-        assertEquals(2, number(status(token), "qualifyingDays"));
-    }
-
-    @Test
-    @DisplayName("Given both devices report the same workout date, when eligibility is evaluated, then that date counts once")
-    void theSameDateFromTwoDevicesCountsOnce() {
-        String token = login("shared-date-" + UUID.randomUUID());
-        permit(token);
-        syncInstallation(token, installation, 0, List.of("2019-03-01"));
-        syncInstallation(token, otherInstallation, 0, List.of("2019-03-01"));
-        assertEquals(1, number(status(token), "qualifyingDays"));
-        assertEquals(2, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-    }
-
-    @Test
-    @DisplayName("Given device A deletes its only workout on a date, when device A synchronizes, then device B's matching date remains counted")
-    void deletingADateOnOneDeviceKeepsTheOtherDevice() {
-        String token = login("device-delete-" + UUID.randomUUID());
-        permit(token);
-        long revision = revision(syncInstallation(token, installation, 0, List.of("2019-04-01")));
-        syncInstallation(token, otherInstallation, 0, List.of("2019-04-01"));
-        syncInstallation(token, installation, revision, List.of());
-        assertEquals(1, number(status(token), "qualifyingDays"));
-        assertEquals(0, count(
-                "select count(*) from pro_discovery_device_day where user_id = ?::uuid and installation_id = ?::uuid",
-                userId(token),
-                installation
-        ));
-        assertEquals(1, count(
-                "select count(*) from pro_discovery_device_day where user_id = ?::uuid and installation_id = ?::uuid",
-                userId(token),
-                otherInstallation
-        ));
-    }
-
-    @Test
-    @DisplayName("Given an old Android client calls the legacy account-wide REPLACE endpoint, when the new device-scoped model is active, then it cannot overwrite other devices' data")
-    void aLegacyReplaceCannotOverwriteAnotherDevice() {
-        String token = login("legacy-replace-" + UUID.randomUUID());
-        permit(token);
-        syncInstallation(token, installation, 0, List.of("2019-05-01", "2019-05-02"));
-        ResponseEntity<String> legacy = put(
-                token,
-                "{\"baseRevision\":0,\"mode\":\"REPLACE\",\"dates\":[\"2019-05-01\"]}"
-        );
-        assertEquals(HttpStatus.CONFLICT, legacy.getStatusCode(), legacy.getBody());
-        assertEquals("ACTIVITY_DEVICE_REQUIRED", parse(legacy).get("errorCode"));
-        assertEquals(2, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-        assertEquals(2, number(status(token), "qualifyingDays"));
-    }
-
-    @Test
-    @DisplayName("Given a device is stale beyond the retention threshold, when automatic cleanup runs, then only that extra stale device is removed")
-    void staleExtraDeviceSnapshotsAreRemoved() {
-        String token = login("stale-device-" + UUID.randomUUID());
-        permit(token);
-        syncInstallation(token, installation, 0, List.of("2018-01-01"));
-        syncInstallation(token, otherInstallation, 0, List.of("2018-02-01"));
-        jdbc.update(
-                "update pro_discovery_device set updated_at = now() - interval '19 months' where user_id = ?::uuid and installation_id = ?::uuid",
-                userId(token),
-                installation
-        );
-        assertTrue(cleanup.cleanup() >= 1);
-        assertEquals(0, count(
-                "select count(*) from pro_discovery_device_day where user_id = ?::uuid and installation_id = ?::uuid",
-                userId(token),
-                installation
-        ));
-        assertEquals(1, count(
-                "select count(*) from pro_discovery_device_day where user_id = ?::uuid and installation_id = ?::uuid",
-                userId(token),
-                otherInstallation
-        ));
-        assertEquals(1, number(status(token), "qualifyingDays"));
-    }
-
-    @Test
-    @DisplayName("Given only one device snapshot exists and it is older than the retention threshold, when cleanup runs, then that snapshot is kept")
-    void theOnlyDeviceSnapshotIsKept() {
-        String token = login("sole-device-" + UUID.randomUUID());
-        permit(token);
-        syncInstallation(token, installation, 0, List.of("2018-03-01"));
-        jdbc.update(
-                "update pro_discovery_device set updated_at = now() - interval '19 months' where user_id = ?::uuid",
-                userId(token)
-        );
-        cleanup.cleanup();
-        assertEquals(1, count("select count(*) from pro_discovery_device_day where user_id = ?::uuid", userId(token)));
-    }
-
-    @Test
-    @DisplayName("Given an existing trial is active, when permission is withdrawn, then the trial continues until its original expiry")
-    void withdrawalLeavesAnActiveTrial() {
-        String token = login("withdraw-trial-" + UUID.randomUUID());
-        union(token, qualifyingDays());
-        String expires = String.valueOf(parse(post("/api/v1/promotions/pro-discovery/activate", "{}", token)).get("expiresAt"));
-        ResponseEntity<String> withdrawn = post(
-                "/api/v1/promotions/pro-discovery/activity/permission",
-                "{\"enabled\":false,\"scopeVersion\":1}",
-                token
-        );
-        assertEquals(HttpStatus.OK, withdrawn.getStatusCode(), withdrawn.getBody());
-        Map<String, Object> body = status(token);
-        assertEquals("ACTIVE_TRIAL", body.get("status"));
-        assertEquals(expires, body.get("expiresAt"));
-        assertEquals(1, trials(token));
-    }
-
-    private List<String> qualifyingDays() {
-        List<String> dates = oldDays(22);
-        dates.add(today().minusDays(1).toString());
-        dates.add(today().toString());
-        return dates;
-    }
-
-    private List<String> oldDays(int count) {
-        LocalDate first = today().minusYears(2);
-        List<String> dates = new ArrayList<>();
-        for (int index = 0; index < count; index++) {
-            dates.add(first.plusDays(index).toString());
-        }
-        return dates;
-    }
-
-    private LocalDate today() {
-        return LocalDate.now(ZoneOffset.UTC);
-    }
-
-    private Map<String, Object> union(String token, List<String> dates) {
-        permit(token);
-        return sync(token, 0, dates);
-    }
-
-    private Map<String, Object> replace(String token, long revision, List<String> dates) {
-        return sync(token, revision, dates);
-    }
-
-    private void permit(String token) {
-        ResponseEntity<String> response = post(
-                "/api/v1/promotions/pro-discovery/activity/permission",
-                "{\"enabled\":true,\"scopeVersion\":1}",
-                token
-        );
-        assertEquals(HttpStatus.OK, response.getStatusCode(), response.getBody());
-        generation = number(parse(response), "generation");
-    }
-
-    private Map<String, Object> sync(String token, long revision, List<String> dates) {
-        return syncInstallation(token, installation, revision, dates);
-    }
-
-    private Map<String, Object> syncInstallation(String token, UUID device, long revision, List<String> dates) {
-        ResponseEntity<String> response = put(token, deviceBody(device, revision, dates));
+    private Map<String, Object> presented(String token) {
+        ResponseEntity<String> response = post("/api/v1/promotions/pro-discovery/presented", "{}", token);
         assertEquals(HttpStatus.OK, response.getStatusCode(), response.getBody());
         return parse(response);
     }
 
-    private String deviceBody(long revision, List<String> dates) {
-        return deviceBody(installation, revision, dates);
+    private void registered(String token, Instant createdAt) {
+        jdbc.update(
+                "update app_user set created_at = ?::timestamptz where id = ?::uuid",
+                createdAt.toString(),
+                userId(token)
+        );
     }
 
-    private String deviceBody(UUID device, long revision, List<String> dates) {
-        return "{\"installationId\":\"" + device + "\",\"baseRevision\":" + revision
-                + ",\"generation\":" + generation + ",\"dates\":" + json(dates) + "}";
-    }
-
-    private static String json(List<String> dates) {
-        StringBuilder builder = new StringBuilder("[");
-        for (int index = 0; index < dates.size(); index++) {
-            if (index > 0) {
-                builder.append(',');
-            }
-            builder.append('"').append(dates.get(index)).append('"');
-        }
-        return builder.append(']').toString();
+    private String presentedAt(String token) {
+        return jdbc.queryForObject(
+                """
+                select to_char(presented_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                from pro_discovery_offer where user_id = ?::uuid
+                """,
+                String.class,
+                userId(token)
+        );
     }
 
     private Map<String, Object> status(String token) {
@@ -645,6 +390,10 @@ class ProDiscoveryEligibilityIT {
 
     private int trials(String token) {
         return count("select count(*) from promotional_trial where user_id = ?::uuid", userId(token));
+    }
+
+    private int offers(String token) {
+        return count("select count(*) from pro_discovery_offer where user_id = ?::uuid", userId(token));
     }
 
     private String login(String subject) {
@@ -664,20 +413,8 @@ class ProDiscoveryEligibilityIT {
         return String.valueOf(parse(response).get("id"));
     }
 
-    private long revision(Map<String, Object> body) {
-        return number(body, "revision");
-    }
-
-    private static long number(Map<String, Object> body, String key) {
-        return ((Number) body.get(key)).longValue();
-    }
-
     private ResponseEntity<String> post(String path, String json, String token) {
         return send(HttpMethod.POST, path, json, token);
-    }
-
-    private ResponseEntity<String> put(String token, String json) {
-        return send(HttpMethod.PUT, "/api/v1/promotions/pro-discovery/activity", json, token);
     }
 
     private ResponseEntity<String> send(HttpMethod method, String path, String json, String token) {
@@ -687,8 +424,8 @@ class ProDiscoveryEligibilityIT {
         }
         RestClient.RequestHeadersSpec<?> spec = json == null ? request : request.body(json);
         return spec.exchange((httpRequest, response) -> {
-            byte[] body = response.getBody().readAllBytes();
-            return ResponseEntity.status(response.getStatusCode()).body(new String(body, StandardCharsets.UTF_8));
+            byte[] payload = response.getBody().readAllBytes();
+            return ResponseEntity.status(response.getStatusCode()).body(new String(payload, StandardCharsets.UTF_8));
         });
     }
 

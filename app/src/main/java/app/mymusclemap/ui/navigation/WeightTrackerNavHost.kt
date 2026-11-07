@@ -57,6 +57,7 @@ import app.mymusclemap.domain.DateProvider
 import app.mymusclemap.domain.entitlement.EffectiveEntitlement
 import app.mymusclemap.domain.entitlement.FreeAccessDecision
 import app.mymusclemap.domain.entitlement.FreeAccessLogic
+import app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind
 import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
 import app.mymusclemap.domain.entitlement.StrictOneTimePrompt
 import app.mymusclemap.domain.entitlement.selectStrictOneTimePrompt
@@ -343,14 +344,10 @@ fun WeightTrackerNavHost(
     onActivateProDiscovery: () -> Unit = {},
     onDismissProDiscoveryOffer: () -> Unit = {},
     onDismissProDiscoveryWarning: () -> Unit = {},
+    onProDiscoveryOfferDisplayed: () -> Unit = {},
     privacyRevision: Int = 0,
     privacyNoticeDue: () -> Boolean = { false },
     onAcknowledgePrivacyNotice: () -> Unit = {},
-    proDiscoverySync: () -> app.mymusclemap.domain.entitlement.ProDiscoverySyncUi = {
-        app.mymusclemap.domain.entitlement.ProDiscoverySyncUi()
-    },
-    onEnableProDiscoverySync: () -> Unit = {},
-    onDeclineProDiscoverySync: () -> Unit = {},
     welcomeBack: () -> app.mymusclemap.domain.entitlement.WelcomeBackSnapshot = {
         app.mymusclemap.domain.entitlement.WelcomeBackSnapshot()
     },
@@ -397,6 +394,8 @@ fun WeightTrackerNavHost(
     val freeAccess by freeAccessDecisions.collectAsStateWithLifecycle(
         initialValue = FreeAccessLogic.unknown()
     )
+    var heldDiscoveryOffer by remember { mutableStateOf(ProDiscoveryOfferKind.NONE) }
+    var discoveryOfferClosed by remember { mutableStateOf(false) }
     var offeredFreeAccessPeriod by rememberSaveable {
         mutableLongStateOf(FreeAccessStartupNavigation.NONE)
     }
@@ -795,13 +794,6 @@ fun WeightTrackerNavHost(
                     accountEmail = accountEmail,
                     onSignOut = onSignOut,
                     onOpenDeleteAccount = { navController.navigateInternal(AppRoutes.DELETE_ACCOUNT) },
-                    activitySyncEnabled = proDiscoverySync().enabled,
-                    activitySyncDeletionPending = proDiscoverySync().deletionPending,
-                    activitySyncDeletionFailed = proDiscoverySync().deletionFailed,
-                    onActivitySyncChange = { enabled ->
-                        if (enabled) onEnableProDiscoverySync() else onDeclineProDiscoverySync()
-                    },
-                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) },
                     showFounderProgram = app.mymusclemap.ui.founder.founderSettingsEntryVisible(
                         availability = founderAvailability,
                         status = founder.status,
@@ -963,11 +955,7 @@ fun WeightTrackerNavHost(
                     onSelectOffer = onSelectBillingOffer,
                     onSubscribe = onSubscribe,
                     onManageSubscription = onManageSubscription,
-                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) },
-                    activitySyncEnabled = proDiscoverySync().enabled,
-                    activitySyncDeletionFailed = proDiscoverySync().deletionFailed ||
-                        proDiscoverySync().deletionPending,
-                    onEnableActivitySync = onEnableProDiscoverySync
+                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) }
                 )
             }
             navigation(
@@ -1719,12 +1707,25 @@ fun WeightTrackerNavHost(
         founderApprovalCelebration()
     }
     val discovery = remember(entitlementRevision) { proDiscovery() }
+    if (!discovery.showAutomaticOffer &&
+        heldDiscoveryOffer == ProDiscoveryOfferKind.NONE &&
+        discoveryOfferClosed
+    ) {
+        discoveryOfferClosed = false
+    }
+    if (discovery.showAutomaticOffer &&
+        !discoveryOfferClosed &&
+        heldDiscoveryOffer == ProDiscoveryOfferKind.NONE &&
+        discovery.offerKind != ProDiscoveryOfferKind.NONE
+    ) {
+        heldDiscoveryOffer = discovery.offerKind
+    }
     val welcome = remember(entitlementRevision) { welcomeBack() }
     val prompt = selectStrictOneTimePrompt(
         founderApproval = founderApproval != null,
         workoutCelebration = globalCelebrations.isNotEmpty(),
         suppressForRoute = suppressGlobalCelebration,
-        discoveryOffer = discovery.showAutomaticOffer,
+        discoveryOffer = heldDiscoveryOffer != ProDiscoveryOfferKind.NONE,
         discoveryWarning = discovery.showAutomaticWarning,
         welcomeOffer = welcome.showAutomaticOffer,
         welcomeWarning = welcome.showAutomaticWarning
@@ -1771,19 +1772,9 @@ fun WeightTrackerNavHost(
         canonicalRoute != AppRoutes.PRIVACY &&
         privacyRevision >= 0 &&
         privacyNoticeDue()
-    val syncPrompt = !suppressGlobalCelebration &&
-        canonicalRoute != AppRoutes.PRIVACY &&
-        !showPrivacyNotice &&
-        proDiscoverySync().prompt
     if (showPrivacyNotice) {
         app.mymusclemap.ui.pro.PrivacyPolicyNoticeDialog(
             onContinue = onAcknowledgePrivacyNotice,
-            onViewPolicy = { navController.navigateInternal(AppRoutes.PRIVACY) }
-        )
-    } else if (syncPrompt) {
-        app.mymusclemap.ui.pro.ProDiscoverySyncPromptDialog(
-            onEnable = onEnableProDiscoverySync,
-            onNotNow = onDeclineProDiscoverySync,
             onViewPolicy = { navController.navigateInternal(AppRoutes.PRIVACY) }
         )
     }
@@ -1805,9 +1796,32 @@ fun WeightTrackerNavHost(
             )
         }
         StrictOneTimePrompt.ProDiscoveryOffer -> {
+            LaunchedEffect(heldDiscoveryOffer) {
+                onProDiscoveryOfferDisplayed()
+            }
             ProDiscoveryOfferDialog(
-                onActivate = onActivateProDiscovery,
-                onNotNow = onDismissProDiscoveryOffer
+                kind = heldDiscoveryOffer,
+                onActivate = {
+                    val kind = heldDiscoveryOffer
+                    discoveryOfferClosed = true
+                    heldDiscoveryOffer = ProDiscoveryOfferKind.NONE
+                    if (kind == ProDiscoveryOfferKind.SUBSCRIPTION) {
+                        onSubscribe()
+                    } else {
+                        onActivateProDiscovery()
+                    }
+                },
+                onNotNow = {
+                    discoveryOfferClosed = true
+                    heldDiscoveryOffer = ProDiscoveryOfferKind.NONE
+                    onDismissProDiscoveryOffer()
+                },
+                onViewPro = {
+                    discoveryOfferClosed = true
+                    heldDiscoveryOffer = ProDiscoveryOfferKind.NONE
+                    onDismissProDiscoveryOffer()
+                    navController.navigateInternal(AppRoutes.PRO_BENEFITS)
+                }
             )
         }
         StrictOneTimePrompt.ProDiscoveryWarning -> {

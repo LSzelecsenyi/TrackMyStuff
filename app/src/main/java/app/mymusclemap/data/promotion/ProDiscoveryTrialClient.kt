@@ -46,47 +46,22 @@ class ProDiscoveryTrialClient(
         }
     }
 
-    suspend fun synchronize(
-        installationId: String,
-        revision: Long,
-        generation: Long,
-        dates: List<String>
-    ): ActivitySync {
-        val body = JSONObject()
-            .put("installationId", installationId)
-            .put("baseRevision", revision)
-            .put("generation", generation)
-            .put("dates", org.json.JSONArray(dates))
-        return syncCall(body)
-    }
-
-    suspend fun setActivitySync(enabled: Boolean): ActivityPermission? = withContext(Dispatchers.IO) {
-        val token = sessionToken() ?: return@withContext null
+    suspend fun acknowledgePresented(): Boolean = withContext(Dispatchers.IO) {
+        val token = sessionToken() ?: return@withContext false
         if (root.isEmpty()) {
-            return@withContext null
+            return@withContext false
         }
-        val body = JSONObject()
-            .put("enabled", enabled)
-            .put("scopeVersion", app.mymusclemap.domain.entitlement.ProDiscoverySyncPermission.SCOPE_VERSION)
         val request = Request.Builder()
-            .url("$root/api/v1/promotions/pro-discovery/activity/permission")
+            .url("$root/api/v1/promotions/pro-discovery/presented")
             .header("Authorization", "Bearer $token")
-            .post(body.toString().toRequestBody(json))
+            .post("{}".toRequestBody(json))
             .build()
         try {
             http.newCall(request).execute().use { response ->
-                if (response.code != 200) {
-                    return@withContext null
-                }
-                val payload = runCatching { JSONObject(response.body.string()) }.getOrNull()
-                    ?: return@withContext null
-                ActivityPermission(
-                    enabled = payload.optBoolean("enabled"),
-                    generation = payload.optLong("generation")
-                )
+                response.code == 200
             }
         } catch (_: IOException) {
-            null
+            false
         }
     }
 
@@ -137,34 +112,6 @@ class ProDiscoveryTrialClient(
         return TrialAuthorization.Granted(activatedAt, expiresAt)
     }
 
-    private suspend fun syncCall(body: JSONObject): ActivitySync = withContext(Dispatchers.IO) {
-        val token = sessionToken() ?: return@withContext ActivitySync.Failed
-        if (root.isEmpty()) {
-            return@withContext ActivitySync.Failed
-        }
-        val request = Request.Builder()
-            .url("$root/api/v1/promotions/pro-discovery/activity")
-            .header("Authorization", "Bearer $token")
-            .put(body.toString().toRequestBody(json))
-            .build()
-        try {
-            http.newCall(request).execute().use { response ->
-                val payload = runCatching { JSONObject(response.body.string()) }.getOrNull()
-                when {
-                    response.code == 200 -> ActivitySync.Applied(payload?.optLong("revision") ?: return@use ActivitySync.Failed)
-                    payload?.optString("errorCode") == "TRIAL_ALREADY_RECORDED" -> ActivitySync.NotRequired
-                    payload?.optString("errorCode") == "ACTIVITY_REVISION_STALE" ->
-                        ActivitySync.Stale(payload.optLong("activityRevision"))
-                    payload?.optString("errorCode") == "ACTIVITY_NOT_PERMITTED" ||
-                        payload?.optString("errorCode") == "ACTIVITY_GENERATION_STALE" -> ActivitySync.Rejected
-                    else -> ActivitySync.Failed
-                }
-            }
-        } catch (_: IOException) {
-            ActivitySync.Failed
-        }
-    }
-
     private fun serverView(payload: JSONObject): ProDiscoveryServerView {
         val status = when (payload.optString("status")) {
             "NOT_ELIGIBLE" -> ProDiscoveryServerStatus.NOT_ELIGIBLE
@@ -175,27 +122,17 @@ class ProDiscoveryTrialClient(
             "INCOMPATIBLE" -> ProDiscoveryServerStatus.INCOMPATIBLE
             else -> ProDiscoveryServerStatus.UNKNOWN
         }
+        val offer = when (payload.optString("offer")) {
+            "TRIAL" -> app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.TRIAL
+            "SUBSCRIPTION" -> app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.SUBSCRIPTION
+            else -> app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.NONE
+        }
         return ProDiscoveryServerView(
             status = status,
+            offer = offer,
             activatedAt = payload.optString("activatedAt").takeIf { it.isNotBlank() }?.let { runCatching { Instant.parse(it) }.getOrNull() },
             expiresAt = payload.optString("expiresAt").takeIf { it.isNotBlank() }?.let { runCatching { Instant.parse(it) }.getOrNull() },
-            qualifyingDays = payload.optInt("qualifyingDays"),
-            remainingDays = payload.optInt("remainingDays"),
-            recentDays = payload.optInt("recentDays"),
-            remainingRecentDays = payload.optInt("remainingRecentDays"),
-            requiredDays = payload.optInt("requiredDays", 24),
-            requiredRecentDays = payload.optInt("requiredRecentDays", 2),
-            matureOn = payload.optString("matureOn").takeIf { it.isNotBlank() }
+            nextOfferAt = payload.optString("nextOfferAt").takeIf { it.isNotBlank() }
         )
     }
-}
-
-data class ActivityPermission(val enabled: Boolean, val generation: Long)
-
-sealed interface ActivitySync {
-    data class Applied(val revision: Long) : ActivitySync
-    data object NotRequired : ActivitySync
-    data class Stale(val revision: Long) : ActivitySync
-    data object Rejected : ActivitySync
-    data object Failed : ActivitySync
 }

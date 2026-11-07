@@ -31,8 +31,6 @@ interface ProDiscoveryStateStore {
     suspend fun dismissWarning()
     suspend fun activate(activatedAt: Instant, expiresAt: Instant)
     suspend fun adoptServerTrial(activatedAt: Instant, expiresAt: Instant)
-    fun activityRevision(): Long?
-    suspend fun setActivityRevision(revision: Long)
     suspend fun reset(fingerprint: String)
     suspend fun clear()
 }
@@ -67,7 +65,6 @@ class ProDiscoveryStore(
     private val mutex = Mutex()
     private var memory = ProDiscoveryRecord()
     private var storedFingerprint: String? = null
-    private var storedRevision: Long? = null
 
     override fun current(): ProDiscoveryRecord = memory
 
@@ -84,7 +81,6 @@ class ProDiscoveryStore(
         mutex.withLock {
             memory = loaded
             storedFingerprint = prefs[FINGERPRINT]
-            storedRevision = prefs[ACTIVITY_REVISION]
         }
         onChanged()
     }
@@ -142,23 +138,10 @@ class ProDiscoveryStore(
         onChanged()
     }
 
-    override fun activityRevision(): Long? = storedRevision
-
-    override suspend fun setActivityRevision(revision: Long) {
-        if (storedRevision == revision) {
-            return
-        }
-        mutex.withLock {
-            storedRevision = revision
-            dataStore.edit { prefs -> prefs[ACTIVITY_REVISION] = revision }
-        }
-    }
-
     override suspend fun reset(fingerprint: String) {
         mutex.withLock {
             memory = ProDiscoveryRecord()
             storedFingerprint = fingerprint
-            storedRevision = null
             dataStore.edit { prefs ->
                 prefs.clear()
                 prefs[FINGERPRINT] = fingerprint
@@ -171,7 +154,6 @@ class ProDiscoveryStore(
         mutex.withLock {
             memory = ProDiscoveryRecord()
             storedFingerprint = null
-            storedRevision = null
             dataStore.edit { prefs -> prefs.clear() }
         }
         onChanged()
@@ -183,7 +165,6 @@ class ProDiscoveryStore(
         val EXPIRES_AT = longPreferencesKey("expires_at")
         val WARNING_DISMISSED = booleanPreferencesKey("warning_dismissed")
         val FINGERPRINT = stringPreferencesKey("fingerprint")
-        val ACTIVITY_REVISION = longPreferencesKey("activity_revision")
     }
 }
 

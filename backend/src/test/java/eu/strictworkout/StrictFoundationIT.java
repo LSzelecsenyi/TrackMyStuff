@@ -103,11 +103,7 @@ class StrictFoundationIT {
                 "marker_key_verifier",
                 "play_rtdn_message",
                 "play_subscription",
-                "pro_discovery_activity_day",
-                "pro_discovery_activity_permission",
-                "pro_discovery_activity_sync",
-                "pro_discovery_device",
-                "pro_discovery_device_day",
+                "pro_discovery_offer",
                 "promotional_program",
                 "promotional_trial",
                 "welcome_back_grant"

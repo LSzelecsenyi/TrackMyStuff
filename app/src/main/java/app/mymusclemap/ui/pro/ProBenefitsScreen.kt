@@ -96,10 +96,7 @@ fun ProBenefitsScreen(
     onSelectOffer: (String) -> Unit = {},
     onSubscribe: () -> Unit = {},
     onManageSubscription: (String) -> Unit = {},
-    onOpenPrivacy: () -> Unit = {},
-    activitySyncEnabled: Boolean = false,
-    activitySyncDeletionFailed: Boolean = false,
-    onEnableActivitySync: () -> Unit = {}
+    onOpenPrivacy: () -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier
@@ -147,11 +144,8 @@ fun ProBenefitsScreen(
                 DiscoverySection(
                     discovery = discovery,
                     onActivateTrial = onActivateTrial,
-                    now = now,
-                    activitySyncEnabled = activitySyncEnabled,
-                    activitySyncDeletionFailed = activitySyncDeletionFailed,
-                    onEnableActivitySync = onEnableActivitySync,
-                    onOpenPrivacy = onOpenPrivacy
+                    onSubscribe = onSubscribe,
+                    now = now
                 )
                 WelcomeBackSection(
                     welcomeBack = welcomeBack,
@@ -250,11 +244,8 @@ private fun sourceLabel(source: ProAccessSource): String? {
 private fun DiscoverySection(
     discovery: ProDiscoverySnapshot,
     onActivateTrial: () -> Unit,
-    now: Instant,
-    activitySyncEnabled: Boolean = false,
-    activitySyncDeletionFailed: Boolean = false,
-    onEnableActivitySync: () -> Unit = {},
-    onOpenPrivacy: () -> Unit = {}
+    onSubscribe: () -> Unit,
+    now: Instant
 ) {
     val expiresAt = discovery.trialExpiresAt
     if (discovery.trialActive && expiresAt != null) {
@@ -315,7 +306,7 @@ private fun DiscoverySection(
                 .testTag(PRO_BENEFITS_TRIAL)
         )
     }
-    if (discovery.activitySyncPending || discovery.serverStatus == app.mymusclemap.domain.entitlement.ProDiscoveryServerStatus.UNKNOWN) {
+    if (discovery.serverStatus == app.mymusclemap.domain.entitlement.ProDiscoveryServerStatus.UNKNOWN) {
         if (!discovery.trialActive && !discovery.offerAvailable) {
             Text(
                 text = stringResource(R.string.pro_discovery_status_pending),
@@ -326,32 +317,6 @@ private fun DiscoverySection(
                     .padding(top = AppDimens.headerStackGap)
             )
         }
-    } else if (discovery.serverStatus == app.mymusclemap.domain.entitlement.ProDiscoveryServerStatus.NOT_ELIGIBLE) {
-        Text(
-            text = if (discovery.matureOn.isNullOrBlank()) {
-                stringResource(
-                    R.string.pro_discovery_progress_no_date,
-                    discovery.qualifyingDays,
-                    discovery.requiredDays,
-                    discovery.recentDays,
-                    discovery.requiredRecentDays
-                )
-            } else {
-                stringResource(
-                    R.string.pro_discovery_progress,
-                    discovery.qualifyingDays,
-                    discovery.requiredDays,
-                    discovery.recentDays,
-                    discovery.requiredRecentDays,
-                    discovery.matureOn
-                )
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = StrictBrand.light,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = AppDimens.headerStackGap)
-        )
     } else if (discovery.serverStatus == app.mymusclemap.domain.entitlement.ProDiscoveryServerStatus.PROGRAM_CLOSED) {
         Text(
             text = stringResource(R.string.pro_discovery_status_closed),
@@ -370,7 +335,10 @@ private fun DiscoverySection(
                 .fillMaxWidth()
                 .padding(top = AppDimens.headerStackGap)
         )
-    } else if (discovery.serverStatus == app.mymusclemap.domain.entitlement.ProDiscoveryServerStatus.ALREADY_USED && !discovery.trialActive) {
+    } else if (discovery.serverStatus == app.mymusclemap.domain.entitlement.ProDiscoveryServerStatus.ALREADY_USED &&
+        !discovery.trialActive &&
+        discovery.offerKind != app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.SUBSCRIPTION
+    ) {
         Text(
             text = stringResource(R.string.pro_discovery_status_used),
             style = MaterialTheme.typography.bodyMedium,
@@ -381,8 +349,11 @@ private fun DiscoverySection(
         )
     }
     if (discovery.offerAvailable) {
+        val subscription = discovery.offerKind == app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.SUBSCRIPTION
         Text(
-            text = stringResource(R.string.pro_discovery_offer_title),
+            text = stringResource(
+                if (subscription) R.string.pro_discovery_subscription_title else R.string.pro_discovery_offer_title
+            ),
             style = MaterialTheme.typography.titleMedium,
             color = StrictBrand.lime,
             modifier = Modifier
@@ -391,46 +362,18 @@ private fun DiscoverySection(
                 .testTag(PRO_BENEFITS_OFFER)
         )
         Text(
-            text = stringResource(R.string.pro_discovery_offer_message),
+            text = stringResource(
+                if (subscription) R.string.pro_discovery_subscription_message else R.string.pro_discovery_offer_message
+            ),
             style = MaterialTheme.typography.bodyLarge,
             color = StrictBrand.light,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = AppDimens.headerStackGap)
         )
-        Text(
-            text = stringResource(R.string.pro_discovery_offer_note),
-            style = MaterialTheme.typography.bodyMedium,
-            color = StrictBrand.light,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = AppDimens.headerStackGap)
-        )
-        Spacer(Modifier.height(AppDimens.headerStackGap))
-        Button(
-            onClick = onActivateTrial,
-            shape = AppShapeTokens.button,
-            colors = StrictBrand.actionButtonColors(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(PRO_DISCOVERY_ACTIVATE)
-        ) {
-            Text(stringResource(R.string.pro_discovery_activate))
-        }
-    }
-    if (!activitySyncEnabled) {
-        Text(
-            text = stringResource(R.string.pro_discovery_sync_setting_body),
-            style = MaterialTheme.typography.bodyMedium,
-            color = StrictBrand.light,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = AppDimens.sectionGap)
-                .testTag(PRO_DISCOVERY_SYNC_SETTING)
-        )
-        if (activitySyncDeletionFailed) {
+        if (!subscription) {
             Text(
-                text = stringResource(R.string.pro_discovery_sync_deletion_failed),
+                text = stringResource(R.string.pro_discovery_offer_note),
                 style = MaterialTheme.typography.bodyMedium,
                 color = StrictBrand.light,
                 modifier = Modifier
@@ -440,17 +383,18 @@ private fun DiscoverySection(
         }
         Spacer(Modifier.height(AppDimens.headerStackGap))
         Button(
-            onClick = onEnableActivitySync,
+            onClick = if (subscription) onSubscribe else onActivateTrial,
             shape = AppShapeTokens.button,
             colors = StrictBrand.actionButtonColors(),
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag(PRO_DISCOVERY_SYNC_ENABLE)
+                .testTag(PRO_DISCOVERY_ACTIVATE)
         ) {
-            Text(stringResource(R.string.pro_discovery_sync_enable))
-        }
-        TextButton(onClick = onOpenPrivacy, modifier = Modifier.testTag(PRO_DISCOVERY_SYNC_PRIVACY)) {
-            Text(stringResource(R.string.action_privacy_policy))
+            Text(
+                stringResource(
+                    if (subscription) R.string.pro_discovery_subscribe else R.string.pro_discovery_activate
+                )
+            )
         }
     }
 }

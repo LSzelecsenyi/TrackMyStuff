@@ -9,13 +9,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
- * Server decision for a new Pro Discovery grant.
- * An existing promotional_trial row is never moved and is never extended.
+ * Server decision for Pro Discovery V3.
+ * An existing promotional trial is never moved and is never extended.
+ * Workout history is not an input.
  */
 @Service
 public class ProDiscoveryGrants {
@@ -27,18 +27,22 @@ public class ProDiscoveryGrants {
     public static final String PROGRAM_CLOSED = "PROGRAM_CLOSED";
     public static final String INCOMPATIBLE = "INCOMPATIBLE";
 
+    public static final String OFFER_NONE = "NONE";
+    public static final String OFFER_TRIAL = "TRIAL";
+    public static final String OFFER_SUBSCRIPTION = "SUBSCRIPTION";
+
     private final PromotionalTrialService trials;
-    private final ProDiscoveryActivity activity;
+    private final ProDiscoveryOffers offers;
     private final PromotionalPrograms programs;
     private final FounderApplicationRepository applications;
     private final AccountPaidAccess paidAccess;
-    private final eu.strictworkout.promotion.WelcomeBackService welcomeBack;
+    private final WelcomeBackService welcomeBack;
     private final DeletedAccountPolicy deletedAccounts;
     private final Clock clock;
 
     public ProDiscoveryGrants(
             PromotionalTrialService trials,
-            ProDiscoveryActivity activity,
+            ProDiscoveryOffers offers,
             PromotionalPrograms programs,
             FounderApplicationRepository applications,
             AccountPaidAccess paidAccess,
@@ -47,7 +51,7 @@ public class ProDiscoveryGrants {
             Clock clock
     ) {
         this.trials = trials;
-        this.activity = activity;
+        this.offers = offers;
         this.programs = programs;
         this.applications = applications;
         this.paidAccess = paidAccess;
@@ -64,16 +68,13 @@ public class ProDiscoveryGrants {
     @Transactional
     public View activate(UUID userId) {
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        activity.lock(userId, now);
+        offers.lock(userId);
         View current = evaluate(userId, now);
-        if (!ELIGIBLE.equals(current.status())) {
+        if (!ELIGIBLE.equals(current.status()) || !OFFER_TRIAL.equals(current.offer())) {
             return current;
         }
-        PromotionalTrialService.Result created = trials.activate(userId, now, true, false);
-        if (created.status() == PromotionalTrialService.Status.ACTIVE) {
-            activity.deleteFor(userId);
-        }
-        return fromTrial(userId, created, now);
+        trials.activate(userId, now, true, false);
+        return evaluate(userId, now);
     }
 
     /**
@@ -100,41 +101,31 @@ public class ProDiscoveryGrants {
 
     private View evaluate(UUID userId, Instant now) {
         PromotionalTrialService.Trial trial = trials.current(userId);
-        ProDiscoveryEligibility.Progress progress = ProDiscoveryEligibility.evaluate(activity.dates(userId), ProDiscoveryEligibility.evaluationDate(now));
-        long revision = activity.revision(userId);
+        Instant registration = offers.registeredAt(userId);
+        Instant presented = offers.presentedAt(userId);
+        Instant anchor = presented == null ? registration : presented;
+        Instant nextOfferAt = anchor == null ? null : ProDiscoveryEligibility.offerDueAt(anchor);
+        boolean due = ProDiscoveryEligibility.offerDue(anchor, now);
         if (trial != null && now.isBefore(trial.expiresAt())) {
-            return view(ACTIVE_TRIAL, trial.activatedAt(), trial.expiresAt(), revision, progress, now);
-        }
-        if (trial != null || deletedAccounts.proDiscoveryUsed(userId)) {
-            Instant activated = trial == null ? null : trial.activatedAt();
-            Instant expires = trial == null ? null : trial.expiresAt();
-            return view(ALREADY_USED, activated, expires, revision, progress, now);
-        }
-        if (!programs.acceptingNewGrants(PromotionalProgram.PRO_DISCOVERY)) {
-            return view(PROGRAM_CLOSED, null, null, revision, progress, now);
+            return view(ACTIVE_TRIAL, OFFER_NONE, trial.activatedAt(), trial.expiresAt(), nextOfferAt);
         }
         if (incompatible(userId, now)) {
-            return view(INCOMPATIBLE, null, null, revision, progress, now);
+            return view(INCOMPATIBLE, OFFER_NONE, trialTime(trial, true), trialTime(trial, false), nextOfferAt);
         }
-        if (!progress.eligible()) {
-            return view(NOT_ELIGIBLE, null, null, revision, progress, now);
+        boolean consumed = trial != null || deletedAccounts.proDiscoveryUsed(userId);
+        if (consumed && !due) {
+            return view(ALREADY_USED, OFFER_NONE, trialTime(trial, true), trialTime(trial, false), nextOfferAt);
         }
-        return view(ELIGIBLE, null, null, revision, progress, now);
-    }
-
-    private View fromTrial(UUID userId, PromotionalTrialService.Result result, Instant now) {
-        String status = switch (result.status()) {
-            case ACTIVE -> "ACTIVE";
-            case ALREADY_USED -> ALREADY_USED;
-            case CLOSED -> PROGRAM_CLOSED;
-            case INCOMPATIBLE -> INCOMPATIBLE;
-            case INVALID -> NOT_ELIGIBLE;
-        };
-        ProDiscoveryEligibility.Progress progress = ProDiscoveryEligibility.evaluate(
-                activity.dates(userId),
-                ProDiscoveryEligibility.evaluationDate(now)
-        );
-        return view(status, result.activatedAt(), result.expiresAt(), activity.revision(userId), progress, now);
+        if (!programs.acceptingNewGrants(PromotionalProgram.PRO_DISCOVERY)) {
+            return view(PROGRAM_CLOSED, OFFER_NONE, trialTime(trial, true), trialTime(trial, false), nextOfferAt);
+        }
+        if (!due) {
+            return view(NOT_ELIGIBLE, OFFER_NONE, null, null, nextOfferAt);
+        }
+        if (consumed) {
+            return view(ALREADY_USED, OFFER_SUBSCRIPTION, trialTime(trial, true), trialTime(trial, false), nextOfferAt);
+        }
+        return view(ELIGIBLE, OFFER_TRIAL, null, null, nextOfferAt);
     }
 
     private boolean incompatible(UUID userId, Instant now) {
@@ -146,45 +137,29 @@ public class ProDiscoveryGrants {
         return founderBlocks || paidAccess.entitledNow(userId, now) || welcomeBack.activeNow(userId, now);
     }
 
+    private static Instant trialTime(PromotionalTrialService.Trial trial, boolean activated) {
+        if (trial == null) {
+            return null;
+        }
+        return activated ? trial.activatedAt() : trial.expiresAt();
+    }
+
     private static View view(
             String status,
+            String offer,
             Instant activatedAt,
             Instant expiresAt,
-            long revision,
-            ProDiscoveryEligibility.Progress progress,
-            Instant now
+            Instant nextOfferAt
     ) {
-        return new View(
-                status,
-                activatedAt,
-                expiresAt,
-                revision,
-                progress.qualifyingDays(),
-                progress.remainingDays(),
-                progress.firstWorkoutDate(),
-                progress.matureOn(),
-                progress.recentDays(),
-                progress.remainingRecentDays(),
-                ProDiscoveryEligibility.evaluationDate(now),
-                ProDiscoveryEligibility.REQUIRED_DAYS,
-                ProDiscoveryEligibility.REQUIRED_RECENT_DAYS
-        );
+        return new View(status, offer, activatedAt, expiresAt, nextOfferAt);
     }
 
     public record View(
             String status,
+            String offer,
             Instant activatedAt,
             Instant expiresAt,
-            long activityRevision,
-            int qualifyingDays,
-            int remainingDays,
-            LocalDate firstWorkoutDate,
-            LocalDate matureOn,
-            int recentDays,
-            int remainingRecentDays,
-            LocalDate evaluationDate,
-            int requiredDays,
-            int requiredRecentDays
+            Instant nextOfferAt
     ) {
     }
 }

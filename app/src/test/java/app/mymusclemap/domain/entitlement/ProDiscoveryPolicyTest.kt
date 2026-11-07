@@ -30,19 +30,54 @@ class ProDiscoveryPolicyTest {
         assertFalse(history(old).offerAvailable)
         assertFalse(history(old).showAutomaticOffer)
         assertEquals(ProDiscoveryServerStatus.UNKNOWN, history(old).serverStatus)
-        val confirmed = evaluate(server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.ELIGIBLE))
+        val confirmed = evaluate(server = ProDiscoveryServerView(
+            status = ProDiscoveryServerStatus.ELIGIBLE,
+            offer = ProDiscoveryOfferKind.TRIAL
+        ))
         assertTrue(confirmed.offerAvailable)
         assertTrue(confirmed.showAutomaticOffer)
     }
 
     @Test
-    fun aPendingSyncDoesNotShowAConfirmedOffer() {
-        val confirmed = evaluate(
-            server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.ELIGIBLE),
-            activitySyncPending = true
+    fun dismissingHidesTheCurrentCycleAndASubscriptionOfferIsNotATrial() {
+        val trial = evaluate(
+            server = ProDiscoveryServerView(
+                status = ProDiscoveryServerStatus.ELIGIBLE,
+                offer = ProDiscoveryOfferKind.TRIAL,
+                nextOfferAt = "2026-08-01T00:00:00Z"
+            )
         )
-        assertFalse(confirmed.offerAvailable)
-        assertTrue(confirmed.activitySyncPending)
+        assertEquals(ProDiscoveryOfferKind.TRIAL, trial.offerKind)
+        assertTrue(trial.showAutomaticOffer)
+        val hidden = evaluate(
+            server = trial.let {
+                ProDiscoveryServerView(
+                    status = ProDiscoveryServerStatus.ELIGIBLE,
+                    offer = ProDiscoveryOfferKind.TRIAL,
+                    nextOfferAt = "2026-08-01T00:00:00Z"
+                )
+            },
+            dismissedCycle = "2026-08-01T00:00:00Z"
+        )
+        assertFalse(hidden.showAutomaticOffer)
+        val returning = evaluate(
+            server = ProDiscoveryServerView(
+                status = ProDiscoveryServerStatus.ALREADY_USED,
+                offer = ProDiscoveryOfferKind.SUBSCRIPTION,
+                nextOfferAt = "2026-10-01T00:00:00Z"
+            )
+        )
+        assertEquals(ProDiscoveryOfferKind.SUBSCRIPTION, returning.offerKind)
+        assertTrue(returning.showAutomaticOffer)
+        assertFalse(
+            evaluate(
+                currentlyFree = false,
+                server = ProDiscoveryServerView(
+                    status = ProDiscoveryServerStatus.ALREADY_USED,
+                    offer = ProDiscoveryOfferKind.SUBSCRIPTION
+                )
+            ).showAutomaticOffer
+        )
     }
 
     @Test
@@ -56,10 +91,26 @@ class ProDiscoveryPolicyTest {
     fun activeProPreventsTheOffer() {
         val snapshot = evaluate(
             currentlyFree = false,
-            server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.ELIGIBLE)
+            server = ProDiscoveryServerView(
+            status = ProDiscoveryServerStatus.ELIGIBLE,
+            offer = ProDiscoveryOfferKind.TRIAL
+        )
         )
         assertFalse(snapshot.offerAvailable)
         assertFalse(snapshot.showAutomaticOffer)
+    }
+
+    @Test
+    fun oneWorkoutOrAnInactiveProgramDoesNotOfferATrial() {
+        assertFalse(
+            evaluate(server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.NOT_ELIGIBLE)).showAutomaticOffer
+        )
+        assertFalse(
+            evaluate(server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.UNKNOWN)).showAutomaticOffer
+        )
+        assertFalse(
+            evaluate(server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.PROGRAM_CLOSED)).offerAvailable
+        )
     }
 
     @Test
@@ -78,7 +129,10 @@ class ProDiscoveryPolicyTest {
 
     @Test
     fun dismissalDoesNotActivateAndTheOfferStaysAvailable() {
-        val coordinator = coordinator(server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.ELIGIBLE))
+        val coordinator = coordinator(server = ProDiscoveryServerView(
+            status = ProDiscoveryServerStatus.ELIGIBLE,
+            offer = ProDiscoveryOfferKind.TRIAL
+        ))
         runBlocking { coordinator.dismissOffer() }
         val snapshot = coordinator.snapshot()
         assertFalse(snapshot.showAutomaticOffer)
@@ -89,7 +143,10 @@ class ProDiscoveryPolicyTest {
 
     @Test
     fun explicitAcceptanceStartsExactlyFourteenDaysAndRepeatAcceptanceIsTheSameTrial() = runBlocking {
-        val coordinator = coordinator(server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.ELIGIBLE))
+        val coordinator = coordinator(server = ProDiscoveryServerView(
+            status = ProDiscoveryServerStatus.ELIGIBLE,
+            offer = ProDiscoveryOfferKind.TRIAL
+        ))
         val started = coordinator.activate() as ProDiscoveryActivation.Started
         val again = coordinator.activate() as ProDiscoveryActivation.AlreadyActive
         assertEquals(today.plus(ProDiscoveryPolicy.TRIAL_DURATION), started.expiresAt)
@@ -103,7 +160,7 @@ class ProDiscoveryPolicyTest {
         val store = MemoryDiscoveryStore()
         store.activate(today.minus(Duration.ofDays(20)), today)
         val coordinator = coordinator(real = store, now = today)
-        assertEquals(ProDiscoveryActivation.AlreadyUsed, coordinator.activate())
+        assertEquals(ProDiscoveryActivation.NotEligible, coordinator.activate())
         assertFalse(coordinator.snapshot().trialActive)
         assertTrue(coordinator.snapshot().trialExpired)
     }
@@ -158,7 +215,10 @@ class ProDiscoveryPolicyTest {
             access = AchievementAccess.PRO,
             requirementMet = true
         )
-        val coordinator = coordinator(server = ProDiscoveryServerView(status = ProDiscoveryServerStatus.ELIGIBLE))
+        val coordinator = coordinator(server = ProDiscoveryServerView(
+            status = ProDiscoveryServerStatus.ELIGIBLE,
+            offer = ProDiscoveryOfferKind.TRIAL
+        ))
         val started = coordinator.activate() as ProDiscoveryActivation.Started
         assertEquals(today.plus(ProDiscoveryPolicy.TRIAL_DURATION), started.expiresAt)
         val expired = EntitlementResolver.resolve(EntitlementSources(), started.expiresAt)
@@ -365,7 +425,7 @@ class ProDiscoveryPolicyTest {
         record: ProDiscoveryRecord = ProDiscoveryRecord(),
         debug: ProDiscoveryDebugConfig = ProDiscoveryDebugConfig(),
         server: ProDiscoveryServerView = ProDiscoveryServerView(),
-        activitySyncPending: Boolean = false
+        dismissedCycle: String? = null
     ): ProDiscoverySnapshot {
         return ProDiscoveryPolicy.evaluate(
             ProDiscoveryFacts(
@@ -378,7 +438,7 @@ class ProDiscoveryPolicyTest {
                 record = record,
                 debug = debug,
                 server = server,
-                activitySyncPending = activitySyncPending
+                dismissedCycle = dismissedCycle
             )
         )
     }
@@ -453,10 +513,6 @@ private class MemoryDiscoveryStore : ProDiscoveryStateStore {
     override suspend fun adoptServerTrial(activatedAt: Instant, expiresAt: Instant) {
         record = record.copy(activatedAt = activatedAt, expiresAt = expiresAt)
     }
-
-    override fun activityRevision(): Long? = null
-
-    override suspend fun setActivityRevision(revision: Long) = Unit
 
     override suspend fun reset(fingerprint: String) {
         record = ProDiscoveryRecord()

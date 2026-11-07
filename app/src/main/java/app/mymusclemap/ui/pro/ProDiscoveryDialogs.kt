@@ -38,6 +38,7 @@ internal const val PRO_DISCOVERY_NOT_NOW = "pro-discovery-not-now"
 internal const val PRO_DISCOVERY_WARNING = "pro-discovery-warning"
 internal const val PRO_DISCOVERY_VIEW_PLANS = "pro-discovery-view-plans"
 internal const val PRO_DISCOVERY_MAYBE_LATER = "pro-discovery-maybe-later"
+internal const val PRO_DISCOVERY_OFFER_PRO = "pro-discovery-offer-pro"
 
 fun proDiscoveryDateTime(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String {
     return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
@@ -47,9 +48,13 @@ fun proDiscoveryDateTime(instant: Instant, zone: ZoneId = ZoneId.systemDefault()
 
 @Composable
 fun ProDiscoveryOfferDialog(
+    kind: app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind =
+        app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.TRIAL,
     onActivate: () -> Unit,
-    onNotNow: () -> Unit
+    onNotNow: () -> Unit,
+    onViewPro: () -> Unit = {}
 ) {
+    val subscription = kind == app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.SUBSCRIPTION
     Dialog(
         onDismissRequest = onNotNow,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -76,25 +81,39 @@ fun ProDiscoveryOfferDialog(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = stringResource(R.string.pro_discovery_offer_title),
+                        text = stringResource(
+                            if (subscription) {
+                                R.string.pro_discovery_subscription_title
+                            } else {
+                                R.string.pro_discovery_offer_title
+                            }
+                        ),
                         style = MaterialTheme.typography.titleLarge,
                         color = StrictBrand.lime,
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = stringResource(R.string.pro_discovery_offer_message),
+                        text = stringResource(
+                            if (subscription) {
+                                R.string.pro_discovery_subscription_message
+                            } else {
+                                R.string.pro_discovery_offer_message
+                            }
+                        ),
                         style = MaterialTheme.typography.bodyLarge,
                         color = StrictBrand.light,
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = stringResource(R.string.pro_discovery_offer_note),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = StrictBrand.light,
-                        textAlign = TextAlign.Center
-                    )
+                    if (!subscription) {
+                        Text(
+                            text = stringResource(R.string.pro_discovery_offer_note),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = StrictBrand.light,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                     Spacer(Modifier.height(24.dp))
                     Button(
                         onClick = onActivate,
@@ -104,7 +123,15 @@ fun ProDiscoveryOfferDialog(
                             .fillMaxWidth()
                             .testTag(PRO_DISCOVERY_ACTIVATE)
                     ) {
-                        Text(stringResource(R.string.pro_discovery_activate))
+                        Text(
+                            stringResource(
+                                if (subscription) {
+                                    R.string.pro_discovery_subscribe
+                                } else {
+                                    R.string.pro_discovery_activate
+                                }
+                            )
+                        )
                     }
                     TextButton(
                         onClick = onNotNow,
@@ -114,6 +141,17 @@ fun ProDiscoveryOfferDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.pro_discovery_not_now),
+                            color = StrictBrand.lime
+                        )
+                    }
+                    TextButton(
+                        onClick = onViewPro,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(PRO_DISCOVERY_OFFER_PRO)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.pro_discovery_view_pro),
                             color = StrictBrand.lime
                         )
                     }

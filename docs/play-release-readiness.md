@@ -242,7 +242,7 @@ No analytics, crash, or advertising SDK is declared in the app’s Gradle depend
 | Health Connect readings | Read from Health Connect, not saved in Strict’s database | No | Health Connect / Google Health, under the user’s Health Connect choice | Not copied by Strict | Revoking Health Connect access does not delete Strict workouts |
 | Founder enrollment, workouts, feedback, and review | Server | Yes, including feedback text | No | No | Deleted with the account. Founder capacity counters are not reduced |
 | Pro Discovery trial | Server | Yes. One trial record per user | No | No | Deleted. The marker records that it was used |
-| Pro Discovery workout dates | Server | Optional. Off until the account enables synchronization. Distinct local dates per installation; eligibility uses the distinct union | No | No | Deleted on account deletion, after the trial is activated, and when synchronization is turned off |
+| Pro Discovery offer time | Server | Written only after an offer is shown. The schedule is two calendar months from registration, then from the last presentation | No | No | Deleted with the account. The one-time trial marker can remain |
 | Welcome Back grant | Server | Yes. Activation can include a qualifying workout id | No | No | Deleted. The marker records that it was used |
 | Play purchase | Server `play_subscription` | Yes: purchase token, product id, order id, expiry, state | Play Billing and the Play Developer API | No | Unlinked from the user and marked so another account cannot claim the token. The token, order id, and state stay. The Google Play subscription is not cancelled |
 | Feedback email | User’s email app | No. The app only opens a draft | The email provider, if the user sends it | No | The user controls the draft |
@@ -292,7 +292,7 @@ The transaction deletes that user’s sessions, external identity, Founder appli
 | --- | --- |
 | `app_user`, `external_identity`, `auth_session` | Deleted. Existing bearers stop working |
 | Founder application, workouts, feedback, snapshot, review decision, entitlement grants | Deleted |
-| `promotional_trial`, `welcome_back_grant`, `account_status_grant`, `pro_discovery_activity_day`, `pro_discovery_activity_sync` | Deleted |
+| `promotional_trial`, `welcome_back_grant`, `account_status_grant`, `pro_discovery_offer` | Deleted |
 | `founder_program_capacity`, `early_adopter_cohort` | Kept unchanged. These are program counters, not a person’s profile |
 | `admin_user`, `admin_session` | Kept. They are operator identities, not the deleted member |
 | `play_rtdn_message` | Kept. It has no user id |

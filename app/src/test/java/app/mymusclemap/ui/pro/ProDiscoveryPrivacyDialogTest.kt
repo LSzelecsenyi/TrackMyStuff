@@ -47,59 +47,44 @@ class ProDiscoveryPrivacyDialogTest {
     }
 
     @Test
-    fun notNowDoesNotEnableActivitySynchronization() {
-        var enabled = 0
+    fun theTrialOfferDoesNotStartUntilThePrimaryButton() {
+        var activated = 0
         var declined = 0
+        var pro = 0
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                ProDiscoverySyncPromptDialog(
-                    onEnable = { enabled += 1 },
+                ProDiscoveryOfferDialog(
+                    kind = app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.TRIAL,
+                    onActivate = { activated += 1 },
                     onNotNow = { declined += 1 },
-                    onViewPolicy = {}
+                    onViewPro = { pro += 1 }
                 )
             }
         }
-        composeRule.onNodeWithText(testString(R.string.pro_discovery_sync_body)).assertIsDisplayed()
-        composeRule.onNodeWithTag(PRO_DISCOVERY_SYNC_NOT_NOW).performClick()
-        assertEquals(0, enabled)
+        composeRule.onNodeWithText(testString(R.string.pro_discovery_offer_title)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PRO_DISCOVERY_OFFER_PRO).performClick()
+        assertEquals(0, activated)
+        assertEquals(1, pro)
+        composeRule.onNodeWithTag(PRO_DISCOVERY_NOT_NOW).performClick()
+        assertEquals(0, activated)
         assertEquals(1, declined)
     }
 
     @Test
-    fun benefitsCanShowHowToEnableSynchronizationWithoutForcingIt() {
-        var enabled = 0
+    fun theReturningOfferAsksForASubscriptionAndDoesNotActivateATrial() {
         var activated = 0
         composeRule.setContent {
             WeightTrackerThemeForPreview {
-                ProBenefitsScreen(
-                    status = ProBenefitsStatus(),
-                    onBack = {},
-                    activitySyncEnabled = false,
-                    onEnableActivitySync = { enabled += 1 },
-                    onActivateTrial = { activated += 1 }
+                ProDiscoveryOfferDialog(
+                    kind = app.mymusclemap.domain.entitlement.ProDiscoveryOfferKind.SUBSCRIPTION,
+                    onActivate = { activated += 1 },
+                    onNotNow = {}
                 )
             }
         }
-        composeRule.onNodeWithTag(PRO_DISCOVERY_SYNC_SETTING).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(PRO_DISCOVERY_SYNC_ENABLE).performScrollTo().performClick()
-        assertEquals(1, enabled)
-        assertEquals(0, activated)
-    }
-
-    @Test
-    fun aFailedServerDeletionIsNotShownAsCompleted() {
-        composeRule.setContent {
-            WeightTrackerThemeForPreview {
-                AccountMembershipScreen(
-                    onBack = {},
-                    activitySyncEnabled = false,
-                    activitySyncDeletionFailed = true
-                )
-            }
-        }
-        composeRule.onNodeWithText(testString(R.string.pro_discovery_sync_deletion_failed))
-            .performScrollTo()
-            .assertIsDisplayed()
-        composeRule.onNodeWithText(testString(R.string.pro_discovery_sync_enabled)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.pro_discovery_subscription_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.pro_discovery_subscribe)).performClick()
+        assertEquals(1, activated)
+        composeRule.onNodeWithText(testString(R.string.pro_discovery_activate)).assertDoesNotExist()
     }
 }

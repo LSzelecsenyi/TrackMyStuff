@@ -28,11 +28,6 @@ import app.mymusclemap.ui.theme.StrictBrand
 internal const val PRIVACY_NOTICE = "privacy-notice"
 internal const val PRIVACY_NOTICE_CONTINUE = "privacy-notice-continue"
 internal const val PRIVACY_NOTICE_VIEW = "privacy-notice-view"
-internal const val PRO_DISCOVERY_SYNC_PROMPT = "pro-discovery-sync-prompt"
-internal const val PRO_DISCOVERY_SYNC_ENABLE = "pro-discovery-sync-enable"
-internal const val PRO_DISCOVERY_SYNC_NOT_NOW = "pro-discovery-sync-not-now"
-internal const val PRO_DISCOVERY_SYNC_PRIVACY = "pro-discovery-sync-privacy"
-internal const val PRO_DISCOVERY_SYNC_SETTING = "pro-discovery-sync-setting"
 
 @Composable
 fun PrivacyPolicyNoticeDialog(
@@ -80,69 +75,6 @@ fun PrivacyPolicyNoticeDialog(
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
                         .testTag(PRIVACY_NOTICE_VIEW)
-                ) {
-                    Text(stringResource(R.string.action_privacy_policy))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ProDiscoverySyncPromptDialog(
-    onEnable: () -> Unit,
-    onNotNow: () -> Unit,
-    onViewPolicy: () -> Unit
-) {
-    Dialog(onDismissRequest = onNotNow) {
-        Surface(
-            modifier = Modifier
-                .widthIn(max = 420.dp)
-                .testTag(PRO_DISCOVERY_SYNC_PROMPT),
-            shape = AppShapeTokens.surface,
-            color = StrictBrand.dark
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .heightIn(max = 560.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    text = stringResource(R.string.pro_discovery_sync_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = StrictBrand.lime
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = stringResource(R.string.pro_discovery_sync_body),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = StrictBrand.light
-                )
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = onEnable,
-                    shape = AppShapeTokens.button,
-                    colors = StrictBrand.actionButtonColors(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(PRO_DISCOVERY_SYNC_ENABLE)
-                ) {
-                    Text(stringResource(R.string.pro_discovery_sync_enable))
-                }
-                TextButton(
-                    onClick = onNotNow,
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .testTag(PRO_DISCOVERY_SYNC_NOT_NOW)
-                ) {
-                    Text(stringResource(R.string.pro_discovery_sync_not_now))
-                }
-                TextButton(
-                    onClick = onViewPolicy,
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .testTag(PRO_DISCOVERY_SYNC_PRIVACY)
                 ) {
                     Text(stringResource(R.string.action_privacy_policy))
                 }

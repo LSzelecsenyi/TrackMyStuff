@@ -35,7 +35,7 @@ Confirmed by code, unless a row says otherwise.
 | Session token hash | Required after sign-in | Authentication. Default lifetime in `application.yml` is 30 days | No |
 | Founder application, qualifying-workout metadata, and tester-report text | Optional. Only if the person joins and submits | Founder Program | No |
 | Pro Discovery trial times | Optional | Promotional access | No |
-| Distinct dates of completed native workouts | Optional. Off until the account enables Pro Discovery activity synchronization. The user can turn it off, which stops new uploads and deletes stored dates and sync metadata | Pro Discovery eligibility and one-time-grant protection. Not analytics | No |
+| Pro Discovery offer time | Optional. Stored only after an offer is shown | Recurring Pro offer schedule. Not analytics | No |
 | Welcome Back times and qualifying workout id | Optional | Promotional access | No |
 | Play purchase token, token hash, package, product id, state, expiry, order id | Optional, and paid checkout is not offered until products are configured | Subscription verification | The purchase itself is processed by Google Play. Strict stores the token after verification |
 | Deletion marker: keyed HMAC of the Google subject, plus one flag per promotion | Created only when an account is deleted | Stop a used one-time benefit from returning while that promotion can still be issued. A flag is cleared after that promotion is permanently retired. The row is deleted when no flag remains | No. The raw subject is not in the marker. The marker is pseudonymous, not anonymous |
@@ -48,7 +48,7 @@ Display name is returned at sign-in and stored only in the on-device profile. Th
 
 Confirmed by code. Do not list these as data Strict collects or shares, unless a Play SDK disclosure says the library itself does.
 
-- The full workout log: plans, exercise catalog, sets, reps, weights, and notes, except the Founder metadata row above and the distinct Pro Discovery workout dates in the collected table. Those dates are not exercise names, sets, or Health Connect data.
+- The full workout log: plans, exercise catalog, sets, reps, weights, and notes, except the Founder metadata row above. Pro Discovery does not collect workout dates.
 - Body weight and measurements.
 - Progress photos.
 - Goals and achievements.
