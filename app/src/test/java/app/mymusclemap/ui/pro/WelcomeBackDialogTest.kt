@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import app.mymusclemap.domain.entitlement.WelcomeBackSnapshot
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -71,7 +72,7 @@ class WelcomeBackDialogTest {
                 )
             }
         }
-        composeRule.onNodeWithTag(WELCOME_BACK_ACTIVATE).performClick()
+        composeRule.onNodeWithTag(WELCOME_BACK_ACTIVATE).performScrollTo().performClick()
         assertEquals(1, activations)
     }
 
