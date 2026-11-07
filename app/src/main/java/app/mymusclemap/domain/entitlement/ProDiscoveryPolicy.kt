@@ -2,9 +2,7 @@ package app.mymusclemap.domain.entitlement
 
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 
 enum class ProDiscoveryDebugMode {
     REAL,
@@ -78,6 +76,30 @@ data class ProDiscoveryRecord(
     val warningDismissed: Boolean = false
 )
 
+enum class ProDiscoveryServerStatus {
+    UNKNOWN,
+    NOT_ELIGIBLE,
+    ELIGIBLE,
+    ACTIVE_TRIAL,
+    ALREADY_USED,
+    PROGRAM_CLOSED,
+    INCOMPATIBLE
+}
+
+/** Last server decision. UNKNOWN is not a confirmed eligibility. */
+data class ProDiscoveryServerView(
+    val status: ProDiscoveryServerStatus = ProDiscoveryServerStatus.UNKNOWN,
+    val activatedAt: Instant? = null,
+    val expiresAt: Instant? = null,
+    val qualifyingDays: Int = 0,
+    val remainingDays: Int = 0,
+    val recentDays: Int = 0,
+    val remainingRecentDays: Int = 0,
+    val requiredDays: Int = 24,
+    val requiredRecentDays: Int = 2,
+    val matureOn: String? = null
+)
+
 data class ProDiscoveryFacts(
     val nativeCompletions: List<Instant>,
     val zone: ZoneId,
@@ -86,7 +108,9 @@ data class ProDiscoveryFacts(
     val promotionsEnabled: Boolean,
     val continuedProBeyondTrial: Boolean,
     val record: ProDiscoveryRecord,
-    val debug: ProDiscoveryDebugConfig = ProDiscoveryDebugConfig()
+    val debug: ProDiscoveryDebugConfig = ProDiscoveryDebugConfig(),
+    val server: ProDiscoveryServerView = ProDiscoveryServerView(),
+    val activitySyncPending: Boolean = false
 )
 
 data class ProDiscoverySnapshot(
@@ -98,7 +122,16 @@ data class ProDiscoverySnapshot(
     val warningOnBenefits: Boolean = false,
     val trialExpired: Boolean = false,
     val subscriptionsAvailable: Boolean = false,
-    val nextBoundary: Instant? = null
+    val nextBoundary: Instant? = null,
+    val serverStatus: ProDiscoveryServerStatus = ProDiscoveryServerStatus.UNKNOWN,
+    val activitySyncPending: Boolean = false,
+    val qualifyingDays: Int = 0,
+    val remainingDays: Int = 0,
+    val recentDays: Int = 0,
+    val remainingRecentDays: Int = 0,
+    val requiredDays: Int = 24,
+    val requiredRecentDays: Int = 2,
+    val matureOn: String? = null
 )
 
 /**
@@ -159,29 +192,11 @@ fun selectStrictOneTimePrompt(
 }
 
 object ProDiscoveryPolicy {
-    const val ELIGIBILITY_DAYS = 60L
-    const val OLDER_THAN_DAYS = 30L
     val TRIAL_DURATION: Duration = Duration.ofHours(14 * 24)
     val WARNING_LEAD: Duration = Duration.ofHours(48)
 
     /** Imported workouts carry a fingerprint and do not count toward this offer. */
     fun countsAsNative(importFingerprint: String?): Boolean = importFingerprint == null
-
-    fun calendarDaysSince(completion: Instant, today: LocalDate, zone: ZoneId): Long {
-        val completedOn = completion.atZone(zone).toLocalDate()
-        return ChronoUnit.DAYS.between(completedOn, today)
-    }
-
-    fun meetsHistory(completions: List<Instant>, today: LocalDate, zone: ZoneId): Boolean {
-        if (completions.isEmpty()) {
-            return false
-        }
-        val earliest = completions.min()
-        if (calendarDaysSince(earliest, today, zone) < ELIGIBILITY_DAYS) {
-            return false
-        }
-        return completions.any { calendarDaysSince(it, today, zone) > OLDER_THAN_DAYS }
-    }
 
     fun trialIsActive(expiresAt: Instant?, now: Instant): Boolean {
         return expiresAt != null && now.isBefore(expiresAt)
@@ -224,21 +239,20 @@ object ProDiscoveryPolicy {
     }
 
     fun evaluate(facts: ProDiscoveryFacts): ProDiscoverySnapshot {
-        val today = facts.now.atZone(facts.zone).toLocalDate()
         val debug = facts.debug
         val alreadyUsed = facts.record.activatedAt != null
         val active = trialIsActive(facts.record.expiresAt, facts.now)
         val expired = alreadyUsed && !active
-        val historyMet = meetsHistory(facts.nativeCompletions, today, facts.zone)
+        val serverEligible = facts.server.status == ProDiscoveryServerStatus.ELIGIBLE &&
+            !facts.activitySyncPending
         val offerEligible = when (debug.mode) {
             ProDiscoveryDebugMode.ACTIVE,
             ProDiscoveryDebugMode.EXPIRED -> false
             ProDiscoveryDebugMode.ELIGIBLE -> facts.currentlyFree && !alreadyUsed
             ProDiscoveryDebugMode.REAL ->
-                historyMet &&
+                serverEligible &&
                     facts.currentlyFree &&
-                    !alreadyUsed &&
-                    facts.promotionsEnabled
+                    !alreadyUsed
         }
         val expiresAt = facts.record.expiresAt
         val lead = debug.warningLead()
@@ -252,7 +266,16 @@ object ProDiscoveryPolicy {
             showAutomaticWarning = inWindow && !facts.record.warningDismissed && !suppressWarning,
             warningOnBenefits = inWindow && !suppressWarning,
             trialExpired = expired,
-            nextBoundary = nextBoundary(expiresAt, facts.now, lead)
+            nextBoundary = nextBoundary(expiresAt, facts.now, lead),
+            serverStatus = facts.server.status,
+            activitySyncPending = facts.activitySyncPending,
+            qualifyingDays = facts.server.qualifyingDays,
+            remainingDays = facts.server.remainingDays,
+            recentDays = facts.server.recentDays,
+            remainingRecentDays = facts.server.remainingRecentDays,
+            requiredDays = facts.server.requiredDays,
+            requiredRecentDays = facts.server.requiredRecentDays,
+            matureOn = facts.server.matureOn?.takeIf { it.isNotBlank() }
         )
     }
 }

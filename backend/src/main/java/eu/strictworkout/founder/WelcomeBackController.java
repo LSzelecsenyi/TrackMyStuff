@@ -3,6 +3,8 @@ package eu.strictworkout.founder;
 import eu.strictworkout.account.DeletedAccountPolicy;
 import eu.strictworkout.auth.StrictRequests;
 import eu.strictworkout.billing.AccountPaidAccess;
+import eu.strictworkout.promotion.PromotionalProgram;
+import eu.strictworkout.promotion.PromotionalPrograms;
 import eu.strictworkout.promotion.PromotionalTrialService;
 import eu.strictworkout.promotion.WelcomeBackService;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +23,7 @@ class WelcomeBackController {
 
     private final WelcomeBackService welcomeBack;
     private final PromotionalTrialService discovery;
-    private final FounderEnrollment enrollment;
+    private final PromotionalPrograms promotions;
     private final FounderApplicationRepository applications;
     private final AccountPaidAccess paidAccess;
     private final DeletedAccountPolicy deletedAccounts;
@@ -30,7 +32,7 @@ class WelcomeBackController {
     WelcomeBackController(
             WelcomeBackService welcomeBack,
             PromotionalTrialService discovery,
-            FounderEnrollment enrollment,
+            PromotionalPrograms promotions,
             FounderApplicationRepository applications,
             AccountPaidAccess paidAccess,
             DeletedAccountPolicy deletedAccounts,
@@ -38,7 +40,7 @@ class WelcomeBackController {
     ) {
         this.welcomeBack = welcomeBack;
         this.discovery = discovery;
-        this.enrollment = enrollment;
+        this.promotions = promotions;
         this.applications = applications;
         this.paidAccess = paidAccess;
         this.deletedAccounts = deletedAccounts;
@@ -64,7 +66,7 @@ class WelcomeBackController {
                 userId,
                 request.qualifyingWorkoutId(),
                 clock.instant(),
-                !enrollment.current().open(),
+                promotions.acceptingNewGrants(PromotionalProgram.WELCOME_BACK),
                 incompatible(userId)
         ));
     }

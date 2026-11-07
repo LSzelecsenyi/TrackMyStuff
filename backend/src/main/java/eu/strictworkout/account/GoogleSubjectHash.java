@@ -5,7 +5,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-/** SHA-256 of the Google subject. The raw subject is not stored in the marker. */
+/**
+ * Legacy unsalted SHA-256 of the Google subject. New deletion markers use
+ * {@link MarkerKeyRing}. This hash remains only so an existing row can be found
+ * and rewritten when the same Google identity is presented again.
+ */
 public final class GoogleSubjectHash {
 
     private GoogleSubjectHash() {

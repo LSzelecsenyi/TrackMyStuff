@@ -42,7 +42,12 @@ class FakeBillingGateway(
         }
     }
 
-    override suspend fun launch(activity: Activity, productId: String, offerToken: String): LaunchOutcome {
+    override suspend fun launch(
+        activity: Activity,
+        productId: String,
+        offerToken: String,
+        obfuscatedAccountId: String?
+    ): LaunchOutcome {
         return when (mode) {
             "CANCELED" -> LaunchOutcome.CANCELED
             "UNAVAILABLE", "LOADING" -> LaunchOutcome.UNAVAILABLE

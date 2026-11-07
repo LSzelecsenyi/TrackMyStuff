@@ -280,7 +280,7 @@ class FounderReviewIT {
             Map<String, Object> again = parse(ok(post("/api/v1/founder/enrollment", "{}", existing)));
             assertEquals("ACTIVE_FREE", again.get("status"));
         } finally {
-            jdbc.update("update founder_program_capacity set enrollment_open = true");
+            jdbc.update("update founder_program_capacity set lifecycle = 'ACTIVE'");
         }
     }
 

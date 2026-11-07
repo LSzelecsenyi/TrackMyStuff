@@ -56,6 +56,13 @@ class PlaySubscriptionEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
+    @Column(name = "ended_at")
+    private Instant endedAt;
+
+    @Column(name = "retention_hold", nullable = false)
+    private boolean retentionHold;
+
     protected PlaySubscriptionEntity() {
     }
 
@@ -79,6 +86,22 @@ class PlaySubscriptionEntity {
         latestOrderId = subscription.orderId();
         claimBlocked = subscription.claimBlocked();
         updatedAt = subscription.updatedAt();
+    }
+
+    Instant getEndedAt() {
+        return endedAt;
+    }
+
+    void setEndedAt(Instant endedAt) {
+        this.endedAt = endedAt;
+    }
+
+    boolean isRetentionHold() {
+        return retentionHold;
+    }
+
+    void setRetentionHold(boolean retentionHold) {
+        this.retentionHold = retentionHold;
     }
 
     StoredPlaySubscription toRecord() {

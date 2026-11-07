@@ -157,7 +157,7 @@ class PlaySubscriptionServiceTest {
     }
 
     @Test
-    void aBlockedTokenCannotBeClaimedAndNotificationsLeaveItUnlinked() {
+    void aLegacyBlockedTokenCanBeRecoveredAndANotificationDoesNotLinkIt() {
         service.verify(TOKEN, PRODUCT, null);
         StoredPlaySubscription stored = repository.rows.values().iterator().next();
         repository.rows.put(stored.tokenHash(), new StoredPlaySubscription(
@@ -165,17 +165,134 @@ class PlaySubscriptionServiceTest {
                 stored.state(), stored.expiry(), stored.autoRenewing(), stored.entitled(), null,
                 stored.orderId(), stored.updatedAt(), true
         ));
-        UUID user = UUID.randomUUID();
-        assertEquals(PlaySubscriptionService.Status.CONFLICT, service.verify(TOKEN, PRODUCT, user).status());
         play.purchase = active(NOW.plusSeconds(1_000), true);
         assertEquals(
                 PlaySubscriptionService.Status.VERIFIED,
                 service.onNotification("blocked", NOW, "com.strictworkout.app", TOKEN, 2).status()
         );
-        StoredPlaySubscription after = repository.rows.values().iterator().next();
-        assertTrue(after.claimBlocked());
-        assertNull(after.linkedUserId());
-        assertEquals(NOW.plusSeconds(1_000), after.expiry());
+        StoredPlaySubscription afterNotification = repository.rows.values().iterator().next();
+        assertTrue(afterNotification.claimBlocked());
+        assertNull(afterNotification.linkedUserId());
+
+        UUID user = UUID.randomUUID();
+        PlaySubscriptionService.Outcome recovered = service.verify(TOKEN, PRODUCT, user);
+        assertEquals(PlaySubscriptionService.Status.VERIFIED, recovered.status());
+        assertTrue(recovered.subscription().entitled());
+        assertEquals(user, recovered.subscription().linkedUserId());
+        assertFalse(recovered.subscription().claimBlocked());
+        UUID other = UUID.randomUUID();
+        assertEquals(PlaySubscriptionService.Status.CONFLICT, service.verify(TOKEN, PRODUCT, other).status());
+        assertEquals(user, repository.rows.values().iterator().next().linkedUserId());
+    }
+
+    @Test
+    void reconciliationDoesNotMoveOrAssignOwnership() {
+        UUID owner = UUID.randomUUID();
+        service.verify(TOKEN, PRODUCT, owner);
+        StoredPlaySubscription stored = repository.rows.values().iterator().next();
+        repository.rows.put(stored.tokenHash(), new StoredPlaySubscription(
+                stored.tokenHash(), stored.purchaseToken(), stored.packageName(), stored.productId(), stored.basePlanId(),
+                stored.state(), stored.expiry(), stored.autoRenewing(), true, null,
+                stored.orderId(), NOW.minusSeconds(7 * 3600), false
+        ));
+        assertEquals(1, service.reconcile(NOW));
+        assertNull(repository.rows.values().iterator().next().linkedUserId());
+
+        repository.rows.put(stored.tokenHash(), new StoredPlaySubscription(
+                stored.tokenHash(), stored.purchaseToken(), stored.packageName(), stored.productId(), stored.basePlanId(),
+                stored.state(), stored.expiry(), stored.autoRenewing(), true, owner,
+                stored.orderId(), NOW.minusSeconds(7 * 3600), false
+        ));
+        play.purchase = active(NOW.plusSeconds(50), true);
+        assertEquals(1, service.reconcile(NOW));
+        assertEquals(owner, repository.rows.values().iterator().next().linkedUserId());
+    }
+
+    @Test
+    void aRevokedPurchaseDoesNotGrantPro() {
+        UUID user = UUID.randomUUID();
+        play.purchase = new PlayPurchase("com.strictworkout.app", "REVOKED", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "GPA.1",
+                List.of(new PlayLineItem(PRODUCT, "monthly", NOW.plusSeconds(3_600), false)));
+        PlaySubscriptionService.Outcome outcome = service.verify(TOKEN, PRODUCT, user);
+        assertEquals(PlaySubscriptionService.Status.VERIFIED, outcome.status());
+        assertFalse(outcome.subscription().entitled());
+        assertNull(outcome.subscription().linkedUserId());
+    }
+
+    @Test
+    void aMismatchedAccountTagDoesNotGrantOrTransferPro() {
+        UUID owner = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        PurchaseAccountTags tags = new PurchaseAccountTags() {
+            @Override
+            public boolean enabled() {
+                return true;
+            }
+
+            @Override
+            public Optional<String> tagFor(UUID userId) {
+                return Optional.of(userId.equals(owner) ? "1.owner" : "1.other");
+            }
+
+            @Override
+            public boolean matches(UUID userId, String presentedTag) {
+                return userId.equals(owner) && "1.owner".equals(presentedTag);
+            }
+        };
+        PlaySubscriptionService tagged = new PlaySubscriptionService(
+                play, repository, "com.strictworkout.app", Set.of(PRODUCT), Clock.fixed(NOW, ZoneOffset.UTC),
+                new PlaySubscriptionService.SubscriptionWork() {
+                    @Override
+                    public <T> T inTransaction(java.util.function.Supplier<T> action) {
+                        return action.get();
+                    }
+                },
+                tags
+        );
+        play.purchase = new PlayPurchase(
+                "com.strictworkout.app", "ACTIVE", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "GPA.1",
+                List.of(new PlayLineItem(PRODUCT, "monthly", NOW.plusSeconds(3_600), true)),
+                "1.owner", null
+        );
+        assertEquals(PlaySubscriptionService.Status.CONFLICT, tagged.verify(TOKEN, PRODUCT, other).status());
+        assertTrue(repository.findLinked(other).isEmpty());
+        assertEquals(PlaySubscriptionService.Status.VERIFIED, tagged.verify(TOKEN, PRODUCT, owner).status());
+        assertEquals(owner, repository.findLinked(owner).orElseThrow().linkedUserId());
+        play.purchase = new PlayPurchase(
+                "com.strictworkout.app", "ACTIVE", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "GPA.1",
+                List.of(new PlayLineItem(PRODUCT, "monthly", NOW.plusSeconds(3_600), true)),
+                "1.other", null
+        );
+        assertEquals(PlaySubscriptionService.Status.CONFLICT, tagged.verify(TOKEN, PRODUCT, owner).status());
+        assertFalse(repository.findLinked(owner).orElseThrow().entitled());
+    }
+
+    @Test
+    void aLegacyPurchaseWithoutAnAccountTagCanBeRecovered() {
+        UUID user = UUID.randomUUID();
+        play.purchase = active(NOW.plusSeconds(3_600), true);
+        PlaySubscriptionService.Outcome outcome = service.verify(TOKEN, PRODUCT, user);
+        assertEquals(PlaySubscriptionService.Status.VERIFIED, outcome.status());
+        assertTrue(outcome.subscription().entitled());
+        assertEquals(user, outcome.subscription().linkedUserId());
+        assertNull(play.purchase.obfuscatedAccountId());
+    }
+
+    @Test
+    void aReplacementTokenOwnedBySomeoneElseIsNotTransferred() {
+        UUID owner = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        service.verify("old-token", PRODUCT, owner);
+        play.purchase = new PlayPurchase(
+                "com.strictworkout.app", "ACTIVE", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "GPA.2",
+                List.of(new PlayLineItem(PRODUCT, "monthly", NOW.plusSeconds(3_600), true)),
+                null, "old-token"
+        );
+        assertEquals(PlaySubscriptionService.Status.CONFLICT, service.verify("new-token", PRODUCT, other).status());
+        assertEquals(owner, repository.findLinked(owner).orElseThrow().linkedUserId());
+        assertTrue(repository.findLinked(other).isEmpty());
+        assertEquals(PlaySubscriptionService.Status.VERIFIED, service.verify("new-token", PRODUCT, owner).status());
+        assertEquals(owner, repository.find(PlaySubscriptionService.sha256("new-token")).orElseThrow().linkedUserId());
     }
 
     @Test
@@ -342,10 +459,26 @@ class PlaySubscriptionServiceTest {
                         purchase.state(),
                         "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED",
                         purchase.orderId(),
-                        purchase.lineItems()
+                        purchase.lineItems(),
+                        purchase.obfuscatedAccountId(),
+                        purchase.linkedPurchaseToken()
                 );
             }
         }
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("Given an expired purchase is already outside the 24-month window, when it is verified with no stored row, then the token is not stored")
+    void ancientExpiredPurchaseIsNotStored() {
+        play.purchase = new PlayPurchase(
+                "com.strictworkout.app",
+                "EXPIRED",
+                "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED",
+                "GPA.old",
+                List.of(new PlayLineItem(PRODUCT, "monthly", NOW.minusSeconds(800L * 86_400L), false))
+        );
+        assertEquals(PlaySubscriptionService.Status.ABSENT, service.verify(TOKEN, PRODUCT, null).status());
+        assertTrue(repository.rows.isEmpty());
     }
 
     private static final class MemoryRepository implements PlaySubscriptionRepository {
@@ -368,6 +501,39 @@ class PlaySubscriptionServiceTest {
         public StoredPlaySubscription save(StoredPlaySubscription subscription) {
             rows.put(subscription.tokenHash(), subscription);
             return subscription;
+        }
+
+        private final Map<String, java.util.concurrent.locks.ReentrantLock> locks = new HashMap<>();
+        private final ThreadLocal<List<java.util.concurrent.locks.ReentrantLock>> held = new ThreadLocal<>();
+
+        @Override
+        public void lockTokens(java.util.Collection<String> tokenHashes) {
+            List<java.util.concurrent.locks.ReentrantLock> acquired = new ArrayList<>();
+            tokenHashes.stream()
+                    .filter(hash -> hash != null && !hash.isBlank())
+                    .distinct()
+                    .sorted()
+                    .forEach(hash -> {
+                        java.util.concurrent.locks.ReentrantLock lock = locks.computeIfAbsent(
+                                hash,
+                                ignored -> new java.util.concurrent.locks.ReentrantLock()
+                        );
+                        lock.lock();
+                        acquired.add(lock);
+                    });
+            held.set(acquired);
+        }
+
+        @Override
+        public void unlockTokens() {
+            List<java.util.concurrent.locks.ReentrantLock> acquired = held.get();
+            if (acquired == null) {
+                return;
+            }
+            for (int i = acquired.size() - 1; i >= 0; i--) {
+                acquired.get(i).unlock();
+            }
+            held.remove();
         }
 
         @Override

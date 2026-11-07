@@ -2,7 +2,10 @@ package app.mymusclemap.ui.settings
 
 import android.os.SystemClock
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -11,9 +14,12 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import app.mymusclemap.ui.pro.PRO_DISCOVERY_SYNC_SETTING
 import app.mymusclemap.R
 import app.mymusclemap.domain.health.HealthSettingsState
 import app.mymusclemap.domain.locale.AppLanguage
@@ -275,6 +281,52 @@ fun DataBackupScreen(
 }
 
 @Composable
+private fun ProDiscoverySyncSection(
+    enabled: Boolean,
+    deletionPending: Boolean,
+    deletionFailed: Boolean,
+    onChange: (Boolean) -> Unit,
+    onOpenPrivacy: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .testTag(PRO_DISCOVERY_SYNC_SETTING)
+    ) {
+        Text(stringResource(R.string.pro_discovery_sync_setting_title))
+        Text(stringResource(R.string.pro_discovery_sync_setting_body))
+        RowSwitch(
+            checked = enabled,
+            label = stringResource(
+                if (enabled) R.string.pro_discovery_sync_enabled else R.string.pro_discovery_sync_disabled
+            ),
+            onChange = onChange
+        )
+        if (deletionPending) {
+            Text(stringResource(R.string.pro_discovery_sync_deletion_pending))
+        }
+        if (deletionFailed) {
+            Text(stringResource(R.string.pro_discovery_sync_deletion_failed))
+        }
+        TextButton(onClick = onOpenPrivacy) {
+            Text(stringResource(R.string.action_privacy_policy))
+        }
+    }
+}
+
+@Composable
+private fun RowSwitch(checked: Boolean, label: String, onChange: (Boolean) -> Unit) {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
 fun AccountMembershipScreen(
     onBack: () -> Unit,
     onOpenProPlan: () -> Unit = {},
@@ -284,7 +336,12 @@ fun AccountMembershipScreen(
     onOpenDeleteAccount: () -> Unit = {},
     showFounderProgram: Boolean = true,
     showFounderBadge: Boolean = false,
-    onOpenFounderProgram: () -> Unit = {}
+    onOpenFounderProgram: () -> Unit = {},
+    activitySyncEnabled: Boolean = false,
+    activitySyncDeletionPending: Boolean = false,
+    activitySyncDeletionFailed: Boolean = false,
+    onActivitySyncChange: (Boolean) -> Unit = {},
+    onOpenPrivacy: () -> Unit = {}
 ) {
     SettingsPage(
         title = stringResource(R.string.settings_category_account),
@@ -297,6 +354,14 @@ fun AccountMembershipScreen(
             email = accountEmail,
             onSignOut = onSignOut,
             onOpenDeleteAccount = onOpenDeleteAccount
+        )
+        CompactEditorDivider()
+        ProDiscoverySyncSection(
+            enabled = activitySyncEnabled,
+            deletionPending = activitySyncDeletionPending,
+            deletionFailed = activitySyncDeletionFailed,
+            onChange = onActivitySyncChange,
+            onOpenPrivacy = onOpenPrivacy
         )
         if (showFounderProgram) {
             CompactEditorDivider()

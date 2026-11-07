@@ -1,6 +1,7 @@
 package eu.strictworkout.billing;
 
 import eu.strictworkout.auth.StrictUserAuthentication;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,11 +21,23 @@ class BillingController {
     private final PlaySubscriptionService subscriptions;
     private final GooglePushAuthenticator push;
     private final Clock clock;
+    private final PurchaseAccountTags tags;
 
     BillingController(PlaySubscriptionService subscriptions, GooglePushAuthenticator push, Clock clock) {
+        this(subscriptions, push, clock, PurchaseAccountTags.disabled());
+    }
+
+    @Autowired
+    BillingController(
+            PlaySubscriptionService subscriptions,
+            GooglePushAuthenticator push,
+            Clock clock,
+            PurchaseAccountTags tags
+    ) {
         this.subscriptions = subscriptions;
         this.push = push;
         this.clock = clock;
+        this.tags = tags == null ? PurchaseAccountTags.disabled() : tags;
     }
 
     @PostMapping("/api/v1/billing/subscriptions/verify")
@@ -44,6 +57,20 @@ class BillingController {
             case CONFLICT -> ResponseEntity.status(409).body(Map.of("status", "CONFLICT"));
             default -> ResponseEntity.badRequest().body(Map.of("status", outcome.status().name()));
         };
+    }
+
+    @GetMapping("/api/v1/billing/purchase-account")
+    ResponseEntity<?> purchaseAccount() {
+        UUID user = currentUser();
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("status", "UNAUTHENTICATED"));
+        }
+        if (!tags.enabled()) {
+            return ResponseEntity.status(503).body(Map.of("status", "NOT_CONFIGURED"));
+        }
+        return tags.tagFor(user)
+                .<ResponseEntity<?>>map(tag -> ResponseEntity.ok(Map.of("obfuscatedAccountId", tag)))
+                .orElseGet(() -> ResponseEntity.status(503).body(Map.of("status", "NOT_CONFIGURED")));
     }
 
     @GetMapping("/api/v1/billing/subscriptions/current")

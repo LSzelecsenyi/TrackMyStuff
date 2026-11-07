@@ -9,7 +9,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Server-side enrollment gate. Closing it does not remove people who are already enrolled.
+ * Older enrollment switch. Open maps to ACTIVE and closed maps to INACTIVE.
+ * Retirement cannot be reversed through this endpoint.
+ * Closing enrollment does not remove people who are already enrolled.
  */
 @RestController
 @RequestMapping("/api/v1/admin/founder/enrollment")

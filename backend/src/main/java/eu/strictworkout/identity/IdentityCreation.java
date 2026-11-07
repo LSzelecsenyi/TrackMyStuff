@@ -41,9 +41,7 @@ class IdentityCreation {
                 verifiedEmail(verified) != null,
                 now
         ));
-        if (!skipEarlyAdopter) {
-            earlyAdopters.assignNewUser(user);
-        }
+        earlyAdopters.register(user, skipEarlyAdopter);
         return user;
     }
 

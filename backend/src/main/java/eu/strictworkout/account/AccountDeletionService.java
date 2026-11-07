@@ -20,12 +20,19 @@ public class AccountDeletionService {
 
     private final ExternalIdentityVerifier identities;
     private final AccountDeletionStore store;
+    private final OneTimeMarkers markers;
     private final Clock clock;
 
-    public AccountDeletionService(ExternalIdentityVerifier identities, AccountDeletionStore store, Clock clock) {
+    public AccountDeletionService(
+            ExternalIdentityVerifier identities,
+            AccountDeletionStore store,
+            Clock clock,
+            OneTimeMarkers markers
+    ) {
         this.identities = identities;
         this.store = store;
         this.clock = clock;
+        this.markers = markers;
     }
 
     /**
@@ -53,10 +60,12 @@ public class AccountDeletionService {
                 );
             }
         }
-        String hash = GoogleSubjectHash.of(identity.subject());
+        if (markers.untrustworthy()) {
+            throw unavailable();
+        }
         UUID userId = store.findGoogleUser(identity.subject());
         if (userId == null) {
-            if (store.marker(hash)) {
+            if (markers.present(identity.subject())) {
                 return;
             }
             throw new AccountDeletionException(
@@ -65,7 +74,7 @@ public class AccountDeletionService {
             );
         }
         if (!store.lock(userId)) {
-            if (store.marker(hash)) {
+            if (markers.present(identity.subject())) {
                 return;
             }
             throw new AccountDeletionException(
@@ -73,11 +82,12 @@ public class AccountDeletionService {
                     "No Strict account exists for this Google sign-in."
             );
         }
+        markers.requireWritable();
         AccountDeletionStore.Usage usage = store.usage(userId);
         Instant now = clock.instant();
-        store.blockSubscriptionClaims(userId, now);
+        store.detachSubscriptions(userId, now);
         store.deleteAccountRows(userId);
-        store.insertMarker(hash, now, usage);
+        markers.write(identity.subject(), now, usage);
         store.deleteUser(userId);
     }
 
@@ -101,6 +111,13 @@ public class AccountDeletionService {
             throw new UnverifiedIdentityException();
         }
         return identity;
+    }
+
+    private static AccountDeletionException unavailable() {
+        return new AccountDeletionException(
+                AccountDeletionException.Code.MARKER_UNAVAILABLE,
+                "Account deletion is unavailable until the marker key is configured and matches its stored checksum."
+        );
     }
 
     private void requireRecent(VerifiedExternalIdentity identity) {

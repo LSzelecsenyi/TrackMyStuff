@@ -39,7 +39,12 @@ interface BillingGateway {
 
     suspend fun refresh(): BillingSnapshot
 
-    suspend fun launch(activity: Activity, productId: String, offerToken: String): LaunchOutcome
+    suspend fun launch(
+        activity: Activity,
+        productId: String,
+        offerToken: String,
+        obfuscatedAccountId: String? = null
+    ): LaunchOutcome
 
     fun setPurchaseListener(listener: (List<ClientPurchase>, LaunchOutcome?) -> Unit)
 }

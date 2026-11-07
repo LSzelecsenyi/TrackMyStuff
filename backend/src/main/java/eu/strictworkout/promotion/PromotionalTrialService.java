@@ -35,6 +35,14 @@ public final class PromotionalTrialService {
         this.store = store;
     }
 
+    public boolean stored(UUID userId) {
+        return store.find(userId) != null;
+    }
+
+    public Trial current(UUID userId) {
+        return store.find(userId);
+    }
+
     public boolean activeNow(UUID userId, Instant now) {
         Trial trial = store.find(userId);
         return trial != null && now.isBefore(trial.expiresAt());
@@ -74,12 +82,15 @@ public final class PromotionalTrialService {
         }
         Instant cap = activatedAt.plus(LENGTH);
         Instant storedExpiry = expiresAt.isAfter(cap) ? cap : expiresAt;
+        if (storedExpiry.isAfter(now)) {
+            return new Result(Status.INVALID, null, null);
+        }
         Trial created = new Trial(userId, activatedAt, storedExpiry);
         if (!store.insert(created)) {
             Trial raced = store.find(userId);
             return raced == null ? new Result(Status.INVALID, null, null) : existingResult(raced, now);
         }
-        return new Result(Status.ACTIVE, created.activatedAt(), created.expiresAt());
+        return new Result(Status.ALREADY_USED, created.activatedAt(), created.expiresAt());
     }
 
     private static Result existingResult(Trial existing, Instant now) {

@@ -301,7 +301,12 @@ class PlaySubscriptionRevocationTest {
         var snapshot = BillingSnapshot(BillingAvailability.READY, purchases = emptyList())
         override fun bind(activity: Activity?) = Unit
         override suspend fun refresh(): BillingSnapshot = snapshot
-        override suspend fun launch(activity: Activity, productId: String, offerToken: String) = LaunchOutcome.STARTED
+        override suspend fun launch(
+            activity: Activity,
+            productId: String,
+            offerToken: String,
+            obfuscatedAccountId: String?
+        ) = LaunchOutcome.STARTED
         override fun setPurchaseListener(listener: (List<ClientPurchase>, LaunchOutcome?) -> Unit) = Unit
     }
 }

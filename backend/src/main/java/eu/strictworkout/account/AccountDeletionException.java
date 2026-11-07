@@ -8,7 +8,8 @@ public class AccountDeletionException extends RuntimeException {
         CONFIRMATION_REQUIRED(HttpStatus.BAD_REQUEST),
         REAUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED),
         ACCOUNT_MISMATCH(HttpStatus.FORBIDDEN),
-        NOT_FOUND(HttpStatus.NOT_FOUND);
+        NOT_FOUND(HttpStatus.NOT_FOUND),
+        MARKER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE);
 
         private final HttpStatus status;
 

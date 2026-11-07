@@ -30,6 +30,9 @@ interface ProDiscoveryStateStore {
     suspend fun dismissPopup()
     suspend fun dismissWarning()
     suspend fun activate(activatedAt: Instant, expiresAt: Instant)
+    suspend fun adoptServerTrial(activatedAt: Instant, expiresAt: Instant)
+    fun activityRevision(): Long?
+    suspend fun setActivityRevision(revision: Long)
     suspend fun reset(fingerprint: String)
     suspend fun clear()
 }
@@ -64,6 +67,7 @@ class ProDiscoveryStore(
     private val mutex = Mutex()
     private var memory = ProDiscoveryRecord()
     private var storedFingerprint: String? = null
+    private var storedRevision: Long? = null
 
     override fun current(): ProDiscoveryRecord = memory
 
@@ -80,6 +84,7 @@ class ProDiscoveryStore(
         mutex.withLock {
             memory = loaded
             storedFingerprint = prefs[FINGERPRINT]
+            storedRevision = prefs[ACTIVITY_REVISION]
         }
         onChanged()
     }
@@ -123,10 +128,37 @@ class ProDiscoveryStore(
         onChanged()
     }
 
+    override suspend fun adoptServerTrial(activatedAt: Instant, expiresAt: Instant) {
+        if (memory.activatedAt == activatedAt && memory.expiresAt == expiresAt) {
+            return
+        }
+        mutex.withLock {
+            memory = memory.copy(activatedAt = activatedAt, expiresAt = expiresAt)
+            dataStore.edit { prefs ->
+                prefs[ACTIVATED_AT] = activatedAt.toEpochMilli()
+                prefs[EXPIRES_AT] = expiresAt.toEpochMilli()
+            }
+        }
+        onChanged()
+    }
+
+    override fun activityRevision(): Long? = storedRevision
+
+    override suspend fun setActivityRevision(revision: Long) {
+        if (storedRevision == revision) {
+            return
+        }
+        mutex.withLock {
+            storedRevision = revision
+            dataStore.edit { prefs -> prefs[ACTIVITY_REVISION] = revision }
+        }
+    }
+
     override suspend fun reset(fingerprint: String) {
         mutex.withLock {
             memory = ProDiscoveryRecord()
             storedFingerprint = fingerprint
+            storedRevision = null
             dataStore.edit { prefs ->
                 prefs.clear()
                 prefs[FINGERPRINT] = fingerprint
@@ -139,6 +171,7 @@ class ProDiscoveryStore(
         mutex.withLock {
             memory = ProDiscoveryRecord()
             storedFingerprint = null
+            storedRevision = null
             dataStore.edit { prefs -> prefs.clear() }
         }
         onChanged()
@@ -150,12 +183,13 @@ class ProDiscoveryStore(
         val EXPIRES_AT = longPreferencesKey("expires_at")
         val WARNING_DISMISSED = booleanPreferencesKey("warning_dismissed")
         val FINGERPRINT = stringPreferencesKey("fingerprint")
+        val ACTIVITY_REVISION = longPreferencesKey("activity_revision")
     }
 }
 
 /**
- * Last successful read of whether general promotions are enabled.
- * Unknown stays disabled so a new offer cannot start while Founder availability is unread.
+ * Last successful read of Pro Discovery and Welcome Back.
+ * Unknown stays disabled. An older single flag is used for both until a newer read arrives.
  */
 class PromotionAvailabilityStore(
     context: Context,
@@ -163,30 +197,48 @@ class PromotionAvailabilityStore(
 ) {
     private val dataStore = context.applicationContext.promotionAvailabilityStore
     private val mutex = Mutex()
-    private var enabled = false
+    private var proDiscovery = false
+    private var welcomeBack = false
 
-    fun promotionsEnabled(): Boolean = enabled
+    fun proDiscoveryEnabled(): Boolean = proDiscovery
+
+    fun welcomeBackEnabled(): Boolean = welcomeBack
+
+    fun promotionsEnabled(): Boolean = proDiscovery && welcomeBack
 
     suspend fun load() {
-        val stored = dataStore.data.first()[ENABLED] == true
-        mutex.withLock { enabled = stored }
+        val stored = dataStore.data.first()
+        val shared = stored[ENABLED] == true
+        mutex.withLock {
+            proDiscovery = stored[PRO_DISCOVERY] ?: shared
+            welcomeBack = stored[WELCOME_BACK] ?: shared
+        }
+        onChanged()
+    }
+
+    suspend fun apply(proDiscoveryEnabled: Boolean, welcomeBackEnabled: Boolean) {
+        if (proDiscovery == proDiscoveryEnabled && welcomeBack == welcomeBackEnabled) {
+            return
+        }
+        mutex.withLock {
+            proDiscovery = proDiscoveryEnabled
+            welcomeBack = welcomeBackEnabled
+            dataStore.edit { prefs ->
+                prefs[PRO_DISCOVERY] = proDiscoveryEnabled
+                prefs[WELCOME_BACK] = welcomeBackEnabled
+            }
+        }
         onChanged()
     }
 
     suspend fun setPromotionsEnabled(value: Boolean) {
-        if (enabled == value) {
-            return
-        }
-        mutex.withLock {
-            enabled = value
-            dataStore.edit { prefs -> prefs[ENABLED] = value }
-        }
-        onChanged()
+        apply(value, value)
     }
 
     suspend fun clear() {
         mutex.withLock {
-            enabled = false
+            proDiscovery = false
+            welcomeBack = false
             dataStore.edit { prefs -> prefs.clear() }
         }
         onChanged()
@@ -194,5 +246,7 @@ class PromotionAvailabilityStore(
 
     private companion object {
         val ENABLED = booleanPreferencesKey("promotions_enabled")
+        val PRO_DISCOVERY = booleanPreferencesKey("pro_discovery_enabled")
+        val WELCOME_BACK = booleanPreferencesKey("welcome_back_enabled")
     }
 }

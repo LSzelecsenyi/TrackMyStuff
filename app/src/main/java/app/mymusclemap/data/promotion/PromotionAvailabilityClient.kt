@@ -7,9 +7,15 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.IOException
 
+data class PromotionAvailability(
+    val proDiscoveryEnabled: Boolean,
+    val welcomeBackEnabled: Boolean
+)
+
 /**
- * Unauthenticated read of whether general promotions are enabled.
- * A failure leaves the previous cache in place. The caller treats a missing cache as disabled.
+ * Unauthenticated read of the two promotion flags.
+ * An older response that only has promotionsEnabled applies that value to both.
+ * A failure leaves the previous cache in place. A missing cache stays disabled.
  */
 class PromotionAvailabilityClient(
     baseUrl: String,
@@ -17,7 +23,7 @@ class PromotionAvailabilityClient(
 ) {
     private val root = baseUrl.trim().trimEnd('/')
 
-    suspend fun promotionsEnabled(): Boolean? = withContext(Dispatchers.IO) {
+    suspend fun read(): PromotionAvailability? = withContext(Dispatchers.IO) {
         if (root.isEmpty()) {
             return@withContext null
         }
@@ -30,8 +36,13 @@ class PromotionAvailabilityClient(
                 if (!response.isSuccessful) {
                     return@withContext null
                 }
-                val body = response.body?.string() ?: return@withContext null
-                JSONObject(body).getBoolean("promotionsEnabled")
+                val body = response.body.string()
+                val json = JSONObject(body)
+                val shared = json.optBoolean("promotionsEnabled", false)
+                PromotionAvailability(
+                    proDiscoveryEnabled = if (json.has("proDiscoveryEnabled")) json.getBoolean("proDiscoveryEnabled") else shared,
+                    welcomeBackEnabled = if (json.has("welcomeBackEnabled")) json.getBoolean("welcomeBackEnabled") else shared
+                )
             }
         } catch (error: IOException) {
             null

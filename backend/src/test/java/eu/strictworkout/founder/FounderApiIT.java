@@ -143,14 +143,14 @@ class FounderApiIT {
             Map<String, Object> again = parse(ok(post("/api/v1/founder/enrollment", "{}", existing)));
             assertEquals("ACTIVE_FREE", again.get("status"));
 
-            jdbc.update("update founder_program_capacity set enrollment_open = false where id = 1");
+            jdbc.update("update founder_program_capacity set lifecycle = 'INACTIVE' where id = 1");
             String afterClose = login("capacity-closed");
             ResponseEntity<String> closed = post("/api/v1/founder/enrollment", "{}", afterClose);
             assertEquals(HttpStatus.CONFLICT, closed.getStatusCode());
             assertEquals("ENROLLMENT_CLOSED", parse(closed).get("errorCode"));
             assertEquals("ACTIVE_FREE", parse(ok(post("/api/v1/founder/enrollment", "{}", existing))).get("status"));
         } finally {
-            jdbc.update("update founder_program_capacity set capacity = 2000, enrollment_open = true where id = 1");
+            jdbc.update("update founder_program_capacity set capacity = 2000, lifecycle = 'ACTIVE' where id = 1");
         }
     }
 

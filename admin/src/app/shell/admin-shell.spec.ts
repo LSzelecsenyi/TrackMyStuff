@@ -31,7 +31,7 @@ describe('Admin shell', () => {
     expect(compiled.querySelector('.brand-mark')?.getAttribute('alt')).toBe('Strict');
     expect(compiled.querySelector('.admin-label')?.textContent).toBe('Admin');
     const links = [...compiled.querySelectorAll('nav a')].map((link) => link.textContent?.trim());
-    expect(links).toEqual(['Founder applications']);
+    expect(links).toEqual(['Founder applications', 'Program management']);
     expect(compiled.querySelector('aside')).toBeNull();
     expect(compiled.querySelector('#main')).not.toBeNull();
   });

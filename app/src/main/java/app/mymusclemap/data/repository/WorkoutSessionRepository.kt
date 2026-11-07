@@ -101,7 +101,8 @@ class WorkoutSessionRepository(
     },
     private val timersAllowed: () -> Boolean = { true },
     private val planMayStart: suspend (Long) -> Boolean = { true },
-    private val exerciseMayExecute: suspend (Long) -> Boolean = { true }
+    private val exerciseMayExecute: suspend (Long) -> Boolean = { true },
+    private val onQualifyingActivityChanged: suspend () -> Unit = {}
 ) {
     private val mutex = Mutex()
 
@@ -1049,6 +1050,7 @@ class WorkoutSessionRepository(
                     if (affectsHeatmap) {
                         onHeatmapDataChanged()
                         notifyTrainingHistoryChanged(null)
+                        onQualifyingActivityChanged()
                     }
                     DeleteWorkoutResult.Deleted
                 }

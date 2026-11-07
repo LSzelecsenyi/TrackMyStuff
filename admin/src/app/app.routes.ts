@@ -22,6 +22,10 @@ export const routes: Routes = [
         path: 'founders/:applicationId',
         loadComponent: () => import('./founders/founder-detail').then((module) => module.FounderDetail),
       },
+      {
+        path: 'programs',
+        loadComponent: () => import('./programs/program-management').then((module) => module.ProgramManagement),
+      },
     ],
   },
 ];

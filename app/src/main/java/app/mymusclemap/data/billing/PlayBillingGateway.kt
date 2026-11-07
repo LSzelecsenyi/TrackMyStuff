@@ -70,12 +70,17 @@ class PlayBillingGateway(
         )
     }
 
-    override suspend fun launch(activity: Activity, productId: String, offerToken: String): LaunchOutcome {
+    override suspend fun launch(
+        activity: Activity,
+        productId: String,
+        offerToken: String,
+        obfuscatedAccountId: String?
+    ): LaunchOutcome {
         if (!connect()) {
             return LaunchOutcome.UNAVAILABLE
         }
         val product = details[productId] ?: return LaunchOutcome.UNAVAILABLE
-        val params = BillingFlowParams.newBuilder()
+        val flow = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(
                 listOf(
                     BillingFlowParams.ProductDetailsParams.newBuilder()
@@ -84,7 +89,10 @@ class PlayBillingGateway(
                         .build()
                 )
             )
-            .build()
+        if (!obfuscatedAccountId.isNullOrBlank()) {
+            flow.setObfuscatedAccountId(obfuscatedAccountId)
+        }
+        val params = flow.build()
         val result = client.launchBillingFlow(activity, params)
         return when (result.responseCode) {
             BillingClient.BillingResponseCode.OK -> LaunchOutcome.STARTED

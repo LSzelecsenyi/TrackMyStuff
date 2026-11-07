@@ -11,7 +11,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
 
     @Query("""
             select user from AppUser user
-            where not exists (
+            where user.earlyAdopterIneligible = false
+              and not exists (
                 select grant from eu.strictworkout.account.AccountStatusGrant grant
                 where grant.user = user
                   and grant.status = eu.strictworkout.account.AccountStatus.EARLY_ADOPTER

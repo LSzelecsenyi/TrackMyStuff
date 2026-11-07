@@ -45,32 +45,47 @@ class PromotionAvailabilityIT {
     }
 
     @Test
-    void unauthenticatedReadFollowsFounderEnrollmentAndEnablesPromotionsOnlyWhenItIsClosed() {
-        Boolean original = jdbc.queryForObject(
-                "SELECT enrollment_open FROM founder_program_capacity WHERE id = 1",
-                Boolean.class
-        );
+    void eachPromotionIsReadIndependentlyOfFounderEnrollment() {
         try {
-            assertAvailability(Boolean.TRUE.equals(original));
-            jdbc.update("UPDATE founder_program_capacity SET enrollment_open = ? WHERE id = 1", !Boolean.TRUE.equals(original));
-            assertAvailability(!Boolean.TRUE.equals(original));
+            jdbc.update("update founder_program_capacity set lifecycle = 'ACTIVE' where id = 1");
+            jdbc.update("update promotional_program set lifecycle = 'INACTIVE'");
+            Map<String, Object> closed = availability();
+            assertEquals(true, flag(closed, "founderProgramActive"));
+            assertEquals(false, flag(closed, "promotionsEnabled"));
+            assertEquals(false, flag(closed, "proDiscoveryEnabled"));
+            assertEquals(false, flag(closed, "welcomeBackEnabled"));
+
+            jdbc.update("update founder_program_capacity set lifecycle = 'RETIRED' where id = 1");
+            jdbc.update("update promotional_program set lifecycle = 'ACTIVE' where program = 'PRO_DISCOVERY'");
+            Map<String, Object> discoveryOnly = availability();
+            assertEquals(false, flag(discoveryOnly, "founderProgramActive"));
+            assertEquals(true, flag(discoveryOnly, "proDiscoveryEnabled"));
+            assertEquals(false, flag(discoveryOnly, "welcomeBackEnabled"));
+            assertEquals(false, flag(discoveryOnly, "promotionsEnabled"));
+
+            jdbc.update("update promotional_program set lifecycle = 'ACTIVE' where program = 'WELCOME_BACK'");
+            Map<String, Object> both = availability();
+            assertEquals(true, flag(both, "proDiscoveryEnabled"));
+            assertEquals(true, flag(both, "welcomeBackEnabled"));
+            assertEquals(true, flag(both, "promotionsEnabled"));
+            assertEquals(false, flag(both, "founderProgramActive"));
         } finally {
-            jdbc.update(
-                    "UPDATE founder_program_capacity SET enrollment_open = ? WHERE id = 1",
-                    Boolean.TRUE.equals(original)
-            );
+            jdbc.update("update founder_program_capacity set lifecycle = 'ACTIVE' where id = 1");
+            jdbc.update("update promotional_program set lifecycle = 'INACTIVE'");
         }
     }
 
-    private void assertAvailability(boolean founderProgramActive) {
+    private Map<String, Object> availability() {
         var response = RestClient.create("http://localhost:" + port)
                 .get()
                 .uri("/api/v1/promotions/availability")
                 .retrieve()
                 .toEntity(String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        Map<String, Object> body = new BasicJsonParser().parseMap(response.getBody());
-        assertEquals(founderProgramActive, Boolean.valueOf(String.valueOf(body.get("founderProgramActive"))));
-        assertEquals(!founderProgramActive, Boolean.valueOf(String.valueOf(body.get("promotionsEnabled"))));
+        return new BasicJsonParser().parseMap(response.getBody());
+    }
+
+    private static boolean flag(Map<String, Object> body, String key) {
+        return Boolean.parseBoolean(String.valueOf(body.get(key)));
     }
 }

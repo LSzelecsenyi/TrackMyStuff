@@ -37,15 +37,30 @@ class PromotionalTrialServiceTest {
     }
 
     @Test
-    void migrationKeepsTheOriginalWindowAndDoesNotExtendIt() {
-        Instant activated = now.minusSeconds(86_400);
-        PromotionalTrialService.Result migrated = trials.migrate(user, activated, activated.plus(PromotionalTrialService.LENGTH).plusSeconds(3600), now);
-        assertEquals(activated.plus(PromotionalTrialService.LENGTH), migrated.expiresAt());
+    void migrationDoesNotCreateALiveGrantAndDoesNotExtendAnExistingTrial() {
+        PromotionalTrialService.Result rejected = trials.migrate(
+                user,
+                now.minusSeconds(3_600),
+                now.plus(PromotionalTrialService.LENGTH),
+                now
+        );
+        assertEquals(PromotionalTrialService.Status.INVALID, rejected.status());
+        assertEquals(0, store.rows.size());
+
+        PromotionalTrialService.Result started = trials.activate(user, now, true, false);
         PromotionalTrialService.Result second = trials.migrate(user, now.minusSeconds(10), now.plusSeconds(10), now);
-        assertEquals(migrated.expiresAt(), second.expiresAt());
+        assertEquals(started.expiresAt(), second.expiresAt());
         assertEquals(1, store.rows.size());
-        assertTrue(now.isBefore(migrated.expiresAt()));
-        assertEquals(PromotionalTrialService.Status.ALREADY_USED, trials.activate(user, migrated.expiresAt(), true, false).status());
+        assertTrue(now.isBefore(second.expiresAt()));
+    }
+
+    @Test
+    void anExpiredLegacyTrialIsRecordedWithoutGrantingPro() {
+        Instant activated = now.minus(PromotionalTrialService.LENGTH).minusSeconds(60);
+        PromotionalTrialService.Result consumed = trials.migrate(user, activated, now.minusSeconds(1), now);
+        assertEquals(PromotionalTrialService.Status.ALREADY_USED, consumed.status());
+        assertTrue(consumed.expiresAt().compareTo(now) <= 0);
+        assertEquals(PromotionalTrialService.Status.ALREADY_USED, trials.activate(user, now, true, false).status());
     }
 
     private static final class Memory implements PromotionalTrialService.Store {

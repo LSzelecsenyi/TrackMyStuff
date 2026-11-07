@@ -1,7 +1,10 @@
 package eu.strictworkout.account;
 
+import eu.strictworkout.program.ProgramLifecycle;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -21,6 +24,10 @@ public class EarlyAdopterCohort {
     @Column(name = "backfill_completed", nullable = false)
     private boolean backfillCompleted;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private ProgramLifecycle lifecycle;
+
     protected EarlyAdopterCohort() {
     }
 
@@ -34,6 +41,14 @@ public class EarlyAdopterCohort {
 
     public boolean isBackfillCompleted() {
         return backfillCompleted;
+    }
+
+    public ProgramLifecycle getLifecycle() {
+        return lifecycle;
+    }
+
+    public void setLifecycle(ProgramLifecycle lifecycle) {
+        this.lifecycle = lifecycle;
     }
 
     public boolean hasRoom() {

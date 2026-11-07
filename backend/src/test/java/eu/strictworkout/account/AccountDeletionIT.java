@@ -63,6 +63,9 @@ class AccountDeletionIT {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private MarkerKeyRing markerKeys;
+
     @Test
     void unauthenticatedDeletionIsRejected() {
         identities.accept("token-open", "subject-open", "open@example.com", true);
@@ -164,7 +167,14 @@ class AccountDeletionIT {
 
         ResponseEntity<String> again = send(HttpMethod.POST, "/api/v1/account/deletion", body("token-delete", true), null);
         assertEquals(HttpStatus.NO_CONTENT, again.getStatusCode());
-        assertEquals(1, count("select count(*) from account_deletion_marker"));
+        assertEquals(1, count(
+                "select count(*) from account_deletion_marker where subject_hash = ?",
+                markerKeys.markerHash("subject-delete")
+        ));
+        assertEquals(0, count(
+                "select count(*) from account_deletion_marker where subject_hash = ?",
+                GoogleSubjectHash.of("subject-delete")
+        ));
 
         identities.accept("token-delete-2", "subject-delete", "delete@example.com", true);
         Map<String, Object> returned = login("token-delete-2");
@@ -206,6 +216,87 @@ class AccountDeletionIT {
         assertEquals(204, second.get());
         pool.shutdown();
         assertEquals(0, count("select count(*) from app_user where id = ?", UUID.fromString(userId(returned))));
+    }
+
+    @Test
+    void aLegacyMarkerMigratesAndKeepsEveryFlag() {
+        String subject = "subject-legacy-marker";
+        String legacy = GoogleSubjectHash.of(subject);
+        jdbc.update(
+                """
+                insert into account_deletion_marker (
+                    subject_hash, deleted_at, founder_used, pro_discovery_used, welcome_back_used, early_adopter_used
+                ) values (?, now(), true, true, true, true)
+                """,
+                legacy
+        );
+        identities.accept("token-legacy", subject, "legacy@example.com", true);
+        Map<String, Object> session = login("token-legacy");
+        assertEquals(0, count("select count(*) from account_deletion_marker where subject_hash = ?", legacy));
+        Map<String, Object> migrated = jdbc.queryForMap(
+                """
+                select founder_used, pro_discovery_used, welcome_back_used, early_adopter_used
+                from account_deletion_marker where subject_hash = ?
+                """,
+                markerKeys.markerHash(subject)
+        );
+        assertEquals(Boolean.TRUE, migrated.get("founder_used"));
+        assertEquals(Boolean.TRUE, migrated.get("pro_discovery_used"));
+        assertEquals(Boolean.TRUE, migrated.get("welcome_back_used"));
+        assertEquals(Boolean.TRUE, migrated.get("early_adopter_used"));
+        assertFalse(markerKeys.markerHash(subject).contains(subject));
+        assertEquals(0, count(
+                "select count(*) from account_status_grant where user_id = ? and status = 'EARLY_ADOPTER'",
+                UUID.fromString(userId(session))
+        ));
+        ResponseEntity<String> founder = send(HttpMethod.POST, "/api/v1/founder/enrollment", null, token(session));
+        assertEquals(HttpStatus.CONFLICT, founder.getStatusCode());
+        assertTrue(founder.getBody().contains("FOUNDER_ALREADY_USED"));
+    }
+
+    @Test
+    void anIncorrectMarkerKeyCannotReenableConsumedBenefits() {
+        identities.accept("token-key", "subject-key", "key@example.com", true);
+        Map<String, Object> session = login("token-key");
+        ResponseEntity<String> enrolled = send(HttpMethod.POST, "/api/v1/founder/enrollment", null, token(session));
+        assertEquals(HttpStatus.OK, enrolled.getStatusCode(), enrolled.getBody());
+        ResponseEntity<String> deleted = send(
+                HttpMethod.DELETE,
+                "/api/v1/account",
+                body("token-key", true),
+                token(session)
+        );
+        assertEquals(HttpStatus.NO_CONTENT, deleted.getStatusCode());
+        jdbc.update("update marker_key_verifier set verifier = 'wrong'");
+        try {
+            identities.accept("token-key-2", "subject-key", "key@example.com", true);
+            Map<String, Object> returned = login("token-key-2");
+            ResponseEntity<String> founder = send(HttpMethod.POST, "/api/v1/founder/enrollment", null, token(returned));
+            assertEquals(HttpStatus.CONFLICT, founder.getStatusCode());
+            assertTrue(founder.getBody().contains("FOUNDER_ALREADY_USED"));
+
+            identities.accept("token-key-fresh", "subject-key-fresh", "fresh@example.com", true);
+            Map<String, Object> fresh = login("token-key-fresh");
+            ResponseEntity<String> freshFounder = send(
+                    HttpMethod.POST,
+                    "/api/v1/founder/enrollment",
+                    null,
+                    token(fresh)
+            );
+            assertEquals(HttpStatus.CONFLICT, freshFounder.getStatusCode());
+            assertTrue(freshFounder.getBody().contains("FOUNDER_ALREADY_USED"));
+            assertEquals(0, count(
+                    "select count(*) from founder_application where user_id = ?",
+                    UUID.fromString(userId(fresh))
+            ));
+        } finally {
+            jdbc.update("update marker_key_verifier set verifier = ?", markerKeys.verifier());
+        }
+        identities.accept("token-key-3", "subject-key", "key@example.com", true);
+        Map<String, Object> restored = login("token-key-3");
+        ResponseEntity<String> stillUsed = send(HttpMethod.POST, "/api/v1/founder/enrollment", null, token(restored));
+        assertEquals(HttpStatus.CONFLICT, stillUsed.getStatusCode());
+        assertTrue(stillUsed.getBody().contains("FOUNDER_ALREADY_USED"));
     }
 
     @Test
@@ -360,13 +451,21 @@ class AccountDeletionIT {
         assertEquals(0, count("select count(*) from founder_workout_event where display_name = 'Secret Name'"));
         assertEquals(0, count("select count(*) from founder_review_snapshot where feedback_text = 'private feedback'"));
         Map<String, Object> subscription = jdbc.queryForMap(
-                "select linked_user_id, claim_blocked, purchase_token from play_subscription where token_hash = ?",
+                "select linked_user_id, claim_blocked, purchase_token, subscription_state from play_subscription where token_hash = ?",
                 "ab".repeat(32)
         );
         assertEquals(null, subscription.get("linked_user_id"));
-        assertEquals(Boolean.TRUE, subscription.get("claim_blocked"));
+        assertEquals(Boolean.FALSE, subscription.get("claim_blocked"));
+        assertEquals("ACTIVE", subscription.get("subscription_state"));
         assertEquals("purchase-token-test", subscription.get("purchase_token"));
-        assertEquals(1, count("select count(*) from account_deletion_marker where founder_used and pro_discovery_used and welcome_back_used"));
+        assertEquals(1, count(
+                """
+                select count(*) from account_deletion_marker
+                where subject_hash = ?
+                  and founder_used and pro_discovery_used and welcome_back_used and early_adopter_used
+                """,
+                markerKeys.markerHash("subject-delete")
+        ));
     }
 
     private Map<String, Object> login(String idToken) {

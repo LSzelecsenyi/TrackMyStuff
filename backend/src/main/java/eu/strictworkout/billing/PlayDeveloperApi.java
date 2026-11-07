@@ -16,8 +16,19 @@ record PlayPurchase(
         String state,
         String acknowledgementState,
         String orderId,
-        List<PlayLineItem> lineItems
+        List<PlayLineItem> lineItems,
+        String obfuscatedAccountId,
+        String linkedPurchaseToken
 ) {
+    PlayPurchase(
+            String packageName,
+            String state,
+            String acknowledgementState,
+            String orderId,
+            List<PlayLineItem> lineItems
+    ) {
+        this(packageName, state, acknowledgementState, orderId, lineItems, null, null);
+    }
 }
 
 enum PlayApiFailure {

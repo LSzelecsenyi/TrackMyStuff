@@ -1,10 +1,12 @@
 package eu.strictworkout.billing;
 
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Repository;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,15 +16,18 @@ class JpaPlaySubscriptionRepository implements PlaySubscriptionRepository {
 
     private final PlaySubscriptionJpaRepository subscriptions;
     private final PlayRtdnMessageJpaRepository messages;
+    private final EntityManager entities;
     private final Clock clock;
 
     JpaPlaySubscriptionRepository(
             PlaySubscriptionJpaRepository subscriptions,
             PlayRtdnMessageJpaRepository messages,
+            EntityManager entities,
             Clock clock
     ) {
         this.subscriptions = subscriptions;
         this.messages = messages;
+        this.entities = entities;
         this.clock = clock;
     }
 
@@ -42,10 +47,42 @@ class JpaPlaySubscriptionRepository implements PlaySubscriptionRepository {
     }
 
     @Override
+    public void lockTokens(Collection<String> tokenHashes) {
+        if (tokenHashes == null) {
+            return;
+        }
+        tokenHashes.stream()
+                .filter(hash -> hash != null && !hash.isBlank())
+                .distinct()
+                .sorted()
+                .forEach(hash -> entities.createNativeQuery("select pg_advisory_xact_lock(hashtext(:tokenHash))")
+                        .setParameter("tokenHash", hash)
+                        .getSingleResult());
+    }
+
+    @Override
+    public void unlockTokens() {
+        // The transaction-scoped advisory lock ends when the caller's transaction commits.
+    }
+
+    @Override
     public StoredPlaySubscription save(StoredPlaySubscription subscription) {
-        PlaySubscriptionEntity entity = subscriptions.findById(subscription.tokenHash())
-                .orElseGet(() -> PlaySubscriptionEntity.from(subscription));
-        entity.copy(subscription);
+        PlaySubscriptionEntity entity = subscriptions.findById(subscription.tokenHash()).orElse(null);
+        Instant previousEnd = entity == null ? null : entity.getEndedAt();
+        boolean hold = entity != null && entity.isRetentionHold();
+        if (entity == null) {
+            entity = PlaySubscriptionEntity.from(subscription);
+        } else {
+            entity.copy(subscription);
+        }
+        entity.setEndedAt(SubscriptionEndedAt.advance(
+                previousEnd,
+                subscription.state(),
+                subscription.expiry(),
+                subscription.entitled(),
+                clock.instant()
+        ));
+        entity.setRetentionHold(hold);
         return subscriptions.save(entity).toRecord();
     }
 

@@ -15,6 +15,7 @@ export const adminPaths = {
   csrf: '/v1/admin/csrf',
   session: '/v1/admin/session',
   founderApplications: '/v1/admin/founder/applications',
+  programs: '/v1/admin/programs',
 } as const;
 
 export function adminUrl(base: string, path: string): string {

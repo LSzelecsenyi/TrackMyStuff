@@ -2,6 +2,7 @@ package eu.strictworkout.founder;
 
 import eu.strictworkout.identity.AppUser;
 import eu.strictworkout.identity.AppUserRepository;
+import eu.strictworkout.program.ProgramLifecycle;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -12,7 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Service
-class FounderEnrollment {
+public class FounderEnrollment {
 
     private final FounderApplicationRepository applications;
     private final FounderProgramCapacityRepository capacity;
@@ -35,8 +36,9 @@ class FounderEnrollment {
     }
 
     /**
-     * New participants take one locked slot. Someone who already has an application
-     * does not take another, including when enrollment is full or closed.
+     * New participants take one locked slot while the program is ACTIVE.
+     * Someone who already has an application does not take another slot and is not
+     * blocked by a later pause, retirement, or a full cohort.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void insert(UUID userId) {
@@ -44,7 +46,7 @@ class FounderEnrollment {
         if (applications.findIdByUserId(userId).isPresent()) {
             return;
         }
-        if (!program.isEnrollmentOpen()) {
+        if (program.getLifecycle() != ProgramLifecycle.ACTIVE) {
             throw closed();
         }
         if (!program.hasRoom()) {
@@ -66,15 +68,30 @@ class FounderEnrollment {
         return state(capacity.require());
     }
 
+    /**
+     * The older enrollment switch. Open is ACTIVE and closed is INACTIVE.
+     * A retired program rejects both, so this endpoint cannot reopen it.
+     */
     @Transactional
     public FounderEnrollmentState setOpen(boolean open) {
+        return transition(open ? ProgramLifecycle.ACTIVE : ProgramLifecycle.INACTIVE);
+    }
+
+    @Transactional
+    public FounderEnrollmentState transition(ProgramLifecycle requested) {
         FounderProgramCapacity program = capacity.lockSingleton();
-        program.setEnrollmentOpen(open);
+        program.setLifecycle(program.getLifecycle().transitionTo(requested));
         return state(program);
     }
 
     private static FounderEnrollmentState state(FounderProgramCapacity program) {
-        return new FounderEnrollmentState(program.isEnrollmentOpen(), program.getEnrolledCount(), program.getCapacity());
+        boolean accepting = program.getLifecycle() == ProgramLifecycle.ACTIVE;
+        return new FounderEnrollmentState(
+                accepting,
+                program.getEnrolledCount(),
+                program.getCapacity(),
+                program.getLifecycle()
+        );
     }
 
     private static FounderCommandException closed() {
@@ -93,6 +110,11 @@ class FounderEnrollment {
         );
     }
 
-    public record FounderEnrollmentState(boolean open, int enrolledCount, int capacity) {
+    public record FounderEnrollmentState(
+            boolean open,
+            int enrolledCount,
+            int capacity,
+            ProgramLifecycle lifecycle
+    ) {
     }
 }

@@ -25,6 +25,14 @@ public class AppUser {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /**
+     * Set when this account was created while Early Adopter was not accepting
+     * new members, or when this Google account had already used Early Adopter.
+     * Historical accounts stay eligible for the one-time backfill.
+     */
+    @Column(name = "early_adopter_ineligible", nullable = false)
+    private boolean earlyAdopterIneligible;
+
     protected AppUser() {
     }
 
@@ -48,5 +56,13 @@ public class AppUser {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public boolean isEarlyAdopterIneligible() {
+        return earlyAdopterIneligible;
+    }
+
+    public void setEarlyAdopterIneligible(boolean earlyAdopterIneligible) {
+        this.earlyAdopterIneligible = earlyAdopterIneligible;
     }
 }

@@ -31,7 +31,7 @@ data class FounderProgramSnapshot(
 )
 
 /**
- * Promotional Pro from the 60-day discovery trial.
+ * Promotional Pro from the 14-day Pro Discovery trial.
  * Active only while [now] is strictly before [expiresAt]. There is no renewal.
  */
 data class PromotionalProEntitlement(

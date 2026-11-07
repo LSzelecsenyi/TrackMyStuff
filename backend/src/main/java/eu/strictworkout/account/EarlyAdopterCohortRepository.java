@@ -10,4 +10,7 @@ public interface EarlyAdopterCohortRepository extends JpaRepository<EarlyAdopter
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select cohort from EarlyAdopterCohort cohort where cohort.id = 1")
     EarlyAdopterCohort lockSingleton();
+
+    @Query("select cohort from EarlyAdopterCohort cohort where cohort.id = 1")
+    EarlyAdopterCohort require();
 }

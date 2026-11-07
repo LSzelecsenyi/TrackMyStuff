@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Clock;
 import java.util.Arrays;
@@ -25,7 +26,9 @@ class BillingConfiguration {
             PlayDeveloperApi play,
             PlaySubscriptionRepository subscriptions,
             BillingProperties properties,
-            Clock clock
+            Clock clock,
+            PlatformTransactionManager transactions,
+            PurchaseAccountTags tags
     ) {
         Set<String> products = Arrays.stream(properties.productIds().split(","))
                 .map(String::trim)
@@ -34,7 +37,7 @@ class BillingConfiguration {
         String packageName = properties.packageName().isEmpty()
                 ? "com.strictworkout.app"
                 : properties.packageName();
-        return new PlaySubscriptionService(play, subscriptions, packageName, products, clock);
+        return new PlaySubscriptionService(play, subscriptions, packageName, products, clock, transactions, tags);
     }
 
     @Bean

@@ -138,6 +138,7 @@ class WeightTrackerApplication : Application() {
             opened.refreshFounderProgramFromStore()
             opened.restoreFounderEntitlementCache()
             opened.migrateLegacyTrial()
+            opened.refreshProDiscoveryAuthority()
             opened.refreshPromotionAvailability()
             opened.refreshBilling()
             opened.refreshAccountAuthorityFromBackend()

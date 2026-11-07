@@ -20,6 +20,7 @@ class BillingCoordinator(
     private val verifier: suspend (token: String, productId: String) -> BillingVerification,
     private val store: VerifiedSubscriptionCache,
     private val current: suspend () -> BillingVerification = { BillingVerification.Absent },
+    private val purchaseAccountId: suspend () -> String? = { null },
     private val clock: Clock = Clock.systemUTC()
 ) {
     private val screenState = kotlinx.coroutines.flow.MutableStateFlow(BillingScreenState())
@@ -75,7 +76,12 @@ class BillingCoordinator(
     suspend fun launch(activity: Activity) {
         val state = screenState.value
         val offer = state.offers.firstOrNull { it.offerToken == state.selectedOfferToken } ?: return
-        when (gateway.launch(activity, offer.productId, offer.offerToken)) {
+        val accountId = if (gateway.testOnly) null else purchaseAccountId()
+        if (!gateway.testOnly && accountId.isNullOrBlank()) {
+            screenState.value = state.copy(verificationFailed = true, canceled = false)
+            return
+        }
+        when (gateway.launch(activity, offer.productId, offer.offerToken, accountId)) {
             LaunchOutcome.CANCELED -> screenState.value = state.copy(canceled = true, verificationFailed = false)
             LaunchOutcome.FAILED, LaunchOutcome.UNAVAILABLE ->
                 screenState.value = state.copy(verificationFailed = true, canceled = false)

@@ -46,6 +46,9 @@ strict:
     service-account-file: ${STRICT_PLAY_SERVICE_ACCOUNT_FILE:}
     rtdn-audience: ${STRICT_PLAY_RTDN_AUDIENCE:}
     rtdn-service-account: ${STRICT_PLAY_RTDN_SERVICE_ACCOUNT:}
+  identity:
+    marker-hmac-keys: ${STRICT_MARKER_HMAC_KEYS:}
+    marker-hmac-active-key: ${STRICT_MARKER_HMAC_ACTIVE_KEY:}
   auth:
     session-lifetime: ${STRICT_AUTH_SESSION_LIFETIME:30d}
   admin:

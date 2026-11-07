@@ -20,11 +20,13 @@ class AccountDeletionServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-10T00:00:00Z");
     private final FakeStore store = new FakeStore();
+    private final FakeMarkers markers = new FakeMarkers();
     private final ScriptedIdentityVerifier identities = new ScriptedIdentityVerifier();
     private final AccountDeletionService service = new AccountDeletionService(
             identities,
             store,
-            Clock.fixed(NOW, ZoneOffset.UTC)
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            markers
     );
 
     @Test
@@ -73,7 +75,7 @@ class AccountDeletionServiceTest {
         store.usage = new AccountDeletionStore.Usage(true, true, false, true);
         service.delete("gone", true, null);
         assertTrue(store.userDeleted);
-        assertTrue(store.claimsBlocked);
+        assertTrue(store.subscriptionsDetached);
         assertEquals(store.usage, store.savedUsage);
         service.delete("gone", true, null);
         assertEquals(1, store.deletes);
@@ -86,6 +88,20 @@ class AccountDeletionServiceTest {
         store.failMarker = true;
         assertThrows(IllegalStateException.class, () -> service.delete("fresh", true, null));
         assertFalse(store.userDeleted);
+    }
+
+    @Test
+    void aMissingMarkerKeyDoesNotDeleteTheAccount() {
+        identities.accept("fresh", "subject-a", "a@example.com", true, NOW);
+        store.userId = UUID.randomUUID();
+        markers.unavailable = true;
+        AccountDeletionException failure = assertThrows(
+                AccountDeletionException.class,
+                () -> service.delete("fresh", true, null)
+        );
+        assertEquals("MARKER_UNAVAILABLE", failure.errorCode());
+        assertFalse(store.userDeleted);
+        assertFalse(store.subscriptionsDetached);
     }
 
     @Test
@@ -107,7 +123,7 @@ class AccountDeletionServiceTest {
         String sessionSubject = "subject-a";
         boolean marker;
         boolean userDeleted;
-        boolean claimsBlocked;
+        boolean subscriptionsDetached;
         boolean failMarker;
         int deletes;
         Usage usage = new Usage(false, false, false, false);
@@ -134,8 +150,8 @@ class AccountDeletionServiceTest {
         }
 
         @Override
-        public void blockSubscriptionClaims(UUID ignored, Instant now) {
-            claimsBlocked = true;
+        public void detachSubscriptions(UUID ignored, Instant now) {
+            subscriptionsDetached = true;
         }
 
         @Override
@@ -166,6 +182,41 @@ class AccountDeletionServiceTest {
         @Override
         public boolean paidSubscriptionKnown(UUID userId) {
             return false;
+        }
+    }
+
+    private final class FakeMarkers implements OneTimeMarkers {
+        boolean unavailable;
+
+        @Override
+        public void requireWritable() {
+            if (unavailable) {
+                throw new AccountDeletionException(
+                        AccountDeletionException.Code.MARKER_UNAVAILABLE,
+                        "missing"
+                );
+            }
+        }
+
+        @Override
+        public boolean untrustworthy() {
+            return unavailable;
+        }
+
+        @Override
+        public boolean present(String googleSubject) {
+            return store.marker;
+        }
+
+        @Override
+        public void write(String googleSubject, Instant deletedAt, AccountDeletionStore.Usage usage) {
+            requireWritable();
+            store.insertMarker("hash", deletedAt, usage);
+        }
+
+        @Override
+        public java.util.Optional<AccountDeletionStore.MarkerRow> find(String googleSubject) {
+            return java.util.Optional.empty();
         }
     }
 }

@@ -11,8 +11,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.time.Instant
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class BillingCoordinatorTest {
     private val offer = SubscriptionOffer("strict_pro", "monthly", "offer-1", "Strict Pro", "€4.99", "P1M")
     private val store = MemoryStore()
@@ -90,6 +96,34 @@ class BillingCoordinatorTest {
     }
 
     @Test
+    fun launchPassesTheAccountTagAndDoesNotStartWithoutIt() = runBlocking {
+        gateway.snapshot = BillingSnapshot(BillingAvailability.READY, listOf(offer))
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        val missing = BillingCoordinator(
+            gateway,
+            { _, _ -> BillingVerification.Failed },
+            store,
+            purchaseAccountId = { null }
+        )
+        missing.refresh()
+        missing.launch(activity)
+        assertTrue(missing.screen.value.verificationFailed)
+        assertNull(gateway.launchedAccountId)
+
+        gateway.launchedAccountId = null
+        val ready = BillingCoordinator(
+            gateway,
+            { _, _ -> BillingVerification.Failed },
+            store,
+            purchaseAccountId = { "1.tag" }
+        )
+        ready.refresh()
+        ready.launch(activity)
+        assertEquals("1.tag", gateway.launchedAccountId)
+        assertFalse(ready.screen.value.verificationFailed)
+    }
+
+    @Test
     fun anOwnershipConflictDoesNotStorePro() = runBlocking {
         val coordinator = coordinator { _, _ -> BillingVerification.OwnershipConflict }
         coordinator.onUpdate(listOf(ClientPurchase("token", "strict_pro", pending = false)), null)
@@ -126,7 +160,16 @@ class BillingCoordinatorTest {
         var launch = LaunchOutcome.STARTED
         override fun bind(activity: Activity?) = Unit
         override suspend fun refresh(): BillingSnapshot = snapshot
-        override suspend fun launch(activity: Activity, productId: String, offerToken: String) = launch
+        var launchedAccountId: String? = null
+        override suspend fun launch(
+            activity: Activity,
+            productId: String,
+            offerToken: String,
+            obfuscatedAccountId: String?
+        ): LaunchOutcome {
+            launchedAccountId = obfuscatedAccountId
+            return launch
+        }
         override fun setPurchaseListener(listener: (List<ClientPurchase>, LaunchOutcome?) -> Unit) = Unit
     }
 }

@@ -179,12 +179,20 @@ final class HttpPlayDeveloperApi implements PlayDeveloperApi {
                 lines.add(new PlayLineItem(item.optString("productId", ""), basePlanId, expiry, renew));
             }
         }
+        String obfuscated = null;
+        if (body.opt("externalAccountIdentifiers") instanceof JSONObject identifiers) {
+            String value = identifiers.optString("obfuscatedExternalAccountId", "");
+            obfuscated = value.isBlank() ? null : value;
+        }
+        String linked = body.optString("linkedPurchaseToken", "");
         return new PlayPurchase(
                 packageName,
                 state,
                 acknowledgement,
                 body.optString("latestOrderId", ""),
-                lines
+                lines,
+                obfuscated,
+                linked.isBlank() ? null : linked
         );
     }
 

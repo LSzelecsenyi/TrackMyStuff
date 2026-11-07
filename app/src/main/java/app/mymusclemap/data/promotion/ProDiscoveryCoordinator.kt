@@ -6,6 +6,7 @@ import app.mymusclemap.domain.entitlement.ProDiscoveryDebugConfig
 import app.mymusclemap.domain.entitlement.ProDiscoveryDebugMode
 import app.mymusclemap.domain.entitlement.ProDiscoveryFacts
 import app.mymusclemap.domain.entitlement.ProDiscoveryPolicy
+import app.mymusclemap.domain.entitlement.ProDiscoveryServerView
 import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
 import app.mymusclemap.domain.entitlement.PromotionalProEntitlement
 import app.mymusclemap.data.preferences.ProDiscoveryStateStore
@@ -33,6 +34,8 @@ class ProDiscoveryCoordinator(
     private val zoneSource: () -> ZoneId = { zone }
 ) {
     private var history: List<Instant> = emptyList()
+    private var server = ProDiscoveryServerView()
+    private var activitySyncPending = false
 
     fun snapshot(): ProDiscoverySnapshot {
         return ProDiscoveryPolicy.evaluate(facts())
@@ -46,6 +49,35 @@ class ProDiscoveryCoordinator(
             return PromotionalProEntitlement()
         }
         return PromotionalProEntitlement(expiresAt = expiresAt)
+    }
+
+    suspend fun applyServer(view: ProDiscoveryServerView) {
+        server = view
+        val activatedAt = view.activatedAt
+        val expiresAt = view.expiresAt
+        if (activatedAt != null && expiresAt != null &&
+            (view.status == app.mymusclemap.domain.entitlement.ProDiscoveryServerStatus.ACTIVE_TRIAL ||
+                view.status == app.mymusclemap.domain.entitlement.ProDiscoveryServerStatus.ALREADY_USED)
+        ) {
+            real.adoptServerTrial(activatedAt, expiresAt)
+        }
+        onChanged()
+    }
+
+    fun markActivitySyncPending() {
+        if (activitySyncPending) {
+            return
+        }
+        activitySyncPending = true
+        onChanged()
+    }
+
+    fun clearActivitySyncPending() {
+        if (!activitySyncPending) {
+            return
+        }
+        activitySyncPending = false
+        onChanged()
     }
 
     suspend fun refreshHistory() {
@@ -150,7 +182,9 @@ class ProDiscoveryCoordinator(
             promotionsEnabled = promotionsEnabled(),
             continuedProBeyondTrial = expiresAt != null && covered.continuedBeyond(expiresAt),
             record = record,
-            debug = config
+            debug = config,
+            server = server,
+            activitySyncPending = activitySyncPending
         )
     }
 

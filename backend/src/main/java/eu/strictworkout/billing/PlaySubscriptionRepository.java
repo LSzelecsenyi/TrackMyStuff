@@ -1,6 +1,7 @@
 package eu.strictworkout.billing;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,6 +33,14 @@ interface PlaySubscriptionRepository {
     Optional<StoredPlaySubscription> findLinked(UUID userId);
 
     StoredPlaySubscription save(StoredPlaySubscription subscription);
+
+    /**
+     * Holds a database lock for these token hashes until the surrounding transaction ends.
+     * Hashes are locked in sorted order. The in-memory test double releases its lock in {@link #unlockTokens()}.
+     */
+    void lockTokens(Collection<String> tokenHashes);
+
+    void unlockTokens();
 
     List<StoredPlaySubscription> reconciliationCandidates(Instant now);
 

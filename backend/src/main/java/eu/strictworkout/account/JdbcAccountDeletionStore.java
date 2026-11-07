@@ -59,11 +59,11 @@ class JdbcAccountDeletionStore implements AccountDeletionStore {
     }
 
     @Override
-    public void blockSubscriptionClaims(UUID userId, Instant now) {
+    public void detachSubscriptions(UUID userId, Instant now) {
         jdbc.update(
                 """
                 update play_subscription
-                set linked_user_id = null, claim_blocked = true, updated_at = ?
+                set linked_user_id = null, claim_blocked = false, updated_at = ?
                 where linked_user_id = ?
                 """,
                 utc(now),
@@ -96,6 +96,11 @@ class JdbcAccountDeletionStore implements AccountDeletionStore {
                 userId
         );
         jdbc.update("delete from founder_application where user_id = ?", userId);
+        jdbc.update("delete from pro_discovery_device_day where user_id = ?", userId);
+        jdbc.update("delete from pro_discovery_device where user_id = ?", userId);
+        jdbc.update("delete from pro_discovery_activity_permission where user_id = ?", userId);
+        jdbc.update("delete from pro_discovery_activity_day where user_id = ?", userId);
+        jdbc.update("delete from pro_discovery_activity_sync where user_id = ?", userId);
         jdbc.update("delete from promotional_trial where user_id = ?", userId);
         jdbc.update("delete from welcome_back_grant where user_id = ?", userId);
         jdbc.update("delete from account_status_grant where user_id = ?", userId);
@@ -132,6 +137,33 @@ class JdbcAccountDeletionStore implements AccountDeletionStore {
         if (removed != 1) {
             throw new IllegalStateException("Account row was not deleted");
         }
+    }
+
+    @Override
+    public java.util.Optional<MarkerRow> findMarker(String subjectHash) {
+        java.util.List<MarkerRow> rows = jdbc.query(
+                """
+                select subject_hash, deleted_at, founder_used, pro_discovery_used,
+                       welcome_back_used, early_adopter_used
+                from account_deletion_marker
+                where subject_hash = ?
+                """,
+                (rs, row) -> new MarkerRow(
+                        rs.getString(1),
+                        rs.getTimestamp(2).toInstant(),
+                        rs.getBoolean(3),
+                        rs.getBoolean(4),
+                        rs.getBoolean(5),
+                        rs.getBoolean(6)
+                ),
+                subjectHash
+        );
+        return rows.stream().findFirst();
+    }
+
+    @Override
+    public void deleteMarker(String subjectHash) {
+        jdbc.update("delete from account_deletion_marker where subject_hash = ?", subjectHash);
     }
 
     @Override

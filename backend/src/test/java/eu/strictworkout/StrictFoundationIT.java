@@ -100,8 +100,15 @@ class StrictFoundationIT {
                 "founder_review_decision",
                 "founder_review_snapshot",
                 "founder_workout_event",
+                "marker_key_verifier",
                 "play_rtdn_message",
                 "play_subscription",
+                "pro_discovery_activity_day",
+                "pro_discovery_activity_permission",
+                "pro_discovery_activity_sync",
+                "pro_discovery_device",
+                "pro_discovery_device_day",
+                "promotional_program",
                 "promotional_trial",
                 "welcome_back_grant"
         ), tables);

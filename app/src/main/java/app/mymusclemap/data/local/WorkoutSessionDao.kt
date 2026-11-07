@@ -170,6 +170,15 @@ abstract class WorkoutSessionDao {
 
     @Query(
         """
+        SELECT DISTINCT workoutDate FROM workout_sessions
+        WHERE status = 'COMPLETED' AND importFingerprint IS NULL
+        ORDER BY workoutDate ASC
+        """
+    )
+    abstract suspend fun qualifyingWorkoutDates(): List<String>
+
+    @Query(
+        """
         SELECT clientWorkoutId, COALESCE(finishedAt, startedAt) AS completedAt
         FROM workout_sessions
         WHERE status = 'COMPLETED' AND importFingerprint IS NULL

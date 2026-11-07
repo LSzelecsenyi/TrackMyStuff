@@ -1,0 +1,85 @@
+@switch (phase()) {
+  @case ('loading') {
+    <strict-state kind="loading" />
+  }
+  @case ('error') {
+    <strict-state kind="error">
+      <h1>Program management could not be loaded</h1>
+      <p>The program records did not respond. Try again.</p>
+      <button type="button" class="button" (click)="load()">Try again</button>
+    </strict-state>
+  }
+  @case ('ready') {
+    <strict-state kind="content">
+      <p class="kicker">Program management</p>
+      <h1>Programs</h1>
+      <p class="lede">
+        Each program is independent. Pausing stops new grants and can be resumed. Retirement is permanent and does not remove existing grants.
+      </p>
+      @if (actionError()) {
+        <p class="action-error" role="alert">{{ actionError() }}</p>
+      }
+      <div class="programs">
+        @for (card of cards(); track card.key) {
+          <section class="surface program" [attr.aria-labelledby]="card.key + '-program'">
+            <h2 [id]="card.key + '-program'">{{ card.title }}</h2>
+            <p class="badge" [attr.data-lifecycle]="card.lifecycle">{{ lifecycleLabel(card.lifecycle) }}</p>
+            <dl class="facts">
+              @for (fact of card.facts; track fact[0]) {
+                <div>
+                  <dt>{{ fact[0] }}</dt>
+                  <dd class="tabular">{{ fact[1] }}</dd>
+                </div>
+              }
+            </dl>
+            @if (card.summary) {
+              <p>{{ card.summary }}</p>
+            }
+            @if (card.eligibility) {
+              <p>{{ card.eligibility }}</p>
+            }
+            <p>{{ card.join }}</p>
+            <div class="actions">
+              @if (card.lifecycle === 'ACTIVE') {
+                <button type="button" class="button" [disabled]="busy() !== null" (click)="pause(card.key)">Pause</button>
+              }
+              @if (card.lifecycle === 'INACTIVE') {
+                <button type="button" class="button" [disabled]="busy() !== null" (click)="resume(card.key)">Resume</button>
+              }
+              @if (card.lifecycle !== 'RETIRED') {
+                <button type="button" class="button caution" [disabled]="busy() !== null" (click)="askRetire(card.key)">
+                  Retire permanently
+                </button>
+              }
+              @if (card.lifecycle === 'RETIRED') {
+                <p>Retired programs stay retired. There is no resume or pause action.</p>
+              }
+            </div>
+          </section>
+        }
+      </div>
+      @if (confirming(); as program) {
+        <div class="confirm-backdrop">
+          <section class="surface confirm" role="alertdialog" aria-modal="true" aria-labelledby="retire-title">
+            <h2 id="retire-title">Retire {{ name(program) }} permanently</h2>
+            <p>This action is permanent. The program can never be reactivated.</p>
+            <p>No new promotional grants will be issued.</p>
+            <p>New participants will never be accepted again.</p>
+            <p>Existing grants and entitlements remain valid.</p>
+            @if (program === 'founder') {
+              <p>Existing Founder participants may still complete the program.</p>
+            }
+            <p>Obsolete HMAC deletion markers may become eligible for cleanup.</p>
+            <p>Retirement is not a pause. A paused program can be resumed. A retired program cannot.</p>
+            <div class="actions">
+              <button type="button" class="button caution" [disabled]="busy() !== null" (click)="confirmRetire()">
+                Retire permanently
+              </button>
+              <button type="button" class="button" [disabled]="busy() !== null" (click)="cancelRetire()">Cancel</button>
+            </div>
+          </section>
+        </div>
+      }
+    </strict-state>
+  }
+}

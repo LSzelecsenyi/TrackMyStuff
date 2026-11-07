@@ -35,9 +35,10 @@ Confirmed by code, unless a row says otherwise.
 | Session token hash | Required after sign-in | Authentication. Default lifetime in `application.yml` is 30 days | No |
 | Founder application, qualifying-workout metadata, and tester-report text | Optional. Only if the person joins and submits | Founder Program | No |
 | Pro Discovery trial times | Optional | Promotional access | No |
+| Distinct dates of completed native workouts | Optional. Off until the account enables Pro Discovery activity synchronization. The user can turn it off, which stops new uploads and deletes stored dates and sync metadata | Pro Discovery eligibility and one-time-grant protection. Not analytics | No |
 | Welcome Back times and qualifying workout id | Optional | Promotional access | No |
 | Play purchase token, token hash, package, product id, state, expiry, order id | Optional, and paid checkout is not offered until products are configured | Subscription verification | The purchase itself is processed by Google Play. Strict stores the token after verification |
-| Deletion marker: SHA-256 of `google:` plus the subject, plus promotion flags | Created only when an account is deleted | Stop a used promotion or Early Adopter assignment from returning | No. The raw subject is not in the marker |
+| Deletion marker: keyed HMAC of the Google subject, plus one flag per promotion | Created only when an account is deleted | Stop a used one-time benefit from returning while that promotion can still be issued. A flag is cleared after that promotion is permanently retired. The row is deleted when no flag remains | No. The raw subject is not in the marker. The marker is pseudonymous, not anonymous |
 
 The Google ID token is sent to the Strict service to open a session and again to delete an account. The app does not store that token as the session.
 
@@ -47,7 +48,7 @@ Display name is returned at sign-in and stored only in the on-device profile. Th
 
 Confirmed by code. Do not list these as data Strict collects or shares, unless a Play SDK disclosure says the library itself does.
 
-- Workout history, plans, exercise catalog, sets, reps, weights, and notes, except the Founder metadata row above.
+- The full workout log: plans, exercise catalog, sets, reps, weights, and notes, except the Founder metadata row above and the distinct Pro Discovery workout dates in the collected table. Those dates are not exercise names, sets, or Health Connect data.
 - Body weight and measurements.
 - Progress photos.
 - Goals and achievements.
@@ -68,7 +69,7 @@ Requires developer/legal confirmation: this inventory does not claim that the lo
 Confirmed by code:
 
 - In the app: Settings, Delete account / Fiók törlése. The button stays disabled until the person confirms. A fresh Google sign-in is required. Local data for that account is erased only after the server returns success.
-- On the server: the account, sessions, external identity, Founder rows, and promotional grant rows are deleted. The deletion marker remains. The Play purchase row is unlinked and `claim_blocked` is set. The token stays. The Play subscription is not cancelled.
+- On the server: the account, sessions, external identity, Founder rows, and promotional grant rows are deleted. The deletion marker remains while its promotions can still be issued. The Play purchase row is unlinked and is not cancelled at Google. A purchase Play still treats as entitled can be verified onto one new Strict account. An ended purchase row is deleted 24 calendar months after it ended, unless `retention_hold` is set.
 - Web route in this backend build: `GET /account/delete`, with no admin login. It is not an email-only form.
 
 Not deployed. Do not paste `https://api.strictworkout.eu/account/delete` into Play Console until that host serves this page.
@@ -98,4 +99,4 @@ They do not require a session. They contain no analytics script. The expected pr
 
 `AboutConfig.privacyPolicyUrl` stays null until that host actually returns the page. The app shows the in-app notice instead of opening a dead browser link.
 
-Requires developer/legal confirmation before the URL is submitted: controller legal name, postal address, privacy contact, data-protection officer, legal bases, hosting location, international-transfer tool, retention of the purchase token and the deletion marker, log retention, target age, and how policy changes are announced. Those items are marked TODO in the policy. The policy is not legally certified.
+The app now shows an informational notice when the published policy version changes. Dismissing it is not consent. Legal review of that wording is still open. Requires developer/legal confirmation before the URL is submitted: controller legal name, postal address, privacy contact, data-protection officer, legal bases, hosting location, international-transfer tool, retention of the purchase token and the deletion marker, log retention, and target age. Those items are marked TODO in the policy. The policy is not legally certified. This inventory was not submitted in Play Console.

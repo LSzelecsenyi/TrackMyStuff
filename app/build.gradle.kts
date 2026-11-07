@@ -221,8 +221,8 @@ android {
         applicationId = "com.strictworkout.app"
         minSdk = 26
         targetSdk = 37
-        // First Play upload. versionCode must increase for every later upload. Do not lower it.
-        versionCode = 4
+        // versionCode must increase for every Play upload. Do not lower it.
+        versionCode = 5
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,7 +1,10 @@
 package eu.strictworkout.founder;
 
+import eu.strictworkout.program.ProgramLifecycle;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -18,8 +21,9 @@ public class FounderProgramCapacity {
     @Column(nullable = false)
     private int capacity;
 
-    @Column(name = "enrollment_open", nullable = false)
-    private boolean enrollmentOpen;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private ProgramLifecycle lifecycle;
 
     protected FounderProgramCapacity() {
     }
@@ -32,8 +36,8 @@ public class FounderProgramCapacity {
         return capacity;
     }
 
-    public boolean isEnrollmentOpen() {
-        return enrollmentOpen;
+    public ProgramLifecycle getLifecycle() {
+        return lifecycle;
     }
 
     public boolean hasRoom() {
@@ -47,7 +51,7 @@ public class FounderProgramCapacity {
         enrolledCount = enrolledCount + 1;
     }
 
-    public void setEnrollmentOpen(boolean enrollmentOpen) {
-        this.enrollmentOpen = enrollmentOpen;
+    public void setLifecycle(ProgramLifecycle lifecycle) {
+        this.lifecycle = lifecycle;
     }
 }

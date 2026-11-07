@@ -7,6 +7,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -14,6 +17,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import eu.strictworkout.account.AccountDeletionException;
 import eu.strictworkout.admin.AdminAccessException;
 import eu.strictworkout.founder.FounderCommandException;
+import eu.strictworkout.program.ProgramLifecycleException;
+import eu.strictworkout.promotion.ProDiscoverySyncException;
 import eu.strictworkout.identity.UnverifiedIdentityException;
 
 @RestControllerAdvice
@@ -44,6 +49,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(new ApiError(exception.errorCode(), exception.getMessage()));
     }
 
+    @ExceptionHandler(ProgramLifecycleException.class)
+    public ResponseEntity<ApiError> programLifecycle(ProgramLifecycleException exception) {
+        log.info("Program lifecycle rejected: {}", exception.errorCode());
+        return ResponseEntity.status(exception.status())
+                .body(new ApiError(exception.errorCode(), exception.getMessage()));
+    }
+
     @ExceptionHandler(FounderCommandException.class)
     public ResponseEntity<ApiError> founderCommand(FounderCommandException exception) {
         log.info("Founder command rejected: {}", exception.errorCode());
@@ -56,6 +68,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("Account deletion rejected: {}", exception.errorCode());
         return ResponseEntity.status(exception.status())
                 .body(new ApiError(exception.errorCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(ProDiscoverySyncException.class)
+    public ResponseEntity<Map<String, Object>> proDiscoverySync(ProDiscoverySyncException exception) {
+        log.info("Pro Discovery activity rejected: {}", exception.errorCode());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("errorCode", exception.errorCode());
+        body.put("message", exception.getMessage());
+        if (exception.activityRevision() != null) {
+            body.put("activityRevision", exception.activityRevision());
+        }
+        if (exception.generation() != null) {
+            body.put("generation", exception.generation());
+        }
+        return ResponseEntity.status(exception.status()).body(body);
     }
 
     @ExceptionHandler(UnverifiedIdentityException.class)

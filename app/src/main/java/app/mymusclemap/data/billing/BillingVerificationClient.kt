@@ -85,6 +85,31 @@ class BillingVerificationClient(
         }
     }
 
+    /**
+     * The backend tag for the signed-in Google account. New Play purchases send it as
+     * the obfuscated account id. A missing tag does not start a purchase.
+     */
+    suspend fun purchaseAccountId(): String? = withContext(Dispatchers.IO) {
+        if (root.isEmpty()) {
+            return@withContext null
+        }
+        val requestBuilder = Request.Builder()
+            .url("$root/api/v1/billing/purchase-account")
+            .get()
+        sessionToken()?.let { requestBuilder.header("Authorization", "Bearer $it") }
+        try {
+            http.newCall(requestBuilder.build()).execute().use { response ->
+                if (response.code != 200) {
+                    return@use null
+                }
+                val id = JSONObject(response.body.string()).optString("obfuscatedAccountId", "")
+                id.takeIf { it.isNotBlank() && it.length <= 64 }
+            }
+        } catch (_: IOException) {
+            null
+        }
+    }
+
     private fun parseCurrent(raw: String?): BillingVerification {
         if (raw.isNullOrBlank()) {
             return BillingVerification.Failed

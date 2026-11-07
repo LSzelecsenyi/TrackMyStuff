@@ -225,6 +225,40 @@ The app still sends the web client id, not the Android client id. `assembleDev` 
 
 Play Billing does not exist for `com.strictworkout.app.dev` until that package is a separate Play application. The DEV env file sets `STRICT_PLAY_PACKAGE_NAME` to the DEV id so it does not verify purchases for `com.strictworkout.app`. Leave the Play JSON paths empty until that application exists.
 
+## Marker HMAC key
+
+One-time Founder and promotion protection, and the Play obfuscated account id, use HMAC-SHA-256. The key is not in source control. DEV and PROD each need their own key. Do not reuse the test key from `backend/src/test/resources/application.properties`.
+
+Generate 32 bytes and put them in the env file, mode `600`:
+
+```sh
+openssl rand -base64 32
+```
+
+```
+STRICT_MARKER_HMAC_KEYS=1:<that base64 value>
+STRICT_MARKER_HMAC_ACTIVE_KEY=1
+```
+
+Back up the same value in a password manager or other offline store that is not the server and not git. Losing it does not reveal Google subjects, but the server can no longer tell a deleted account from a new one. After the first deletion has stored a key checksum, a missing or wrong key fails closed: one-time benefits are refused and account deletion is refused, rather than granting those benefits again. Restore the backed-up value to return to normal checks. Do not invent a new key for an existing key id.
+
+To rotate, add a second key and keep the old one in the list:
+
+```
+STRICT_MARKER_HMAC_KEYS=1:<old>,2:<new>
+STRICT_MARKER_HMAC_ACTIVE_KEY=2
+```
+
+New markers use key 2. An old marker is rewritten to key 2 when that Google account signs in or is deleted again. The raw subject is not stored, so there is no bulk rewrite. Do not remove key 1 while any marker written with it might remain. Removing a key id that still has a stored checksum fails closed for everyone until that key is restored.
+
+Account deletion unlinks a Play subscription and keeps the purchase token, token hash, package, product, state, expiry, order id, and the time the subscription ended. It does not cancel the subscription at Google. A still-active purchase, including one made before an account tag existed, can be verified onto one new Strict account. Realtime notifications and reconciliation refresh that row and do not move it to a different account. The two-day reconciliation lookback is not a retention period.
+
+A scheduled job deletes an ended purchase row 24 calendar months after `ended_at`. `ended_at` is the expiry for an expired or lapsed subscription, or the first time a revoked purchase was confirmed. Entitled, paused, pending, grace, and account-hold rows are not deleted. A row with `retention_hold` true is kept. The application does not set that flag. Set it in the database only when a specific row must be kept for a dispute or another reason decided outside this product rule. Rows whose end cannot be verified are left in place and counted in the cleanup log. The log does not include tokens or account ids. Play notification ids in `play_rtdn_message` are kept so a repeated notification is ignored. They do not contain the purchase token or a Strict account. This document does not state that 24 months satisfies a tax, accounting, or legal duty.
+
+A one-time marker flag is cleared only after that program is RETIRED. The row is deleted when every flag is false. Pausing a program does not clear the marker.
+
+Pro Discovery activity dates and device snapshots are deleted when a trial row exists, when the account is deleted, and when synchronization is turned off. An extra device snapshot with no refresh for 18 months is removed only if another snapshot for that account was refreshed in those 18 months. The only remaining snapshot is kept. They are not kept for 24 months. No new environment variable is required.
+
 ## Android DEV build
 
 `:app:assembleRelease` and `:app:bundleRelease` are unchanged. The DEV app is a release-like build type, not a product flavor, so those task names and the Play output path stay where they are. The DEV compile classpath uses `src/release/java`, which is the production Founder, entitlement, and billing selection. Debug overrides stay on the debug build type.

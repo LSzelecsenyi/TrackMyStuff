@@ -38,6 +38,7 @@ import app.mymusclemap.data.promotion.WelcomeBackCoordinator
 import app.mymusclemap.data.promotion.WelcomeBackCoverage
 import app.mymusclemap.domain.entitlement.EntitlementResolver
 import app.mymusclemap.domain.entitlement.ProDiscoveryCoverage
+import app.mymusclemap.domain.entitlement.toUi
 import app.mymusclemap.domain.entitlement.ProDiscoveryPolicy
 import app.mymusclemap.domain.entitlement.ProDiscoverySnapshot
 import app.mymusclemap.domain.entitlement.PromotionalProEntitlement
@@ -196,7 +197,8 @@ class AppContainer(
         onTrainingHistoryChanged = { clientWorkoutId -> achievementRepository.reconcile(clientWorkoutId) },
         timersAllowed = { featureEntitlements.hasAccess(app.mymusclemap.domain.entitlement.AppFeature.WorkoutTimers) },
         planMayStart = { id -> planMayStart.get().invoke(id) },
-        exerciseMayExecute = { id -> exerciseMayExecute.get().invoke(id) }
+        exerciseMayExecute = { id -> exerciseMayExecute.get().invoke(id) },
+        onQualifyingActivityChanged = { founderCacheScope.launch { refreshProDiscoveryAuthority() } }
     )
     val lockScreenSetCompletion = LockScreenSetCompletionPreferences(appContext)
     val timerSounds = TimerSoundPreferences(appContext)
@@ -264,6 +266,17 @@ class AppContainer(
             entitlementRevision.value = entitlementRevision.value + 1
         }
     )
+    val proDiscoverySyncPermission = app.mymusclemap.data.preferences.ProDiscoverySyncPermissionStore(
+        java.io.File(appContext.filesDir, "pro_discovery_sync_$accountUserId.txt")
+    )
+    val installationId = app.mymusclemap.data.preferences.InstallationIdStore(
+        java.io.File(appContext.filesDir, "pro_discovery_installation_id.txt")
+    )
+    val privacyNotice = app.mymusclemap.data.preferences.PrivacyNoticeStore(
+        java.io.File(appContext.filesDir, "privacy_policy_notice.txt")
+    )
+    private val proDiscoverySyncEpoch = java.util.concurrent.atomic.AtomicInteger()
+
     private val proDiscoveryReal = ProDiscoveryStore(
         context = appContext,
         kind = ProDiscoveryStoreKind.REAL,
@@ -293,8 +306,10 @@ class AppContainer(
             database.workoutSessionDao().nativeCompletionEpochMillis().map { Instant.ofEpochMilli(it) }
         },
         debugConfig = { ProDiscoveryDebugSelection.current() },
-        promotionsEnabled = { promotionAvailability.promotionsEnabled() },
-        onAvailability = { enabled -> promotionAvailability.setPromotionsEnabled(enabled) },
+        promotionsEnabled = { promotionAvailability.proDiscoveryEnabled() },
+        onAvailability = { enabled ->
+            founderCacheScope.launch { promotionAvailability.apply(enabled, promotionAvailability.welcomeBackEnabled()) }
+        },
         onChanged = { entitlementRevision.value = entitlementRevision.value + 1 },
         authorizeActivation = {
             app.mymusclemap.data.promotion.ProDiscoveryTrialClient(
@@ -327,7 +342,7 @@ class AppContainer(
             }
         },
         debugConfig = { WelcomeBackDebugSelection.current() },
-        promotionsEnabled = { promotionAvailability.promotionsEnabled() },
+        promotionsEnabled = { promotionAvailability.welcomeBackEnabled() },
         onChanged = { entitlementRevision.value = entitlementRevision.value + 1 },
         authorizeActivation = { workoutId ->
             WelcomeBackClient(
@@ -477,6 +492,7 @@ class AppContainer(
             founderCacheScope.launch {
                 proDiscovery.refreshHistory()
                 welcomeBack.noteCompletion(clientWorkoutId)
+                refreshProDiscoveryAuthority()
             }
         }
         systemDates.bind(founderCacheScope)
@@ -515,6 +531,166 @@ class AppContainer(
 
     suspend fun refreshFounderProgramFromStore() {
         founderProgram.refresh()
+    }
+
+    private val proDiscoverySync = kotlinx.coroutines.sync.Mutex()
+
+    fun privacyNoticeDue(): Boolean {
+        return app.mymusclemap.domain.entitlement.PrivacyPolicyNotice.due(privacyNotice.acknowledgedVersion())
+    }
+
+    fun acknowledgePrivacyNotice() {
+        privacyNotice.acknowledge()
+        entitlementRevision.value = entitlementRevision.value + 1
+    }
+
+    fun proDiscoverySyncUi(): app.mymusclemap.domain.entitlement.ProDiscoverySyncUi {
+        return proDiscoverySyncPermission.read().toUi()
+    }
+
+    fun enableProDiscoverySync() {
+        founderCacheScope.launch {
+            val granted = proDiscoverySync.withLock {
+                val result = proDiscoveryClient().setActivitySync(enabled = true) ?: return@withLock false
+                if (!result.enabled || result.generation <= 0L) {
+                    return@withLock false
+                }
+                proDiscoverySyncPermission.write(
+                    app.mymusclemap.domain.entitlement.ProDiscoverySyncPermission(
+                        choice = app.mymusclemap.domain.entitlement.ProDiscoverySyncChoice.ENABLED,
+                        generation = result.generation,
+                        deletion = app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.NONE
+                    )
+                )
+                entitlementRevision.value = entitlementRevision.value + 1
+                true
+            }
+            if (granted) {
+                refreshProDiscoveryAuthority()
+            }
+        }
+    }
+
+    fun declineProDiscoverySync() {
+        founderCacheScope.launch {
+            proDiscoverySync.withLock {
+                withdrawProDiscoverySyncLocked()
+            }
+        }
+    }
+
+    suspend fun refreshProDiscoveryAuthority() {
+        proDiscoverySync.withLock {
+            val client = proDiscoveryClient()
+            val permission = proDiscoverySyncPermission.read()
+            if (!permission.allowsUpload) {
+                if (permission.deletion != app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.NONE) {
+                    val withdrawn = client.setActivitySync(enabled = false)
+                    proDiscoverySyncPermission.write(
+                        permission.copy(
+                            choice = app.mymusclemap.domain.entitlement.ProDiscoverySyncChoice.DISABLED,
+                            deletion = if (withdrawn != null && !withdrawn.enabled) {
+                                app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.NONE
+                            } else {
+                                app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.FAILED
+                            }
+                        )
+                    )
+                    entitlementRevision.value = entitlementRevision.value + 1
+                }
+                val status = client.current()
+                if (status != null) {
+                    proDiscovery.applyServer(status)
+                }
+                proDiscovery.clearActivitySyncPending()
+                return@withLock
+            }
+            val epoch = proDiscoverySyncEpoch.get()
+            val dates = database.workoutSessionDao().qualifyingWorkoutDates()
+            var outcome = client.synchronize(
+                installationId = installationId.getOrCreate(),
+                revision = proDiscoveryReal.activityRevision() ?: 0L,
+                generation = permission.generation,
+                dates = dates
+            )
+            if (outcome is app.mymusclemap.data.promotion.ActivitySync.Stale &&
+                epoch == proDiscoverySyncEpoch.get() &&
+                proDiscoverySyncPermission.read().allowsUpload
+            ) {
+                proDiscoveryReal.setActivityRevision(outcome.revision)
+                outcome = client.synchronize(
+                    installationId = installationId.getOrCreate(),
+                    revision = outcome.revision,
+                    generation = proDiscoverySyncPermission.read().generation,
+                    dates = dates
+                )
+            }
+            if (epoch != proDiscoverySyncEpoch.get() || !proDiscoverySyncPermission.read().allowsUpload) {
+                return@withLock
+            }
+            if (outcome is app.mymusclemap.data.promotion.ActivitySync.Stale) {
+                proDiscoveryReal.setActivityRevision(outcome.revision)
+            }
+            if (outcome is app.mymusclemap.data.promotion.ActivitySync.Applied) {
+                proDiscoveryReal.setActivityRevision(outcome.revision)
+            }
+            val status = client.current()
+            if (status != null) {
+                proDiscovery.applyServer(status)
+            }
+            val synced = outcome is app.mymusclemap.data.promotion.ActivitySync.Applied ||
+                outcome is app.mymusclemap.data.promotion.ActivitySync.NotRequired ||
+                outcome is app.mymusclemap.data.promotion.ActivitySync.Rejected
+            if (synced && status != null) {
+                proDiscovery.clearActivitySyncPending()
+            } else if (outcome !is app.mymusclemap.data.promotion.ActivitySync.Rejected) {
+                proDiscovery.markActivitySyncPending()
+            }
+        }
+    }
+
+    private suspend fun withdrawProDiscoverySyncLocked() {
+        val current = proDiscoverySyncPermission.read()
+        proDiscoverySyncEpoch.incrementAndGet()
+        if (current.choice != app.mymusclemap.domain.entitlement.ProDiscoverySyncChoice.ENABLED &&
+            current.deletion == app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.NONE
+        ) {
+            proDiscoverySyncPermission.write(
+                current.copy(
+                    choice = app.mymusclemap.domain.entitlement.ProDiscoverySyncChoice.DISABLED,
+                    deletion = app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.NONE
+                )
+            )
+            entitlementRevision.value = entitlementRevision.value + 1
+            return
+        }
+        proDiscoverySyncPermission.write(
+            current.copy(
+                choice = app.mymusclemap.domain.entitlement.ProDiscoverySyncChoice.DISABLED,
+                deletion = app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.PENDING
+            )
+        )
+        entitlementRevision.value = entitlementRevision.value + 1
+        val withdrawn = proDiscoveryClient().setActivitySync(enabled = false)
+        proDiscoverySyncPermission.write(
+            current.copy(
+                choice = app.mymusclemap.domain.entitlement.ProDiscoverySyncChoice.DISABLED,
+                deletion = if (withdrawn != null && !withdrawn.enabled) {
+                    app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.NONE
+                } else {
+                    app.mymusclemap.domain.entitlement.ProDiscoverySyncDeletion.FAILED
+                }
+            )
+        )
+        entitlementRevision.value = entitlementRevision.value + 1
+    }
+
+    private fun proDiscoveryClient(): app.mymusclemap.data.promotion.ProDiscoveryTrialClient {
+        return app.mymusclemap.data.promotion.ProDiscoveryTrialClient(
+            baseUrl = BuildConfig.STRICT_API_BASE_URL,
+            http = strictOkHttpClient(),
+            sessionToken = { strictAccount.sessions.read()?.accessToken?.value }
+        )
     }
 
     suspend fun migrateLegacyTrial() {
@@ -601,7 +777,8 @@ class AppContainer(
     }
 
     suspend fun refreshPromotionAvailability() {
-        proDiscovery.refreshAvailability { promotionAvailabilityClient.promotionsEnabled() }
+        val availability = promotionAvailabilityClient.read() ?: return
+        promotionAvailability.apply(availability.proDiscoveryEnabled, availability.welcomeBackEnabled)
     }
 
     /**
@@ -741,6 +918,7 @@ class AppContainer(
         verifier = billingVerifier::verify,
         store = verifiedSubscriptions,
         current = billingVerifier::current,
+        purchaseAccountId = billingVerifier::purchaseAccountId,
         clock = clock
     )
 

@@ -35,6 +35,7 @@ describe('Admin API configuration', () => {
     expect(adminUrl('/api', adminPaths.session)).toBe('/api/v1/admin/session');
     expect(adminUrl('/api', adminPaths.csrf)).toBe('/api/v1/admin/csrf');
     expect(adminUrl('/api', adminPaths.founderApplications)).toBe('/api/v1/admin/founder/applications');
+    expect(adminUrl('/api', adminPaths.programs)).toBe('/api/v1/admin/programs');
     expect(adminPaths.session).not.toContain('/api/v1/auth/');
   });
 
