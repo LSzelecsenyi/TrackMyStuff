@@ -2,6 +2,7 @@ package eu.strictworkout.account;
 
 import eu.strictworkout.identity.ScriptedIdentityVerifier;
 import eu.strictworkout.identity.ScriptedIdentityVerifierConfig;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -122,6 +123,7 @@ class AccountDeletionIT {
     }
 
     @Test
+    @DisplayName("Given two accounts, when one session presents the other Google account, then neither account is deleted")
     void oneAccountCannotDeleteAnother() {
         identities.accept("token-owner", "subject-owner", "owner@example.com", true);
         identities.accept("token-other", "subject-other", "other@example.com", true);
@@ -137,6 +139,77 @@ class AccountDeletionIT {
         assertTrue(response.getBody().contains("ACCOUNT_MISMATCH"));
         assertEquals(HttpStatus.OK, me(token(owner)).getStatusCode());
         assertEquals(HttpStatus.OK, me(token(other)).getStatusCode());
+    }
+
+    @Test
+    @DisplayName("Given a Pro Discovery offer row, when that account is deleted, then the offer is removed and the other account stays")
+    void proDiscoveryOfferIsRemovedWithTheAccount() {
+        identities.accept("token-offer", "subject-offer", "offer@example.com", true);
+        identities.accept("token-offer-other", "subject-offer-other", "other-offer@example.com", true);
+        Map<String, Object> session = login("token-offer");
+        Map<String, Object> other = login("token-offer-other");
+        UUID ownerId = UUID.fromString(userId(session));
+        UUID otherId = UUID.fromString(userId(other));
+        OffsetDateTime at = OffsetDateTime.now(ZoneOffset.UTC);
+        jdbc.update(
+                "insert into pro_discovery_offer (user_id, presented_at, updated_at) values (?, ?, ?)",
+                ownerId,
+                at,
+                at
+        );
+        jdbc.update(
+                "insert into pro_discovery_offer (user_id, presented_at, updated_at) values (?, null, ?)",
+                otherId,
+                at
+        );
+
+        ResponseEntity<String> deleted = send(
+                HttpMethod.DELETE,
+                "/api/v1/account",
+                body("token-offer", true),
+                token(session)
+        );
+        assertEquals(HttpStatus.NO_CONTENT, deleted.getStatusCode());
+        assertEquals(0, count("select count(*) from app_user where id = ?", ownerId));
+        assertEquals(0, count("select count(*) from pro_discovery_offer where user_id = ?", ownerId));
+        assertEquals(0, count("select count(*) from external_identity where user_id = ?", ownerId));
+        assertEquals(1, count("select count(*) from app_user where id = ?", otherId));
+        assertEquals(1, count("select count(*) from pro_discovery_offer where user_id = ?", otherId));
+    }
+
+    @Test
+    @DisplayName("Given offer rows on two accounts, when the wrong Google account is selected, then both offers remain")
+    void aDifferentGoogleAccountDoesNotRemoveOfferRows() {
+        identities.accept("token-keep", "subject-keep", "keep@example.com", true);
+        identities.accept("token-keep-other", "subject-keep-other", "keep-other@example.com", true);
+        Map<String, Object> owner = login("token-keep");
+        Map<String, Object> other = login("token-keep-other");
+        UUID ownerId = UUID.fromString(userId(owner));
+        UUID otherId = UUID.fromString(userId(other));
+        OffsetDateTime at = OffsetDateTime.now(ZoneOffset.UTC);
+        jdbc.update(
+                "insert into pro_discovery_offer (user_id, presented_at, updated_at) values (?, null, ?)",
+                ownerId,
+                at
+        );
+        jdbc.update(
+                "insert into pro_discovery_offer (user_id, presented_at, updated_at) values (?, null, ?)",
+                otherId,
+                at
+        );
+
+        ResponseEntity<String> rejected = send(
+                HttpMethod.DELETE,
+                "/api/v1/account",
+                body("token-keep-other", true),
+                token(owner)
+        );
+        assertEquals(HttpStatus.FORBIDDEN, rejected.getStatusCode());
+        assertTrue(rejected.getBody().contains("ACCOUNT_MISMATCH"));
+        assertEquals(1, count("select count(*) from pro_discovery_offer where user_id = ?", ownerId));
+        assertEquals(1, count("select count(*) from pro_discovery_offer where user_id = ?", otherId));
+        assertEquals(1, count("select count(*) from app_user where id = ?", ownerId));
+        assertEquals(1, count("select count(*) from app_user where id = ?", otherId));
     }
 
     @Test

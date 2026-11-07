@@ -47,6 +47,9 @@ enum class DeleteAccountResult {
     NeedsNetwork,
     Cancelled,
     ReauthenticationRequired,
+    WrongAccount,
+    NotFound,
+    GoogleFailed,
     Failed,
     LocalCleanupIncomplete
 }
@@ -61,7 +64,8 @@ fun DeleteAccountScreen(
     onDelete: suspend () -> DeleteAccountResult,
     onFinished: () -> Unit,
     onBack: () -> Unit,
-    onOpenPrivacy: () -> Unit = {}
+    onOpenPrivacy: () -> Unit = {},
+    accountEmail: String? = null
 ) {
     var confirmed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -91,6 +95,12 @@ fun DeleteAccountScreen(
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             Text(stringResource(R.string.delete_account_intro))
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.delete_account_google))
+            if (!accountEmail.isNullOrBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text(stringResource(R.string.delete_account_signed_in_as, accountEmail))
+            }
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.delete_account_founder))
             Spacer(Modifier.height(12.dp))
@@ -144,9 +154,14 @@ fun DeleteAccountScreen(
                             DeleteAccountResult.Deleted,
                             DeleteAccountResult.LocalCleanupIncomplete -> onFinished()
                             DeleteAccountResult.NeedsNetwork -> message = R.string.delete_account_offline
-                            DeleteAccountResult.Cancelled -> Unit
+                            DeleteAccountResult.Cancelled -> message = R.string.delete_account_cancelled
                             DeleteAccountResult.ReauthenticationRequired ->
                                 message = R.string.delete_account_reauth
+                            DeleteAccountResult.WrongAccount ->
+                                message = R.string.delete_account_wrong_account
+                            DeleteAccountResult.NotFound -> message = R.string.delete_account_not_found
+                            DeleteAccountResult.GoogleFailed ->
+                                message = R.string.delete_account_google_failed
                             DeleteAccountResult.Failed -> message = R.string.delete_account_failed
                         }
                         busy = false

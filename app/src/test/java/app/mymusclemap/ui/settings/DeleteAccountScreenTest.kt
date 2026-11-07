@@ -73,4 +73,72 @@ class DeleteAccountScreenTest {
         assertEquals(1, managed)
         assertEquals(1, privacy)
     }
+
+    @Test
+    fun givenTheSignedInEmail_whenTheScreenOpens_thenGoogleReauthenticationIsExplained() {
+        composeRule.setContent {
+            WeightTrackerThemeForPreview {
+                DeleteAccountScreen(
+                    paidSubscriptionKnown = false,
+                    onManageSubscription = {},
+                    onDelete = { DeleteAccountResult.Cancelled },
+                    onFinished = {},
+                    onBack = {},
+                    accountEmail = "owner@example.com"
+                )
+            }
+        }
+        composeRule.onNodeWithText(testString(R.string.delete_account_google))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.delete_account_signed_in_as, "owner@example.com"))
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun givenAccountSelectionIsCancelled_whenTheResultReturns_thenCancellationIsShownAndDeletionDoesNotFinish() {
+        var finished = 0
+        composeRule.setContent {
+            WeightTrackerThemeForPreview {
+                DeleteAccountScreen(
+                    paidSubscriptionKnown = false,
+                    onManageSubscription = {},
+                    onDelete = { DeleteAccountResult.Cancelled },
+                    onFinished = { finished += 1 },
+                    onBack = {}
+                )
+            }
+        }
+        composeRule.onNodeWithTag(DELETE_ACCOUNT_CONFIRM).performScrollTo().performClick()
+        composeRule.onNodeWithTag(DELETE_ACCOUNT_ACTION).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(testString(R.string.delete_account_cancelled))
+            .performScrollTo()
+            .assertIsDisplayed()
+        assertEquals(0, finished)
+    }
+
+    @Test
+    fun givenADifferentGoogleAccount_whenTheResultReturns_thenTheWrongAccountMessageIsShown() {
+        var finished = 0
+        composeRule.setContent {
+            WeightTrackerThemeForPreview {
+                DeleteAccountScreen(
+                    paidSubscriptionKnown = false,
+                    onManageSubscription = {},
+                    onDelete = { DeleteAccountResult.WrongAccount },
+                    onFinished = { finished += 1 },
+                    onBack = {}
+                )
+            }
+        }
+        composeRule.onNodeWithTag(DELETE_ACCOUNT_CONFIRM).performScrollTo().performClick()
+        composeRule.onNodeWithTag(DELETE_ACCOUNT_ACTION).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(testString(R.string.delete_account_wrong_account))
+            .performScrollTo()
+            .assertIsDisplayed()
+        assertEquals(0, finished)
+    }
 }

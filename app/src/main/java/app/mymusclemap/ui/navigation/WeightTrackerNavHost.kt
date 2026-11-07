@@ -824,7 +824,8 @@ fun WeightTrackerNavHost(
                     onDelete = onDeleteAccount,
                     onFinished = onAccountDeletionFinished,
                     onBack = { navController.popBackStack() },
-                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) }
+                    onOpenPrivacy = { navController.navigateInternal(AppRoutes.PRIVACY) },
+                    accountEmail = accountEmail
                 )
             }
             composable(AppRoutes.FOUNDER_PROGRAM) {

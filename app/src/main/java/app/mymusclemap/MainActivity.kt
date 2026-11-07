@@ -343,10 +343,12 @@ class MainActivity : AppCompatActivity() {
                                         AccountDeletionOutcome.Cancelled -> DeleteAccountResult.Cancelled
                                         AccountDeletionOutcome.ReauthenticationRequired ->
                                             DeleteAccountResult.ReauthenticationRequired
+                                        AccountDeletionOutcome.WrongAccount -> DeleteAccountResult.WrongAccount
+                                        AccountDeletionOutcome.NotFound -> DeleteAccountResult.NotFound
+                                        AccountDeletionOutcome.GoogleUnavailable ->
+                                            DeleteAccountResult.GoogleFailed
                                         is AccountDeletionOutcome.LocalCleanupFailed ->
                                             DeleteAccountResult.LocalCleanupIncomplete
-                                        AccountDeletionOutcome.GoogleUnavailable,
-                                        AccountDeletionOutcome.NotFound,
                                         AccountDeletionOutcome.Failed,
                                         AccountDeletionOutcome.NoAccount -> DeleteAccountResult.Failed
                                     }

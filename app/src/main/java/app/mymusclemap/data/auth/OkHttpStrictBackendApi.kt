@@ -291,17 +291,8 @@ class OkHttpStrictBackendApi(
 
     private suspend fun interpretDeletion(request: Request): AccountDeletionCall {
         return call(request) { response ->
-            when (response.code) {
-                204 -> AccountDeletionCall.Deleted
-                401 -> if (errorCode(response) == "REAUTHENTICATION_REQUIRED") {
-                    AccountDeletionCall.ReauthenticationRequired
-                } else {
-                    AccountDeletionCall.Unauthenticated
-                }
-                404 -> AccountDeletionCall.NotFound
-                in 500..599 -> AccountDeletionCall.Failed
-                else -> AccountDeletionCall.Rejected
-            }
+            val error = if (response.code == 204) null else errorCode(response)
+            accountDeletionCall(response.code, error)
         } ?: AccountDeletionCall.Unavailable
     }
 

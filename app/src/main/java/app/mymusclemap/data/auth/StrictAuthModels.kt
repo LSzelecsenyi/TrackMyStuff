@@ -23,7 +23,10 @@ data class StoredStrictSession(
 )
 
 sealed interface GoogleIdTokenRequest {
-    data class Issued(val idToken: GoogleIdTokenValue) : GoogleIdTokenRequest
+    data class Issued(
+        val idToken: GoogleIdTokenValue,
+        val email: String? = null
+    ) : GoogleIdTokenRequest
     data object Cancelled : GoogleIdTokenRequest
     data object NotConfigured : GoogleIdTokenRequest
     data object Failed : GoogleIdTokenRequest
@@ -115,11 +118,36 @@ sealed interface FounderReportSubmission {
 sealed interface AccountDeletionCall {
     data object Deleted : AccountDeletionCall
     data object ReauthenticationRequired : AccountDeletionCall
+    data object InvalidGoogleToken : AccountDeletionCall
     data object Unauthenticated : AccountDeletionCall
+    data object AccountMismatch : AccountDeletionCall
     data object NotFound : AccountDeletionCall
     data object Rejected : AccountDeletionCall
     data object Failed : AccountDeletionCall
     data object Unavailable : AccountDeletionCall
+}
+
+/**
+ * Maps a deletion HTTP result. A 204 is the only success.
+ * [errorCode] is null when the response has no error body.
+ */
+internal fun accountDeletionCall(status: Int, errorCode: String?): AccountDeletionCall {
+    return when (status) {
+        204 -> AccountDeletionCall.Deleted
+        401 -> when (errorCode) {
+            "REAUTHENTICATION_REQUIRED" -> AccountDeletionCall.ReauthenticationRequired
+            "INVALID_GOOGLE_TOKEN" -> AccountDeletionCall.InvalidGoogleToken
+            else -> AccountDeletionCall.Unauthenticated
+        }
+        403 -> if (errorCode == "ACCOUNT_MISMATCH") {
+            AccountDeletionCall.AccountMismatch
+        } else {
+            AccountDeletionCall.Rejected
+        }
+        404 -> AccountDeletionCall.NotFound
+        in 500..599 -> AccountDeletionCall.Failed
+        else -> AccountDeletionCall.Rejected
+    }
 }
 
 sealed interface FounderEntitlementCall {

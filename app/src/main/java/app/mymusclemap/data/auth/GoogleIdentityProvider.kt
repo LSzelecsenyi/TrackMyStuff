@@ -9,6 +9,7 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -41,16 +42,15 @@ class CredentialManagerGoogleIdentityProvider(
                 .build()
             val response = CredentialManager.create(uiContext).getCredential(uiContext, request)
             val credential = response.credential
-            if (credential !is CustomCredential ||
-                credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-            ) {
+            if (credential !is CustomCredential || !isAcceptedGoogleIdTokenType(credential.type)) {
                 return GoogleIdTokenRequest.Failed
             }
-            val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
+            val parsed = GoogleIdTokenCredential.createFrom(credential.data)
+            val idToken = parsed.idToken
             if (!isCredentialSafe(idToken)) {
                 GoogleIdTokenRequest.Failed
             } else {
-                GoogleIdTokenRequest.Issued(GoogleIdTokenValue(idToken))
+                GoogleIdTokenRequest.Issued(GoogleIdTokenValue(idToken), parsed.email)
             }
         } catch (_: GetCredentialCancellationException) {
             GoogleIdTokenRequest.Cancelled
@@ -58,8 +58,20 @@ class CredentialManagerGoogleIdentityProvider(
             GoogleIdTokenRequest.Failed
         } catch (_: GetCredentialException) {
             GoogleIdTokenRequest.Failed
+        } catch (_: GoogleIdTokenParsingException) {
+            GoogleIdTokenRequest.Failed
         }
     }
+}
+
+/**
+ * Sign in with Google returns [GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL]
+ * on current Play services. The older button flow used
+ * [GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL]. Both carry an ID token.
+ */
+internal fun isAcceptedGoogleIdTokenType(type: String): Boolean {
+    return type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL ||
+        type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL
 }
 
 /**

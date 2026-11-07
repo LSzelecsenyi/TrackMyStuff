@@ -10,6 +10,7 @@ sealed interface AccountDeletionOutcome {
     data object Cancelled : AccountDeletionOutcome
     data object GoogleUnavailable : AccountDeletionOutcome
     data object ReauthenticationRequired : AccountDeletionOutcome
+    data object WrongAccount : AccountDeletionOutcome
     data object NotFound : AccountDeletionOutcome
     data object Failed : AccountDeletionOutcome
     data object NoAccount : AccountDeletionOutcome
@@ -27,21 +28,21 @@ class AccountDeletionCoordinator(
     private val online: () -> Boolean,
     private val afterServerDeletion: suspend (String) -> Boolean
 ) {
-    suspend fun delete(userId: String): AccountDeletionOutcome {
+    suspend fun delete(userId: String, expectedEmail: String? = null): AccountDeletionOutcome {
         if (!online()) {
             return AccountDeletionOutcome.NeedsNetwork
         }
-        val token = when (val google = requestIdToken()) {
+        val selected = when (val google = requestIdToken()) {
             GoogleIdTokenRequest.Cancelled -> return AccountDeletionOutcome.Cancelled
             GoogleIdTokenRequest.Failed, GoogleIdTokenRequest.NotConfigured ->
                 return AccountDeletionOutcome.GoogleUnavailable
-            is GoogleIdTokenRequest.Issued -> google.idToken
+            is GoogleIdTokenRequest.Issued -> google
         }
-        val authenticated = deleteAuthenticated(token)
-        val result = if (authenticated == AccountDeletionCall.Unauthenticated) {
-            deletePublic(token)
-        } else {
-            authenticated
+        val authenticated = deleteAuthenticated(selected.idToken)
+        val result = when {
+            authenticated != AccountDeletionCall.Unauthenticated -> authenticated
+            emailsMatch(expectedEmail, selected.email) -> deletePublic(selected.idToken)
+            else -> AccountDeletionCall.AccountMismatch
         }
         return when (result) {
             AccountDeletionCall.Deleted ->
@@ -50,7 +51,9 @@ class AccountDeletionCoordinator(
                 } else {
                     AccountDeletionOutcome.LocalCleanupFailed(userId)
                 }
-            AccountDeletionCall.ReauthenticationRequired -> AccountDeletionOutcome.ReauthenticationRequired
+            AccountDeletionCall.ReauthenticationRequired,
+            AccountDeletionCall.InvalidGoogleToken -> AccountDeletionOutcome.ReauthenticationRequired
+            AccountDeletionCall.AccountMismatch -> AccountDeletionOutcome.WrongAccount
             AccountDeletionCall.NotFound -> AccountDeletionOutcome.NotFound
             AccountDeletionCall.Unavailable ->
                 if (online()) AccountDeletionOutcome.Failed else AccountDeletionOutcome.NeedsNetwork
@@ -59,4 +62,10 @@ class AccountDeletionCoordinator(
             AccountDeletionCall.Failed -> AccountDeletionOutcome.Failed
         }
     }
+}
+
+internal fun emailsMatch(expectedEmail: String?, selectedEmail: String?): Boolean {
+    val expected = expectedEmail?.trim().orEmpty()
+    val selected = selectedEmail?.trim().orEmpty()
+    return expected.isNotEmpty() && expected.equals(selected, ignoreCase = true)
 }

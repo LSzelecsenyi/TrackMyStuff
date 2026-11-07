@@ -175,7 +175,7 @@ class WeightTrackerApplication : Application() {
             online = { online() },
             afterServerDeletion = { id -> finishLocalDeletion(id) }
         )
-        return coordinator.delete(userId)
+        return coordinator.delete(userId, accounts.profile()?.email)
     }
 
     fun retryPendingLocalDeletion(): Boolean {

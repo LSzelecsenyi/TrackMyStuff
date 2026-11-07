@@ -1185,6 +1185,8 @@
     <string name="settings_delete_account_subtitle">Permanently deletes this Strict account. This is not sign-out.</string>
     <string name="delete_account_title">Delete account</string>
     <string name="delete_account_intro">This deletes the Strict account on the server.</string>
+    <string name="delete_account_google">Google has to confirm this account before anything is deleted. In the account list, choose the Google account that is signed in to Strict. A different Google account does not delete this one.</string>
+    <string name="delete_account_signed_in_as">Signed in to Strict as %1$s.</string>
     <string name="delete_account_founder">Founder status and promotional grants for this account will be lost.</string>
     <string name="delete_account_local">Workout history, measurements, goals, and achievements stored for this account on this phone will be removed. An older Android backup or a ZIP you already exported may still contain a copy. Strict cannot delete those copies.</string>
     <string name="delete_account_photos">Progress photos for this account on this phone will be removed. A ZIP backup you already exported stays where you saved it. Strict cannot delete that file.</string>
@@ -1197,6 +1199,10 @@
     <string name="delete_account_working">Deleting account…</string>
     <string name="delete_account_offline">Account deletion needs an internet connection. Nothing was deleted.</string>
     <string name="delete_account_reauth">Sign in with Google again to confirm this account. Nothing was deleted.</string>
+    <string name="delete_account_cancelled">Google account selection was cancelled. Nothing was deleted.</string>
+    <string name="delete_account_wrong_account">That Google account is not this Strict account. Nothing was deleted. Choose the Google account that is signed in to Strict.</string>
+    <string name="delete_account_google_failed">Google did not confirm the account. Nothing was deleted. Try again.</string>
+    <string name="delete_account_not_found">No Strict account was found for that Google sign-in. Nothing was deleted.</string>
     <string name="delete_account_failed">The account was not deleted. Nothing was removed from this phone. Try again.</string>
     <string name="welcome_local_cleanup">The account was deleted, but some of its data is still on this phone.</string>
     <string name="welcome_local_cleanup_retry">Try removing the remaining local data</string>

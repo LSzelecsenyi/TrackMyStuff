@@ -1185,6 +1185,8 @@
     <string name="settings_delete_account_subtitle">Véglegesen törli ezt a Strict-fiókot. Ez nem kijelentkezés.</string>
     <string name="delete_account_title">Fiók törlése</string>
     <string name="delete_account_intro">Ez törli a Strict-fiókot a szerveren.</string>
+    <string name="delete_account_google">A törlés előtt a Google-nak meg kell erősítenie ezt a fiókot. A listában azt a Google-fiókot válaszd, amelyikkel a Strictba be vagy jelentkezve. Másik Google-fiók nem törli ezt a Strict-fiókot.</string>
+    <string name="delete_account_signed_in_as">A Strictba ezzel a fiókkal vagy bejelentkezve: %1$s.</string>
     <string name="delete_account_founder">A Founder állapot és a promóciós jogosultságok elvesznek.</string>
     <string name="delete_account_local">Az ehhez a fiókhoz tartozó edzésnapló, mérések, célok és eredmények törlődnek erről a telefonról. Egy régebbi Android-mentés vagy egy már exportált ZIP még tartalmazhat másolatot. A Strict ezeket a másolatokat nem tudja törölni.</string>
     <string name="delete_account_photos">Az ehhez a fiókhoz tartozó haladásfotók törlődnek erről a telefonról. A korábban exportált ZIP mentés ott marad, ahová elmentetted. A Strict azt nem tudja távolról törölni.</string>
@@ -1197,6 +1199,10 @@
     <string name="delete_account_working">Fiók törlése…</string>
     <string name="delete_account_offline">A fiók törléséhez internetkapcsolat kell. Semmi sem lett törölve.</string>
     <string name="delete_account_reauth">Erősítsd meg a fiókot újabb Google-bejelentkezéssel. Semmi sem lett törölve.</string>
+    <string name="delete_account_cancelled">A Google-fiók kiválasztása megszakadt. Semmi sem lett törölve.</string>
+    <string name="delete_account_wrong_account">Ez a Google-fiók nem ehhez a Strict-fiókhoz tartozik. Semmi sem lett törölve. Azt a Google-fiókot válaszd, amellyel a Strictba be vagy jelentkezve.</string>
+    <string name="delete_account_google_failed">A Google nem erősítette meg a fiókot. Semmi sem lett törölve. Próbáld újra.</string>
+    <string name="delete_account_not_found">Ehhez a Google-bejelentkezéshez nem tartozik Strict-fiók. Semmi sem lett törölve.</string>
     <string name="delete_account_failed">A fiók nem lett törölve. Erről a telefonról semmi sem lett eltávolítva. Próbáld újra.</string>
     <string name="welcome_local_cleanup">A fiók törölve lett, de néhány adata még ezen a telefonon van.</string>
     <string name="welcome_local_cleanup_retry">A megmaradt helyi adatok törlésének újrapróbálása</string>
