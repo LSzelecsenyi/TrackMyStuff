@@ -1,29 +1,44 @@
 package app.mymusclemap.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,9 +46,24 @@ import app.mymusclemap.domain.model.ChartPoint
 import app.mymusclemap.domain.model.ChartScale
 import app.mymusclemap.domain.model.ChartValueDomain
 import app.mymusclemap.domain.model.SeriesPoint
+import app.mymusclemap.ui.theme.AppTypeTokens
+import app.mymusclemap.ui.theme.StrictBrand
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.hypot
+import kotlin.math.roundToInt
+
+internal const val OVERVIEW_WEIGHT_CHART_TOOLTIP = "overview_weight_chart_tooltip"
+
+internal object ChartCanvasMetrics {
+    val plotLeft = 52.dp
+    val plotRightInset = 16.dp
+    val plotTop = 12.dp
+    val plotBottomInset = 40.dp
+    val tooltipClearance = 18.dp
+    val tooltipMargin = 4.dp
+    const val hitSlopPx = 28f
+}
 
 @Composable
 fun WeightChart(
@@ -42,9 +72,22 @@ fun WeightChart(
     contentDescription: String,
     onPointSelected: (ChartPoint?) -> Unit = {},
     subdued: Boolean = false,
-    chartHeight: Dp = 240.dp
+    chartHeight: Dp = 240.dp,
+    showSelectionTooltip: Boolean = false
 ) {
     val units = app.mymusclemap.ui.units.LocalUnitSystem.current
+    val selectionTooltip: (@Composable (SeriesPoint) -> Unit)? = if (showSelectionTooltip) {
+        { series ->
+            val stored = points.firstOrNull { it.date == series.date && it.weightKg == series.value }
+            val kilograms = stored?.weightKg ?: series.value
+            ChartSelectionTooltip(
+                date = UiFormatters.compactDate(series.date),
+                value = UiFormatters.weightKg(kilograms, units)
+            )
+        }
+    } else {
+        null
+    }
     SeriesChart(
         points = points.map { it.toSeriesPoint() },
         contentDescription = contentDescription,
@@ -57,7 +100,8 @@ fun WeightChart(
             app.mymusclemap.domain.units.MeasurementText.axisWeight(value, units)
         },
         valueDomain = ChartValueDomain.Padded,
-        modifier = modifier
+        modifier = modifier,
+        selectionTooltip = selectionTooltip
     )
 }
 
@@ -74,7 +118,8 @@ fun SeriesChart(
     yAxisLabel: (Double) -> String = { value ->
         String.format(app.mymusclemap.domain.locale.AppLocale.UI, "%.1f", value)
     },
-    snapXAxisToPoints: Boolean = false
+    snapXAxisToPoints: Boolean = false,
+    selectionTooltip: (@Composable (SeriesPoint) -> Unit)? = null
 ) {
     val lineColor = MaterialTheme.colorScheme.primary
     val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = if (subdued) 0.08f else 0.16f)
@@ -88,48 +133,42 @@ fun SeriesChart(
     val lineWidth = if (subdued) 2.dp else 3.dp
     val gridWidth = if (subdued) 0.5.dp else 1.dp
 
-    Box(
+    val density = LocalDensity.current
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(chartHeight)
+            .clipToBounds()
             .semantics { this.contentDescription = contentDescription }
     ) {
-        if (points.isEmpty()) return@Box
-        Canvas(
+        if (points.isEmpty()) return@BoxWithConstraints
+        val layout = ChartLayout.from(
+            width = constraints.maxWidth.toFloat(),
+            height = constraints.maxHeight.toFloat(),
+            points = points,
+            left = with(density) { ChartCanvasMetrics.plotLeft.toPx() },
+            rightInset = with(density) { ChartCanvasMetrics.plotRightInset.toPx() },
+            top = with(density) { ChartCanvasMetrics.plotTop.toPx() },
+            bottomInset = with(density) { ChartCanvasMetrics.plotBottomInset.toPx() },
+            valueDomain = valueDomain,
+            xAxisLabel = xAxisLabel,
+            yAxisLabel = yAxisLabel,
+            snapXAxisToPoints = snapXAxisToPoints
+        )
+        val layoutState = rememberUpdatedState(layout)
+        val selectedMarker = layout.mapped.firstOrNull { it.point.date.toString() == selectedDate }
+        Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .pointerInput(points, valueDomain) {
                     detectTapGestures { tap ->
-                        val layout = ChartLayout.from(
-                            width = size.width.toFloat(),
-                            height = size.height.toFloat(),
-                            points = points,
-                            left = 52.dp.toPx(),
-                            rightInset = 16.dp.toPx(),
-                            top = 12.dp.toPx(),
-                            bottomInset = 40.dp.toPx(),
-                            valueDomain = valueDomain,
-                            yAxisLabel = yAxisLabel
-                        )
-                        val hit = layout.hitTest(tap)
+                        val hit = layoutState.value.hitTest(tap)
                         selectedDate = hit?.date?.toString()
                         onPointSelected(hit)
                     }
                 }
         ) {
-            val layout = ChartLayout.from(
-                width = size.width,
-                height = size.height,
-                points = points,
-                left = 52.dp.toPx(),
-                rightInset = 16.dp.toPx(),
-                top = 12.dp.toPx(),
-                bottomInset = 40.dp.toPx(),
-                valueDomain = valueDomain,
-                xAxisLabel = xAxisLabel,
-                yAxisLabel = yAxisLabel,
-                snapXAxisToPoints = snapXAxisToPoints
-            )
+        Canvas(modifier = Modifier.fillMaxSize()) {
             layout.yLabels.forEach { label ->
                 drawLine(
                     color = gridColor,
@@ -211,21 +250,148 @@ fun SeriesChart(
                 )
             }
         }
+            val tooltipContent = selectionTooltip
+            val marker = selectedMarker
+            if (marker != null && tooltipContent != null) {
+                val anchor = marker.offset
+                val point = marker.point
+                ChartTooltipOverlay(
+                    anchor = anchor,
+                    clearance = with(density) { ChartCanvasMetrics.tooltipClearance.toPx() },
+                    margin = with(density) { ChartCanvasMetrics.tooltipMargin.toPx() }
+                ) {
+                    tooltipContent(point)
+                }
+            }
+        }
     }
 }
 
-private data class MappedPoint(
+@Composable
+private fun ChartSelectionTooltip(
+    date: String,
+    value: String
+) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val shape = RoundedCornerShape(8.dp)
+    val container = if (dark) MaterialTheme.colorScheme.surfaceContainer else StrictBrand.dark
+    val valueColor = if (dark) MaterialTheme.colorScheme.onSurface else StrictBrand.light
+    val dateColor = if (dark) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        StrictBrand.light.copy(alpha = 0.72f)
+    }
+    val borderColor = if (dark) {
+        MaterialTheme.colorScheme.outlineVariant
+    } else {
+        StrictBrand.light.copy(alpha = 0.18f)
+    }
+    Column(
+        modifier = Modifier
+            .semantics(mergeDescendants = true) {}
+            .testTag(OVERVIEW_WEIGHT_CHART_TOOLTIP)
+            .background(container, shape)
+            .border(1.dp, borderColor, shape)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(1.dp)
+    ) {
+        Text(
+            text = date,
+            style = AppTypeTokens.statCaption,
+            color = dateColor,
+            maxLines = 1
+        )
+        Text(
+            text = value,
+            style = AppTypeTokens.statValue.copy(fontSize = 15.sp, lineHeight = 18.sp),
+            color = valueColor,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun ChartTooltipOverlay(
+    anchor: Offset,
+    clearance: Float,
+    margin: Float,
+    content: @Composable () -> Unit
+) {
+    SubcomposeLayout(modifier = Modifier.fillMaxSize()) { incoming ->
+        val placeable = subcompose("tooltip") { content() }
+            .first()
+            .measure(
+                Constraints(
+                    maxWidth = incoming.maxWidth,
+                    maxHeight = incoming.maxHeight
+                )
+            )
+        val placement = placeChartTooltip(
+            anchorX = anchor.x,
+            anchorY = anchor.y,
+            tooltipWidth = placeable.width.toFloat(),
+            tooltipHeight = placeable.height.toFloat(),
+            boundsWidth = incoming.maxWidth.toFloat(),
+            boundsHeight = incoming.maxHeight.toFloat(),
+            clearance = clearance,
+            margin = margin
+        )
+        val maxX = (incoming.maxWidth - placeable.width).coerceAtLeast(0)
+        val maxY = (incoming.maxHeight - placeable.height).coerceAtLeast(0)
+        layout(incoming.maxWidth, incoming.maxHeight) {
+            placeable.place(
+                placement.left.roundToInt().coerceIn(0, maxX),
+                placement.top.roundToInt().coerceIn(0, maxY)
+            )
+        }
+    }
+}
+
+internal data class ChartTooltipPlacement(
+    val left: Float,
+    val top: Float
+)
+
+internal fun placeChartTooltip(
+    anchorX: Float,
+    anchorY: Float,
+    tooltipWidth: Float,
+    tooltipHeight: Float,
+    boundsWidth: Float,
+    boundsHeight: Float,
+    clearance: Float,
+    margin: Float
+): ChartTooltipPlacement {
+    val minLeft = margin
+    val maxLeft = (boundsWidth - margin - tooltipWidth).coerceAtLeast(minLeft)
+    val left = (anchorX - tooltipWidth / 2f).coerceIn(minLeft, maxLeft)
+    val aboveTop = anchorY - clearance - tooltipHeight
+    val belowTop = anchorY + clearance
+    val minTop = margin
+    val maxTop = (boundsHeight - margin - tooltipHeight).coerceAtLeast(minTop)
+    val aboveFits = aboveTop >= minTop && aboveTop <= maxTop
+    val belowFits = belowTop >= minTop && belowTop <= maxTop
+    val top = when {
+        aboveFits -> aboveTop
+        belowFits -> belowTop
+        anchorY >= boundsHeight / 2f -> aboveTop.coerceIn(minTop, maxTop)
+        else -> belowTop.coerceIn(minTop, maxTop)
+    }
+    return ChartTooltipPlacement(left = left, top = top)
+}
+
+internal data class MappedPoint(
     val point: SeriesPoint,
     val offset: Offset
 )
 
-private data class AxisLabel(
+internal data class AxisLabel(
     val text: String,
     val x: Float = 0f,
     val y: Float = 0f
 )
 
-private data class ChartLayout(
+internal data class ChartLayout(
     val mapped: List<MappedPoint>,
     val xLabels: List<AxisLabel>,
     val yLabels: List<AxisLabel>,
@@ -234,9 +400,8 @@ private data class ChartLayout(
     val plotBottom: Float
 ) {
     fun hitTest(tap: Offset): SeriesPoint? {
-        val threshold = 28f
         return mapped.minByOrNull { hypot(it.offset.x - tap.x, it.offset.y - tap.y) }
-            ?.takeIf { hypot(it.offset.x - tap.x, it.offset.y - tap.y) <= threshold }
+            ?.takeIf { hypot(it.offset.x - tap.x, it.offset.y - tap.y) <= ChartCanvasMetrics.hitSlopPx }
             ?.point
     }
 

@@ -106,6 +106,7 @@ import kotlinx.coroutines.flow.first
 import app.mymusclemap.ui.units.LocalUnitSystem
 
 internal const val OVERVIEW_SETTINGS = "overview-settings"
+internal const val OVERVIEW_WEIGHT_CHART_PLOT = "overview_weight_chart_plot"
 internal const val OVERVIEW_MEMBERSHIP_BADGE = "overview-membership-badge"
 internal const val OVERVIEW_MEMBERSHIP_INFO = "overview-membership-info"
 private val HeatmapCoachCalloutSpace = 176.dp
@@ -437,7 +438,7 @@ private fun OverviewSectionDivider() {
 }
 
 @Composable
-private fun CompactWeightChartSection(
+internal fun CompactWeightChartSection(
     snapshot: DashboardSnapshot,
     onOpenDetails: () -> Unit,
     modifier: Modifier = Modifier
@@ -508,9 +509,10 @@ private fun CompactWeightChartSection(
                     UiFormatters.weightKg(snapshot.chartPoints.minOf { it.weightKg }, LocalUnitSystem.current),
                     UiFormatters.weightKg(snapshot.chartPoints.maxOf { it.weightKg }, LocalUnitSystem.current)
                 ),
-                onPointSelected = {},
+                showSelectionTooltip = true,
                 subdued = true,
-                chartHeight = 200.dp
+                chartHeight = 200.dp,
+                modifier = Modifier.testTag(OVERVIEW_WEIGHT_CHART_PLOT)
             )
         }
     }
