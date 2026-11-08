@@ -37,10 +37,10 @@ Separate the evidence below as follows:
 
 ### Privacy policy is written and still needs a production deploy
 
-- **Evidence:** English and Hungarian pages are served by this API at `GET /privacy`, `GET /privacy/en`, and `GET /privacy/hu`. The in-app notice uses the same facts and is dated 10 October 2026. `AboutConfig.privacyPolicyUrl` stays `null` so a release build does not open `https://api.strictworkout.eu/privacy` before that host serves the page. The pages are not a legal certification. Controller identity, legal bases, and several retention periods are still TODO. See `docs/play-data-safety.md`.
+- **Evidence:** English and Hungarian pages are served by this API at `GET /privacy`, `GET /privacy/en`, and `GET /privacy/hu`. The in-app notice uses the same facts and is dated 8 November 2026. `AboutConfig.privacyPolicyUrl` stays `null` so a release build does not open `https://api.strictworkout.eu/privacy` before that host serves the page. The pages are not a legal certification. The controller, hosting location, and verified log retention are now in the text. Legal bases remain a draft, and Cloudflare log retention is still unverified. See `docs/play-data-safety.md`.
 - **Affected component:** `PrivacyPageController`, Settings, the welcome screen, Play Console listing.
 - **User impact:** Play Console still needs a live HTTPS URL. Until this backend is deployed, that URL does not exist.
-- **Required action:** Deploy this backend, confirm the three routes on the public host, then set `AboutConfig.privacyPolicyUrl` to `https://api.strictworkout.eu/privacy` and enter that URL in Play Console. Do not invent the controller’s legal name or a retention period the code does not implement.
+- **Required action:** Deploy this backend, confirm the three routes on the public host, then set `AboutConfig.privacyPolicyUrl` to `https://api.strictworkout.eu/privacy` and enter that URL in Play Console. Do not describe the planned 20-day database backup as already running, and do not treat the draft legal basis as a verified conclusion.
 
 ### Account deletion is implemented and still needs a production deploy
 
@@ -368,7 +368,7 @@ Use `docs/play-store-listing.md` for the name and descriptions.
 
 ## 15. Recommended next implementation task
 
-The privacy policy, the in-app notice, and the fail-closed upload-key configuration are in this tree. The next listing work is creating the upload key from `docs/android-release-signing.md`, registering the Play App Signing OAuth client, and a real billing purchase test, plus deploying this backend so `/privacy` and `/account/delete` answer on the public host. After that deploy, set `AboutConfig.privacyPolicyUrl` to `https://api.strictworkout.eu/privacy`. Do not describe either URL as live before then. Fill the controller, legal-basis, and retention TODOs before treating the policy as ready for Play Console.
+The privacy policy, the in-app notice, and the fail-closed upload-key configuration are in this tree. The next listing work is creating the upload key from `docs/android-release-signing.md`, registering the Play App Signing OAuth client, and a real billing purchase test, plus deploying this backend so `/privacy` and `/account/delete` answer on the public host. After that deploy, set `AboutConfig.privacyPolicyUrl` to `https://api.strictworkout.eu/privacy`. Do not describe either URL as live before then. The controller and the verified log facts are in the 8 November 2026 text. Do not treat the draft legal basis, the unverified Cloudflare and Oracle logs, or the planned backup as settled before Play Console.
 
 ## 16. Manual steps the developer must perform
 

@@ -93,6 +93,8 @@ chmod +x /opt/strict/db-backup/backup-strict-db.sh
 
 The compose file mounts `./postgres/init` relative to itself, which is `/opt/strict/postgres/postgres/init` after the copy above.
 
+On the current production host the running file is `/opt/strict/oci/docker-compose.postgres.yml`. `/opt/strict/postgres` is not present there. A logging change has to be made in the file that created the running container, then applied by recreating that container. Do not set a Docker daemon log limit; that would change every container on the host.
+
 Create the env files from the examples. Generate the database password on the server. Do not put it in git or in GitHub.
 
 ```sh
@@ -136,11 +138,9 @@ opc ALL=(root) NOPASSWD: /bin/systemctl restart strict-backend-dev, /bin/systemc
 
 Confirm the real paths with `command -v systemctl`, `command -v nginx`, and `command -v journalctl` before writing the sudoers file. Do not grant `docker`, `systemctl restart puff-backend-prod`, or `systemctl restart puff-backend-dev`.
 
-Optional daily dump, only after a manual run of the script succeeds. This cron does not replace PUFF's `/opt/puff/db-backup` job.
+The production database backup is `deploy/oci/postgres/backup-strict-db.sh`, run by `strict-db-backup.timer` at 03:15 UTC. It dumps only `strict`, in custom format, into `/opt/strict/db-backup/automatic`. Files match `strict-automatic-YYYYMMDDTHHMMSSZ.dump`. After a verified backup, files in that directory with that exact name and a timestamp older than 20 days are deleted, except the newest file. A failed run does not delete anything. `/opt/strict/db-backup/manual` is outside this cleanup. Do not install the earlier seven-day `strict*-*.sql.gz` cron. It is not the retention rule, and that pattern could match more than the intended files.
 
-```text
-15 3 * * * /opt/strict/db-backup/backup-strict-db.sh >> /opt/strict/db-backup/backup.log 2>&1
-```
+Do not enable the timer until a manual run and `verify-strict-backup.sh` have succeeded. Off-host copy stays off until `/etc/strict/strict-backup.env` sets `STRICT_BACKUP_OFFHOST=required` after a verified Object Storage upload. `disabled` means the local backup worked and no off-host copy was made. The script does not read the PUFF backup profile.
 
 ## nginx and the origin certificate
 

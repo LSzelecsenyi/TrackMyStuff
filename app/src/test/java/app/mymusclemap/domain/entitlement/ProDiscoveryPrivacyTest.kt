@@ -17,6 +17,6 @@ class ProDiscoveryPrivacyTest {
         store.acknowledge(PrivacyPolicyNotice.CURRENT_VERSION)
         assertFalse(PrivacyPolicyNotice.due(store.acknowledgedVersion()))
         assertTrue(PrivacyPolicyNotice.due(PrivacyPolicyNotice.CURRENT_VERSION - 1))
-        assertEquals(3, PrivacyPolicyNotice.CURRENT_VERSION)
+        assertEquals(4, PrivacyPolicyNotice.CURRENT_VERSION)
     }
 }

@@ -86,7 +86,7 @@ Requires developer/legal confirmation: Play services libraries can have their ow
 
 Confirmed by code: sign-in diagnosis does not log the ID token, Google subject, email, or name. Application deletion and billing paths log error codes. Purchase tokens are stored in the database, not written into those application log lines.
 
-Requires backend/infrastructure confirmation: whether the reverse proxy, host, or database provider stores IP addresses, and how long any log is kept. Do not answer “we do not log IP addresses” from this repository.
+Confirmed on the production host on 8 November 2026: Nginx stores the connecting IP address, X-Forwarded-For, the request URL and query string, status, referrer, and user agent, with 10 daily rotations. The application journal is temporary and cleared on reboot. PostgreSQL does not log ordinary SQL. Database errors can appear in the Docker log, and that log has no size limit yet. Cloudflare carries public API traffic, and its log retention was not verified. Some Oracle Cloud logs were not visible from the host. Do not answer that those unverified logs are off.
 
 ## Privacy policy URL for the form
 
@@ -99,4 +99,4 @@ They do not require a session. They contain no analytics script. The expected pr
 
 `AboutConfig.privacyPolicyUrl` stays null until that host actually returns the page. The app shows the in-app notice instead of opening a dead browser link.
 
-The app now shows an informational notice when the published policy version changes. Dismissing it is not consent. Legal review of that wording is still open. Requires developer/legal confirmation before the URL is submitted: controller legal name, postal address, privacy contact, data-protection officer, legal bases, hosting location, international-transfer tool, retention of the purchase token and the deletion marker, log retention, and target age. Those items are marked TODO in the policy. The policy is not legally certified. This inventory was not submitted in Play Console.
+The app shows an informational notice when the published policy version changes. Dismissing it is not consent. The 8 November 2026 text names the controller, the Frankfurt host, the 16-and-17 age group, the manual rights path, and the logging that was verified on the host. It still does not certify a legal basis, a transfer tool, Cloudflare log retention, other Oracle Cloud logs, Play services telemetry, or that 24 months meets a tax duty. The daily 20-day database backup is described as planned, not running. The policy is not legally certified. This inventory was not submitted in Play Console.

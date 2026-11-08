@@ -14,7 +14,6 @@
     a { color: #C6F24E; }
     .mark { color: #C6F24E; font-weight: 700; letter-spacing: 0.14em; margin: 0; }
     .langs { display: flex; gap: 1rem; margin: 0.8rem 0 0; }
-    .todo { background: #171E2B; border-left: 4px solid #C6F24E; padding: 0.8rem 1rem; margin: 0.8rem 0; }
     ul { padding-left: 1.2rem; }
   </style>
 </head>
@@ -26,12 +25,10 @@
     <a href="/privacy/hu">Magyar</a>
   </nav>
   <h1>Privacy policy</h1>
-  <p>Effective date: 7 November 2026. This notice describes the Strict Android app and the Strict account service in this version. It is not a legal certification.</p>
+  <p>Effective date: 8 November 2026. This notice describes the Strict Android app and the Strict account service in this version. It is not a legal certification.</p>
 
   <h2>Who is responsible</h2>
-  <div class="todo">
-    <p><strong>TODO, confirm before publication.</strong> The legal name, postal address, and any registration number of the controller are not in the app. The feedback draft uses laszlo.szelecsenyi@gmail.com. Confirm that this address is the privacy contact. Confirm whether a data protection officer is appointed. The app does not name one.</p>
-  </div>
+  <p>The controller is Szelecsényi László, a natural person, of 2141 Csömör, Bajcsy-Zsilinszky utca 1., Hungary. The privacy contact is <a href="mailto:laszlo.szelecsenyi@gmail.com">laszlo.szelecsenyi@gmail.com</a>. No data protection officer is appointed.</p>
 
   <h2>Strict is local-first, and sign-in is required</h2>
   <p>Workout history, plans, the exercise catalog, body weight, measurements, progress photos, goals, and achievements stay on the phone. Strict does not upload that log as a cloud copy. Google sign-in is mandatory, so Strict does process account information on its server.</p>
@@ -60,69 +57,79 @@
   <h2>Google Play subscriptions</h2>
   <p>Paid checkout is not offered until Play products are configured and a real purchase has been tested. When a purchase is verified, the server stores the purchase token, a hash of the token, package name, product id, subscription state, expiry, and order id. Google Play also processes the payment.</p>
   <p>Deleting a Strict account does not cancel a Google Play subscription. Billing stays with Google until you cancel it in Google Play. The purchase is unlinked from the deleted account. A purchase that Google Play still treats as entitled, including a purchase made before Strict sent an account tag, can be verified onto one new Strict account. The same purchase is not active on two Strict accounts at the same time. The server keeps the purchase token, a hash of the token, package name, product id, subscription state, expiry, order id, and the time the subscription ended.</p>
-  <p>The token stays while the subscription is entitled or can still return to an entitled state, including a pause, account hold, or grace period. After the subscription has ended, the purchase row, including the token and order id, is deleted once 24 calendar months have passed from that end. Cancellation time is not the start of that period while paid access continues. A retention hold can keep one row past that date. That hold is not applied automatically, and this notice does not say that 24 months meets a tax, accounting, or dispute duty. Play notification ids are kept so a repeated notification is not applied twice. Those ids do not contain the purchase token or the Strict account.</p>
-  <div class="todo">
-    <p><strong>TODO, confirm before publication.</strong> Whether 24 months is the right period for tax, accounting, or a dispute still needs a decision outside this product rule. This notice is not a certification.</p>
-  </div>
+  <p>The token stays while the subscription is entitled or can still return to an entitled state, including a pause, account hold, or grace period. After the subscription has ended, the purchase row, including the token and order id, is deleted once 24 calendar months have passed from that end. Cancellation time is not the start of that period while paid access continues. A retention hold can keep one row past that date. That hold is not applied automatically. This notice does not say that 24 months meets a tax, accounting, or dispute duty. Play notification ids are kept so a repeated notification is not applied twice. Those ids do not contain the purchase token or the Strict account.</p>
 
   <h2>Feedback, backups, and logs</h2>
   <p>Send feedback opens your email app with a draft to laszlo.szelecsenyi@gmail.com. The draft includes the app version, Android version, and device manufacturer and model. Strict does not send the email. Your email provider handles it if you send it.</p>
-  <p>A ZIP backup contains the structured training data and progress photos you export. You choose the file location. Strict does not delete that file later. Health Connect readings and the session token are not in the ZIP. Android Auto Backup and device-to-device transfer of app data are turned off.</p>
-  <p>Application logs record error codes and rejection reasons. The sign-in diagnosis does not record the ID token, Google subject, email, or name. Purchase tokens are not written to those application logs.</p>
-  <div class="todo">
-    <p><strong>TODO, confirm before publication.</strong> Confirm whether the production host, reverse proxy, or database provider stores IP addresses, and for how long logs are kept. The app repository does not define that.</p>
-  </div>
+  <p>A ZIP backup contains the structured training data and progress photos you export. You choose the file location. Strict does not delete that file later. Health Connect readings and the session token are not in the ZIP. Android can also back up workouts, body data, and appearance and language settings when the phone’s backup settings and schedule allow it. The latest changes may not be included. Photo files, sign-in sessions, and Pro or special status are not in that Android backup. Android does not promise to remove an older cloud copy after you delete an account.</p>
+  <p>The production service runs on Oracle Cloud in Frankfurt, Germany. Public requests pass through Cloudflare before they reach that host. This notice does not state how long Cloudflare keeps logs.</p>
+  <p>On the host, Nginx keeps an access log and an error log. The access log stores the connecting IP address, an address sent in the X-Forwarded-For header, the request URL including a query string when one is present, the response status, the referrer, and the user agent. It does not have a field for the Authorization header or for cookies. The files rotate daily, and 10 rotated files are kept.</p>
+  <p>The application log is the system journal on the same host. It is kept in temporary storage and removed when the host reboots. Debug and trace logging are off. The application records error codes and rejection reasons. The sign-in diagnosis does not record the ID token, Google subject, email, or name. Purchase tokens are not written to those application logs. A review of the journal present on 8 November 2026 found no email address, Google subject, or access token. This notice does not say that a later error message can never include other text.</p>
+  <p>PostgreSQL does not log connections or ordinary SQL statements. A database error can be written to the database container’s log. A size limit for that container log is not turned on.</p>
+  <p>Some Oracle Cloud logging, including audit logs, network flow logs, and load-balancer logs, was not visible from the host. This notice does not say those logs are off.</p>
+  <p>A manual copy of the production database is stored on the Frankfurt host. Nothing on that host deletes it automatically. It can contain account, sign-in, session, and purchase records, including an account that was deleted after the copy was made. A daily automatic backup is planned and is not running. The planned rule would remove an automatic copy older than 20 days only after a newer copy has been verified, and it would keep the newest verified copy even if that copy were older than 20 days. That plan is not a promise that every database copy disappears after 20 days.</p>
 
   <h2>Who else receives data</h2>
   <ul>
     <li>Google, for sign-in and, if you subscribe, for Play Billing.</li>
+    <li>Cloudflare, because public API traffic passes through it.</li>
+    <li>Oracle Cloud Infrastructure, which hosts the server and database in Frankfurt.</li>
     <li>Health Connect on your device, only if you grant access. Strict does not send those readings to its own service.</li>
     <li>Your email app and the file location you pick for a backup.</li>
   </ul>
-  <p>The app’s dependency list does not include an analytics, advertising, or crash-reporting SDK. It does include Play services libraries used for sign-in and billing.</p>
-  <div class="todo">
-    <p><strong>TODO, confirm before publication.</strong> Confirm Play services library telemetry with Google’s SDK guidance. Confirm where the server and database are hosted, and whether any transfer outside your country needs a transfer tool. This notice does not claim standard contractual clauses or an adequacy decision.</p>
-  </div>
+  <p>The app’s dependency list does not include an analytics, advertising, or crash-reporting SDK. It does include Play services libraries used for sign-in and billing. This notice does not describe telemetry from those libraries, and it does not state a transfer tool for Cloudflare, Google, or Oracle, such as standard contractual clauses or an adequacy decision.</p>
 
   <h2>Legal bases</h2>
-  <div class="todo">
-    <p><strong>TODO, confirm before publication.</strong> The product does not record a GDPR legal basis. Do not read this notice as choosing contract, legitimate interests, consent, or a legal obligation. Sign-in is required to use Strict. That is not, by itself, a consent checkbox, and this app does not ask you to tick one.</p>
-  </div>
+  <p>This section is a draft. Counsel has not verified it, and it is not a decision that the processing is lawful.</p>
+  <p>Sign-in is required to use Strict. The app does not ask you to tick a consent box for that requirement. Health Connect starts only if you allow it in the device settings. This notice does not treat that device permission as GDPR consent, and it does not state an Article 9 condition. Health Connect readings stay on the phone.</p>
+  <p>A preliminary technical note discussed Article 6(1)(f) only for the one-time benefit marker: an interest in not giving the same one-time promotion twice to the same Google account after deletion. That note is not a legitimate-interest assessment. It did not decide that the interest outweighs the person’s rights, including for people aged 16 and 17. This notice does not choose contract, consent, or a legal obligation for the other processing.</p>
 
   <h2>How long data is kept</h2>
   <ul>
-    <li>Training data on the phone remains until you delete it, delete the account, or uninstall the app.</li>
-    <li>The server account, sessions, Founder records, and promotional grant rows are deleted when the account deletion succeeds.</li>
+    <li>Training data on the phone remains until you delete it, delete the account, or uninstall the app. An Android backup, if the phone made one, can remain outside the app.</li>
+    <li>The server account, sessions, Founder records, and promotional grant rows are deleted when the account deletion succeeds. A database copy made before that deletion can still contain them until that copy itself is removed.</li>
     <li>A one-time benefit marker remains while that promotion can still be issued. After the promotion is permanently retired, its flag can be removed, and the marker row is deleted when no flag remains.</li>
     <li>An active or still-recoverable Play purchase remains so it can be verified onto one Strict account. An ended purchase row is deleted 24 calendar months after it ended, unless a retention hold is set.</li>
+    <li>Nginx access and error logs rotate daily, and 10 rotated files are kept. The application journal is removed when the host reboots. The database container log has no size limit in the current configuration.</li>
+    <li>The manual production database copy has no automatic deletion date. The planned daily backup is not running.</li>
     <li>An exported ZIP remains wherever you saved it.</li>
   </ul>
 
   <h2>Account deletion</h2>
   <p>In the app, open Settings and choose Delete account. The button stays disabled until you confirm. The signed-in Strict session identifies the account. The app does not ask you to choose a Google account again. Local data for that account is removed only after the server confirms deletion. The same Google account can sign in later as a new empty account. Founder recognition, a used promotion, and the old workouts are not restored. A Play purchase that is still entitled can be verified onto that new account, and it cannot be active on two accounts at once.</p>
   <p>If you no longer have the app, use <a href="/account/delete">Delete your Strict account</a> on this site. That page verifies a fresh Google sign-in. It is separate from deletion in the signed-in app. That page is part of this server build. It is not a claim that the public production address is already online.</p>
-  <p>Sign-out and uninstall do not delete the server account.</p>
+  <p>Sign-out and uninstall do not delete the server account. Deleting the account does not erase a ZIP you already saved, an Android backup the phone already made, or a database copy made while the account existed.</p>
 
   <h2>Your requests</h2>
   <p>You can delete individual measurements, photos, and workouts in the app, export a ZIP of local training data, and delete the account as described above. There is no separate self-serve download of the server profile.</p>
-  <div class="todo">
-    <p><strong>TODO, confirm before publication.</strong> Confirm how people can ask for access, correction, restriction, objection, or a portable copy of server-side data, and how those requests are answered. Sending email to the feedback address is the only contact path implemented in the app.</p>
-  </div>
+  <p>To ask for access, correction, deletion, restriction, objection, or a portable copy of server-side data, email <a href="mailto:laszlo.szelecsenyi@gmail.com">laszlo.szelecsenyi@gmail.com</a>. Requests are handled manually.</p>
 
   <h2>Security</h2>
   <p>The release app is configured to call the API over HTTPS. The session token on the phone is encrypted, and the server stores a hash of it. The local database is in app-private storage. This notice does not claim a separate encryption layer for that database, and it does not claim a security certification.</p>
 
   <h2>Children</h2>
-  <div class="todo">
-    <p><strong>TODO, confirm before publication.</strong> The app has no child mode and requires a Google account. Confirm the age group before the Play listing.</p>
-  </div>
+  <p>People aged 16 and 17 may use Strict, as may adults. Strict is not directed at children under 16. It has no separate child mode, it does not ask for a date of birth, and it requires a Google account.</p>
 
   <h2>Changes</h2>
-  <p>The effective date above is the date of this text. A later version should change that date.</p>
-  <div class="todo">
-    <p>When this text has a material update, the app shows an informational notice on a later launch until that version is dismissed. Dismissing it records the version. It is not a consent record and it does not start a Pro trial or a purchase. The notice is shown again for a later material version. Reinstalling the app clears the local record, so the current notice can appear again.</p>
-    <p><strong>TODO, confirm before publication.</strong> Legal review of the notice wording is still open. This page does not state a legal basis or an international transfer arrangement.</p>
-  </div>
+  <p>The effective date above is the date of this text. When this text has a material update, the app shows an informational notice on a later launch until that version is dismissed. Dismissing it records the version. It is not a consent record and it does not start a Pro trial or a purchase. The notice is shown again for a later material version. Reinstalling the app clears the local record, so the current notice can appear again.</p>
 </main>
 </body>
 </html>
+<!--
+Source notes. These comments are not shown on the page.
+TODO: confirm Play services library telemetry against Google's SDK guidance.
+TODO: confirm Cloudflare log retention.
+TODO: confirm OCI Audit, VCN flow logs, load-balancer logs, and object-storage archives.
+TODO: choose an international-transfer tool, if one is required.
+TODO: obtain legal review of the draft Article 6(1)(f) note and of whether 24 months meets a tax, accounting, or dispute duty.
+- No company registration number was provided. The controller is a natural person. Do not invent one.
+- Play services library telemetry is not confirmed against Google's SDK guidance.
+- Cloudflare log retention is not verified.
+- OCI Audit, VCN flow logs, load-balancer logs, and object-storage archives were not visible from the host.
+- No international-transfer tool has been chosen.
+- The 24-month purchase rule is the product rule. Whether it meets a tax, accounting, or dispute duty is not legally verified.
+- Article 6(1)(f) for the one-time marker is the 6 November 2026 preliminary technical note, not a legitimate-interest assessment and not a verified conclusion.
+- Counsel has not certified this notice.
+- Automatic 20-day database backups are not deployed. The manual dump has no automatic deletion. The prepared design keeps the newest verified backup even when it is older than 20 days.
+- Docker log rotation for PostgreSQL is not enabled.
+-->

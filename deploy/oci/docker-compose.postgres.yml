@@ -20,6 +20,13 @@ services:
     networks:
       - strict_internal
     restart: unless-stopped
+    # Takes effect only when this container is recreated. Do not put the same
+    # limit in the Docker daemon config; that would change every container.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U strict_app -d strict"]
       interval: 10s
