@@ -95,6 +95,8 @@ sealed interface FounderEnrollmentCall {
     data object Unauthenticated : FounderEnrollmentCall
     data object Closed : FounderEnrollmentCall
     data object Full : FounderEnrollmentCall
+    /** This Google identity already used its one-time Founder enrollment. */
+    data object AlreadyUsed : FounderEnrollmentCall
     data object Rejected : FounderEnrollmentCall
     data object Unavailable : FounderEnrollmentCall
 }

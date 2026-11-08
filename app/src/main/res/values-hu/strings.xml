@@ -1467,6 +1467,9 @@
     <string name="founder_join_google_failed">A Google-bejelentkezés nem fejeződött be. Újra próbálkozhatsz.</string>
     <string name="founder_join_unavailable">A Strict nem érhető el. Az edzésadataid továbbra is ezen az eszközön vannak. Újra próbálkozhatsz.</string>
     <string name="founder_join_rejected">A Founding Tester jelentkezés nem fejeződött be. Újra próbálkozhatsz.</string>
+    <string name="founder_already_used_title">A Founder lehetőséget már felhasználtad.</string>
+    <string name="founder_already_used_body">Ezzel a Google-fiókkal korábban már csatlakoztál a Founder Programhoz. A csatlakozás egyszeri lehetőség, új regisztrációval sem használható fel ismét.</string>
+    <string name="founder_already_used_action">Rendben</string>
     <string name="founder_join_closed">A Founding Tester jelentkezés lezárult. Az eszközön lévő edzések itt maradnak.</string>
     <string name="founder_join_full">A Founding Tester jelentkezés betelt. Az eszközön lévő edzések itt maradnak.</string>
     <string name="founder_join_not_configured">A Google-bejelentkezés nem érhető el ebben a buildben.</string>

@@ -56,6 +56,7 @@ enum class FounderJoinNotice {
     Unavailable,
     Closed,
     Full,
+    AlreadyUsed,
     Rejected,
     NotConfigured
 }
@@ -69,6 +70,7 @@ fun FounderJoinResult.toNotice(): FounderJoinNotice {
         FounderJoinResult.Unavailable -> FounderJoinNotice.Unavailable
         FounderJoinResult.Closed -> FounderJoinNotice.Closed
         FounderJoinResult.Full -> FounderJoinNotice.Full
+        FounderJoinResult.AlreadyUsed -> FounderJoinNotice.AlreadyUsed
         FounderJoinResult.Rejected -> FounderJoinNotice.Rejected
         FounderJoinResult.NotConfigured -> FounderJoinNotice.NotConfigured
     }
@@ -202,7 +204,7 @@ class FounderProgramViewModel(
     }
 
     fun enroll() {
-        if (joining.value) {
+        if (joining.value || joinNotice.value == FounderJoinNotice.AlreadyUsed) {
             return
         }
         if (!founderEnrollmentAllowed(availability, coordinator.currentState().status)) {

@@ -83,6 +83,33 @@ class FounderProgramScreenTest {
     }
 
     @Test
+    fun alreadyUsedShowsTheFinalExplanationAndLeavesEnrollmentUnavailable() {
+        var continued = 0
+        render(
+            ui(fastRules).copy(joinNotice = FounderJoinNotice.AlreadyUsed),
+            onBack = { continued += 1 }
+        )
+        composeRule.onNodeWithText(testString(R.string.founder_already_used_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_already_used_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag(FOUNDER_ENROLL).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_enroll)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_join_rejected)).assertDoesNotExist()
+        composeRule.onNodeWithTag(FOUNDER_BADGE).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_already_used_action)).performClick()
+        assertEquals(1, continued)
+        composeRule.onNodeWithTag(FOUNDER_ENROLL).assertDoesNotExist()
+    }
+
+    @Test
+    fun aNetworkFailureKeepsTheRetryableEnrollmentAction() {
+        render(ui(fastRules).copy(joinNotice = FounderJoinNotice.Unavailable))
+        composeRule.onNodeWithText(testString(R.string.founder_join_unavailable)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(FOUNDER_ENROLL).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_already_used_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_join_rejected)).assertDoesNotExist()
+    }
+
+    @Test
     fun welcomeCanShowTheFastRulesWithoutHardcodingProductionCounts() {
         render(ui(fastRules))
         show(bullet(R.plurals.founder_challenge_workouts, fastRules.founderWorkoutCount))
@@ -395,15 +422,17 @@ class FounderProgramScreenTest {
     private fun render(
         state: FounderProgramUiState = ui(fastRules),
         onEnroll: () -> Unit = {},
-        onAcknowledge: () -> Unit = {}
+        onAcknowledge: () -> Unit = {},
+        onBack: () -> Unit = {}
     ) {
-        render(state = { state }, onEnroll = onEnroll, onAcknowledge = onAcknowledge)
+        render(state = { state }, onEnroll = onEnroll, onAcknowledge = onAcknowledge, onBack = onBack)
     }
 
     private fun render(
         state: () -> FounderProgramUiState,
         onEnroll: () -> Unit = {},
-        onAcknowledge: () -> Unit = {}
+        onAcknowledge: () -> Unit = {},
+        onBack: () -> Unit = {}
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -419,7 +448,7 @@ class FounderProgramScreenTest {
                     ) {
                         FounderProgramScreen(
                             state = state(),
-                            onBack = {},
+                            onBack = onBack,
                             onEnroll = onEnroll,
                             onFeedbackChange = {},
                             onSubmitReport = {},

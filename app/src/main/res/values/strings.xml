@@ -1467,6 +1467,9 @@
     <string name="founder_join_google_failed">Google sign-in did not finish. You can try again.</string>
     <string name="founder_join_unavailable">Strict could not be reached. Your training data is still on this device. You can try again.</string>
     <string name="founder_join_rejected">Founding Tester enrollment did not complete. You can try again.</string>
+    <string name="founder_already_used_title">You have already used the Founder opportunity.</string>
+    <string name="founder_already_used_body">You already joined the Founder Program with this Google account. Joining is a one-time opportunity and cannot be used again by registering a new account.</string>
+    <string name="founder_already_used_action">OK</string>
     <string name="founder_join_closed">Founding Tester enrollment is closed. Workouts already on this device stay here.</string>
     <string name="founder_join_full">Founding Tester enrollment is full. Workouts already on this device stay here.</string>
     <string name="founder_join_not_configured">Google sign-in is not available in this build.</string>

@@ -108,7 +108,11 @@ class OnboardingViewModel(
     }
 
     fun onJoinFounder() {
-        if (founderDeclined || joiningState.value || stepState.value != OnboardingStep.FounderInvitation) {
+        if (founderDeclined ||
+            joiningState.value ||
+            joinNoticeState.value == FounderJoinNotice.AlreadyUsed ||
+            stepState.value != OnboardingStep.FounderInvitation
+        ) {
             return
         }
         val join = founderJoin ?: return

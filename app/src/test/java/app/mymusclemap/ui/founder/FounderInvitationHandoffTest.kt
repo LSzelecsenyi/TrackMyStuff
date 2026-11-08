@@ -164,6 +164,50 @@ class FounderInvitationHandoffTest {
     }
 
     @Test
+    fun alreadyUsedContinuesOnboardingWithoutFounderOrPro() = runTest {
+        firstRun.prepare()
+        val viewModel = onboardingViewModel(FounderProgramAvailability.Open) {
+            FounderJoinResult.AlreadyUsed
+        }
+        viewModel.onContinue()
+        viewModel.onContinue()
+        viewModel.onContinue()
+        viewModel.step.first { it == OnboardingStep.FounderInvitation }
+        viewModel.onJoinFounder()
+        assertEquals(FounderJoinNotice.AlreadyUsed, viewModel.founderJoinNotice.value)
+        assertEquals(OnboardingStep.FounderInvitation, viewModel.step.value)
+        viewModel.onJoinFounder()
+        assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
+        viewModel.onDeclineFounder()
+        assertEquals(OnboardingStep.WeeklyGoal, viewModel.step.first { it == OnboardingStep.WeeklyGoal })
+        assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
+        assertNoFounderEntitlement()
+    }
+
+    @Test
+    fun alreadyUsedDoesNotGrantEntitlementFromSettingsAndBlocksAnotherAttempt() = runTest {
+        var joinCalls = 0
+        val settings = FounderProgramViewModel(
+            founder,
+            rules,
+            "0.1.0-debug",
+            acknowledgements,
+            FounderProgramAvailability.Open,
+            joinFounder = {
+                joinCalls += 1
+                FounderJoinResult.AlreadyUsed
+            }
+        )
+        settings.enroll()
+        assertEquals(FounderJoinNotice.AlreadyUsed, settings.uiState.value.joinNotice)
+        assertEquals(1, joinCalls)
+        settings.enroll()
+        assertEquals(1, joinCalls)
+        assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
+        assertNoFounderEntitlement()
+    }
+
+    @Test
     fun notNowLeavesEnrollmentAvailableFromSettingsWhileOpen() = runTest {
         firstRun.prepare()
         val viewModel = onboardingViewModel(FounderProgramAvailability.Open)
@@ -252,14 +296,27 @@ class FounderInvitationHandoffTest {
         assertFalse(acknowledgements.load().invitationHandled)
     }
 
-    private fun onboardingViewModel(availability: FounderProgramAvailability): OnboardingViewModel {
+    private fun onboardingViewModel(
+        availability: FounderProgramAvailability,
+        founderJoin: suspend () -> FounderJoinResult = { applyServerEnrollment() }
+    ): OnboardingViewModel {
         return OnboardingViewModel(
             firstRunCoordinator = firstRun,
             founderInvitations = acknowledgements,
             founderProgram = founder,
             founderAvailability = availability,
-            founderJoin = { applyServerEnrollment() }
+            founderJoin = founderJoin
         )
+    }
+
+    private fun assertNoFounderEntitlement() {
+        val resolved = EntitlementResolver.resolve(
+            EntitlementSources.of(program = founder.currentState()),
+            Instant.parse("2026-10-03T12:00:00Z")
+        )
+        assertFalse(resolved.temporaryTesterPro)
+        assertFalse(resolved.founderLifetime)
+        assertEquals(EntitlementTier.Free, resolved.tier)
     }
 
     private suspend fun applyServerEnrollment(): FounderJoinResult {

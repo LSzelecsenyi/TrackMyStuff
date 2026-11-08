@@ -114,6 +114,7 @@ class OkHttpStrictBackendApi(
                 response.code == 409 -> when (errorCode(response)) {
                     "ENROLLMENT_CLOSED" -> FounderEnrollmentCall.Closed
                     "ENROLLMENT_FULL" -> FounderEnrollmentCall.Full
+                    "FOUNDER_ALREADY_USED" -> FounderEnrollmentCall.AlreadyUsed
                     else -> FounderEnrollmentCall.Rejected
                 }
                 !response.isSuccessful -> FounderEnrollmentCall.Rejected

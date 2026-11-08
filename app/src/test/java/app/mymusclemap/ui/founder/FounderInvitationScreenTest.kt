@@ -81,6 +81,27 @@ class FounderInvitationScreenTest {
     }
 
     @Test
+    fun alreadyUsedHidesEnrollmentAndContinuesWithoutJoining() {
+        var joins = 0
+        var continued = 0
+        render(
+            fastRules,
+            onJoin = { joins += 1 },
+            onNotNow = { continued += 1 },
+            joinNotice = FounderJoinNotice.AlreadyUsed
+        )
+        composeRule.onNodeWithText(testString(R.string.founder_already_used_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_already_used_body)).assertIsDisplayed()
+        composeRule.onNodeWithTag(FOUNDER_ENROLL).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_enroll)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_join_rejected)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_invitation_not_now)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_already_used_action)).performClick()
+        assertEquals(0, joins)
+        assertEquals(1, continued)
+    }
+
+    @Test
     fun invitationCanShowProductionRules() {
         render(FounderProgramRules.Production)
         show(bullet(R.plurals.founder_challenge_workouts, FounderProgramRules.Production.founderWorkoutCount))
@@ -176,14 +197,20 @@ class FounderInvitationScreenTest {
     private fun render(
         rules: FounderProgramRules,
         onJoin: () -> Unit = {},
-        onNotNow: () -> Unit = {}
+        onNotNow: () -> Unit = {},
+        joinNotice: FounderJoinNotice = FounderJoinNotice.None
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density = density.density, fontScale = 1f)) {
                 WeightTrackerThemeForPreview {
                     Box(Modifier.width(360.dp).height(2000.dp).fillMaxSize()) {
-                        FounderInvitationScreen(rules = rules, onJoin = onJoin, onNotNow = onNotNow)
+                        FounderInvitationScreen(
+                            rules = rules,
+                            onJoin = onJoin,
+                            onNotNow = onNotNow,
+                            joinNotice = joinNotice
+                        )
                     }
                 }
             }

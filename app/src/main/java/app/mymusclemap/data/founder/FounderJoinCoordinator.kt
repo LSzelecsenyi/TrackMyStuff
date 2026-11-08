@@ -16,6 +16,7 @@ enum class FounderJoinResult {
     Unavailable,
     Closed,
     Full,
+    AlreadyUsed,
     Rejected,
     InProgress
 }
@@ -64,6 +65,7 @@ class FounderJoinCoordinator(
                 FounderEnrollmentCall.NoSession -> Unit
                 FounderEnrollmentCall.Closed -> return FounderJoinResult.Closed
                 FounderEnrollmentCall.Full -> return FounderJoinResult.Full
+                FounderEnrollmentCall.AlreadyUsed -> return FounderJoinResult.AlreadyUsed
                 FounderEnrollmentCall.Rejected -> return FounderJoinResult.Rejected
                 FounderEnrollmentCall.Unavailable -> return FounderJoinResult.Unavailable
             }

@@ -56,10 +56,17 @@ fun FounderInvitationScreen(
             FounderWelcomeContent(
                 rules = rules,
                 onEnroll = {
-                    if (declined || joining) return@FounderWelcomeContent
+                    if (declined || joining || joinNotice == FounderJoinNotice.AlreadyUsed) {
+                        return@FounderWelcomeContent
+                    }
                     onJoin()
                 },
                 onDecline = {
+                    if (declined || joining) return@FounderWelcomeContent
+                    declined = true
+                    onNotNow()
+                },
+                onAlreadyUsedContinue = {
                     if (declined || joining) return@FounderWelcomeContent
                     declined = true
                     onNotNow()

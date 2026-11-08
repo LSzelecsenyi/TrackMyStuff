@@ -73,6 +73,8 @@ internal const val FOUNDER_STATUS = "founder-status"
 internal const val FOUNDER_INVITATION = "founder-invitation"
 internal const val FOUNDER_INVITATION_NOT_NOW = "founder-invitation-not-now"
 internal const val FOUNDER_JOIN_NOTICE = "founder-join-notice"
+internal const val FOUNDER_ALREADY_USED = "founder-already-used"
+internal const val FOUNDER_ALREADY_USED_CONTINUE = "founder-already-used-continue"
 
 @Composable
 fun FounderProgramScreen(
@@ -140,6 +142,7 @@ fun FounderProgramScreen(
                     FounderWelcomeContent(
                         rules = state.journey.rules,
                         onEnroll = onEnroll,
+                        onAlreadyUsedContinue = onBack,
                         actionsEnabled = !state.joining,
                         joining = state.joining,
                         joinNotice = state.joinNotice
@@ -197,10 +200,15 @@ internal fun FounderWelcomeContent(
     rules: FounderProgramRules,
     onEnroll: () -> Unit,
     onDecline: (() -> Unit)? = null,
+    onAlreadyUsedContinue: () -> Unit = {},
     actionsEnabled: Boolean = true,
     joining: Boolean = false,
     joinNotice: FounderJoinNotice = FounderJoinNotice.None
 ) {
+    if (joinNotice == FounderJoinNotice.AlreadyUsed) {
+        FounderAlreadyUsedContent(onContinue = onAlreadyUsedContinue)
+        return
+    }
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -306,10 +314,41 @@ private fun joinNoticeText(notice: FounderJoinNotice): String? {
         FounderJoinNotice.Unavailable -> R.string.founder_join_unavailable
         FounderJoinNotice.Closed -> R.string.founder_join_closed
         FounderJoinNotice.Full -> R.string.founder_join_full
+        FounderJoinNotice.AlreadyUsed -> return null
         FounderJoinNotice.Rejected -> R.string.founder_join_rejected
         FounderJoinNotice.NotConfigured -> R.string.founder_join_not_configured
     }
     return stringResource(res)
+}
+
+@Composable
+private fun FounderAlreadyUsedContent(onContinue: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(FOUNDER_ALREADY_USED),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(AppDimens.sectionGap))
+        Text(
+            text = stringResource(R.string.founder_already_used_title),
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(AppDimens.itemGap))
+        BodyText(stringResource(R.string.founder_already_used_body))
+        Spacer(Modifier.height(AppDimens.sectionGap))
+        Button(
+            onClick = onContinue,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(FOUNDER_ALREADY_USED_CONTINUE)
+        ) {
+            Text(stringResource(R.string.founder_already_used_action))
+        }
+        Spacer(Modifier.height(AppDimens.sectionGap))
+    }
 }
 
 @Composable

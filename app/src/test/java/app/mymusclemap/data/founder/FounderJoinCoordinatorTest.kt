@@ -157,6 +157,26 @@ class FounderJoinCoordinatorTest {
     }
 
     @Test
+    fun anAlreadyUsedFounderIdentityIsFinalAndDoesNotWriteLocalState() = runBlocking {
+        val google = CountingGoogle(GoogleIdTokenRequest.Issued(GoogleIdTokenValue("google-id-token")))
+        withJoin(google) { server, sessions, join, applied ->
+            sessions.write(stored("existing-bearer"))
+            server.enqueue(MockResponse().setBody("""{"id":"$userId"}"""))
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(409)
+                    .setBody("""{"errorCode":"FOUNDER_ALREADY_USED","message":"Founder enrollment was already used."}""")
+            )
+            assertEquals(FounderJoinResult.AlreadyUsed, join.join())
+            assertEquals(0, google.calls)
+            assertEquals("existing-bearer", sessions.read()?.accessToken?.value)
+            assertTrue(applied.isEmpty())
+            assertEquals("/api/v1/me", server.takeRequest().path)
+            assertEquals("/api/v1/founder/enrollment", server.takeRequest().path)
+        }
+    }
+
+    @Test
     fun aRejectedBearerIsClearedAndGoogleCanReplaceIt() = runBlocking {
         val google = CountingGoogle(GoogleIdTokenRequest.Issued(GoogleIdTokenValue("google-id-token")))
         withJoin(google) { server, sessions, join, applied ->
