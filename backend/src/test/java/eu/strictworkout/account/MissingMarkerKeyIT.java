@@ -81,8 +81,46 @@ class MissingMarkerKeyIT {
                 () -> deletion.delete("token-fresh", true, null)
         );
         assertEquals("MARKER_UNAVAILABLE", failure.errorCode());
+        assertEquals(
+                "Account deletion is unavailable because the marker key does not match its stored checksum.",
+                failure.getMessage()
+        );
         assertEquals(1, count("select count(*) from app_user where id = ?", fresh));
         assertEquals(1, count("select count(*) from account_deletion_marker where subject_hash = ?", GoogleSubjectHash.of("legacy-subject")));
+    }
+
+    @Test
+    void aSignedInDeletionWithoutAMarkerKeyIsRejectedAndKeepsTheAccount() {
+        jdbc.update("delete from marker_key_verifier");
+        UUID userId = insertUser("signed-in-without-key");
+        int markersBefore = count("select count(*) from account_deletion_marker");
+
+        AccountDeletionException missing = assertThrows(
+                AccountDeletionException.class,
+                () -> deletion.deleteSignedIn(true, userId)
+        );
+
+        assertEquals("MARKER_UNAVAILABLE", missing.errorCode());
+        assertEquals(
+                "Account deletion is unavailable because the marker key is not configured.",
+                missing.getMessage()
+        );
+        assertEquals(1, count("select count(*) from app_user where id = ?", userId));
+        assertEquals(markersBefore, count("select count(*) from account_deletion_marker"));
+        assertEquals(0, count("select count(*) from marker_key_verifier"));
+
+        jdbc.update("insert into marker_key_verifier (key_id, verifier) values (1, 'missing-secret')");
+        AccountDeletionException mismatched = assertThrows(
+                AccountDeletionException.class,
+                () -> deletion.deleteSignedIn(true, userId)
+        );
+        assertEquals("MARKER_UNAVAILABLE", mismatched.errorCode());
+        assertEquals(
+                "Account deletion is unavailable because the marker key does not match its stored checksum.",
+                mismatched.getMessage()
+        );
+        assertEquals(1, count("select count(*) from app_user where id = ?", userId));
+        assertEquals(markersBefore, count("select count(*) from account_deletion_marker"));
     }
 
     private UUID insertUser(String subject) {

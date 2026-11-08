@@ -36,4 +36,18 @@ public class AccountDeletionException extends RuntimeException {
     public String errorCode() {
         return code.name();
     }
+
+    public static AccountDeletionException markerKeyMissing() {
+        return new AccountDeletionException(
+                Code.MARKER_UNAVAILABLE,
+                "Account deletion is unavailable because the marker key is not configured."
+        );
+    }
+
+    public static AccountDeletionException markerKeyMismatch() {
+        return new AccountDeletionException(
+                Code.MARKER_UNAVAILABLE,
+                "Account deletion is unavailable because the marker key does not match its stored checksum."
+        );
+    }
 }

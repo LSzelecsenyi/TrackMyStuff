@@ -26,11 +26,11 @@ public class DeletionMarkerService implements OneTimeMarkers {
 
     @Override
     public void requireWritable() {
-        if (!keys.configured() || untrustworthy()) {
-            throw new AccountDeletionException(
-                    AccountDeletionException.Code.MARKER_UNAVAILABLE,
-                    "Account deletion is unavailable until the marker key is configured and matches its stored checksum."
-            );
+        if (untrustworthy()) {
+            throw AccountDeletionException.markerKeyMismatch();
+        }
+        if (!keys.configured()) {
+            throw AccountDeletionException.markerKeyMissing();
         }
     }
 

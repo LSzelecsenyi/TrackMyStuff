@@ -153,6 +153,114 @@ class AccountDeletionIT {
     }
 
     @Test
+    @DisplayName("Given a marker checksum that does not match the configured key, when the signed-in account is deleted, then that account and every other account remain")
+    void aMismatchedMarkerChecksumRejectsSignedInDeletion() {
+        identities.accept("token-mismatch", "subject-mismatch", "mismatch@example.com", true);
+        identities.accept("token-mismatch-other", "subject-mismatch-other", "mismatch-other@example.com", true);
+        Map<String, Object> session = login("token-mismatch");
+        Map<String, Object> other = login("token-mismatch-other");
+        UUID ownerId = UUID.fromString(userId(session));
+        UUID otherId = UUID.fromString(userId(other));
+        Integer stored = jdbc.queryForObject(
+                "select count(*) from marker_key_verifier where key_id = ?",
+                Integer.class,
+                markerKeys.activeKeyId()
+        );
+        String previous = stored != null && stored > 0
+                ? jdbc.queryForObject(
+                        "select verifier from marker_key_verifier where key_id = ?",
+                        String.class,
+                        markerKeys.activeKeyId()
+                )
+                : null;
+        if (previous == null) {
+            jdbc.update(
+                    "insert into marker_key_verifier (key_id, verifier) values (?, 'wrong')",
+                    markerKeys.activeKeyId()
+            );
+        } else {
+            jdbc.update(
+                    "update marker_key_verifier set verifier = 'wrong' where key_id = ?",
+                    markerKeys.activeKeyId()
+            );
+        }
+        try {
+            ResponseEntity<String> rejected = send(
+                    HttpMethod.DELETE,
+                    "/api/v1/account",
+                    "{\"confirmed\":true}",
+                    token(session)
+            );
+            assertEquals(HttpStatus.SERVICE_UNAVAILABLE, rejected.getStatusCode());
+            assertTrue(rejected.getBody().contains("MARKER_UNAVAILABLE"));
+            assertTrue(rejected.getBody().contains("does not match its stored checksum"));
+            assertEquals(1, count("select count(*) from app_user where id = ?", ownerId));
+            assertEquals(1, count("select count(*) from app_user where id = ?", otherId));
+            assertEquals(0, count(
+                    "select count(*) from account_deletion_marker where subject_hash = ?",
+                    markerKeys.markerHash("subject-mismatch")
+            ));
+        } finally {
+            if (previous == null) {
+                jdbc.update(
+                        "delete from marker_key_verifier where key_id = ? and verifier = 'wrong'",
+                        markerKeys.activeKeyId()
+                );
+            } else {
+                jdbc.update(
+                        "update marker_key_verifier set verifier = ? where key_id = ?",
+                        previous,
+                        markerKeys.activeKeyId()
+                );
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Given an existing deletion marker, when the same account is deleted, then the marker flags are preserved")
+    void anExistingMarkerIsPreservedWhenTheAccountIsDeleted() {
+        identities.accept("token-merge", "subject-merge", "merge@example.com", true);
+        identities.accept("token-merge-other", "subject-merge-other", "merge-other@example.com", true);
+        Map<String, Object> session = login("token-merge");
+        Map<String, Object> other = login("token-merge-other");
+        UUID ownerId = UUID.fromString(userId(session));
+        UUID otherId = UUID.fromString(userId(other));
+        String hash = markerKeys.markerHash("subject-merge");
+        jdbc.update(
+                """
+                insert into account_deletion_marker (
+                    subject_hash, deleted_at, founder_used, pro_discovery_used, welcome_back_used, early_adopter_used
+                ) values (?, now(), true, false, true, false)
+                """,
+                hash
+        );
+        jdbc.update("delete from account_status_grant where user_id = ?", ownerId);
+
+        ResponseEntity<String> deleted = send(
+                HttpMethod.DELETE,
+                "/api/v1/account",
+                "{\"confirmed\":true}",
+                token(session)
+        );
+
+        assertEquals(HttpStatus.NO_CONTENT, deleted.getStatusCode());
+        assertEquals(0, count("select count(*) from app_user where id = ?", ownerId));
+        assertEquals(1, count("select count(*) from app_user where id = ?", otherId));
+        assertEquals(1, count("select count(*) from account_deletion_marker where subject_hash = ?", hash));
+        Map<String, Object> marker = jdbc.queryForMap(
+                """
+                select founder_used, pro_discovery_used, welcome_back_used, early_adopter_used
+                from account_deletion_marker where subject_hash = ?
+                """,
+                hash
+        );
+        assertEquals(Boolean.TRUE, marker.get("founder_used"));
+        assertEquals(Boolean.FALSE, marker.get("pro_discovery_used"));
+        assertEquals(Boolean.TRUE, marker.get("welcome_back_used"));
+        assertEquals(Boolean.FALSE, marker.get("early_adopter_used"));
+    }
+
+    @Test
     @DisplayName("Given an expired session, when authenticated deletion is requested, then the account remains")
     void anExpiredSessionDoesNotDelete() {
         identities.accept("token-expired", "subject-expired", "expired@example.com", true);

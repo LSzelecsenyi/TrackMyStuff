@@ -65,7 +65,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(AccountDeletionException.class)
     public ResponseEntity<ApiError> accountDeletion(AccountDeletionException exception) {
-        log.info("Account deletion rejected: {}", exception.errorCode());
+        log.info("Account deletion rejected: {} ({})", exception.errorCode(), exception.getMessage());
         return ResponseEntity.status(exception.status())
                 .body(new ApiError(exception.errorCode(), exception.getMessage()));
     }

@@ -80,9 +80,14 @@ class AccountDeletionServiceTest {
     void anUnavailableMarkerDoesNotDeleteTheSignedInAccount() {
         store.userId = UUID.randomUUID();
         markers.unavailable = true;
+        AccountDeletionException failure = assertThrows(
+                AccountDeletionException.class,
+                () -> service.deleteSignedIn(true, store.userId)
+        );
+        assertEquals("MARKER_UNAVAILABLE", failure.errorCode());
         assertEquals(
-                "MARKER_UNAVAILABLE",
-                assertThrows(AccountDeletionException.class, () -> service.deleteSignedIn(true, store.userId)).errorCode()
+                "Account deletion is unavailable because the marker key does not match its stored checksum.",
+                failure.getMessage()
         );
         assertFalse(store.userDeleted);
         assertFalse(store.subscriptionsDetached);
@@ -138,6 +143,10 @@ class AccountDeletionServiceTest {
                 () -> service.delete("fresh", true, null)
         );
         assertEquals("MARKER_UNAVAILABLE", failure.errorCode());
+        assertEquals(
+                "Account deletion is unavailable because the marker key does not match its stored checksum.",
+                failure.getMessage()
+        );
         assertFalse(store.userDeleted);
         assertFalse(store.subscriptionsDetached);
     }

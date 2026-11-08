@@ -59,7 +59,7 @@ public class AccountDeletionService {
             }
         }
         if (markers.untrustworthy()) {
-            throw unavailable();
+            throw AccountDeletionException.markerKeyMismatch();
         }
         UUID userId = store.findGoogleUser(identity.subject());
         if (userId == null) {
@@ -90,7 +90,7 @@ public class AccountDeletionService {
             throw notFound();
         }
         if (markers.untrustworthy()) {
-            throw unavailable();
+            throw AccountDeletionException.markerKeyMismatch();
         }
         String subject = store.googleSubject(sessionUserId);
         if (!store.lock(sessionUserId)) {
@@ -148,13 +148,6 @@ public class AccountDeletionService {
         return new AccountDeletionException(
                 AccountDeletionException.Code.NOT_FOUND,
                 "No Strict account exists for this sign-in."
-        );
-    }
-
-    private static AccountDeletionException unavailable() {
-        return new AccountDeletionException(
-                AccountDeletionException.Code.MARKER_UNAVAILABLE,
-                "Account deletion is unavailable until the marker key is configured and matches its stored checksum."
         );
     }
 
