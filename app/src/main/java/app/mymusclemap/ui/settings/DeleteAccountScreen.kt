@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 internal const val DELETE_ACCOUNT_CONFIRM = "delete-account-confirm"
 internal const val DELETE_ACCOUNT_ACTION = "delete-account-action"
 internal const val DELETE_ACCOUNT_PRIVACY = "delete-account-privacy"
-internal const val DELETE_ACCOUNT_MANAGE = "delete-account-manage"
+internal const val DELETE_ACCOUNT_EMAIL = "delete-account-email"
 
 enum class DeleteAccountResult {
     Deleted,
@@ -59,8 +59,6 @@ private val Destructive = Color(0xFF8C1D18)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeleteAccountScreen(
-    paidSubscriptionKnown: Boolean,
-    onManageSubscription: () -> Unit,
     onDelete: suspend () -> DeleteAccountResult,
     onFinished: () -> Unit,
     onBack: () -> Unit,
@@ -94,34 +92,33 @@ fun DeleteAccountScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
-            Text(stringResource(R.string.delete_account_intro))
+            Text(
+                stringResource(R.string.delete_account_heading),
+                style = MaterialTheme.typography.titleLarge
+            )
             Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.delete_account_google))
+            Text(
+                stringResource(R.string.delete_account_description),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Spacer(Modifier.height(20.dp))
+            Text(
+                stringResource(R.string.delete_account_signed_in_label),
+                style = MaterialTheme.typography.labelLarge
+            )
             if (!accountEmail.isNullOrBlank()) {
-                Spacer(Modifier.height(12.dp))
-                Text(stringResource(R.string.delete_account_signed_in_as, accountEmail))
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.delete_account_founder))
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.delete_account_local))
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.delete_account_photos))
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.delete_account_subscription))
-            if (paidSubscriptionKnown) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    stringResource(R.string.delete_account_subscription_known),
-                    color = MaterialTheme.colorScheme.error
+                    accountEmail,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.testTag(DELETE_ACCOUNT_EMAIL)
                 )
-                TextButton(
-                    onClick = onManageSubscription,
-                    modifier = Modifier.testTag(DELETE_ACCOUNT_MANAGE)
-                ) {
-                    Text(stringResource(R.string.delete_account_manage_subscription))
-                }
             }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                stringResource(R.string.delete_account_additional),
+                style = MaterialTheme.typography.bodyLarge
+            )
             TextButton(
                 onClick = onOpenPrivacy,
                 modifier = Modifier.testTag(DELETE_ACCOUNT_PRIVACY)
@@ -129,8 +126,6 @@ fun DeleteAccountScreen(
                 Text(stringResource(R.string.action_privacy_policy))
             }
             Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.delete_account_undo))
-            Spacer(Modifier.height(28.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = confirmed,

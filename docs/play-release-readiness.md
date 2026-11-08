@@ -264,7 +264,7 @@ Account deletion is implemented in this working tree. It has not been deployed. 
 
 ### What the user does
 
-In the app, Settings shows **Delete account** / **Fiók törlése**. That opens a confirmation screen. The delete button stays disabled until the person checks the confirmation box. The app then asks Google for a new sign-in and calls `DELETE /api/v1/account` with the session and that ID token. The body is `{ "idToken", "confirmed": true }`. It does not contain a user id.
+In the app, Settings shows **Delete account** / **Fiók törlése**. That opens a confirmation screen. The delete button stays disabled until the person checks the confirmation box. The signed-in app does not ask Google for a new sign-in. It calls `DELETE /api/v1/account` with the existing bearer session. The body is `{ "confirmed": true }`. It does not contain a user id, an email address, or a Google ID token.
 
 The public page is served by the API process at `GET /account/delete`. The expected production URL, after this backend is deployed and the reverse proxy forwards that path, is:
 
@@ -278,9 +278,9 @@ If `STRICT_GOOGLE_CLIENT_ID` is blank or not a Web client id, the page explains 
 
 ### Backend behavior
 
-The user id comes from the Google subject inside the verified ID token. On the authenticated route, that subject must also match the session. A session for account A cannot delete account B.
+On `DELETE /api/v1/account`, the account is identified only from the authenticated session user id. The request body cannot authorize a different account. A session for account A cannot delete account B. An expired or invalid session returns `401` and nothing is deleted.
 
-The ID token must have been issued within the last 10 minutes, and not more than 2 minutes in the future. Otherwise the response is `401 REAUTHENTICATION_REQUIRED` and nothing is deleted.
+The public page still verifies a fresh Google ID token. That token must have been issued within the last 10 minutes, and not more than 2 minutes in the future. Otherwise `POST /api/v1/account/deletion` returns `401 REAUTHENTICATION_REQUIRED` and nothing is deleted.
 
 Deletion runs in one database transaction. A failure rolls it back and the client is not told that deletion succeeded. Deleting an account that is already gone, when the marker exists, returns `204` again. Two concurrent deletions of the same account settle on one deleted user and one marker.
 
@@ -306,7 +306,7 @@ No legal retention period is stated for the purchase row or the marker. Those ar
 
 ### Subscriptions
 
-Deleting the Strict account does not cancel a Google Play subscription. The app and the web page say that, and they link to Google Play subscription management. They do not say the subscription was cancelled. A later `verify` of that purchase token for a different user returns a conflict. Real-time notifications may refresh the stored state and must leave `claim_blocked` set.
+Deleting the Strict account does not cancel a Google Play subscription. The app says an active Google Play subscription has to be cancelled separately. The public page says the same and links to Google Play subscription management. They do not say the subscription was cancelled. A later `verify` of that purchase token for a different user returns a conflict. Real-time notifications may refresh the stored state and must leave `claim_blocked` set.
 
 ### Signing in again
 
@@ -338,11 +338,11 @@ Put `https://api.strictworkout.eu/account/delete` in the Play Console account-de
 1. Sign in with a test Google account that has a workout and, if possible, a Founder application.
 2. Open Settings, Delete account. Confirm the button does nothing until the box is checked.
 3. Turn on airplane mode and try. The app must say nothing was deleted, and the workout must still be there.
-4. Turn the network back on, confirm with Google, and delete. The app must return to the welcome screen.
+4. Turn the network back on, check the box, and delete. The app must not open a Google account picker. It must return to the welcome screen after the server confirms.
 5. Sign in with a second Google account. The first account’s workouts must be absent.
 6. Sign in again with the first Google account. The account id is new, workouts are empty, and a used promotion does not return.
 7. On a computer, open the deployed `/account/delete` page, continue with Google, and delete. Confirm the server user is gone. Do not use a URL that has not been deployed.
-8. If a paid subscription exists, confirm the screen says it is not cancelled and the Play subscriptions page opens. Do not expect the charge to stop.
+8. If a paid subscription exists, confirm the screen says it has to be cancelled separately. The screen does not open Google Play and does not say the charge stopped.
 
 ## 14. Play Console publishing checklist
 

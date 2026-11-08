@@ -40,7 +40,7 @@ Confirmed by code, unless a row says otherwise.
 | Play purchase token, token hash, package, product id, state, expiry, order id | Optional, and paid checkout is not offered until products are configured | Subscription verification | The purchase itself is processed by Google Play. Strict stores the token after verification |
 | Deletion marker: keyed HMAC of the Google subject, plus one flag per promotion | Created only when an account is deleted | Stop a used one-time benefit from returning while that promotion can still be issued. A flag is cleared after that promotion is permanently retired. The row is deleted when no flag remains | No. The raw subject is not in the marker. The marker is pseudonymous, not anonymous |
 
-The Google ID token is sent to the Strict service to open a session and again to delete an account. The app does not store that token as the session.
+The Google ID token is sent to the Strict service to open a session. Deleting an account in the signed-in app uses that session and a confirmation flag. It does not send a new Google ID token. The public deletion page still sends a Google ID token. The app does not store that token as the session.
 
 Display name is returned at sign-in and stored only in the on-device profile. The server has no user-name column. Do not list the name as data Strict’s server collects. Whether the Play services sign-in library should be declared separately is a Play SDK confirmation.
 
@@ -68,9 +68,9 @@ Requires developer/legal confirmation: this inventory does not claim that the lo
 
 Confirmed by code:
 
-- In the app: Settings, Delete account / Fiók törlése. The button stays disabled until the person confirms. A fresh Google sign-in is required. Local data for that account is erased only after the server returns success.
+- In the app: Settings, Delete account / Fiók törlése. The button stays disabled until the person confirms. The signed-in Strict session identifies the account. The app does not ask for another Google sign-in. Local data for that account is erased only after the server returns success.
 - On the server: the account, sessions, external identity, Founder rows, and promotional grant rows are deleted. The deletion marker remains while its promotions can still be issued. The Play purchase row is unlinked and is not cancelled at Google. A purchase Play still treats as entitled can be verified onto one new Strict account. An ended purchase row is deleted 24 calendar months after it ended, unless `retention_hold` is set.
-- Web route in this backend build: `GET /account/delete`, with no admin login. It is not an email-only form.
+- Web route in this backend build: `GET /account/delete`, with no admin login. It is not an email-only form. It verifies a fresh Google sign-in. That page is separate from deletion in the signed-in app.
 
 Not deployed. Do not paste `https://api.strictworkout.eu/account/delete` into Play Console until that host serves this page.
 

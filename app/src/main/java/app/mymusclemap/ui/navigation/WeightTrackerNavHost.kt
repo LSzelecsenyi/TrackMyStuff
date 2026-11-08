@@ -816,11 +816,7 @@ fun WeightTrackerNavHost(
                 )
             }
             composable(AppRoutes.DELETE_ACCOUNT) {
-                val subscription = paidSubscription()
                 app.mymusclemap.ui.settings.DeleteAccountScreen(
-                    paidSubscriptionKnown = subscription != null &&
-                        (subscription.entitled || subscription.autoRenewing),
-                    onManageSubscription = { onManageSubscription(subscription?.productId.orEmpty()) },
                     onDelete = onDeleteAccount,
                     onFinished = onAccountDeletionFinished,
                     onBack = { navController.popBackStack() },
