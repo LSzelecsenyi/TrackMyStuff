@@ -51,6 +51,44 @@ class AccountDeletionServiceTest {
     }
 
     @Test
+    void theSignedInSessionDeletesThatAccountWithoutAGoogleToken() {
+        store.userId = UUID.randomUUID();
+        service.deleteSignedIn(true, store.userId);
+        assertTrue(store.userDeleted);
+        assertTrue(store.subscriptionsDetached);
+        assertEquals(store.usage, store.savedUsage);
+    }
+
+    @Test
+    void aSignedInDeletionWithoutConfirmationDoesNotDelete() {
+        assertEquals(
+                "CONFIRMATION_REQUIRED",
+                assertThrows(AccountDeletionException.class, () -> service.deleteSignedIn(false, store.userId)).errorCode()
+        );
+        assertFalse(store.userDeleted);
+    }
+
+    @Test
+    void aFailedMarkerInsertRollsTheSignedInDeletionBack() {
+        store.userId = UUID.randomUUID();
+        store.failMarker = true;
+        assertThrows(IllegalStateException.class, () -> service.deleteSignedIn(true, store.userId));
+        assertFalse(store.userDeleted);
+    }
+
+    @Test
+    void anUnavailableMarkerDoesNotDeleteTheSignedInAccount() {
+        store.userId = UUID.randomUUID();
+        markers.unavailable = true;
+        assertEquals(
+                "MARKER_UNAVAILABLE",
+                assertThrows(AccountDeletionException.class, () -> service.deleteSignedIn(true, store.userId)).errorCode()
+        );
+        assertFalse(store.userDeleted);
+        assertFalse(store.subscriptionsDetached);
+    }
+
+    @Test
     void theSessionSubjectMustMatchAndAnotherAccountIsNotDeleted() {
         identities.accept("token-b", "subject-b", "b@example.com", true, NOW);
         store.sessionSubject = "subject-a";

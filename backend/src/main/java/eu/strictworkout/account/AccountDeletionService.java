@@ -37,6 +37,7 @@ public class AccountDeletionService {
 
     /**
      * Deletes the account named by the verified Google token.
+     * Used by the public web page, which has no Strict session.
      * When {@code sessionUserId} is present, that session's Google subject must be the same token.
      * A missing user with an existing marker is success. The caller must not treat a thrown
      * exception as success: this method is one transaction, and a failure rolls the work back.
@@ -44,10 +45,7 @@ public class AccountDeletionService {
     @Transactional
     public void delete(String idToken, boolean confirmed, UUID sessionUserId) {
         if (!confirmed) {
-            throw new AccountDeletionException(
-                    AccountDeletionException.Code.CONFIRMATION_REQUIRED,
-                    "Confirm account deletion before it can run."
-            );
+            throw confirmationRequired();
         }
         VerifiedExternalIdentity identity = verified(idToken);
         requireRecent(identity);
@@ -68,26 +66,52 @@ public class AccountDeletionService {
             if (markers.present(identity.subject())) {
                 return;
             }
-            throw new AccountDeletionException(
-                    AccountDeletionException.Code.NOT_FOUND,
-                    "No Strict account exists for this Google sign-in."
-            );
+            throw notFound();
         }
         if (!store.lock(userId)) {
             if (markers.present(identity.subject())) {
                 return;
             }
-            throw new AccountDeletionException(
-                    AccountDeletionException.Code.NOT_FOUND,
-                    "No Strict account exists for this Google sign-in."
-            );
+            throw notFound();
         }
+        erase(userId, identity.subject());
+    }
+
+    /**
+     * Deletes the account identified by the authenticated Strict session.
+     * The body cannot name another account. A Google ID token is not required.
+     */
+    @Transactional
+    public void deleteSignedIn(boolean confirmed, UUID sessionUserId) {
+        if (!confirmed) {
+            throw confirmationRequired();
+        }
+        if (sessionUserId == null) {
+            throw notFound();
+        }
+        if (markers.untrustworthy()) {
+            throw unavailable();
+        }
+        String subject = store.googleSubject(sessionUserId);
+        if (!store.lock(sessionUserId)) {
+            if (subject != null && markers.present(subject)) {
+                return;
+            }
+            throw notFound();
+        }
+        if (subject == null || subject.isBlank()) {
+            throw notFound();
+        }
+        erase(sessionUserId, subject);
+    }
+
+    private void erase(UUID userId, String googleSubject) {
         markers.requireWritable();
         AccountDeletionStore.Usage usage = store.usage(userId);
         Instant now = clock.instant();
         store.detachSubscriptions(userId, now);
         store.deleteAccountRows(userId);
-        markers.write(identity.subject(), now, usage);
+        markers.write(googleSubject, now, usage);
         store.deleteUser(userId);
     }
 
@@ -111,6 +135,20 @@ public class AccountDeletionService {
             throw new UnverifiedIdentityException();
         }
         return identity;
+    }
+
+    private static AccountDeletionException confirmationRequired() {
+        return new AccountDeletionException(
+                AccountDeletionException.Code.CONFIRMATION_REQUIRED,
+                "Confirm account deletion before it can run."
+        );
+    }
+
+    private static AccountDeletionException notFound() {
+        return new AccountDeletionException(
+                AccountDeletionException.Code.NOT_FOUND,
+                "No Strict account exists for this sign-in."
+        );
     }
 
     private static AccountDeletionException unavailable() {

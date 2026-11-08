@@ -16,9 +16,12 @@ class AccountDeletionController {
         this.deletion = deletion;
     }
 
+    /**
+     * The bearer session names the account. {@code idToken} is not authorization.
+     */
     @DeleteMapping("/api/v1/account")
     ResponseEntity<Void> deleteAuthenticated(@RequestBody DeleteAccountRequest request) {
-        deletion.delete(request.idToken(), request.confirmed(), StrictRequests.current().userId());
+        deletion.deleteSignedIn(request.confirmed(), StrictRequests.current().userId());
         return ResponseEntity.noContent().build();
     }
 

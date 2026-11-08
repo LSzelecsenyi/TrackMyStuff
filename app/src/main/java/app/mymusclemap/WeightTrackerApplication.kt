@@ -169,13 +169,12 @@ class WeightTrackerApplication : Application() {
         val userId = accounts.activeUserId()
             ?: return app.mymusclemap.data.account.AccountDeletionOutcome.NoAccount
         val coordinator = app.mymusclemap.data.account.AccountDeletionCoordinator(
-            requestIdToken = { signIn.googleIdentity.requestIdToken() },
-            deleteAuthenticated = { signIn.deleteAuthenticated(it) },
-            deletePublic = { signIn.deletePublic(it) },
+            sessionUserId = { signIn.auth.storedSession()?.userId },
+            deleteSignedIn = { signIn.deleteSignedIn() },
             online = { online() },
             afterServerDeletion = { id -> finishLocalDeletion(id) }
         )
-        return coordinator.delete(userId, accounts.profile()?.email)
+        return coordinator.delete(userId)
     }
 
     fun retryPendingLocalDeletion(): Boolean {

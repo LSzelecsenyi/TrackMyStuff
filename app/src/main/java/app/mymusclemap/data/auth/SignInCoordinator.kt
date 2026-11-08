@@ -18,9 +18,7 @@ class SignInCoordinator(context: Context) {
 
     suspend fun continueWithGoogle() = auth.signIn()
 
-    suspend fun deleteAuthenticated(idToken: GoogleIdTokenValue) = api.deleteAccount(idToken)
-
-    suspend fun deletePublic(idToken: GoogleIdTokenValue) = api.deleteAccountPublic(idToken)
+    suspend fun deleteSignedIn() = api.deleteSignedInAccount()
 
     fun clearLocalSession() = sessions.clear()
 

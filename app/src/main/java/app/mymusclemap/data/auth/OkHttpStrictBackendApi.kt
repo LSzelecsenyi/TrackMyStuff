@@ -28,6 +28,7 @@ interface StrictBackendApi {
     suspend fun currentUser(): CurrentUserCall
     suspend fun revokeSession(): RevokeCall
     suspend fun deleteAccount(idToken: GoogleIdTokenValue): AccountDeletionCall
+    suspend fun deleteSignedInAccount(): AccountDeletionCall
     suspend fun deleteAccountPublic(idToken: GoogleIdTokenValue): AccountDeletionCall
     suspend fun enrollFounder(zone: ZoneId): FounderEnrollmentCall
     suspend fun currentFounder(zone: ZoneId): FounderSnapshotCall
@@ -266,6 +267,17 @@ class OkHttpStrictBackendApi(
             .put("idToken", idToken.value)
             .put("confirmed", true)
             .toString()
+        val request = Request.Builder()
+            .url("$root/api/v1/account")
+            .header("Authorization", "Bearer ${session.accessToken.value}")
+            .delete(body.toRequestBody(json))
+            .build()
+        return interpretDeletion(request)
+    }
+
+    override suspend fun deleteSignedInAccount(): AccountDeletionCall {
+        val session = sessions.read() ?: return AccountDeletionCall.Unauthenticated
+        val body = JSONObject().put("confirmed", true).toString()
         val request = Request.Builder()
             .url("$root/api/v1/account")
             .header("Authorization", "Bearer ${session.accessToken.value}")

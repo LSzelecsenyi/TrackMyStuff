@@ -1,8 +1,6 @@
 package app.mymusclemap.data.account
 
 import app.mymusclemap.data.auth.AccountDeletionCall
-import app.mymusclemap.data.auth.GoogleIdTokenRequest
-import app.mymusclemap.data.auth.GoogleIdTokenValue
 
 sealed interface AccountDeletionOutcome {
     data object Deleted : AccountDeletionOutcome
@@ -19,53 +17,42 @@ sealed interface AccountDeletionOutcome {
 
 /**
  * Deletes the signed-in account only after the backend confirms it.
+ * The Strict session names the account. A Google account picker is not used.
  * A network or server failure does not remove local data.
  */
 class AccountDeletionCoordinator(
-    private val requestIdToken: suspend () -> GoogleIdTokenRequest,
-    private val deleteAuthenticated: suspend (GoogleIdTokenValue) -> AccountDeletionCall,
-    private val deletePublic: suspend (GoogleIdTokenValue) -> AccountDeletionCall,
+    private val sessionUserId: () -> String?,
+    private val deleteSignedIn: suspend () -> AccountDeletionCall,
     private val online: () -> Boolean,
     private val afterServerDeletion: suspend (String) -> Boolean
 ) {
-    suspend fun delete(userId: String, expectedEmail: String? = null): AccountDeletionOutcome {
+    suspend fun delete(userId: String): AccountDeletionOutcome {
         if (!online()) {
             return AccountDeletionOutcome.NeedsNetwork
         }
-        val selected = when (val google = requestIdToken()) {
-            GoogleIdTokenRequest.Cancelled -> return AccountDeletionOutcome.Cancelled
-            GoogleIdTokenRequest.Failed, GoogleIdTokenRequest.NotConfigured ->
-                return AccountDeletionOutcome.GoogleUnavailable
-            is GoogleIdTokenRequest.Issued -> google
+        val sessionUser = sessionUserId()
+        if (sessionUser == null) {
+            return AccountDeletionOutcome.ReauthenticationRequired
         }
-        val authenticated = deleteAuthenticated(selected.idToken)
-        val result = when {
-            authenticated != AccountDeletionCall.Unauthenticated -> authenticated
-            emailsMatch(expectedEmail, selected.email) -> deletePublic(selected.idToken)
-            else -> AccountDeletionCall.AccountMismatch
+        if (sessionUser != userId) {
+            return AccountDeletionOutcome.Failed
         }
-        return when (result) {
+        return when (val result = deleteSignedIn()) {
             AccountDeletionCall.Deleted ->
                 if (afterServerDeletion(userId)) {
                     AccountDeletionOutcome.Deleted
                 } else {
                     AccountDeletionOutcome.LocalCleanupFailed(userId)
                 }
+            AccountDeletionCall.Unauthenticated,
             AccountDeletionCall.ReauthenticationRequired,
             AccountDeletionCall.InvalidGoogleToken -> AccountDeletionOutcome.ReauthenticationRequired
             AccountDeletionCall.AccountMismatch -> AccountDeletionOutcome.WrongAccount
             AccountDeletionCall.NotFound -> AccountDeletionOutcome.NotFound
             AccountDeletionCall.Unavailable ->
                 if (online()) AccountDeletionOutcome.Failed else AccountDeletionOutcome.NeedsNetwork
-            AccountDeletionCall.Unauthenticated,
             AccountDeletionCall.Rejected,
             AccountDeletionCall.Failed -> AccountDeletionOutcome.Failed
         }
     }
-}
-
-internal fun emailsMatch(expectedEmail: String?, selectedEmail: String?): Boolean {
-    val expected = expectedEmail?.trim().orEmpty()
-    val selected = selectedEmail?.trim().orEmpty()
-    return expected.isNotEmpty() && expected.equals(selected, ignoreCase = true)
 }

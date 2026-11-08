@@ -91,39 +91,93 @@ class AccountDeletionIT {
     }
 
     @Test
-    void staleAuthenticationAndMissingConfirmationDoNotDelete() {
-        identities.accept("token-stale-login", "subject-stale", "stale@example.com", true);
-        Map<String, Object> session = login("token-stale-login");
-        identities.accept(
-                "token-stale-delete",
-                "subject-stale",
-                "stale@example.com",
-                true,
-                Instant.now().minusSeconds(11 * 60)
+    @DisplayName("Given a signed-in session, when deletion is confirmed without a Google token, then that account is deleted")
+    void theSignedInSessionDeletesWithoutAGoogleToken() {
+        identities.accept("token-session", "subject-session", "session@example.com", true);
+        identities.accept("token-session-other", "subject-session-other", "session-other@example.com", true);
+        Map<String, Object> session = login("token-session");
+        Map<String, Object> other = login("token-session-other");
+        UUID ownerId = UUID.fromString(userId(session));
+        UUID otherId = UUID.fromString(userId(other));
+        OffsetDateTime at = OffsetDateTime.now(ZoneOffset.UTC);
+        jdbc.update(
+                "insert into pro_discovery_offer (user_id, presented_at, updated_at) values (?, ?, ?)",
+                ownerId,
+                at,
+                at
         );
-        ResponseEntity<String> stale = send(
-                HttpMethod.DELETE,
-                "/api/v1/account",
-                body("token-stale-delete", true),
-                token(session)
+        jdbc.update(
+                """
+                insert into play_subscription (
+                    token_hash, purchase_token, package_name, product_id, subscription_state,
+                    expiry_time, auto_renewing, entitled, linked_user_id, latest_order_id, updated_at, claim_blocked
+                ) values (?, 'purchase-token-session', 'com.strictworkout.app', 'strict_pro', 'ACTIVE', ?, true, true, ?, 'GPA.session', ?, false)
+                """,
+                "cd".repeat(32),
+                at.plusSeconds(86_400),
+                ownerId,
+                at
         );
-        assertEquals(HttpStatus.UNAUTHORIZED, stale.getStatusCode());
-        assertTrue(stale.getBody().contains("REAUTHENTICATION_REQUIRED"));
 
-        identities.accept("token-unconfirmed", "subject-stale", "stale@example.com", true);
         ResponseEntity<String> unconfirmed = send(
                 HttpMethod.DELETE,
                 "/api/v1/account",
-                body("token-unconfirmed", false),
+                "{\"confirmed\":false}",
                 token(session)
         );
         assertEquals(HttpStatus.BAD_REQUEST, unconfirmed.getStatusCode());
         assertTrue(unconfirmed.getBody().contains("CONFIRMATION_REQUIRED"));
-        assertEquals(1, count("select count(*) from app_user where id = ?", UUID.fromString(userId(session))));
+        assertEquals(1, count("select count(*) from app_user where id = ?", ownerId));
+
+        ResponseEntity<String> deleted = send(
+                HttpMethod.DELETE,
+                "/api/v1/account",
+                "{\"confirmed\":true}",
+                token(session)
+        );
+        assertEquals(HttpStatus.NO_CONTENT, deleted.getStatusCode());
+        assertEquals(0, count("select count(*) from app_user where id = ?", ownerId));
+        assertEquals(0, count("select count(*) from pro_discovery_offer where user_id = ?", ownerId));
+        assertEquals(1, count("select count(*) from app_user where id = ?", otherId));
+        Map<String, Object> subscription = jdbc.queryForMap(
+                "select linked_user_id, claim_blocked, purchase_token from play_subscription where token_hash = ?",
+                "cd".repeat(32)
+        );
+        assertEquals(null, subscription.get("linked_user_id"));
+        assertEquals(Boolean.FALSE, subscription.get("claim_blocked"));
+        assertEquals("purchase-token-session", subscription.get("purchase_token"));
+        assertEquals(1, count(
+                "select count(*) from account_deletion_marker where subject_hash = ?",
+                markerKeys.markerHash("subject-session")
+        ));
     }
 
     @Test
-    @DisplayName("Given two accounts, when one session presents the other Google account, then neither account is deleted")
+    @DisplayName("Given an expired session, when authenticated deletion is requested, then the account remains")
+    void anExpiredSessionDoesNotDelete() {
+        identities.accept("token-expired", "subject-expired", "expired@example.com", true);
+        Map<String, Object> session = login("token-expired");
+        UUID userId = UUID.fromString(userId(session));
+        OffsetDateTime created = OffsetDateTime.now(ZoneOffset.UTC).minusHours(2);
+        jdbc.update(
+                "update auth_session set created_at = ?, expires_at = ? where user_id = ?",
+                created,
+                created.plusMinutes(30),
+                userId
+        );
+        ResponseEntity<String> rejected = send(
+                HttpMethod.DELETE,
+                "/api/v1/account",
+                "{\"confirmed\":true}",
+                token(session)
+        );
+        assertEquals(HttpStatus.UNAUTHORIZED, rejected.getStatusCode());
+        assertTrue(rejected.getBody().contains("UNAUTHENTICATED"));
+        assertEquals(1, count("select count(*) from app_user where id = ?", userId));
+    }
+
+    @Test
+    @DisplayName("Given a signed-in session, when the body names another Google token, then only the session account can be deleted")
     void oneAccountCannotDeleteAnother() {
         identities.accept("token-owner", "subject-owner", "owner@example.com", true);
         identities.accept("token-other", "subject-other", "other@example.com", true);
@@ -135,10 +189,10 @@ class AccountDeletionIT {
                 body("token-other", true),
                 token(owner)
         );
-        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        assertTrue(response.getBody().contains("ACCOUNT_MISMATCH"));
-        assertEquals(HttpStatus.OK, me(token(owner)).getStatusCode());
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        assertEquals(0, count("select count(*) from app_user where id = ?", UUID.fromString(userId(owner))));
         assertEquals(HttpStatus.OK, me(token(other)).getStatusCode());
+        assertEquals(1, count("select count(*) from app_user where id = ?", UUID.fromString(userId(other))));
     }
 
     @Test
@@ -178,38 +232,26 @@ class AccountDeletionIT {
     }
 
     @Test
-    @DisplayName("Given offer rows on two accounts, when the wrong Google account is selected, then both offers remain")
-    void aDifferentGoogleAccountDoesNotRemoveOfferRows() {
-        identities.accept("token-keep", "subject-keep", "keep@example.com", true);
-        identities.accept("token-keep-other", "subject-keep-other", "keep-other@example.com", true);
-        Map<String, Object> owner = login("token-keep");
-        Map<String, Object> other = login("token-keep-other");
-        UUID ownerId = UUID.fromString(userId(owner));
-        UUID otherId = UUID.fromString(userId(other));
-        OffsetDateTime at = OffsetDateTime.now(ZoneOffset.UTC);
-        jdbc.update(
-                "insert into pro_discovery_offer (user_id, presented_at, updated_at) values (?, null, ?)",
-                ownerId,
-                at
+    @DisplayName("Given a stale Google token on the public page, when deletion is requested, then the account remains")
+    void aStalePublicGoogleTokenDoesNotDelete() {
+        identities.accept("token-stale-login", "subject-stale", "stale@example.com", true);
+        Map<String, Object> session = login("token-stale-login");
+        identities.accept(
+                "token-stale-delete",
+                "subject-stale",
+                "stale@example.com",
+                true,
+                Instant.now().minusSeconds(11 * 60)
         );
-        jdbc.update(
-                "insert into pro_discovery_offer (user_id, presented_at, updated_at) values (?, null, ?)",
-                otherId,
-                at
+        ResponseEntity<String> stale = send(
+                HttpMethod.POST,
+                "/api/v1/account/deletion",
+                body("token-stale-delete", true),
+                null
         );
-
-        ResponseEntity<String> rejected = send(
-                HttpMethod.DELETE,
-                "/api/v1/account",
-                body("token-keep-other", true),
-                token(owner)
-        );
-        assertEquals(HttpStatus.FORBIDDEN, rejected.getStatusCode());
-        assertTrue(rejected.getBody().contains("ACCOUNT_MISMATCH"));
-        assertEquals(1, count("select count(*) from pro_discovery_offer where user_id = ?", ownerId));
-        assertEquals(1, count("select count(*) from pro_discovery_offer where user_id = ?", otherId));
-        assertEquals(1, count("select count(*) from app_user where id = ?", ownerId));
-        assertEquals(1, count("select count(*) from app_user where id = ?", otherId));
+        assertEquals(HttpStatus.UNAUTHORIZED, stale.getStatusCode());
+        assertTrue(stale.getBody().contains("REAUTHENTICATION_REQUIRED"));
+        assertEquals(1, count("select count(*) from app_user where id = ?", UUID.fromString(userId(session))));
     }
 
     @Test
