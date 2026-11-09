@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily Strict production database backup
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+AccuracySec=1min
+Unit=strict-db-backup.service
+
+[Install]
+WantedBy=timers.target

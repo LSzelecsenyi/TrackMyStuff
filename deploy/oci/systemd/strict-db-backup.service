@@ -1,0 +1,21 @@
+[Unit]
+Description=Strict production database backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+# backup-strict-db.sh reads /etc/strict/strict-backup.env itself and rejects a
+# file that is not owned by root with mode 600. A missing file leaves off-host
+# upload disabled. Do not set EnvironmentFile=: a missing file must not stop
+# the local dump.
+ExecStart=/opt/strict/db-backup/backup-strict-db.sh
+TimeoutStartSec=6h
+Nice=10
+NoNewPrivileges=true
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strict-db-backup
