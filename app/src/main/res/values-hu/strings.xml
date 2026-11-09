@@ -1454,7 +1454,7 @@
     <string name="reports_muscles_title">Vezető izmok</string>
     <string name="reports_muscles_empty">Nincs befejezett sorozat ebben a jelentésben.</string>
     <string name="founder_program_title">Founding Tester</string>
-    <string name="founder_enroll">Csatlakozás a Founding Tester programhoz</string>
+    <string name="founder_enroll">Csatlakozás</string>
     <string name="founder_enroll_working">Bejelentkezés…</string>
     <string name="founder_resume_sign_in">Jelentkezz be a Founder-haladás frissítéséhez</string>
     <string name="founder_welcome_account">A Founder-jelentkezés azt a Google-fiókot használja, amellyel már bejelentkeztél.</string>

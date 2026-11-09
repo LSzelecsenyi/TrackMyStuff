@@ -2,6 +2,7 @@
 Description=Strict production database backup
 After=docker.service
 Requires=docker.service
+OnFailure=strict-db-backup-notify.service
 
 [Service]
 Type=oneshot

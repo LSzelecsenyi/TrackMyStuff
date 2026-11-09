@@ -948,6 +948,7 @@ test_systemd_units() {
     grep -q '^Group=root$' "$service"
     grep -q '^ExecStart=/opt/strict/db-backup/backup-strict-db.sh$' "$service"
     grep -q '^TimeoutStartSec=6h$' "$service"
+    grep -q '^OnFailure=strict-db-backup-notify.service$' "$service"
     if grep -q '^EnvironmentFile=' "$service"; then
         printf 'service must read the env file from the backup script\n' >&2
         return 1

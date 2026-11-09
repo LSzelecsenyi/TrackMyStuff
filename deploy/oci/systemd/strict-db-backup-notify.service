@@ -1,0 +1,20 @@
+[Unit]
+Description=Email a Strict production backup failure
+After=network-online.target
+# Started only by OnFailure= from strict-db-backup.service.
+# There is no [Install] section, so this unit cannot be enabled.
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+# Do not set EnvironmentFile=. The script reads the SendGrid SMTP settings
+# from the PUFF production env file and the recipient from the Strict alert
+# env file. A notification failure must not restart the backup.
+ExecStart=/opt/strict/db-backup/notify-strict-backup-failure.sh
+TimeoutStartSec=2min
+NoNewPrivileges=true
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strict-db-backup-notify

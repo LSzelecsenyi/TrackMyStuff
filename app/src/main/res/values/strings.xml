@@ -1454,7 +1454,7 @@
     <string name="reports_muscles_title">Top muscles</string>
     <string name="reports_muscles_empty">No completed sets in this report.</string>
     <string name="founder_program_title">Founding Tester</string>
-    <string name="founder_enroll">Join the Founding Tester Program</string>
+    <string name="founder_enroll">Join</string>
     <string name="founder_enroll_working">Signing in…</string>
     <string name="founder_resume_sign_in">Sign in to update Founder progress</string>
     <string name="founder_welcome_account">Founder enrollment uses the Google account you already signed in with.</string>

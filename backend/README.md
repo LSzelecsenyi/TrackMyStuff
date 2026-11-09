@@ -12,6 +12,24 @@ Production must run with the `prod` profile. That profile has no database defaul
 - `SERVER_PORT` when the process should not use `8082`
 - `SPRING_PROFILES_ACTIVE=prod`
 
+## Production database backups
+
+`strict-db-backup.timer` runs the production PostgreSQL backup. The dump is kept on the VM and uploaded to OCI Object Storage.
+
+A failed `strict-db-backup.service` starts `strict-db-backup-notify.service` through systemd `OnFailure`. The notifier reads the PUFF production SendGrid settings from `/etc/puff/puff-backend-prod.env`. The recipient is set separately with `STRICT_BACKUP_ALERT_TO` in `/etc/strict/strict-backup-alert.env`.
+
+GitHub Actions production deployment does not install or update these files. Copy the scripts and units to OCI by hand. Backup installation is described in `docs/deploy-oci.md` under "Database backup".
+
+- `deploy/oci/postgres/backup-strict-db.sh`
+- `deploy/oci/postgres/verify-strict-backup.sh`
+- `deploy/oci/postgres/notify-strict-backup-failure.sh`
+- `deploy/oci/postgres/notify-strict-backup-failure.py`
+- `deploy/oci/systemd/strict-db-backup.service`
+- `deploy/oci/systemd/strict-db-backup.timer`
+- `deploy/oci/systemd/strict-db-backup-notify.service`
+- `deploy/oci/env/strict-backup.env.example`
+- `deploy/oci/env/strict-backup-alert.env.example`
+
 ## Start PostgreSQL
 
 From `backend/`:
