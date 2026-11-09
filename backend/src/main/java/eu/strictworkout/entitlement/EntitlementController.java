@@ -8,6 +8,9 @@ import eu.strictworkout.founder.FounderFacts;
 import eu.strictworkout.founder.FounderStateMachine;
 import eu.strictworkout.founder.FounderStatus;
 import eu.strictworkout.founder.FounderWorkoutEventRepository;
+import eu.strictworkout.identity.ExternalIdentity;
+import eu.strictworkout.identity.ExternalIdentityRepository;
+import eu.strictworkout.identity.IdentityProvider;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,6 +29,7 @@ public class EntitlementController {
     private final FounderWorkoutEventRepository events;
     private final EntitlementGrantRepository grants;
     private final AccountStatusGrantRepository accountStatuses;
+    private final ExternalIdentityRepository identities;
     private final FounderStateMachine machine;
     private final eu.strictworkout.founder.FounderRules rules;
     private final Clock clock;
@@ -35,6 +39,7 @@ public class EntitlementController {
             FounderWorkoutEventRepository events,
             EntitlementGrantRepository grants,
             AccountStatusGrantRepository accountStatuses,
+            ExternalIdentityRepository identities,
             FounderStateMachine machine,
             eu.strictworkout.founder.FounderRules rules,
             Clock clock
@@ -43,6 +48,7 @@ public class EntitlementController {
         this.events = events;
         this.grants = grants;
         this.accountStatuses = accountStatuses;
+        this.identities = identities;
         this.machine = machine;
         this.rules = rules;
         this.clock = clock;
@@ -65,7 +71,8 @@ public class EntitlementController {
                 .orElse(null);
         boolean lifetime = legacy != null;
         boolean founderProActive = founderPro != null && founderPro.founderProActive(now);
-        EffectiveEntitlement entitlement = EffectiveEntitlement.resolve(status, lifetime, founderProActive, false);
+        boolean reviewer = PlayReviewAccess.matchesVerifiedEmail(verifiedGoogleEmail(userId));
+        EffectiveEntitlement entitlement = EffectiveEntitlement.resolve(status, lifetime, founderProActive, reviewer);
         EntitlementGrant recognition = founderPro != null ? founderPro : legacy;
         boolean founderRecognized = status == FounderStatus.APPROVED || recognition != null;
         List<SpecialAchievementResponse> specials = accountStatuses.findByUser_IdOrderByStatusAsc(userId)
@@ -75,12 +82,28 @@ public class EntitlementController {
         return new EntitlementResponse(
                 entitlement.access(),
                 entitlement.founderLifetime(),
-                entitlement.temporaryFounderPro(),
+                temporaryFounderPro(entitlement, reviewer),
                 recognition == null ? null : recognition.getGrantedAt(),
                 specials,
                 founderRecognized,
                 founderPro == null ? null : founderPro.getExpiresAt()
         );
+    }
+
+    /**
+     * The installed app grants Pro from {@code temporaryFounderPro}. The reviewer flag
+     * is reported only when no Founder grant already does that, and no Founder row is written.
+     */
+    static boolean temporaryFounderPro(EffectiveEntitlement entitlement, boolean reviewer) {
+        return entitlement.temporaryFounderPro()
+                || (reviewer && !entitlement.founderLifetime() && !entitlement.founderProActive());
+    }
+
+    private String verifiedGoogleEmail(UUID userId) {
+        return identities.findByUser_IdAndProvider(userId, IdentityProvider.GOOGLE)
+                .filter(ExternalIdentity::isEmailVerified)
+                .map(ExternalIdentity::getEmail)
+                .orElse(null);
     }
 
     private FounderStatus evaluatedStatus(FounderApplication application) {
