@@ -6,6 +6,10 @@ import androidx.compose.ui.unit.dp
 
 object AppDimens {
     val screenPadding = 20.dp
+    /** Form and onboarding content stays within this width and is centered when the window is wider. */
+    val readableMaxWidth = 600.dp
+    val choicePaddingHorizontal = 20.dp
+    val choicePaddingVertical = 12.dp
     val sectionGap = 20.dp
     val itemGap = 12.dp
     val heroPadding = 20.dp

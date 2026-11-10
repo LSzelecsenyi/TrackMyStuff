@@ -2,6 +2,7 @@ package app.mymusclemap.ui.exercises
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -156,13 +158,16 @@ fun ExerciseEditorScreen(
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .imePadding()
-                    .padding(horizontal = AppDimens.screenPadding, vertical = 8.dp)
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Button(
                     onClick = onSave,
                     enabled = !state.saving && !state.loading,
                     shape = AppShapeTokens.button,
                     modifier = Modifier
+                        .padding(horizontal = AppDimens.screenPadding)
+                        .widthIn(max = AppDimens.readableMaxWidth)
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = AppDimens.minTouch)
                         .testTag(EXERCISE_EDITOR_SAVE)
@@ -181,10 +186,16 @@ fun ExerciseEditorScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize()
+                .fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = AppDimens.readableMaxWidth)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = AppDimens.screenPadding)
                 .padding(top = 8.dp, bottom = AppDimens.scrollEndPadding)
@@ -351,6 +362,7 @@ fun ExerciseEditorScreen(
                     testTag = EXERCISE_FIELD_NOTES
                 )
             }
+        }
         }
     }
     if (state.showDiscardConfirm) {

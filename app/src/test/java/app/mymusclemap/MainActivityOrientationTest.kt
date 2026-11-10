@@ -20,4 +20,28 @@ class MainActivityOrientationTest {
         )
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, main.screenOrientation)
     }
+
+    @Test
+    fun phonesStayPortraitAndTabletsCanRotate() {
+        assertEquals(
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,
+            requestedOrientationForSmallestWidth(360)
+        )
+        assertEquals(
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,
+            requestedOrientationForSmallestWidth(599)
+        )
+        assertEquals(
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED,
+            requestedOrientationForSmallestWidth(600)
+        )
+        assertEquals(
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED,
+            requestedOrientationForSmallestWidth(840)
+        )
+        assertEquals(
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED,
+            requestedOrientationForSmallestWidth(1280)
+        )
+    }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -98,7 +99,8 @@ fun FounderProgramScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .statusBarsPadding()
+                .statusBarsPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -134,6 +136,8 @@ fun FounderProgramScreen(
             Column(
                 modifier = Modifier
                     .weight(1f)
+                    .widthIn(max = AppDimens.readableMaxWidth)
+                    .fillMaxWidth()
                     .windowInsetsPadding(bottomContentInsets)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = AppDimens.screenPadding)

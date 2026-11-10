@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -103,6 +104,8 @@ import app.mymusclemap.domain.theme.PaletteType
 import app.mymusclemap.domain.theme.PaletteValidationError
 import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.ui.components.CompactEditorDivider
+import app.mymusclemap.ui.components.ExclusiveChoice
+import app.mymusclemap.ui.components.ReadableContent
 import app.mymusclemap.ui.components.StrictBrandLockup
 import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.units.WeightAdjustmentConfiguration
@@ -359,10 +362,16 @@ internal fun SettingsPage(
                         }
                     )
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = AppDimens.screenPadding)
-                    .padding(top = AppDimens.headerStackGap, bottom = AppDimens.sectionGap),
-                content = content
-            )
+            ) {
+                ReadableContent(
+                    modifier = Modifier.padding(
+                        top = AppDimens.headerStackGap,
+                        bottom = AppDimens.sectionGap
+                    )
+                ) {
+                    content()
+                }
+            }
         }
     }
 }
@@ -407,14 +416,17 @@ internal fun SettingsSaveBar(
             .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
             .imePadding()
-            .testTag(SETTINGS_SAVE_BAR)
+            .testTag(SETTINGS_SAVE_BAR),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         HorizontalDivider(
+            modifier = Modifier.fillMaxWidth(),
             thickness = AppDimens.strokeThin,
             color = MaterialTheme.colorScheme.outlineVariant
         )
         Row(
             modifier = Modifier
+                .widthIn(max = AppDimens.readableMaxWidth)
                 .fillMaxWidth()
                 .padding(horizontal = AppDimens.screenPadding, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -487,15 +499,18 @@ internal fun MeasurementUnitsSection(
             modifier = Modifier.testTag("settings-units")
         )
         Spacer(Modifier.height(AppDimens.itemGap))
-        Column(modifier = Modifier.selectableGroup()) {
-            ChoiceRow(
+        Column(
+            modifier = Modifier.selectableGroup(),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
+        ) {
+            ExclusiveChoice(
                 label = stringResource(R.string.units_metric),
                 supporting = stringResource(R.string.units_metric_detail),
                 selected = selected == app.mymusclemap.domain.units.UnitSystem.METRIC,
                 testTag = "settings-units-metric",
                 onClick = { onSelected(app.mymusclemap.domain.units.UnitSystem.METRIC) }
             )
-            ChoiceRow(
+            ExclusiveChoice(
                 label = stringResource(R.string.units_imperial),
                 supporting = stringResource(R.string.units_imperial_detail),
                 selected = selected == app.mymusclemap.domain.units.UnitSystem.IMPERIAL,
@@ -519,14 +534,17 @@ internal fun MuscleMapBodyModelSection(
             modifier = Modifier.testTag("settings-body-model")
         )
         Spacer(Modifier.height(AppDimens.itemGap))
-        Column(modifier = Modifier.selectableGroup()) {
-            ChoiceRow(
+        Column(
+            modifier = Modifier.selectableGroup(),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
+        ) {
+            ExclusiveChoice(
                 label = stringResource(R.string.body_model_male),
                 selected = selected == app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE,
                 testTag = "settings-body-model-male",
                 onClick = { onSelected(app.mymusclemap.domain.musclemap.MuscleMapBodyModel.MALE) }
             )
-            ChoiceRow(
+            ExclusiveChoice(
                 label = stringResource(R.string.body_model_female),
                 selected = selected == app.mymusclemap.domain.musclemap.MuscleMapBodyModel.FEMALE,
                 testTag = "settings-body-model-female",

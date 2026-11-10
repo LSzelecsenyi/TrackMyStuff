@@ -1,6 +1,7 @@
 package app.mymusclemap.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -10,10 +11,13 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Button
@@ -25,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,6 +50,8 @@ import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.workout.WeeklyGoalLogic
 import app.mymusclemap.ui.founder.FounderInvitationScreen
 import app.mymusclemap.ui.founder.FounderJoinNotice
+import app.mymusclemap.ui.components.ExclusiveChoice
+import app.mymusclemap.ui.components.ReadableContent
 import app.mymusclemap.ui.components.StrictBrandLockup
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
@@ -109,6 +116,10 @@ fun OnboardingScreen(
         OnboardingStep.WeeklyGoal -> stringResource(R.string.weekly_goal_set)
         OnboardingStep.CreatePlan -> stringResource(R.string.onboarding_create_plan)
     }
+    val bodyScroll = rememberScrollState()
+    LaunchedEffect(step) {
+        bodyScroll.scrollTo(0)
+    }
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
@@ -122,15 +133,22 @@ fun OnboardingScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .fillMaxSize()
-                .padding(horizontal = AppDimens.screenPadding, vertical = AppDimens.sectionGap)
+                .padding(vertical = AppDimens.sectionGap)
         ) {
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+            ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(bodyScroll)
+                    .heightIn(min = maxHeight),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                ReadableContent {
                 if (step == OnboardingStep.Welcome) {
                     StrictBrandLockup(
                         showTagline = true,
@@ -167,35 +185,35 @@ fun OnboardingScreen(
                 )
                 if (step == OnboardingStep.MeasurementUnits) {
                     Spacer(Modifier.height(AppDimens.sectionGap))
-                    UnitSystemChoice(
-                        title = stringResource(R.string.units_metric),
-                        detail = stringResource(R.string.units_metric_detail),
+                    ExclusiveChoice(
+                        label = stringResource(R.string.units_metric),
+                        supporting = stringResource(R.string.units_metric_detail),
                         selected = selectedUnitSystem == UnitSystem.METRIC,
-                        tag = "onboarding-units-metric",
+                        testTag = "onboarding-units-metric",
                         onClick = { onUnitSystemSelected(UnitSystem.METRIC) }
                     )
                     Spacer(Modifier.height(AppDimens.itemGap))
-                    UnitSystemChoice(
-                        title = stringResource(R.string.units_imperial),
-                        detail = stringResource(R.string.units_imperial_detail),
+                    ExclusiveChoice(
+                        label = stringResource(R.string.units_imperial),
+                        supporting = stringResource(R.string.units_imperial_detail),
                         selected = selectedUnitSystem == UnitSystem.IMPERIAL,
-                        tag = "onboarding-units-imperial",
+                        testTag = "onboarding-units-imperial",
                         onClick = { onUnitSystemSelected(UnitSystem.IMPERIAL) }
                     )
                 }
                 if (step == OnboardingStep.BodyModel) {
                     Spacer(Modifier.height(AppDimens.sectionGap))
-                    UnitSystemChoice(
-                        title = stringResource(R.string.body_model_male),
+                    ExclusiveChoice(
+                        label = stringResource(R.string.body_model_male),
                         selected = selectedBodyModel == MuscleMapBodyModel.MALE,
-                        tag = "onboarding-body-model-male",
+                        testTag = "onboarding-body-model-male",
                         onClick = { onBodyModelSelected(MuscleMapBodyModel.MALE) }
                     )
                     Spacer(Modifier.height(AppDimens.itemGap))
-                    UnitSystemChoice(
-                        title = stringResource(R.string.body_model_female),
+                    ExclusiveChoice(
+                        label = stringResource(R.string.body_model_female),
                         selected = selectedBodyModel == MuscleMapBodyModel.FEMALE,
-                        tag = "onboarding-body-model-female",
+                        testTag = "onboarding-body-model-female",
                         onClick = { onBodyModelSelected(MuscleMapBodyModel.FEMALE) }
                     )
                 }
@@ -235,6 +253,9 @@ fun OnboardingScreen(
                     }
                 }
             }
+            }
+            }
+            ReadableContent {
             Button(
                 onClick = {
                     when (step) {
@@ -280,35 +301,7 @@ fun OnboardingScreen(
                     )
                 }
             }
+            }
         }
     }
-}
-
-@Composable
-private fun UnitSystemChoice(
-    title: String,
-    detail: String? = null,
-    selected: Boolean,
-    tag: String,
-    onClick: () -> Unit
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title)
-                if (detail != null) {
-                    Text(detail, style = AppTypeTokens.statCaption)
-                }
-            }
-        },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = StrictBrand.actionContainer(),
-            selectedLabelColor = StrictBrand.onAction()
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(tag)
-    )
 }

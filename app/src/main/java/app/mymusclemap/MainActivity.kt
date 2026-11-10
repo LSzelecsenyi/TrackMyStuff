@@ -84,6 +84,9 @@ class MainActivity : AppCompatActivity() {
         splashScreen.setKeepOnScreenCondition { !splashReady }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        requestedOrientation = requestedOrientationForSmallestWidth(
+            resources.configuration.smallestScreenWidthDp
+        )
         openPrivacyPolicy.value = HealthConnectGateway.isPermissionUsage(intent)
         acceptOverviewRequest(intent)
         if (savedInstanceState == null) {

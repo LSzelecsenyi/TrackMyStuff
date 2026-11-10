@@ -19,7 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import app.mymusclemap.domain.entitlement.FounderProgramRules
-import app.mymusclemap.ui.theme.AppDimens
+import app.mymusclemap.ui.components.ReadableContent
 
 /**
  * Onboarding step. Decline is one-shot. Join stays available after a cancelled or failed sign-in.
@@ -51,8 +51,8 @@ fun FounderInvitationScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = AppDimens.screenPadding)
         ) {
+            ReadableContent {
             FounderWelcomeContent(
                 rules = rules,
                 onEnroll = {
@@ -75,6 +75,7 @@ fun FounderInvitationScreen(
                 joining = joining,
                 joinNotice = joinNotice
             )
+            }
         }
     }
 }

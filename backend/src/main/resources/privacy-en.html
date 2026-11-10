@@ -25,7 +25,7 @@
     <a href="/privacy/hu">Magyar</a>
   </nav>
   <h1>Privacy policy</h1>
-  <p>Effective date: 8 November 2026. This notice describes the Strict Android app and the Strict account service in this version. It is not a legal certification.</p>
+  <p>Effective date: 9 November 2026. This notice describes the Strict Android app and the Strict account service in this version. It is not a legal certification.</p>
 
   <h2>Who is responsible</h2>
   <p>The controller is Szelecsényi László, a natural person, of 2141 Csömör, Bajcsy-Zsilinszky utca 1., Hungary. The privacy contact is <a href="mailto:laszlo.szelecsenyi@gmail.com">laszlo.szelecsenyi@gmail.com</a>. No data protection officer is appointed.</p>
@@ -67,13 +67,13 @@
   <p>The application log is the system journal on the same host. It is kept in temporary storage and removed when the host reboots. Debug and trace logging are off. The application records error codes and rejection reasons. The sign-in diagnosis does not record the ID token, Google subject, email, or name. Purchase tokens are not written to those application logs. A review of the journal present on 8 November 2026 found no email address, Google subject, or access token. This notice does not say that a later error message can never include other text.</p>
   <p>PostgreSQL does not log connections or ordinary SQL statements. A database error can be written to the database container’s log. A size limit for that container log is not turned on.</p>
   <p>Some Oracle Cloud logging, including audit logs, network flow logs, and load-balancer logs, was not visible from the host. This notice does not say those logs are off.</p>
-  <p>A manual copy of the production database is stored on the Frankfurt host. Nothing on that host deletes it automatically. It can contain account, sign-in, session, and purchase records, including an account that was deleted after the copy was made. A daily automatic backup is planned and is not running. The planned rule would remove an automatic copy older than 20 days only after a newer copy has been verified, and it would keep the newest verified copy even if that copy were older than 20 days. That plan is not a promise that every database copy disappears after 20 days.</p>
+  <p>A manual copy of the production database is stored on the Frankfurt host. Nothing on that host deletes that manual copy automatically. It can contain account, sign-in, session, and purchase records, including an account that was deleted after the copy was made. Since 9 November 2026 a daily automatic backup also runs. Each automatic copy is stored on the Frankfurt host and uploaded to a private OCI Object Storage bucket in eu-frankfurt-1. On the host, an automatic copy older than 20 days is removed only after a newer verified copy exists. The newest verified automatic copy is kept even when it is older than 20 days, and a copy whose upload has not succeeded is kept. Objects in the bucket are deleted by a 20-day lifecycle rule. That deletion is asynchronous and can leave an object past 20 days. A failed automatic backup can send an operational email to the operator. That email does not include the database contents. Deleting an account does not erase that account from a backup already made, on the host or in the bucket. This is not a promise that every database copy disappears after 20 days.</p>
 
   <h2>Who else receives data</h2>
   <ul>
     <li>Google, for sign-in and, if you subscribe, for Play Billing.</li>
     <li>Cloudflare, because public API traffic passes through it.</li>
-    <li>Oracle Cloud Infrastructure, which hosts the server and database in Frankfurt.</li>
+    <li>Oracle Cloud Infrastructure, which hosts the server and database in Frankfurt and stores automatic database backups in a private Object Storage bucket in eu-frankfurt-1.</li>
     <li>Health Connect on your device, only if you grant access. Strict does not send those readings to its own service.</li>
     <li>Your email app and the file location you pick for a backup.</li>
   </ul>
@@ -91,14 +91,14 @@
     <li>A one-time benefit marker remains while that promotion can still be issued. After the promotion is permanently retired, its flag can be removed, and the marker row is deleted when no flag remains.</li>
     <li>An active or still-recoverable Play purchase remains so it can be verified onto one Strict account. An ended purchase row is deleted 24 calendar months after it ended, unless a retention hold is set.</li>
     <li>Nginx access and error logs rotate daily, and 10 rotated files are kept. The application journal is removed when the host reboots. The database container log has no size limit in the current configuration.</li>
-    <li>The manual production database copy has no automatic deletion date. The planned daily backup is not running.</li>
+    <li>The manual production database copy has no automatic deletion date. Daily automatic backups are stored on the Frankfurt host and in a private OCI Object Storage bucket in eu-frankfurt-1. Host copies older than 20 days are removed only after a newer verified copy exists, and the newest verified copy is kept even when it is older. A copy whose upload has not succeeded is kept. Bucket objects are removed by a 20-day lifecycle rule, which may not finish on that day. A backup made before account deletion can still contain the deleted account until that backup itself is removed.</li>
     <li>An exported ZIP remains wherever you saved it.</li>
   </ul>
 
   <h2>Account deletion</h2>
   <p>In the app, open Settings and choose Delete account. The button stays disabled until you confirm. The signed-in Strict session identifies the account. The app does not ask you to choose a Google account again. Local data for that account is removed only after the server confirms deletion. The same Google account can sign in later as a new empty account. Founder recognition, a used promotion, and the old workouts are not restored. A Play purchase that is still entitled can be verified onto that new account, and it cannot be active on two accounts at once.</p>
   <p>If you no longer have the app, use <a href="/account/delete">Delete your Strict account</a> on this site. That page verifies a fresh Google sign-in. It is separate from deletion in the signed-in app. That page is part of this server build. It is not a claim that the public production address is already online.</p>
-  <p>Sign-out and uninstall do not delete the server account. Deleting the account does not erase a ZIP you already saved, an Android backup the phone already made, or a database copy made while the account existed.</p>
+  <p>Sign-out and uninstall do not delete the server account. Deleting the account does not erase a ZIP you already saved, an Android backup the phone already made, or a database copy made while the account existed, including a copy on the Frankfurt host or in the private OCI Object Storage bucket.</p>
 
   <h2>Your requests</h2>
   <p>You can delete individual measurements, photos, and workouts in the app, export a ZIP of local training data, and delete the account as described above. There is no separate self-serve download of the server profile.</p>
@@ -130,6 +130,6 @@ TODO: obtain legal review of the draft Article 6(1)(f) note and of whether 24 mo
 - The 24-month purchase rule is the product rule. Whether it meets a tax, accounting, or dispute duty is not legally verified.
 - Article 6(1)(f) for the one-time marker is the 6 November 2026 preliminary technical note, not a legitimate-interest assessment and not a verified conclusion.
 - Counsel has not certified this notice.
-- Automatic 20-day database backups are not deployed. The manual dump has no automatic deletion. The prepared design keeps the newest verified backup even when it is older than 20 days.
+- Since 9 November 2026, daily automatic backups run on the Frankfurt host and are uploaded to a private OCI Object Storage bucket in eu-frankfurt-1. Local retention removes an automatic copy older than 20 days only after a newer verified copy exists, and it keeps the newest verified copy and any copy whose upload has not succeeded. The bucket lifecycle rule deletes automatic objects about 20 days after upload and can lag. The manual dump has no automatic deletion. Account deletion does not remove an existing backup. A failed backup can email the operator without the database contents.
 - Docker log rotation for PostgreSQL is not enabled.
 -->

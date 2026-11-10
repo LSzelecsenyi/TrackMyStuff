@@ -84,6 +84,7 @@ import app.mymusclemap.domain.workout.TemplateExerciseDraft
 import app.mymusclemap.domain.workout.TemplateFieldError
 import app.mymusclemap.domain.workout.TemplateOrdering
 import app.mymusclemap.domain.workout.TemplateValidationIssue
+import app.mymusclemap.ui.components.ReadableContent
 import app.mymusclemap.ui.components.SegmentedControl
 import app.mymusclemap.ui.components.musclemap.TemplateMuscleMapCard
 import app.mymusclemap.ui.exercises.CatalogDropdown
@@ -219,17 +220,15 @@ fun TemplateEditorScreen(
                 }
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = AppDimens.screenPadding)
-                        .padding(top = 8.dp)
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(top = 8.dp)
                 ) {
                     item(key = TEMPLATE_HEADER_KEY) {
                         val nameError = state.issues.firstOrNull {
                             it.error == TemplateFieldError.NameBlank ||
                                 it.error == TemplateFieldError.NameTooLong
                         }
-                        Column {
+                        ReadableContent {
                             if (state.contentLocked) {
                                 app.mymusclemap.ui.entitlement.FreeAccessLockNote(
                                     onExplorePro = onExploreProBenefits
@@ -275,10 +274,18 @@ fun TemplateEditorScreen(
                                 strict = state.draft.restProgressionMode == RestProgressionMode.STRICT,
                                 onChange = onRestMode
                             )
-                            if (state.draft.exercises.isNotEmpty()) {
+                        }
+                        if (state.draft.exercises.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = AppDimens.screenPadding)
+                            ) {
                                 Spacer(Modifier.height(20.dp))
                                 TemplateMuscleMapCard(state = state.musclePreview)
                             }
+                        }
+                        ReadableContent {
                             Spacer(Modifier.height(20.dp))
                             Text(
                                 text = stringResource(R.string.template_exercises_heading),
@@ -298,7 +305,7 @@ fun TemplateEditorScreen(
                         key = { _, item -> templateExerciseKey(item.localId) }
                     ) { index, item ->
                         val exercise = state.catalog[item.exerciseId]
-                        Column {
+                        ReadableContent {
                             Spacer(Modifier.height(12.dp))
                             if (exercise != null) {
                                 ExerciseCard(
@@ -342,27 +349,30 @@ fun TemplateEditorScreen(
                         }
                     }
                     item(key = TEMPLATE_ADD_KEY) {
-                        Spacer(Modifier.height(16.dp))
-                        OutlinedButton(
-                            onClick = onOpenPicker,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = AppDimens.scrollEndPadding)
-                        ) {
-                            Text(stringResource(R.string.template_add_exercise))
+                        ReadableContent {
+                            Spacer(Modifier.height(16.dp))
+                            OutlinedButton(
+                                onClick = onOpenPicker,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = AppDimens.scrollEndPadding)
+                            ) {
+                                Text(stringResource(R.string.template_add_exercise))
+                            }
                         }
                     }
                 }
-                Button(
-                    onClick = onSave,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = AppDimens.screenPadding, vertical = 12.dp)
-                        .defaultMinSize(minHeight = AppDimens.minTouch)
-                        .testTag("template-save"),
-                    enabled = !state.duplicateName
-                ) {
-                    Text(stringResource(R.string.action_save))
+                ReadableContent(Modifier.padding(vertical = 12.dp)) {
+                    Button(
+                        onClick = onSave,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = AppDimens.minTouch)
+                            .testTag("template-save"),
+                        enabled = !state.duplicateName
+                    ) {
+                        Text(stringResource(R.string.action_save))
+                    }
                 }
             }
         }
@@ -421,17 +431,17 @@ private fun PickerPane(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = AppDimens.screenPadding)
+            .imePadding()
             .verticalScroll(rememberScrollState())
     ) {
+        ReadableContent {
         if (state.catalog.values.none { !it.archived }) {
             Text(
                 text = stringResource(R.string.template_picker_empty),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(top = 24.dp)
             )
-            return
-        }
+        } else {
         OutlinedTextField(
             value = state.pickerQuery,
             onValueChange = onQuery,
@@ -483,6 +493,8 @@ private fun PickerPane(
             }
         }
         Spacer(Modifier.height(AppDimens.scrollEndPadding))
+        }
+        }
     }
 }
 

@@ -25,7 +25,7 @@
     <a href="/privacy/hu" aria-current="page">Magyar</a>
   </nav>
   <h1>Adatvédelmi tájékoztató</h1>
-  <p>Hatályos: 2026. november 8. Ez a szöveg a Strict Android-alkalmazás és a Strict-fiókszolgáltatás jelen verzióját írja le. Nem jogi tanúsítvány.</p>
+  <p>Hatályos: 2026. november 9. Ez a szöveg a Strict Android-alkalmazás és a Strict-fiókszolgáltatás jelen verzióját írja le. Nem jogi tanúsítvány.</p>
 
   <h2>Ki a felelős</h2>
   <p>Az adatkezelő Szelecsényi László, természetes személy, 2141 Csömör, Bajcsy-Zsilinszky utca 1. Az adatvédelmi kapcsolat: <a href="mailto:laszlo.szelecsenyi@gmail.com">laszlo.szelecsenyi@gmail.com</a>. Adatvédelmi tisztviselő nincs kinevezve.</p>
@@ -67,13 +67,13 @@
   <p>Az alkalmazás naplója ugyanezen a gépen a rendszernapló. Átmeneti tárolóban van, és a gép újraindításakor törlődik. A részletes hibakeresési naplózás ki van kapcsolva. Az alkalmazás hibakódokat és elutasítási okokat rögzít. A bejelentkezés diagnosztikája nem rögzíti az azonosító tokent, a Google-alanyazonosítót, az e-mailt vagy a nevet. A vásárlási tokenek nem kerülnek ezekbe az alkalmazásnaplókba. A 2026. november 8-án meglévő rendszernapló átnézése nem talált e-mail-címet, Google-alanyazonosítót vagy hozzáférési tokent. Ez a tájékoztató nem állítja, hogy egy későbbi hibaüzenet sem tartalmazhat más szöveget.</p>
   <p>A PostgreSQL nem naplózza a kapcsolatokat és a szokásos SQL-utasításokat. Adatbázishiba a konténer naplójába kerülhet. Ennek a konténernaplónak jelenleg nincs méretkorlátja.</p>
   <p>Az Oracle Cloud egyes naplói, köztük az auditnapló, a hálózati forgalmi napló és a terheléselosztó naplója, a gépről nem voltak láthatók. Ez a tájékoztató nem állítja, hogy ezek a naplók ki vannak kapcsolva.</p>
-  <p>Az éles adatbázisnak kézi másolata van a frankfurti gépen. A gépen semmi nem törli ezt automatikusan. Tartalmazhat fiókot, bejelentkezést, munkamenetet és vásárlási adatot, köztük olyan fiókét is, amelyet a másolat elkészülte után töröltek. Napi automatikus mentés tervezve van, és nem fut. A tervezett szabály egy 20 napnál régebbi automatikus másolatot csak egy újabb, ellenőrzött másolat után törölne, és a legutóbbi ellenőrzött másolatot akkor is megtartaná, ha az 20 napnál régebbi. Ez a terv nem ígéri, hogy minden adatbázis-másolat 20 nap után eltűnik.</p>
+  <p>Az éles adatbázisnak kézi másolata van a frankfurti gépen. A gépen semmi nem törli ezt a kézi másolatot automatikusan. Tartalmazhat fiókot, bejelentkezést, munkamenetet és vásárlási adatot, köztük olyan fiókét is, amelyet a másolat elkészülte után töröltek. 2026. november 9. óta napi automatikus mentés is fut. Minden automatikus másolat a frankfurti gépen marad, és feltöltődik egy privát OCI Object Storage tárolóba, az eu-frankfurt-1 régióban. A gépen a 20 napnál régebbi automatikus másolat csak akkor törlődik, ha már van nála újabb, ellenőrzött másolat. A legutóbbi ellenőrzött automatikus másolat akkor is megmarad, ha 20 napnál régebbi, és az a másolat is megmarad, amelynek feltöltése nem sikerült. A tárolóban lévő objektumokat egy 20 napos életciklus-szabály törli. Ez a törlés nem azonnali, ezért egy objektum 20 napnál tovább is megmaradhat. A sikertelen automatikus mentés üzemeltetési e-mailt küldhet az üzemeltetőnek. Ez az e-mail nem tartalmazza az adatbázis tartalmát. A fiók törlése nem törli a fiókot a már elkészült mentésből, sem a gépen, sem a tárolóban. Ez nem ígéri, hogy minden adatbázis-másolat 20 nap után eltűnik.</p>
 
   <h2>Ki kap még adatot</h2>
   <ul>
     <li>A Google, a bejelentkezéshez, és előfizetés esetén a Play-számlázáshoz.</li>
     <li>A Cloudflare, mert a nyilvános API-forgalom rajta megy keresztül.</li>
-    <li>Az Oracle Cloud Infrastructure, amely a szervert és az adatbázist Frankfurtban üzemelteti.</li>
+    <li>Az Oracle Cloud Infrastructure, amely a szervert és az adatbázist Frankfurtban üzemelteti, és az automatikus adatbázis-mentéseket egy privát Object Storage tárolóban őrzi, az eu-frankfurt-1 régióban.</li>
     <li>A Health Connect az eszközödön, csak ha hozzáférést adsz. A Strict ezeket az adatokat nem küldi a saját szolgáltatásának.</li>
     <li>Az e-mail-alkalmazásod, és a mentéshez választott fájlhely.</li>
   </ul>
@@ -91,14 +91,14 @@
     <li>Az egyszeri juttatás jelölője addig marad, amíg az a promóció még kiadható. A végleges lezárás után a jelző törölhető, és a jelölősor akkor törlődik, ha már egy jelző sem marad.</li>
     <li>Az aktív vagy még helyreállítható Play-vásárlás megmarad, hogy egy Strict-fiókra ellenőrizhető legyen. A lezárult vásárlási sor a végétől számított 24 naptári hónap után törlődik, kivéve ha megőrzési zárolás van rajta.</li>
     <li>A Nginx hozzáférési és hibanaplója naponta cserélődik, és 10 korábbi fájl marad meg. Az alkalmazás rendszernaplója a gép újraindításakor törlődik. Az adatbázis-konténer naplójának a jelenlegi beállításban nincs méretkorlátja.</li>
-    <li>Az éles adatbázis kézi másolatának nincs automatikus törlési dátuma. A tervezett napi mentés nem fut.</li>
+    <li>Az éles adatbázis kézi másolatának nincs automatikus törlési dátuma. A napi automatikus mentések a frankfurti gépen és egy privát OCI Object Storage tárolóban vannak, az eu-frankfurt-1 régióban. A gépen a 20 napnál régebbi másolat csak egy újabb, ellenőrzött másolat után törlődik, és a legutóbbi ellenőrzött másolat akkor is megmarad, ha régebbi. Az a másolat is megmarad, amelynek feltöltése nem sikerült. A tároló objektumait 20 napos életciklus-szabály törli, amely nem feltétlenül azon a napon fejeződik be. A fióktörlés előtt készült mentés a törölt fiókot addig tartalmazhatja, amíg magát a mentést el nem távolítják.</li>
     <li>Az exportált ZIP ott marad, ahová mentetted.</li>
   </ul>
 
   <h2>Fiók törlése</h2>
   <p>Az alkalmazásban nyisd meg a Beállításokat, és válaszd a Fiók törlése lehetőséget. A gomb addig nem működik, amíg meg nem erősíted. A bejelentkezett Strict-munkamenet azonosítja a fiókot. Az alkalmazás nem kér újabb Google-fiókválasztást. Az adott fiók helyi adatai csak a szerver visszaigazolása után törlődnek. Ugyanazzal a Google-fiókkal később új, üres fiókként lehet belépni. A Founder-elismerés, a felhasznált promóció és a régi edzések nem állnak vissza. A Play által még jogosultnak tekintett vásárlás az új fiókra ellenőrizhető, és két fiókon egyszerre nem lehet aktív.</p>
   <p>Ha az alkalmazás már nincs meg, ezen az oldalon a <a href="/account/delete">Strict-fiók törlése</a> használható. Az az oldal friss Google-ellenőrzést kér. Ez külön van az alkalmazáson belüli, már bejelentkezett törléstől. Ez az oldal ennek a szerververziónak a része. Ez nem azt állítja, hogy a nyilvános éles cím már elérhető.</p>
-  <p>A kijelentkezés és az eltávolítás nem törli a szerverfiókot. A fiók törlése nem törli a már elmentett ZIP-et, a telefon által már készített Android-mentést, és az adatbázisnak a fiók létezésekor készült másolatát.</p>
+  <p>A kijelentkezés és az eltávolítás nem törli a szerverfiókot. A fiók törlése nem törli a már elmentett ZIP-et, a telefon által már készített Android-mentést, és az adatbázisnak a fiók létezésekor készült másolatát, beleértve a frankfurti gépen vagy a privát OCI Object Storage tárolóban lévő másolatot.</p>
 
   <h2>Kérelmek</h2>
   <p>Az alkalmazásban törölhetsz egyes méréseket, fotókat és edzéseket, exportálhatsz egy ZIP-et a helyi edzésadatokról, és a fentiek szerint törölheted a fiókot. A szerverprofil külön letöltése nincs megvalósítva.</p>
@@ -130,6 +130,6 @@ TODO: jogi áttekintés a 6. cikk (1) f) piszkozatáról, és arról, hogy a 24 
 - A 24 hónap termékszabály. Az, hogy adóügyi, számviteli vagy jogvita miatti kötelezettségnek megfelel-e, jogilag nincs ellenőrizve.
 - A 6. cikk (1) f) pontja az egyszeri jelölőre a 2026. november 6-i előzetes technikai feljegyzés, nem jogosérdek-mérlegelés és nem ellenőrzött következtetés.
 - A tájékoztatót jogász nem tanúsította.
-- A 20 napos automatikus adatbázis-mentés nincs telepítve. A kézi mentésnek nincs automatikus törlése. Az előkészített terv a legutóbbi ellenőrzött mentést akkor is megtartja, ha az 20 napnál régebbi.
+- 2026. november 9. óta a napi automatikus mentés a frankfurti gépen fut, és egy privát OCI Object Storage tárolóba kerül, az eu-frankfurt-1 régióban. A helyi megőrzés a 20 napnál régebbi automatikus másolatot csak egy újabb, ellenőrzött másolat után törli, és megtartja a legutóbbi ellenőrzött másolatot, valamint azt, amelynek feltöltése nem sikerült. A tároló életciklus-szabálya az automatikus objektumokat a feltöltés után körülbelül 20 nappal törli, és késhet. A kézi mentésnek nincs automatikus törlése. A fióktörlés a már meglévő mentést nem törli. A sikertelen mentés az üzemeltetőnek e-mailt küldhet, az adatbázis tartalma nélkül.
 - A PostgreSQL Docker-naplójának forgatása nincs bekapcsolva.
 -->

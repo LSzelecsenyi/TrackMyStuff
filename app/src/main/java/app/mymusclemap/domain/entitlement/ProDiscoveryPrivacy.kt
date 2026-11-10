@@ -6,7 +6,7 @@ package app.mymusclemap.domain.entitlement
  * It is not a consent decision and it does not start a Pro trial or a purchase.
  */
 object PrivacyPolicyNotice {
-    const val CURRENT_VERSION = 4
+    const val CURRENT_VERSION = 5
 
     fun due(acknowledgedVersion: Int): Boolean = acknowledgedVersion < CURRENT_VERSION
 }
