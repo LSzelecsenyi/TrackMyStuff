@@ -222,7 +222,9 @@ android {
         minSdk = 26
         targetSdk = 37
         // versionCode must increase for every Play upload. Do not lower it.
-        versionCode = 16
+        // 17 follows the highest code found on this machine: Gradle and the
+        // local release AAB are both 16. Play Console was not queried.
+        versionCode = 17
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

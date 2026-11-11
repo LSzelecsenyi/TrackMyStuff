@@ -1,6 +1,6 @@
 package app.mymusclemap.ui.auth
 
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,13 +15,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.R
+import app.mymusclemap.ui.components.StrictBrandArtwork
+import app.mymusclemap.ui.components.StrictBrandLockup
 import app.mymusclemap.ui.theme.AppShapeTokens
 import app.mymusclemap.ui.theme.StrictBrand
 
@@ -50,12 +50,18 @@ fun WelcomeSignInScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.weight(1f))
-        Image(
-            painter = painterResource(R.drawable.strict_wordmark_dark),
-            contentDescription = stringResource(R.string.app_name),
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxWidth(0.72f)
-        )
+        BoxWithConstraints(
+            Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            StrictBrandLockup(
+                artwork = StrictBrandArtwork.Lockup,
+                centered = true,
+                markWidth = maxWidth * 0.72f,
+                // WelcomeGate already paints this column on navy.
+                containerOnLight = false
+            )
+        }
         Spacer(Modifier.height(28.dp))
         Text(
             text = stringResource(R.string.welcome_title),

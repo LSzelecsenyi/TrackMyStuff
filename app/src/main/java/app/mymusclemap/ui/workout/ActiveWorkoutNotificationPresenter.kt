@@ -183,7 +183,7 @@ internal object ActiveWorkoutNotifications {
         }
         val current = model.body as? ActiveWorkoutNotificationBody.CurrentSet
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_notification_strict)
             .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -297,7 +297,7 @@ internal object ActiveWorkoutNotifications {
         setId: Long
     ): NotificationCompat.Action {
         return NotificationCompat.Action.Builder(
-            R.drawable.ic_launcher_monochrome,
+            R.drawable.ic_notification_strict,
             context.getString(R.string.notification_complete_set),
             completePendingIntent(context, sessionId, setId)
         ).build()
@@ -405,7 +405,7 @@ internal object ActiveWorkoutNotifications {
         current: ActiveWorkoutNotificationBody.CurrentSet?
     ): android.app.Notification {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_notification_strict)
             .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

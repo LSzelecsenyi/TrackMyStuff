@@ -15,8 +15,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.mymusclemap.domain.theme.ThemeSeeds
-import app.mymusclemap.ui.components.STRICT_WORDMARK_DARK
-import app.mymusclemap.ui.components.STRICT_WORDMARK_LIGHT
+import app.mymusclemap.ui.components.STRICT_LOCKUP
+import app.mymusclemap.ui.components.STRICT_WORDMARK
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -36,9 +36,10 @@ class OnboardingScreenLayoutTest {
         var continued = 0
         render(OnboardingStep.Welcome, onContinue = { continued += 1 })
         composeRule.onNodeWithTag(ONBOARDING_SCREEN).assertIsDisplayed()
-        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Strict").assertIsDisplayed()
-        composeRule.onNodeWithText("TRACK WHAT YOU DID").assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_LOCKUP).assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_WORDMARK).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Strict. TRACK WHAT YOU DID").assertIsDisplayed()
+        composeRule.onNodeWithText("TRACK WHAT YOU DID").assertDoesNotExist()
         composeRule.onNodeWithText("MY MUSCLE MAP").assertDoesNotExist()
         composeRule.onNodeWithText("Track your training").assertDoesNotExist()
         composeRule.onNodeWithText("STRICT").assertDoesNotExist()
@@ -63,7 +64,7 @@ class OnboardingScreenLayoutTest {
         )
         composeRule.onNodeWithText("STRICT").assertIsDisplayed()
         composeRule.onNodeWithText("TRACK WHAT YOU DID").assertDoesNotExist()
-        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(STRICT_LOCKUP).assertDoesNotExist()
         composeRule.onNodeWithText("Set a weekly workout goal").assertIsDisplayed()
         composeRule.onNodeWithText("How many workouts would you like to complete each week?").assertIsDisplayed()
         composeRule.onNodeWithText("Meet your weekly goal to build your workout streak.").assertIsDisplayed()
@@ -87,7 +88,7 @@ class OnboardingScreenLayoutTest {
         )
         composeRule.onNodeWithText("STRICT").assertIsDisplayed()
         composeRule.onNodeWithText("TRACK WHAT YOU DID").assertDoesNotExist()
-        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(STRICT_LOCKUP).assertDoesNotExist()
         composeRule.onNodeWithText("Create your first workout").assertIsDisplayed()
         composeRule.onNodeWithText(
             "Add exercises from the starter catalog to a plan. After you save it, you can start it anytime from Workout.",
@@ -102,12 +103,12 @@ class OnboardingScreenLayoutTest {
     }
 
     @Test
-    fun welcomeDarkThemeUsesTheDarkWordmark() {
+    fun welcomeDarkThemeUsesTheSameMetallicLockup() {
         render(OnboardingStep.Welcome, darkTheme = true)
-        composeRule.onNodeWithTag(STRICT_WORDMARK_DARK).assertIsDisplayed()
-        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Strict").assertIsDisplayed()
-        composeRule.onNodeWithText("TRACK WHAT YOU DID").assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_LOCKUP).assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_WORDMARK).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Strict. TRACK WHAT YOU DID").assertIsDisplayed()
+        composeRule.onNodeWithText("TRACK WHAT YOU DID").assertDoesNotExist()
     }
 
     private fun render(

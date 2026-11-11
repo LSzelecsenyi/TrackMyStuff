@@ -148,7 +148,7 @@ class ActiveWorkoutNotificationTest {
         assertEquals(1, firstNotification.actions.size)
         assertEquals("Complete Set", context.getString(R.string.notification_complete_set))
         assertEquals(context.getString(R.string.notification_complete_set), firstNotification.actions[0].title)
-        assertEquals(R.drawable.ic_launcher_monochrome, firstNotification.smallIcon.resId)
+        assertEquals(R.drawable.ic_notification_strict, firstNotification.smallIcon.resId)
         val firstAction = shadowOf(firstNotification.actions[0].actionIntent).savedIntent
         val secondAction = shadowOf(secondNotification.actions[0].actionIntent).savedIntent
         assertEquals(7L to 3L, ActiveWorkoutNotifications.completionIds(firstAction))

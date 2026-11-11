@@ -106,6 +106,7 @@ import app.mymusclemap.domain.theme.SeedField
 import app.mymusclemap.ui.components.CompactEditorDivider
 import app.mymusclemap.ui.components.ExclusiveChoice
 import app.mymusclemap.ui.components.ReadableContent
+import app.mymusclemap.ui.components.StrictBrandArtwork
 import app.mymusclemap.ui.components.StrictBrandLockup
 import app.mymusclemap.domain.units.UnitSystem
 import app.mymusclemap.domain.units.WeightAdjustmentConfiguration
@@ -1458,8 +1459,9 @@ internal fun AboutSection(
     }
     CompactEditorSection(title = settingsKicker(stringResource(R.string.about_title))) {
         StrictBrandLockup(
+            artwork = StrictBrandArtwork.Wordmark,
             showTagline = true,
-            wordmarkWidth = 200.dp
+            markWidth = 200.dp
         )
         Spacer(Modifier.height(AppDimens.itemGap))
         Text(

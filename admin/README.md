@@ -55,8 +55,8 @@ Nothing in this task deploys that build.
 - `src/app/api` — local and production API base URL, and the existing admin-session HTTP contract
 - `src/environments` — development uses same-origin `/api` (the proxy); production uses the Strict API host
 - `proxy.conf.json` — development proxy to `127.0.0.1:8082`
-- `public/strict-symbol-light.png` — browser favicon from the Android Strict symbol
-- `public/strict-wordmark-dark.png` — header wordmark from the Android Strict brand
+- `public/strict-symbol.png` — browser favicon and login mark, copied from `branding/metallic/source/strict-symbol.png`
+- `public/strict-wordmark.png` — header wordmark, copied from `branding/metallic/source/strict-wordmark.png`
 
 ## Authentication status
 

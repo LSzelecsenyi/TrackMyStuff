@@ -52,8 +52,8 @@ import app.mymusclemap.domain.theme.StrictBrandTokens
 import app.mymusclemap.domain.theme.ThemeMode
 import app.mymusclemap.domain.theme.ThemeSeeds
 import app.mymusclemap.ui.theme.toComposeColorScheme
-import app.mymusclemap.ui.components.STRICT_WORDMARK_DARK
-import app.mymusclemap.ui.components.STRICT_WORDMARK_LIGHT
+import app.mymusclemap.ui.components.STRICT_LOCKUP
+import app.mymusclemap.ui.components.STRICT_WORDMARK
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.WeightTrackerThemeForPreview
 import org.junit.Assert.assertEquals
@@ -482,11 +482,11 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
-    fun aboutDarkThemeUsesTheDarkWordmark() {
+    fun aboutUsesTheMetallicWordmarkAndLocalizedTagline() {
         render(page = SettingsSurface.About, darkTheme = true)
         composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(STRICT_WORDMARK_DARK).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(STRICT_WORDMARK_LIGHT).assertDoesNotExist()
+        composeRule.onNodeWithTag(STRICT_WORDMARK).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_LOCKUP).assertDoesNotExist()
         composeRule.onNodeWithText(testString(R.string.brand_tagline)).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText("My Muscle Map").assertCountEquals(0)
     }

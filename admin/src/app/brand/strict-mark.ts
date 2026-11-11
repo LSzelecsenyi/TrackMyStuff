@@ -5,7 +5,7 @@ import { Component, input } from '@angular/core';
   template: `
     <img
       class="mark"
-      src="strict-symbol-dark.png"
+      src="strict-symbol.png"
       [attr.alt]="decorative() ? '' : 'Strict'"
     />
   `,

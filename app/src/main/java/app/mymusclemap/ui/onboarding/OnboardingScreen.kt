@@ -52,6 +52,7 @@ import app.mymusclemap.ui.founder.FounderInvitationScreen
 import app.mymusclemap.ui.founder.FounderJoinNotice
 import app.mymusclemap.ui.components.ExclusiveChoice
 import app.mymusclemap.ui.components.ReadableContent
+import app.mymusclemap.ui.components.StrictBrandArtwork
 import app.mymusclemap.ui.components.StrictBrandLockup
 import app.mymusclemap.ui.theme.AppDimens
 import app.mymusclemap.ui.theme.AppShapeTokens
@@ -150,13 +151,18 @@ fun OnboardingScreen(
             ) {
                 ReadableContent {
                 if (step == OnboardingStep.Welcome) {
-                    StrictBrandLockup(
-                        showTagline = true,
-                        centered = true,
-                        wordmarkWidth = 240.dp,
-                        taglineIsHeading = true,
-                        modifier = Modifier.testTag(ONBOARDING_TITLE)
-                    )
+                    BoxWithConstraints(
+                        Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        StrictBrandLockup(
+                            artwork = StrictBrandArtwork.Lockup,
+                            centered = true,
+                            markWidth = (maxWidth * 0.86f).coerceIn(200.dp, 360.dp),
+                            taglineIsHeading = true,
+                            modifier = Modifier.testTag(ONBOARDING_TITLE)
+                        )
+                    }
                 } else {
                     Text(
                         text = stringResource(R.string.onboarding_kicker).uppercase(AppLocale.UI),

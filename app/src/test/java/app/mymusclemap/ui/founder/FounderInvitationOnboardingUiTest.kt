@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -27,6 +28,7 @@ import app.mymusclemap.domain.entitlement.FounderProgramAvailability
 import app.mymusclemap.domain.entitlement.FounderProgramRules
 import app.mymusclemap.domain.entitlement.FounderProgramState
 import app.mymusclemap.testString
+import app.mymusclemap.ui.components.strictLockupContentDescription
 import app.mymusclemap.ui.onboarding.ONBOARDING_PRIMARY
 import app.mymusclemap.ui.onboarding.ONBOARDING_SKIP
 import app.mymusclemap.ui.onboarding.OnboardingScreen
@@ -121,7 +123,13 @@ class FounderInvitationOnboardingUiTest {
             founderAvailability = FounderProgramAvailability.Open
         )
         show(viewModel)
-        composeRule.onNodeWithText(testString(R.string.brand_tagline)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            strictLockupContentDescription(
+                testString(R.string.app_name),
+                testString(R.string.brand_tagline)
+            )
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.brand_tagline)).assertDoesNotExist()
         composeRule.onNodeWithTag(FOUNDER_INVITATION).assertDoesNotExist()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
@@ -149,7 +157,13 @@ class FounderInvitationOnboardingUiTest {
             founderAvailability = FounderProgramAvailability.Closed
         )
         show(viewModel)
-        composeRule.onNodeWithText(testString(R.string.brand_tagline)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            strictLockupContentDescription(
+                testString(R.string.app_name),
+                testString(R.string.brand_tagline)
+            )
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.brand_tagline)).assertDoesNotExist()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY).performClick()
