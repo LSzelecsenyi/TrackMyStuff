@@ -202,6 +202,7 @@ class AppBackupRepository(
         restoreBodyModel(snapshot)
         restoreWeightAdjustment(snapshot)
         onHeatmapDataChanged()
+        reconcileSystemCatalog()
         notifyRestored()
         return AppBackupRestoreResult.Success
     }
@@ -249,8 +250,21 @@ class AppBackupRepository(
         restoreBodyModel(snapshot)
         restoreWeightAdjustment(snapshot)
         onHeatmapDataChanged()
+        reconcileSystemCatalog()
         notifyRestored()
         return AppBackupRestoreResult.Success
+    }
+
+    private suspend fun reconcileSystemCatalog() {
+        try {
+            SystemCatalogReconciler(
+                database,
+                ExerciseRepository(database.exerciseDao(), java.time.Clock.systemUTC())
+            ).reconcile()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+        }
     }
 
     private suspend fun backupSettings(): Map<String, String> {

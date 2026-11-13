@@ -99,6 +99,78 @@ class FounderProgramAvailabilityTest {
     }
 
     @Test
+    fun settingsJoinStaysAvailableAfterNotNowAndIgnoresPro() {
+        val declined = FounderMilestoneAcknowledgements(invitationHandled = true)
+        assertFalse(
+            shouldOfferFounderOnboardingInvitation(
+                FounderProgramAvailability.Open,
+                FounderProgramStatus.NotEnrolled,
+                declined
+            )
+        )
+        assertTrue(
+            founderSettingsEntryVisible(
+                FounderProgramAvailability.Open,
+                FounderProgramStatus.NotEnrolled,
+                programReady = true
+            )
+        )
+        assertTrue(
+            founderSettingsOffersJoin(
+                FounderProgramAvailability.Open,
+                FounderProgramStatus.NotEnrolled,
+                programReady = true
+            )
+        )
+        assertFalse(
+            founderSettingsOffersJoin(
+                FounderProgramAvailability.Open,
+                FounderProgramStatus.NotEnrolled,
+                programReady = false
+            )
+        )
+        assertFalse(
+            founderSettingsOffersJoin(
+                FounderProgramAvailability.Closed,
+                FounderProgramStatus.NotEnrolled,
+                programReady = true
+            )
+        )
+        FounderProgramStatus.values().filter { it != FounderProgramStatus.NotEnrolled }.forEach { status ->
+            assertFalse(
+                founderSettingsOffersJoin(
+                    FounderProgramAvailability.Open,
+                    status,
+                    programReady = true
+                )
+            )
+            assertTrue(
+                founderSettingsEntryVisible(
+                    FounderProgramAvailability.Open,
+                    status,
+                    programReady = true
+                )
+            )
+        }
+        val pro = EntitlementResolver.resolve(
+            EntitlementSources.of(
+                subscription = app.mymusclemap.domain.entitlement.SubscriptionEntitlement(
+                    paidUntilInclusive = now.plusSeconds(86_400)
+                )
+            ),
+            now
+        )
+        assertEquals(EntitlementTier.Pro, pro.tier)
+        assertTrue(
+            founderSettingsOffersJoin(
+                FounderProgramAvailability.Open,
+                FounderProgramStatus.NotEnrolled,
+                programReady = true
+            )
+        )
+    }
+
+    @Test
     fun closingAvailabilityDoesNotGrantOrRevokePro() {
         val approved = FounderProgramState(
             status = FounderProgramStatus.Approved,

@@ -524,6 +524,23 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
+    fun givenEnrollmentIsOpenThenAccountOffersJoinOnce() {
+        val opens = intArrayOf(0)
+        render(
+            page = SettingsSurface.Account,
+            offerFounderJoin = true,
+            onOpenFounderProgram = { opens[0] += 1 }
+        )
+        composeRule.onNodeWithTag("settings-founder-program").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_program_title)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_settings_join)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.founder_open_subtitle)).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.founder_badge)).assertDoesNotExist()
+        composeRule.onNodeWithTag("settings-founder-program").performClick()
+        assertEquals(1, opens[0])
+    }
+
+    @Test
     fun givenFoundingMemberThenSettingsShowsMemberStatusOnce() {
         render(
             page = SettingsSurface.Account,
@@ -791,6 +808,7 @@ class SettingsScreenLayoutTest {
         onOpenProPlan: () -> Unit = {},
         showFounderProgram: Boolean = true,
         showFounderBadge: Boolean = false,
+        offerFounderJoin: Boolean = false,
         darkTheme: Boolean = false,
         seeds: ThemeSeeds? = null,
         onBack: () -> Unit = {},
@@ -856,6 +874,7 @@ class SettingsScreenLayoutTest {
                                 onOpenDeleteAccount = onOpenDeleteAccount,
                                 showFounderProgram = showFounderProgram,
                                 showFounderBadge = showFounderBadge,
+                                offerFounderJoin = offerFounderJoin,
                                 onOpenFounderProgram = onOpenFounderProgram
                             )
                             SettingsSurface.About -> AboutStrictScreen(

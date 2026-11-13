@@ -186,7 +186,7 @@ class ExerciseRepositoryRoomTest {
         val mapped = repository.getById(created.id)!!
         assertEquals(MuscleGroup.NECK, mapped.primaryMuscle)
         assertEquals(listOf(MuscleGroup.UPPER_BACK), mapped.secondaryMuscles)
-        assertEquals(22, database.openHelper.readableDatabase.version)
+        assertEquals(23, database.openHelper.readableDatabase.version)
     }
 
     @Test
@@ -250,7 +250,8 @@ class ExerciseRepositoryRoomTest {
             notes = null,
             archived = false,
             createdAt = 1L,
-            updatedAt = 1L
+            updatedAt = 1L,
+            customNormalizedName = normalizedName
         )
     }
 }

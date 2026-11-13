@@ -598,6 +598,7 @@
     <string name="message_exercise_restored">Gyakorlat visszaállítva.</string>
     <string name="message_exercise_deleted">Gyakorlat véglegesen törölve.</string>
     <string name="message_exercise_delete_blocked">Ez a gyakorlat egy edzéstervben vagy edzésben szerepel, ezért nem törölhető véglegesen. Archiváld helyette.</string>
+    <string name="message_exercise_system_protected">A beépített gyakorlatok nem módosíthatók.</string>
     <string name="template_delete_blocked_body">Ez az edzésterv egy edzésben szerepel, ezért nem törölhető véglegesen. Archiváld helyette.</string>
     <string name="action_start_workout">Edzés indítása</string>
     <string name="action_start_template">%1$s indítása</string>
@@ -1471,6 +1472,7 @@
     <string name="founder_settings_title">Founding Tester</string>
     <string name="founder_open">Founding Tester program</string>
     <string name="founder_open_subtitle">Nézd meg a kvalifikációs haladásodat</string>
+    <string name="founder_settings_join">Csatlakozás a Founding Tester programhoz</string>
     <string name="founder_member_subtitle">Nézd meg a programállapotodat</string>
     <string name="founder_badge">Alapító tag</string>
     <string name="founder_mark_content_description">Founding Tester program</string>

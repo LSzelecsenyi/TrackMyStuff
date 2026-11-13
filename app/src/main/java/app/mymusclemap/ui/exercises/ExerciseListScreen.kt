@@ -492,11 +492,12 @@ private fun ExerciseList(
         contentPadding = PaddingValues(bottom = AppDimens.scrollEndPadding)
     ) {
         items(ordered, key = { it.id }) { exercise ->
+            val system = exercise.isVerifiedSystemExercise()
             ExerciseRow(
                 exercise = exercise,
                 locked = exercise.custom && exercise.id in lockedCustomExerciseIds,
                 onExplorePro = onExplorePro,
-                onEdit = { onEdit(exercise.id) },
+                onEdit = { if (!system) onEdit(exercise.id) },
                 onArchive = { onArchive(exercise.id) },
                 onRestore = { onRestore(exercise.id) },
                 onDelete = { onRequestDelete(exercise) },
@@ -547,15 +548,18 @@ private fun ExerciseRow(
         }
     }.joinToString(" · ")
     val displayName = starterExerciseLabel(exercise.name)
+    val system = exercise.isVerifiedSystemExercise()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = AppDimens.minTouch)
-            .clickable(onClick = onEdit)
+            .then(if (system) Modifier else Modifier.clickable(onClick = onEdit))
             .padding(vertical = AppDimens.headerStackGap)
             .testTag(catalogRowTag(exercise.id))
             .semantics {
-                role = Role.Button
+                if (!system) {
+                    role = Role.Button
+                }
                 contentDescription = displayName
             },
         verticalAlignment = Alignment.Top
@@ -606,6 +610,7 @@ private fun ExerciseRow(
                 )
             }
         }
+        if (!system) {
         Box(
             modifier = Modifier
                 .wrapContentSize(Alignment.TopEnd)
@@ -672,6 +677,7 @@ private fun ExerciseRow(
                     }
                 )
             }
+        }
         }
     }
 }

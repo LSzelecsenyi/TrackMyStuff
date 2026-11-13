@@ -1,69 +1,52 @@
 package app.mymusclemap.data.repository
 
-import androidx.room.withTransaction
 import app.mymusclemap.data.local.WeightDatabase
-import app.mymusclemap.data.preferences.ThemePreferences
-import app.mymusclemap.domain.exercise.ExerciseSaveResult
-import app.mymusclemap.domain.exercise.StarterCatalog
+import app.mymusclemap.data.preferences.OnboardingProgress
 
 /**
- * First-run catalog seed and onboarding gate.
- *
- * Onboarding completion and progressive-discovery flags live in DataStore, not in
- * the v1 backup file. Appearance restore preserves those flags so restore cannot
- * reopen first-run or reset discoveries. Starter exercises are inserted only when
- * the catalog is empty and onboarding has not started or completed. A restored,
- * upgraded, or already-used catalog is left untouched, and existing users are
- * migrated to completed onboarding instead of the progressive journey. Successful
- * first-run seed sets a welcome-pending flag so rotation or process death on the
- * welcome screens cannot be mistaken for an existing-user upgrade.
+ * Opens an account by reconciling the official exercise catalog, then decides
+ * whether this account still needs onboarding. Catalog availability does not
+ * depend on onboarding, Founder enrollment, or PRO.
+ * An account that already contains training data is treated as an existing
+ * user so onboarding does not start again. A completed or started account
+ * still receives any catalog entries it does not yet have.
  */
 class FirstRunCoordinator(
     private val database: WeightDatabase,
     private val exerciseRepository: ExerciseRepository,
-    private val themePreferences: ThemePreferences
+    private val onboarding: OnboardingProgress,
+    private val catalog: SystemCatalogReconciler = SystemCatalogReconciler(database, exerciseRepository),
+    private val beforePrepare: suspend (hasPreexistingContent: Boolean) -> Unit = {}
 ) {
     suspend fun prepare(): FirstRunDecision {
-        if (themePreferences.isOnboardingCompleted()) {
+        val preexisting = hasPreexistingContent()
+        beforePrepare(preexisting)
+        if (preexisting && !onboarding.isOnboardingCompleted() && !onboarding.isOnboardingStarted() && !onboarding.isWelcomePending()) {
+            onboarding.markOnboardingCompleted()
+        }
+        catalog.reconcile()
+        if (onboarding.isOnboardingCompleted() || onboarding.isOnboardingStarted()) {
             return FirstRunDecision.Ready
         }
-        if (themePreferences.isOnboardingStarted()) {
-            return FirstRunDecision.Ready
+        if (!onboarding.isWelcomePending()) {
+            onboarding.setWelcomePending(true)
         }
-        if (themePreferences.isWelcomePending()) {
-            seedStarterCatalogIfEmpty()
-            return FirstRunDecision.ShowOnboarding
-        }
-        if (database.exerciseDao().countAll() > 0) {
-            themePreferences.markOnboardingCompleted()
-            return FirstRunDecision.Ready
-        }
-        themePreferences.setWelcomePending(true)
-        seedStarterCatalogIfEmpty()
         return FirstRunDecision.ShowOnboarding
     }
 
     suspend fun markOnboardingStarted() {
-        themePreferences.markOnboardingStarted()
+        onboarding.markOnboardingStarted()
     }
 
     suspend fun completeOnboarding() {
-        themePreferences.markOnboardingCompleted()
+        onboarding.markOnboardingCompleted()
     }
 
-    private suspend fun seedStarterCatalogIfEmpty(): Boolean {
-        return database.withTransaction {
-            if (database.exerciseDao().countAll() > 0) {
-                return@withTransaction false
-            }
-            StarterCatalog.drafts.forEach { draft ->
-                val result = exerciseRepository.save(draft, asStarter = true)
-                check(result is ExerciseSaveResult.Created) {
-                    "Starter catalog seed failed for ${draft.name}: $result"
-                }
-            }
-            true
-        }
+    private suspend fun hasPreexistingContent(): Boolean {
+        return database.exerciseDao().countAll() > 0 ||
+            database.workoutTemplateDao().countAll() > 0 ||
+            database.workoutSessionDao().countAll() > 0 ||
+            database.weightMeasurementDao().getAllAscending().isNotEmpty()
     }
 }
 

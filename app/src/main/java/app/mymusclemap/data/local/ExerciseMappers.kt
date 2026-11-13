@@ -27,6 +27,7 @@ fun ExerciseEntity.toModel(muscles: List<ExerciseMuscleEntity>): Exercise {
         archived = archived,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        custom = custom
+        custom = custom,
+        catalogKey = catalogKey
     )
 }

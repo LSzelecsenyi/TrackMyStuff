@@ -61,6 +61,9 @@ abstract class WorkoutSessionDao {
     @Query("SELECT COUNT(*) FROM workout_sessions WHERE status = 'COMPLETED'")
     abstract suspend fun countCompleted(): Int
 
+    @Query("SELECT COUNT(*) FROM workout_sessions")
+    abstract suspend fun countAll(): Int
+
     @Query("SELECT MIN(workoutDate) FROM workout_sessions WHERE status = 'COMPLETED'")
     abstract suspend fun earliestCompletedWorkoutDate(): String?
 

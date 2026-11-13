@@ -22,7 +22,7 @@ private val Context.themeDataStore: DataStore<Preferences> by preferencesDataSto
     name = "weight_tracker_settings"
 )
 
-class ThemePreferences(context: Context) {
+class ThemePreferences(context: Context) : OnboardingProgress {
     private val dataStore = context.applicationContext.themeDataStore
 
     val appearance: Flow<AppearanceSettings> = dataStore.data.map { preferences ->
@@ -47,7 +47,7 @@ class ThemePreferences(context: Context) {
      * Appearance restore keeps these flags so a backup cannot re-open onboarding
      * or wipe in-progress discoveries on the current device.
      */
-    val onboardingFlags: Flow<OnboardingFlags> = dataStore.data.map { preferences ->
+    override val onboardingFlags: Flow<OnboardingFlags> = dataStore.data.map { preferences ->
         OnboardingFlags(
             completed = preferences[KEY_ONBOARDING_COMPLETED] == true,
             started = preferences[KEY_ONBOARDING_STARTED] == true,
@@ -59,25 +59,25 @@ class ThemePreferences(context: Context) {
         )
     }
 
-    suspend fun currentOnboardingFlags(): OnboardingFlags = onboardingFlags.first()
+    override suspend fun currentOnboardingFlags(): OnboardingFlags = onboardingFlags.first()
 
-    suspend fun isOnboardingCompleted(): Boolean {
+    override suspend fun isOnboardingCompleted(): Boolean {
         return currentOnboardingFlags().completed
     }
 
-    suspend fun isOnboardingStarted(): Boolean {
+    override suspend fun isOnboardingStarted(): Boolean {
         return currentOnboardingFlags().started
     }
 
-    suspend fun markOnboardingCompleted() {
+    override suspend fun markOnboardingCompleted() {
         setOnboardingCompleted(true)
     }
 
-    suspend fun isWelcomePending(): Boolean {
+    override suspend fun isWelcomePending(): Boolean {
         return dataStore.data.first()[KEY_ONBOARDING_WELCOME_PENDING] == true
     }
 
-    suspend fun setWelcomePending(pending: Boolean) {
+    override suspend fun setWelcomePending(pending: Boolean) {
         dataStore.edit { prefs ->
             if (pending) {
                 prefs[KEY_ONBOARDING_WELCOME_PENDING] = true
@@ -87,7 +87,7 @@ class ThemePreferences(context: Context) {
         }
     }
 
-    suspend fun markOnboardingStarted() {
+    override suspend fun markOnboardingStarted() {
         dataStore.edit { prefs ->
             prefs[KEY_ONBOARDING_STARTED] = true
             prefs -= KEY_ONBOARDING_WELCOME_PENDING
@@ -105,23 +105,23 @@ class ThemePreferences(context: Context) {
         }
     }
 
-    suspend fun setHeatmapSeen() {
+    override suspend fun setHeatmapSeen() {
         dataStore.edit { it[KEY_ONBOARDING_HEATMAP_SEEN] = true }
     }
 
-    suspend fun setWeightIntroduced() {
+    override suspend fun setWeightIntroduced() {
         dataStore.edit { it[KEY_ONBOARDING_WEIGHT_INTRODUCED] = true }
     }
 
-    suspend fun setWeightChartSeen() {
+    override suspend fun setWeightChartSeen() {
         dataStore.edit { it[KEY_ONBOARDING_WEIGHT_CHART_SEEN] = true }
     }
 
-    suspend fun setCalendarSeen() {
+    override suspend fun setCalendarSeen() {
         dataStore.edit { it[KEY_ONBOARDING_CALENDAR_SEEN] = true }
     }
 
-    suspend fun setReminderDismissed() {
+    override suspend fun setReminderDismissed() {
         dataStore.edit { it[KEY_ONBOARDING_REMINDER_DISMISSED] = true }
     }
 

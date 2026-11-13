@@ -115,6 +115,11 @@ object AppBackupJson {
                             .put("notes", nullable(row.notes))
                             .put("archived", row.archived)
                             .put("custom", row.custom)
+                            .apply {
+                                if (row.catalogKey != null) {
+                                    put("catalogKey", row.catalogKey)
+                                }
+                            }
                             .put("createdAt", row.createdAt)
                             .put("updatedAt", row.updatedAt)
                     )
@@ -673,6 +678,7 @@ object AppBackupJson {
             freeAccess = parseFreeAccess(tablesObject, errors)
         )
         val tables = parsedTables.copy(
+            exercises = CatalogKeyClaims.sanitize(parsedTables.exercises),
             scheduledWorkouts = hydrateScheduledTemplateNames(
                 parsedTables.scheduledWorkouts,
                 parsedTables.workoutTemplates
@@ -934,6 +940,11 @@ object AppBackupJson {
         } else {
             obj.requiredBoolean("custom", errors) ?: return null
         }
+        val claimedCatalogKey = if (!obj.has("catalogKey") || obj.isNull("catalogKey")) {
+            null
+        } else {
+            obj.requiredString("catalogKey", errors)
+        }
         val createdAt = obj.requiredLong("createdAt", errors) ?: return null
         val updatedAt = obj.requiredLong("updatedAt", errors) ?: return null
         if (errors.any { it.detail?.startsWith("notes") == true && it.code == AppBackupErrorCode.InvalidType }) {
@@ -952,7 +963,8 @@ object AppBackupJson {
             archived,
             createdAt,
             updatedAt,
-            custom
+            custom,
+            claimedCatalogKey
         )
     }
 

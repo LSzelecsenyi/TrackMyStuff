@@ -77,6 +77,7 @@ sealed interface CatalogMessage {
     data object Deleted : CatalogMessage
     data object DeleteBlocked : CatalogMessage
     data object ReleaseBlocked : CatalogMessage
+    data object SystemProtected : CatalogMessage
 }
 
 private data class ListQuery(
@@ -271,6 +272,10 @@ class ExerciseListViewModel(
 
     fun archive(id: Long) {
         viewModelScope.launch {
+            if (repository.getById(id)?.isVerifiedSystemExercise() == true) {
+                message.value = CatalogMessage.SystemProtected
+                return@launch
+            }
             if (repository.archive(id)) {
                 message.value = CatalogMessage.Archived
             }
@@ -279,6 +284,10 @@ class ExerciseListViewModel(
 
     fun restore(id: Long) {
         viewModelScope.launch {
+            if (repository.getById(id)?.isVerifiedSystemExercise() == true) {
+                message.value = CatalogMessage.SystemProtected
+                return@launch
+            }
             if (repository.restore(id)) {
                 message.value = CatalogMessage.Restored
             }
@@ -286,6 +295,10 @@ class ExerciseListViewModel(
     }
 
     fun requestDelete(exercise: Exercise) {
+        if (exercise.isVerifiedSystemExercise()) {
+            message.value = CatalogMessage.SystemProtected
+            return
+        }
         if (exercise.id in uiState.value.referencedIds) {
             pendingBlocked.value = exercise
         } else {
@@ -306,6 +319,7 @@ class ExerciseListViewModel(
                 ExerciseDeleteResult.Deleted -> CatalogMessage.Deleted
                 ExerciseDeleteResult.BlockedByReferences -> CatalogMessage.DeleteBlocked
                 ExerciseDeleteResult.NotFound -> CatalogMessage.DeleteBlocked
+                ExerciseDeleteResult.SystemProtected -> CatalogMessage.SystemProtected
             }
         }
     }

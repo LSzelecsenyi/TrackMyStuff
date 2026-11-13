@@ -47,9 +47,24 @@ abstract class ExerciseDao {
     abstract suspend fun getMuscles(exerciseId: Long): List<ExerciseMuscleEntity>
 
     @Query(
-        "SELECT id FROM exercises WHERE normalizedName = :normalizedName AND id != :exceptId LIMIT 1"
+        "SELECT id FROM exercises WHERE customNormalizedName = :normalizedName AND id != :exceptId LIMIT 1"
     )
-    abstract suspend fun findIdByNormalizedName(normalizedName: String, exceptId: Long): Long?
+    abstract suspend fun findIdByCustomNormalizedName(normalizedName: String, exceptId: Long): Long?
+
+    @Query("SELECT * FROM exercises WHERE catalogKey = :catalogKey LIMIT 1")
+    abstract suspend fun findByCatalogKey(catalogKey: String): ExerciseEntity?
+
+    @Query("SELECT catalogKey FROM exercises WHERE catalogKey IS NOT NULL")
+    abstract suspend fun existingCatalogKeys(): List<String>
+
+    @Query(
+        """
+        UPDATE exercises
+        SET customNormalizedName = normalizedName
+        WHERE catalogKey IS NULL AND customNormalizedName IS NULL
+        """
+    )
+    abstract suspend fun backfillCustomNormalizedNames()
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insert(entity: ExerciseEntity): Long

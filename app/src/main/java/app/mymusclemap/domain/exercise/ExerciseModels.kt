@@ -18,8 +18,13 @@ data class Exercise(
     val archived: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
-    val custom: Boolean = true
-)
+    val custom: Boolean = true,
+    val catalogKey: String? = null
+) {
+    fun isVerifiedSystemExercise(): Boolean {
+        return catalogKey != null && StarterCatalog.isOfficialKey(catalogKey)
+    }
+}
 
 data class ExerciseDraft(
     val id: Long? = null,
@@ -51,12 +56,14 @@ sealed class ExerciseSaveResult {
     data object NotFound : ExerciseSaveResult()
     data object CreationLimited : ExerciseSaveResult()
     data object Locked : ExerciseSaveResult()
+    data object SystemProtected : ExerciseSaveResult()
 }
 
 sealed class ExerciseDeleteResult {
     data object Deleted : ExerciseDeleteResult()
     data object BlockedByReferences : ExerciseDeleteResult()
     data object NotFound : ExerciseDeleteResult()
+    data object SystemProtected : ExerciseDeleteResult()
 }
 
 object ExerciseNaming {

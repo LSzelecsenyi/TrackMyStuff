@@ -163,7 +163,7 @@ fun ExerciseEditorScreen(
             ) {
                 Button(
                     onClick = onSave,
-                    enabled = !state.saving && !state.loading,
+                    enabled = !state.saving && !state.loading && !state.systemProtected,
                     shape = AppShapeTokens.button,
                     modifier = Modifier
                         .padding(horizontal = AppDimens.screenPadding)
@@ -200,6 +200,10 @@ fun ExerciseEditorScreen(
                 .padding(horizontal = AppDimens.screenPadding)
                 .padding(top = 8.dp, bottom = AppDimens.scrollEndPadding)
         ) {
+            if (state.systemProtected) {
+                Text(stringResource(R.string.message_exercise_system_protected))
+                Spacer(Modifier.height(8.dp))
+            }
             if (state.contentLocked) {
                 app.mymusclemap.ui.entitlement.FreeAccessLockNote(onExplorePro = onExploreProBenefits)
                 Spacer(Modifier.height(8.dp))

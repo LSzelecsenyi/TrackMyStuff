@@ -825,6 +825,24 @@ val MIGRATION_18_19 = object : Migration(18, 19) {
     }
 }
 
+val MIGRATION_22_23 = object : Migration(22, 23) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `exercises` ADD COLUMN `catalogKey` TEXT")
+        db.execSQL("ALTER TABLE `exercises` ADD COLUMN `customNormalizedName` TEXT")
+        db.execSQL(
+            "UPDATE `exercises` SET `customNormalizedName` = `normalizedName`"
+        )
+        LegacyStarterAdoption.adopt(db)
+        db.execSQL("DROP INDEX IF EXISTS `index_exercises_normalizedName`")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_exercises_catalogKey` ON `exercises` (`catalogKey`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_exercises_customNormalizedName` ON `exercises` (`customNormalizedName`)"
+        )
+    }
+}
+
 val MIGRATION_21_22 = object : Migration(21, 22) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

@@ -1,6 +1,6 @@
 package app.mymusclemap.data.repository
 
-import app.mymusclemap.data.preferences.ThemePreferences
+import app.mymusclemap.data.preferences.OnboardingProgress
 import app.mymusclemap.domain.onboarding.OnboardingFacts
 import app.mymusclemap.domain.onboarding.OnboardingGuide
 import app.mymusclemap.domain.onboarding.ProgressiveOnboardingLogic
@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class OnboardingRepository(
-    private val themePreferences: ThemePreferences,
+    private val themePreferences: OnboardingProgress,
     private val sessionRepository: WorkoutSessionRepository,
     private val weightRepository: WeightRepository,
     private val templateRepository: WorkoutTemplateRepository

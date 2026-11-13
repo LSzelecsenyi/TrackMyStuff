@@ -342,9 +342,82 @@ class AppBackupJsonTest {
             activeLock = activeLock
         )
     }
+
+    @Test
+    fun oldBackupOmitsCatalogKeyAndConflictingClaimsAreNotTrusted() {
+        val system = ExerciseEntity(
+            id = 1L,
+            name = "Squat",
+            normalizedName = "squat",
+            category = "STRENGTH",
+            movementPattern = "SQUAT",
+            measurementType = "REPETITIONS_AND_WEIGHT",
+            resistanceBasis = "EXTERNAL",
+            weightInterpretation = "TOTAL",
+            notes = "official",
+            archived = false,
+            createdAt = 1L,
+            updatedAt = 1L,
+            custom = false,
+            catalogKey = "SQUAT"
+        )
+        val custom = system.copy(id = 2L, notes = "mine", custom = true, catalogKey = null)
+        val snapshot = emptySnapshot().copy(
+            tables = emptyTables().copy(
+                exercises = listOf(system, custom),
+                exerciseMuscles = listOf(
+                    ExerciseMuscleEntity(1L, "QUADRICEPS", "PRIMARY"),
+                    ExerciseMuscleEntity(2L, "QUADRICEPS", "PRIMARY")
+                )
+            )
+        )
+        val encoded = AppBackupJson.encode(snapshot)
+        assertTrue(encoded.contains("\"catalogKey\": \"SQUAT\""))
+        val parsed = AppBackupJson.parse(encoded) as AppBackupParseResult.Success
+        assertEquals("SQUAT", parsed.snapshot.tables.exercises.single { it.id == 1L }.catalogKey)
+        assertEquals(false, parsed.snapshot.tables.exercises.single { it.id == 1L }.custom)
+        assertNull(parsed.snapshot.tables.exercises.single { it.id == 2L }.catalogKey)
+        assertEquals("official", parsed.snapshot.tables.exercises.single { it.id == 1L }.notes)
+
+        val oldSnapshot = snapshot.copy(
+            tables = snapshot.tables.copy(
+                exercises = listOf(system.copy(catalogKey = null)),
+                exerciseMuscles = snapshot.tables.exerciseMuscles.filter { it.exerciseId == 1L }
+            )
+        )
+        val oldJson = AppBackupJson.encode(oldSnapshot)
+        assertFalse(oldJson.contains("catalogKey"))
+        val legacy = AppBackupJson.parse(oldJson) as AppBackupParseResult.Success
+        assertNull(legacy.snapshot.tables.exercises.single().catalogKey)
+        assertEquals("official", legacy.snapshot.tables.exercises.single().notes)
+
+        val unknownRoot = JSONObject(encoded)
+        unknownRoot.getJSONObject("tables").getJSONArray("exercises").getJSONObject(1)
+            .put("catalogKey", "NOT_AN_EXERCISE")
+        val unknown = AppBackupJson.parse(unknownRoot.toString()) as AppBackupParseResult.Success
+        assertEquals("SQUAT", unknown.snapshot.tables.exercises.single { it.id == 1L }.catalogKey)
+        assertNull(unknown.snapshot.tables.exercises.single { it.id == 2L }.catalogKey)
+
+        val duplicateRoot = JSONObject(encoded)
+        duplicateRoot.getJSONObject("tables").getJSONArray("exercises").getJSONObject(1)
+            .put("catalogKey", "SQUAT")
+        val duplicated = AppBackupJson.parse(duplicateRoot.toString()) as AppBackupParseResult.Success
+        assertEquals(listOf(1L), duplicated.snapshot.tables.exercises.mapNotNull { row ->
+            row.id.takeIf { row.catalogKey == "SQUAT" }
+        })
+        assertNull(duplicated.snapshot.tables.exercises.single { it.id == 2L }.catalogKey)
+
+        val renamedRoot = JSONObject(encoded)
+        val renamedRow = renamedRoot.getJSONObject("tables").getJSONArray("exercises").getJSONObject(0)
+        renamedRow.put("name", "Front Squat")
+        renamedRow.put("normalizedName", "front squat")
+        val renamed = AppBackupJson.parse(renamedRoot.toString()) as AppBackupParseResult.Success
+        assertNull(renamed.snapshot.tables.exercises.single { it.id == 1L }.catalogKey)
+        assertEquals("official", renamed.snapshot.tables.exercises.single { it.id == 1L }.notes)
+    }
 }
 
-internal fun emptySnapshot(): AppBackupSnapshot {
+fun emptySnapshot(): AppBackupSnapshot {
     return AppBackupSnapshot(
         formatVersion = AppBackupFormat.FORMAT_VERSION,
         schemaVersion = AppBackupFormat.SCHEMA_VERSION,
@@ -355,7 +428,7 @@ internal fun emptySnapshot(): AppBackupSnapshot {
     )
 }
 
-internal fun emptyTables(): AppBackupTables {
+fun emptyTables(): AppBackupTables {
     return AppBackupTables(
         weightMeasurements = emptyList(),
         exercises = emptyList(),

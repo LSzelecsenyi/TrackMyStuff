@@ -110,5 +110,6 @@ fun CatalogMessage.labelRes(): Int {
         CatalogMessage.Deleted -> R.string.message_exercise_deleted
         CatalogMessage.DeleteBlocked -> R.string.message_exercise_delete_blocked
         CatalogMessage.ReleaseBlocked -> R.string.free_release_active_workout
+        CatalogMessage.SystemProtected -> R.string.message_exercise_system_protected
     }
 }

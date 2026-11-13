@@ -54,3 +54,15 @@ fun founderSettingsEntryVisible(
     }
     return status != FounderProgramStatus.NotEnrolled
 }
+
+/**
+ * Settings may offer Join only after this account's Founder state is known.
+ * The onboarding invitation flag is intentionally not an input.
+ */
+fun founderSettingsOffersJoin(
+    availability: FounderProgramAvailability,
+    status: FounderProgramStatus,
+    programReady: Boolean
+): Boolean {
+    return programReady && founderEnrollmentAllowed(availability, status)
+}

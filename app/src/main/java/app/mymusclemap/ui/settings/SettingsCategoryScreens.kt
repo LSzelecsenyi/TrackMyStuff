@@ -288,6 +288,7 @@ fun AccountMembershipScreen(
     onOpenDeleteAccount: () -> Unit = {},
     showFounderProgram: Boolean = true,
     showFounderBadge: Boolean = false,
+    offerFounderJoin: Boolean = false,
     onOpenFounderProgram: () -> Unit = {}
 ) {
     SettingsPage(
@@ -306,6 +307,7 @@ fun AccountMembershipScreen(
             CompactEditorDivider()
             FounderSection(
                 foundingMember = showFounderBadge,
+                offerJoin = offerFounderJoin && !showFounderBadge,
                 onOpenFounderProgram = onOpenFounderProgram
             )
         }

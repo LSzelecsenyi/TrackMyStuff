@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -68,6 +69,8 @@ class FirstRunCoordinatorTest {
             catalog.map { it.name }.toSet()
         )
         assertTrue(catalog.all { !it.archived })
+        assertTrue(catalog.all { it.isVerifiedSystemExercise() && !it.custom })
+        assertEquals(StarterCatalog.keys, catalog.mapNotNull { it.catalogKey }.toSet())
         assertFalse(themePreferences.isOnboardingCompleted())
         assertTrue(themePreferences.isWelcomePending())
         catalog.forEach { exercise ->
@@ -92,13 +95,16 @@ class FirstRunCoordinatorTest {
         val catalog = exerciseRepository.observeAll().first()
         assertEquals(FirstRunDecision.Ready, decision)
         assertTrue(themePreferences.isOnboardingCompleted())
-        assertEquals(1, catalog.size)
-        assertEquals(original, exerciseRepository.getById(created.id))
+        val kept = exerciseRepository.getById(created.id)!!
+        assertEquals(original.id, kept.id)
+        assertEquals(original.name, kept.name)
+        assertNull(kept.catalogKey)
+        assertEquals(1 + StarterCatalog.entries.size, catalog.size)
+        assertTrue(catalog.any { it.catalogKey == "BENCH_PRESS" })
         assertEquals(
             listOf(WeightMeasurementEntity(weightId, "2026-09-20", 82.4, 5, 5)),
             database.weightMeasurementDao().getAllAscending()
         )
-        assertFalse(catalog.any { it.name == "Bench Press" })
     }
 
     @Test
@@ -106,8 +112,9 @@ class FirstRunCoordinatorTest {
         themePreferences.markOnboardingCompleted()
         val decision = coordinator.prepare()
         assertEquals(FirstRunDecision.Ready, decision)
-        assertTrue(exerciseRepository.observeAll().first().isEmpty())
-        assertEquals(0, database.exerciseDao().countAll())
+        val catalog = exerciseRepository.observeAll().first()
+        assertEquals(StarterCatalog.entries.size, catalog.size)
+        assertEquals(StarterCatalog.keys, catalog.mapNotNull { it.catalogKey }.toSet())
     }
 
     @Test

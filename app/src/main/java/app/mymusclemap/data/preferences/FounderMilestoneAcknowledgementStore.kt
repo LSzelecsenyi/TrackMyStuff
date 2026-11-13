@@ -3,10 +3,15 @@ package app.mymusclemap.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import java.io.File
 
 /**
  * Local "already shown" flags for Founder milestone messages.
@@ -29,10 +34,34 @@ data class FounderMilestoneAcknowledgements(
     val founderApproved: Boolean = false,
     val invitationPending: Boolean = false,
     val invitationHandled: Boolean = false
-)
+) {
+    fun hasAny(): Boolean {
+        return temporaryProUnlocked ||
+            trainingComplete ||
+            qualificationComplete ||
+            founderApproved ||
+            invitationPending ||
+            invitationHandled
+    }
+}
 
-class FounderMilestoneAcknowledgementStore(context: Context) {
-    private val dataStore = context.applicationContext.founderMilestoneDataStore
+class FounderMilestoneAcknowledgementStore(
+    context: Context,
+    userId: String? = null
+) {
+    private val dataStore: DataStore<Preferences> = if (userId == null) {
+        context.applicationContext.founderMilestoneDataStore
+    } else {
+        PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            produceFile = {
+                File(
+                    context.applicationContext.filesDir,
+                    "datastore/founder_milestones_$userId.preferences_pb"
+                )
+            }
+        )
+    }
 
     suspend fun load(): FounderMilestoneAcknowledgements {
         val prefs = dataStore.data.first()
@@ -44,6 +73,13 @@ class FounderMilestoneAcknowledgementStore(context: Context) {
             invitationPending = prefs[KEY_INVITATION_PENDING] == true,
             invitationHandled = prefs[KEY_INVITATION_HANDLED] == true
         )
+    }
+
+    suspend fun adoptIfEmpty(source: FounderMilestoneAcknowledgements) {
+        if (!source.hasAny() || load().hasAny()) {
+            return
+        }
+        save(source)
     }
 
     suspend fun save(acknowledgements: FounderMilestoneAcknowledgements) {

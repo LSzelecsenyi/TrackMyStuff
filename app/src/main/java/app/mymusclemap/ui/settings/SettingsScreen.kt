@@ -1422,17 +1422,24 @@ internal fun ProPlanSection(onOpenProPlan: () -> Unit) {
 @Composable
 internal fun FounderSection(
     foundingMember: Boolean,
+    offerJoin: Boolean = false,
     onOpenFounderProgram: () -> Unit
 ) {
+    val title = when {
+        foundingMember -> R.string.founder_badge
+        offerJoin -> R.string.founder_program_title
+        else -> R.string.founder_open
+    }
+    val subtitle = when {
+        foundingMember -> R.string.founder_member_subtitle
+        offerJoin -> R.string.founder_settings_join
+        else -> R.string.founder_open_subtitle
+    }
     CompactEditorSection(title = settingsKicker(stringResource(R.string.founder_settings_title))) {
         DataActionRow(
             icon = Icons.Filled.EmojiEvents,
-            title = stringResource(
-                if (foundingMember) R.string.founder_badge else R.string.founder_open
-            ),
-            subtitle = stringResource(
-                if (foundingMember) R.string.founder_member_subtitle else R.string.founder_open_subtitle
-            ),
+            title = stringResource(title),
+            subtitle = stringResource(subtitle),
             testTag = "settings-founder-program",
             onClick = onOpenFounderProgram
         )

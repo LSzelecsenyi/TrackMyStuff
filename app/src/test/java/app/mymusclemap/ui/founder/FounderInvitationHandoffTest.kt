@@ -219,6 +219,20 @@ class FounderInvitationHandoffTest {
         viewModel.step.first { it == OnboardingStep.WeeklyGoal }
         assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
         assertTrue(acknowledgements.load().invitationHandled)
+        assertFalse(
+            shouldOfferFounderOnboardingInvitation(
+                FounderProgramAvailability.Open,
+                FounderProgramStatus.NotEnrolled,
+                acknowledgements.load()
+            )
+        )
+        assertTrue(
+            founderSettingsOffersJoin(
+                FounderProgramAvailability.Open,
+                FounderProgramStatus.NotEnrolled,
+                programReady = true
+            )
+        )
         val restarted = onboardingViewModel(FounderProgramAvailability.Open)
         restarted.onContinue()
         restarted.onContinue()
@@ -233,9 +247,41 @@ class FounderInvitationHandoffTest {
             joinFounder = { applyServerEnrollment() }
         )
         settings.enroll()
-        assertEquals(
-            FounderProgramStatus.ActiveFree,
-            founder.view.first { it.state.status == FounderProgramStatus.ActiveFree }.state.status
+        val settled = settings.uiState.first {
+            it.status == FounderProgramStatus.ActiveFree && !it.joining
+        }
+        assertEquals(FounderJoinNotice.None, settled.joinNotice)
+        assertFalse(
+            founderSettingsOffersJoin(
+                FounderProgramAvailability.Open,
+                settled.status,
+                programReady = true
+            )
+        )
+        settings.enroll()
+        assertEquals(FounderProgramStatus.ActiveFree, founder.currentState().status)
+    }
+
+    @Test
+    fun rejectedEnrollmentShowsTheNoticeAndDoesNotEnroll() = runTest {
+        val settings = FounderProgramViewModel(
+            founder,
+            rules,
+            "0.1.0-debug",
+            acknowledgements,
+            FounderProgramAvailability.Open,
+            joinFounder = { FounderJoinResult.Rejected }
+        )
+        settings.enroll()
+        assertEquals(FounderJoinNotice.Rejected, settings.uiState.value.joinNotice)
+        assertEquals(FounderProgramStatus.NotEnrolled, founder.currentState().status)
+        assertFalse(settings.uiState.value.joining)
+        assertTrue(
+            founderSettingsOffersJoin(
+                FounderProgramAvailability.Open,
+                founder.currentState().status,
+                programReady = true
+            )
         )
     }
 

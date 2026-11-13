@@ -32,7 +32,7 @@ import androidx.room.RoomDatabase
         FreeAccessReleasedExerciseEntity::class,
         FreeAccessKnownExerciseEntity::class
     ],
-    version = 22,
+    version = 23,
     exportSchema = true
 )
 abstract class WeightDatabase : RoomDatabase() {
@@ -95,7 +95,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_18_19,
                     MIGRATION_19_20,
                     MIGRATION_20_21,
-                    MIGRATION_21_22
+                    MIGRATION_21_22,
+                    MIGRATION_22_23
                 )
                 .build()
         }

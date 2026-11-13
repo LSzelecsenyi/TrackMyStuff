@@ -38,7 +38,8 @@ data class ExerciseEditorUiState(
     val created: Boolean = false,
     val saved: Boolean = false,
     val lockedFeature: AppFeature? = null,
-    val contentLocked: Boolean = false
+    val contentLocked: Boolean = false,
+    val systemProtected: Boolean = false
 ) {
     val weightInterpretationVisible: Boolean
         get() = ExerciseDraftLogic.isWeightInterpretationVisible(
@@ -48,7 +49,7 @@ data class ExerciseEditorUiState(
     val bodyweightHelperVisible: Boolean
         get() = ExerciseDraftLogic.bodyweightAllowsPerSetLoad(draft.resistanceBasis)
     val canSave: Boolean
-        get() = ExerciseDraftLogic.validate(draft).isEmpty()
+        get() = !systemProtected && ExerciseDraftLogic.validate(draft).isEmpty()
 }
 
 class ExerciseEditorViewModel(
@@ -89,7 +90,12 @@ class ExerciseEditorViewModel(
                     val draft = sortedSecondaries(ExerciseDraftLogic.fromExercise(exercise))
                     original.value = draft
                     _uiState.update {
-                        it.copy(draft = draft, isEditing = true, loading = false)
+                        it.copy(
+                            draft = draft,
+                            isEditing = true,
+                            loading = false,
+                            systemProtected = exercise.isVerifiedSystemExercise()
+                        )
                     }
                 }
             }
@@ -135,7 +141,7 @@ class ExerciseEditorViewModel(
     fun save() {
         var draftToSave: ExerciseDraft? = null
         _uiState.update { state ->
-            if (state.saving || state.finished || state.loading || state.contentLocked) {
+            if (state.saving || state.finished || state.loading || state.contentLocked || state.systemProtected) {
                 return@update state
             }
             val prepared = sortedSecondaries(state.draft)
@@ -204,6 +210,9 @@ class ExerciseEditorViewModel(
                 ExerciseSaveResult.Locked -> {
                     _uiState.update { it.copy(saving = false, contentLocked = true) }
                 }
+                ExerciseSaveResult.SystemProtected -> {
+                    _uiState.update { it.copy(saving = false, systemProtected = true) }
+                }
             }
         }
     }
@@ -237,7 +246,7 @@ class ExerciseEditorViewModel(
 
     private fun updateDraft(transform: (ExerciseDraft) -> ExerciseDraft) {
         _uiState.update { state ->
-            if (state.saving || state.contentLocked) {
+            if (state.saving || state.contentLocked || state.systemProtected) {
                 return@update state
             }
             val next = transform(state.draft)

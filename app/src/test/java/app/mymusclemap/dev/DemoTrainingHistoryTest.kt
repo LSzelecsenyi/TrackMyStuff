@@ -12,6 +12,7 @@ import app.mymusclemap.data.local.WeightDatabase
 import app.mymusclemap.data.preferences.ThemePreferences
 import app.mymusclemap.data.repository.AppBackupRepository
 import app.mymusclemap.domain.body.BodyMeasurementType
+import app.mymusclemap.domain.exercise.ExerciseNaming
 import app.mymusclemap.domain.exercise.StarterCatalog
 import app.mymusclemap.domain.statistics.StatisticsRange
 import app.mymusclemap.domain.theme.AppearanceSettings
@@ -133,7 +134,27 @@ class DemoTrainingHistoryTest {
         try {
             val result = AppBackupRepository(database, preferences).restoreJson(json)
             assertEquals(AppBackupRestoreResult.Success, result)
-            assertEquals(snapshot.tables, database.appBackupDao().loadTables())
+            val loaded = database.appBackupDao().loadTables()
+            val originalIds = snapshot.tables.exercises.map { it.id }.toSet()
+            assertEquals(
+                snapshot.tables.copy(exercises = emptyList(), exerciseMuscles = emptyList()),
+                loaded.copy(exercises = emptyList(), exerciseMuscles = emptyList())
+            )
+            val keyByName = StarterCatalog.entries.associate {
+                ExerciseNaming.normalize(it.draft.name) to it.catalogKey
+            }
+            assertEquals(snapshot.tables.exercises.size, loaded.exercises.size)
+            assertEquals(
+                snapshot.tables.exercises.sortedBy { it.id }.map { row ->
+                    row.copy(catalogKey = keyByName[row.normalizedName])
+                },
+                loaded.exercises.sortedBy { it.id }
+            )
+            assertEquals(
+                snapshot.tables.exerciseMuscles,
+                loaded.exerciseMuscles.filter { it.exerciseId in originalIds }
+            )
+            assertTrue(StarterCatalog.keys.all { key -> loaded.exercises.any { it.catalogKey == key } })
             assertEquals(ThemeMode.Dark, preferences.current().mode)
         } finally {
             database.close()

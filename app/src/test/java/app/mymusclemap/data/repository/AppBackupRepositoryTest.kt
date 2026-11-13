@@ -106,14 +106,31 @@ class AppBackupRepositoryTest {
         assertEquals(AppBackupRestoreResult.Success, restored)
 
         val loaded = targetDb.appBackupDao().loadTables()
-        assertEquals(tables, loaded)
+        assertEquals(
+            tables.copy(exercises = emptyList(), exerciseMuscles = emptyList()),
+            loaded.copy(exercises = emptyList(), exerciseMuscles = emptyList())
+        )
+        val originalIds = tables.exercises.map { it.id }.toSet()
+        assertEquals(
+            tables.exercises,
+            loaded.exercises.filter { it.id in originalIds }.map { it.copy(customNormalizedName = null) }
+        )
+        assertEquals(
+            tables.exerciseMuscles,
+            loaded.exerciseMuscles.filter { it.exerciseId in originalIds }
+        )
+        assertTrue(app.mymusclemap.domain.exercise.StarterCatalog.keys.all { key ->
+            loaded.exercises.any { it.catalogKey == key }
+        })
         assertEquals(appearance.mode, themePreferences.current().mode)
         assertEquals(appearance.paletteType, themePreferences.current().paletteType)
         assertEquals(appearance.customLight.canonical(), themePreferences.current().customLight.canonical())
         assertEquals(appearance.customDark.canonical(), themePreferences.current().customDark.canonical())
+        val loadedExerciseIds = loaded.exercises.map { it.id }.toSet()
+        assertTrue(loaded.exerciseMuscles.all { it.exerciseId in loadedExerciseIds })
         assertEquals(
             tables.exerciseMuscles.map { it.exerciseId }.toSet(),
-            loaded.exercises.map { it.id }.intersect(loaded.exerciseMuscles.map { it.exerciseId }.toSet())
+            loaded.exerciseMuscles.filter { it.exerciseId in originalIds }.map { it.exerciseId }.toSet()
         )
         val archivedExercise = loaded.exercises.single { it.archived }
         assertEquals(51L, archivedExercise.id)
@@ -232,7 +249,7 @@ class AppBackupRepositoryTest {
         assertEquals(AppBackupRestoreResult.Success, AppBackupRepository(targetDb, themePreferences).restoreJson(json))
 
         val sequence = sqliteSequence("exercises")
-        assertEquals(52L, sequence)
+        assertTrue(sequence != null && sequence >= 52L)
         val nextId = targetDb.exerciseDao().insert(
             ExerciseEntity(
                 id = 0,
@@ -249,7 +266,7 @@ class AppBackupRepositoryTest {
                 updatedAt = 9L
             )
         )
-        assertEquals(53L, nextId)
+        assertEquals(sequence!! + 1, nextId)
     }
 
     @Test
@@ -508,11 +525,13 @@ class AppBackupRepositoryTest {
         assertTrue(parsed.snapshot.tables.workoutSessionExerciseMuscles.none { it.muscleGroup == "TRAPS" })
         val restored = AppBackupRepository(targetDb, themePreferences).restoreJson(legacy)
         assertEquals(AppBackupRestoreResult.Success, restored)
-        assertEquals(originalExercises.size, targetDb.exerciseDao().countAll())
-        assertEquals(
-            originalExercises.map { it.name }.toSet(),
-            targetDb.exerciseDao().getAll().map { it.name }.toSet()
-        )
+        val stored = targetDb.exerciseDao().getAll()
+        assertTrue(stored.size >= originalExercises.size)
+        originalExercises.forEach { original ->
+            val row = stored.single { it.id == original.id }
+            assertEquals(original.name, row.name)
+            assertNull(row.catalogKey)
+        }
         assertTrue(targetDb.appBackupDao().loadTables().exerciseMuscles.none { it.muscleGroup == "TRAPS" })
         val rewritten = AppBackupJson.encode(
             representativeSnapshot().copy(tables = targetDb.appBackupDao().loadTables())

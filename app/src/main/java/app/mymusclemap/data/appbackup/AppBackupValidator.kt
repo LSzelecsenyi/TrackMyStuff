@@ -11,6 +11,7 @@ import app.mymusclemap.domain.achievements.TargetWeightProgressEvaluator
 import app.mymusclemap.domain.achievements.WeeklyGoalCompletionEvaluator
 import app.mymusclemap.domain.achievements.WeightMilestone
 import app.mymusclemap.domain.exercise.ExerciseCategory
+import app.mymusclemap.domain.exercise.StarterCatalog
 import app.mymusclemap.domain.exercise.MeasurementType
 import app.mymusclemap.domain.exercise.MovementPattern
 import app.mymusclemap.domain.exercise.MuscleGroup
@@ -58,7 +59,22 @@ object AppBackupValidator {
             validateWeeklyGoal(row, errors)
         }
         requireUnique(tables.exercises.map { it.id }, "exercises.id", errors)
-        requireUnique(tables.exercises.map { it.normalizedName }, "exercises.normalizedName", errors)
+        requireUnique(
+            tables.exercises.filter { it.catalogKey == null }.map { it.normalizedName },
+            "exercises.normalizedName",
+            errors
+        )
+        requireUnique(
+            tables.exercises.mapNotNull { it.catalogKey },
+            "exercises.catalogKey",
+            errors
+        )
+        tables.exercises.forEach { row ->
+            val key = row.catalogKey ?: return@forEach
+            if (!StarterCatalog.isOfficialKey(key)) {
+                errors += AppBackupError(AppBackupErrorCode.InvalidValue, "exercises.catalogKey")
+            }
+        }
         requireUnique(
             tables.exerciseMuscles.map { it.exerciseId to it.muscleGroup },
             "exercise_muscles",

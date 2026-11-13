@@ -224,8 +224,8 @@ android {
         // versionCode must increase for every Play upload. Do not lower it.
         // 17 follows the highest code found on this machine: Gradle and the
         // local release AAB are both 16. Play Console was not queried.
-        versionCode = 17
-        versionName = "0.1.0"
+        versionCode = 18
+        versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

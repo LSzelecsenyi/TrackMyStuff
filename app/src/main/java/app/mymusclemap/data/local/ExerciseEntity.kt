@@ -9,7 +9,8 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "exercises",
     indices = [
-        Index(value = ["normalizedName"], unique = true),
+        Index(value = ["catalogKey"], unique = true),
+        Index(value = ["customNormalizedName"], unique = true),
         Index(value = ["archived"]),
         Index(value = ["category"]),
         Index(value = ["movementPattern"])
@@ -29,7 +30,9 @@ data class ExerciseEntity(
     val createdAt: Long,
     val updatedAt: Long,
     @ColumnInfo(defaultValue = "1")
-    val custom: Boolean = true
+    val custom: Boolean = true,
+    val catalogKey: String? = null,
+    val customNormalizedName: String? = null
 )
 
 @Entity(

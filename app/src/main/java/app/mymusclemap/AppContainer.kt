@@ -216,6 +216,11 @@ class AppContainer(
         }
     )
     val themePreferences = ThemePreferences(appContext)
+    val accountOnboarding = app.mymusclemap.data.preferences.AccountOnboardingStore(appContext, accountUserId)
+    val systemCatalogReconciler = app.mymusclemap.data.repository.SystemCatalogReconciler(
+        database,
+        exerciseRepository
+    )
     val progressPhotoStore = ProgressPhotoStore(
         File(appContext.filesDir, app.mymusclemap.domain.account.accountPhotoDirectory(accountUserId))
     )
@@ -232,11 +237,27 @@ class AppContainer(
             achievementRepository.reconcile()
         }
     )
-    val firstRunCoordinator = FirstRunCoordinator(database, exerciseRepository, themePreferences)
+    val legacyFounderMilestones = FounderMilestoneAcknowledgementStore(appContext)
+    val founderMilestoneAcknowledgements = FounderMilestoneAcknowledgementStore(appContext, accountUserId)
+    val firstRunCoordinator = FirstRunCoordinator(
+        database,
+        exerciseRepository,
+        accountOnboarding,
+        systemCatalogReconciler,
+        beforePrepare = { preexisting ->
+            app.mymusclemap.data.account.AccountScopedStateMigration(
+                appContext,
+                accountUserId,
+                accountOnboarding,
+                themePreferences,
+                founderMilestoneAcknowledgements,
+                legacyFounderMilestones
+            ).run(preexisting)
+        }
+    )
     val founderProgramRules: FounderProgramRules = FounderProgramRuleSelection.rules
     val founderProgramAvailability = FounderProgramAvailabilitySelection.availability
     val founderProgramStore = FounderProgramStore(appContext, accountUserId)
-    val founderMilestoneAcknowledgements = FounderMilestoneAcknowledgementStore(appContext)
     private val entitlementRevision = MutableStateFlow(0)
     val entitlementRevisions: kotlinx.coroutines.flow.StateFlow<Int> get() = entitlementRevision
     private val founderAuthorityRefresh = Mutex()
@@ -460,6 +481,7 @@ class AppContainer(
         onExerciseCreated.set { id -> freeAccessRepository.allocateCreatedCustomExercise(id) }
         afterBackupRestore.set {
             freeAccessRepository.refresh(legacyRestoreWithoutSelection = true)
+            systemCatalogReconciler.reconcile()
         }
         founderCacheScope.launch {
             entitlementRevision.collect { freeAccessRepository.refresh() }
@@ -1011,7 +1033,7 @@ class AppContainer(
     }
 
     val onboardingRepository = OnboardingRepository(
-        themePreferences = themePreferences,
+        themePreferences = accountOnboarding,
         sessionRepository = workoutSessionRepository,
         weightRepository = weightRepository,
         templateRepository = workoutTemplateRepository

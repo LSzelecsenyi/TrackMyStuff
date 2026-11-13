@@ -14,6 +14,7 @@ import app.mymusclemap.domain.exercise.ExerciseDraftLogic
 import app.mymusclemap.domain.exercise.ExerciseNaming
 import app.mymusclemap.domain.exercise.ExerciseSaveResult
 import app.mymusclemap.domain.exercise.MuscleRole
+import app.mymusclemap.domain.exercise.StarterCatalog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -58,7 +59,15 @@ class ExerciseRepository(
 
     suspend fun activeCustomCount(): Int = dao.countActiveCustom()
 
-    suspend fun save(draft: ExerciseDraft, asStarter: Boolean = false): ExerciseSaveResult {
+    suspend fun save(
+        draft: ExerciseDraft,
+        asStarter: Boolean = false,
+        catalogKey: String? = null
+    ): ExerciseSaveResult {
+        val officialKey = catalogKey?.takeIf { StarterCatalog.isOfficialKey(it) }
+        if (catalogKey != null && officialKey == null) {
+            return ExerciseSaveResult.SystemProtected
+        }
         val prepared = draft.copy(
             secondaryMuscles = ExerciseDraftLogic.normalizeSecondary(
                 draft.primaryMuscle,
@@ -77,9 +86,6 @@ class ExerciseRepository(
         val name = ExerciseNaming.displayName(prepared.name)
         val normalized = ExerciseNaming.normalize(name)
         val exceptId = prepared.id ?: 0L
-        if (dao.findIdByNormalizedName(normalized, exceptId) != null) {
-            return ExerciseSaveResult.DuplicateName
-        }
         val now = clock.millis()
         val notes = prepared.notes.trim().ifBlank { null }
         val secondary = prepared.secondaryMuscles
@@ -88,10 +94,24 @@ class ExerciseRepository(
         if (prepared.id != null && existing == null) {
             return ExerciseSaveResult.NotFound
         }
+        if (existing != null && existing.isVerifiedSystemRow()) {
+            return ExerciseSaveResult.SystemProtected
+        }
+        if (officialKey != null) {
+            if (existing != null) {
+                return ExerciseSaveResult.SystemProtected
+            }
+            val already = dao.findByCatalogKey(officialKey)
+            if (already != null) {
+                return ExerciseSaveResult.Created(already.id)
+            }
+        } else if (dao.findIdByCustomNormalizedName(normalized, exceptId) != null) {
+            return ExerciseSaveResult.DuplicateName
+        }
         if (existing != null && existing.custom && !mayUpdate(existing.id)) {
             return ExerciseSaveResult.Locked
         }
-        val creatingCustom = existing == null && !asStarter
+        val creatingCustom = existing == null && officialKey == null && !asStarter
         if (creatingCustom && !allowCustomCreate(dao.countActiveCustom())) {
             return ExerciseSaveResult.CreationLimited
         }
@@ -108,7 +128,13 @@ class ExerciseRepository(
             archived = existing?.archived ?: false,
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
-            custom = existing?.custom ?: !asStarter
+            custom = when {
+                officialKey != null -> false
+                existing != null -> existing.custom
+                else -> !asStarter
+            },
+            catalogKey = officialKey,
+            customNormalizedName = if (officialKey == null) normalized else null
         )
         val muscles = buildList {
             add(
@@ -141,11 +167,21 @@ class ExerciseRepository(
             }
         } catch (error: Exception) {
             if (isUniqueConstraint(error)) {
+                if (officialKey != null) {
+                    val winner = dao.findByCatalogKey(officialKey)
+                    if (winner != null) {
+                        return ExerciseSaveResult.Created(winner.id)
+                    }
+                }
                 ExerciseSaveResult.DuplicateName
             } else {
                 throw error
             }
         }
+    }
+
+    private fun ExerciseEntity.isVerifiedSystemRow(): Boolean {
+        return catalogKey != null && StarterCatalog.isOfficialKey(catalogKey)
     }
 
     private fun isUniqueConstraint(error: Throwable): Boolean {
@@ -165,6 +201,7 @@ class ExerciseRepository(
 
     suspend fun archive(id: Long): Boolean {
         val existing = dao.getById(id) ?: return false
+        if (existing.isVerifiedSystemRow()) return false
         if (existing.custom && !mayUpdate(id)) return false
         dao.update(existing.copy(archived = true, updatedAt = clock.millis()))
         return true
@@ -172,21 +209,24 @@ class ExerciseRepository(
 
     suspend fun restore(id: Long): Boolean {
         val existing = dao.getById(id) ?: return false
+        if (existing.isVerifiedSystemRow()) return false
         if (existing.custom && !mayUpdate(id)) return false
         dao.update(existing.copy(archived = false, updatedAt = clock.millis()))
         return true
     }
 
     suspend fun canDeletePermanently(exerciseId: Long): Boolean {
-        if (dao.getById(exerciseId) == null) {
+        val existing = dao.getById(exerciseId) ?: return false
+        if (existing.isVerifiedSystemRow()) {
             return false
         }
         return !hasWorkoutReferences(exerciseId)
     }
 
     suspend fun deletePermanently(id: Long): ExerciseDeleteResult {
-        if (dao.getById(id) == null) {
-            return ExerciseDeleteResult.NotFound
+        val existing = dao.getById(id) ?: return ExerciseDeleteResult.NotFound
+        if (existing.isVerifiedSystemRow()) {
+            return ExerciseDeleteResult.SystemProtected
         }
         if (!canDeletePermanently(id)) {
             return ExerciseDeleteResult.BlockedByReferences

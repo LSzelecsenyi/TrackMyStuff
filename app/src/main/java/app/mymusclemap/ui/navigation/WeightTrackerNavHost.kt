@@ -800,6 +800,11 @@ fun WeightTrackerNavHost(
                         programReady = !founder.loading
                     ),
                     showFounderBadge = founder.founderBadge,
+                    offerFounderJoin = app.mymusclemap.ui.founder.founderSettingsOffersJoin(
+                        availability = founderAvailability,
+                        status = founder.status,
+                        programReady = !founder.loading
+                    ),
                     onOpenFounderProgram = {
                         navController.navigateInternal(AppRoutes.FOUNDER_PROGRAM)
                     }

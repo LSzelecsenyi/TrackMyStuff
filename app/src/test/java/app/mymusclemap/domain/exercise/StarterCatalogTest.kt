@@ -17,6 +17,20 @@ class StarterCatalogTest {
         }
         val names = drafts.map { ExerciseNaming.normalize(it.name) }
         assertEquals(names.distinct(), names)
+        assertEquals(drafts.size, StarterCatalog.keys.size)
+        assertEquals(
+            setOf(
+                "SQUAT", "LEG_PRESS", "LUNGE", "DEADLIFT", "ROMANIAN_DEADLIFT", "HIP_THRUST",
+                "LEG_CURL", "CALF_RAISE", "BENCH_PRESS", "PUSH_UP", "OVERHEAD_PRESS", "DIP",
+                "PULL_UP", "CHIN_UP", "LAT_PULLDOWN", "BARBELL_ROW", "DUMBBELL_ROW", "FACE_PULL",
+                "LATERAL_RAISE", "BICEPS_CURL", "TRICEPS_EXTENSION", "PLANK"
+            ),
+            StarterCatalog.keys
+        )
+        StarterCatalog.entries.forEach { entry ->
+            assertTrue(entry.catalogKey.none { it.isLowerCase() })
+            assertFalse(entry.catalogKey == ExerciseNaming.normalize(entry.draft.name))
+        }
     }
 
     @Test

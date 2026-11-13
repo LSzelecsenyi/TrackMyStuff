@@ -598,6 +598,7 @@
     <string name="message_exercise_restored">Exercise restored.</string>
     <string name="message_exercise_deleted">Exercise permanently deleted.</string>
     <string name="message_exercise_delete_blocked">This exercise is used in a workout plan or workout, so it cannot be deleted permanently. Archive it instead.</string>
+    <string name="message_exercise_system_protected">Built-in exercises cannot be changed.</string>
     <string name="template_delete_blocked_body">This workout plan is used in a workout, so it cannot be deleted permanently. Archive it instead.</string>
     <string name="action_start_workout">Start workout</string>
     <string name="action_start_template">Start %1$s</string>
@@ -1471,6 +1472,7 @@
     <string name="founder_settings_title">Founding Tester</string>
     <string name="founder_open">Founding Tester program</string>
     <string name="founder_open_subtitle">See your qualification progress</string>
+    <string name="founder_settings_join">Join Founding Tester</string>
     <string name="founder_member_subtitle">View your program status</string>
     <string name="founder_badge">Founding Member</string>
     <string name="founder_mark_content_description">Founding Tester program</string>
