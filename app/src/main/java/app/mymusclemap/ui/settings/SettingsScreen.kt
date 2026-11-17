@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -470,14 +471,17 @@ internal fun LanguageSection(
             modifier = Modifier.testTag(SETTINGS_LANGUAGE)
         )
         Spacer(Modifier.height(AppDimens.itemGap))
-        Column(modifier = Modifier.selectableGroup()) {
-            ChoiceRow(
+        Column(
+            modifier = Modifier.selectableGroup(),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
+        ) {
+            ExclusiveChoice(
                 label = stringResource(R.string.language_hungarian),
                 selected = selected == app.mymusclemap.domain.locale.AppLanguage.HU,
                 testTag = SETTINGS_LANGUAGE_HU,
                 onClick = { onSelected(app.mymusclemap.domain.locale.AppLanguage.HU) }
             )
-            ChoiceRow(
+            ExclusiveChoice(
                 label = stringResource(R.string.language_english),
                 selected = selected == app.mymusclemap.domain.locale.AppLanguage.EN,
                 testTag = SETTINGS_LANGUAGE_EN,
@@ -968,17 +972,19 @@ internal fun TrainingSection(
             testTag = SETTINGS_WEEKLY_GOAL,
             onClick = onOpenGoal
         )
+        CompactEditorDivider()
         LockScreenSetCompletionRow(
             enabled = lockScreenSetCompletion,
             note = lockScreenAccessNote,
             onCheckedChange = onLockScreenSetCompletionChange,
             onOpenSettings = onOpenLockScreenAccessSettings
         )
+        CompactEditorDivider()
         TimerAudioRow(
             mode = timerAudio,
             onModeChange = onTimerAudioChange
         )
-        Spacer(Modifier.height(AppDimens.sectionGap))
+        CompactEditorDivider()
         WeightAdjustmentSection(
             unitSystem = unitSystem,
             configuration = weightAdjustment,
@@ -1373,8 +1379,7 @@ internal fun AccountSection(
             testTag = SETTINGS_SIGN_OUT,
             onClick = { confirm = true }
         )
-        Spacer(Modifier.height(AppDimens.sectionGap))
-        HorizontalDivider(color = MaterialTheme.colorScheme.error.copy(alpha = 0.35f))
+        CompactEditorDivider()
         DataActionRow(
             icon = Icons.Outlined.Delete,
             title = stringResource(R.string.settings_delete_account),
@@ -1465,12 +1470,18 @@ internal fun AboutSection(
         stringResource(R.string.about_version, state.appVersionName)
     }
     CompactEditorSection(title = settingsKicker(stringResource(R.string.about_title))) {
-        StrictBrandLockup(
-            artwork = StrictBrandArtwork.Wordmark,
-            showTagline = true,
-            markWidth = 200.dp
-        )
-        Spacer(Modifier.height(AppDimens.itemGap))
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            StrictBrandLockup(
+                artwork = StrictBrandArtwork.Lockup,
+                showTagline = false,
+                centered = true,
+                markWidth = (maxWidth * 0.86f).coerceAtMost(320.dp)
+            )
+        }
+        Spacer(Modifier.height(AppDimens.sectionGap))
         Text(
             text = stringResource(R.string.about_product),
             style = AppTypeTokens.sectionTitle,

@@ -482,13 +482,49 @@ class SettingsScreenLayoutTest {
     }
 
     @Test
-    fun aboutUsesTheMetallicWordmarkAndLocalizedTagline() {
-        render(page = SettingsSurface.About, darkTheme = true)
+    fun aboutUsesTheMetallicLockupWithoutADuplicateTagline() {
+        render(page = SettingsSurface.About, darkTheme = true, width = 320.dp)
         composeRule.onNodeWithText(testString(R.string.about_title).uppercase()).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(STRICT_WORDMARK).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(STRICT_LOCKUP).assertDoesNotExist()
-        composeRule.onNodeWithText(testString(R.string.brand_tagline)).performScrollTo().assertIsDisplayed()
+        val lockup = composeRule.onNodeWithTag(STRICT_LOCKUP).performScrollTo()
+        lockup.assertIsDisplayed()
+        composeRule.onNodeWithTag(STRICT_WORDMARK).assertDoesNotExist()
+        composeRule.onNodeWithText(testString(R.string.brand_tagline)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(
+            "${testString(R.string.app_name)}. ${testString(R.string.brand_tagline)}"
+        ).assertIsDisplayed()
         composeRule.onAllNodesWithText("My Muscle Map").assertCountEquals(0)
+        val bounds = lockup.getBoundsInRoot()
+        val product = composeRule.onNodeWithText(testString(R.string.about_product)).getBoundsInRoot()
+        val center = (bounds.left + bounds.right) / 2
+        assertTrue(
+            "lockup should stay centered on a narrow screen: $bounds",
+            kotlin.math.abs(center.value - 160f) < 2f
+        )
+        assertTrue("lockup should stay inside the screen: $bounds", bounds.left >= 0.dp && bounds.right <= 320.dp)
+        assertTrue("lockup should not cover the product name: lockup=$bounds product=$product", bounds.bottom <= product.top)
+        val ratio = (bounds.right - bounds.left).value / (bounds.bottom - bounds.top).value
+        assertTrue("lockup should keep its aspect ratio: $ratio", kotlin.math.abs(ratio - 1.5f) < 0.08f)
+    }
+
+    @Test
+    fun trainingSettingsKeepStandardSeparatorsOnANarrowScreen() {
+        render(page = SettingsSurface.Training, darkTheme = true, width = 320.dp)
+        val goal = composeRule.onNodeWithTag(SETTINGS_WEEKLY_GOAL).getBoundsInRoot()
+        val toggle = composeRule.onNodeWithTag(SETTINGS_LOCK_SCREEN_SETS).getBoundsInRoot()
+        val audio = composeRule.onNodeWithTag("settings_timer_audio").getBoundsInRoot()
+        val step = composeRule.onNodeWithTag(SETTINGS_WEIGHT_STEP).getBoundsInRoot()
+        assertTrue(goal.bottom < toggle.top)
+        assertTrue(toggle.bottom < audio.top)
+        assertTrue(audio.bottom < step.top)
+        val dividerGap = AppDimens.sectionDividerSpace * 2 + AppDimens.strokeThin
+        val audioToStep = step.top - audio.bottom
+        assertTrue(
+            "weight step should follow timer audio across a standard divider, gap=$audioToStep",
+            kotlin.math.abs(audioToStep.value - dividerGap.value) < 2f
+        )
+        assertTrue(goal.left >= 0.dp && step.right <= 320.dp)
+        assertTrue(kotlin.math.abs(goal.left.value - audio.left.value) < 1f)
+        assertTrue(kotlin.math.abs(audio.right.value - step.right.value) < 1f)
     }
 
     @Test
@@ -920,7 +956,21 @@ class SettingsScreenLayoutTest {
             onSignOut = { signedOut += 1 },
             onOpenDeleteAccount = { deletes += 1 }
         )
-        composeRule.onNodeWithTag(SETTINGS_DELETE_ACCOUNT).performScrollTo().performClick()
+        val delete = composeRule.onNodeWithTag(SETTINGS_DELETE_ACCOUNT).performScrollTo().getBoundsInRoot()
+        val signOut = composeRule.onNodeWithTag(SETTINGS_SIGN_OUT).getBoundsInRoot()
+        val founder = composeRule.onNodeWithTag("settings-founder-program").getBoundsInRoot()
+        assertTrue(kotlin.math.abs(delete.left.value - signOut.left.value) < 1f)
+        assertTrue(kotlin.math.abs(delete.right.value - signOut.right.value) < 1f)
+        assertTrue(kotlin.math.abs(delete.left.value - founder.left.value) < 1f)
+        assertTrue(kotlin.math.abs(delete.right.value - founder.right.value) < 1f)
+        val gap = delete.top - signOut.bottom
+        val dividerGap = AppDimens.sectionDividerSpace * 2 + AppDimens.strokeThin
+        assertTrue(
+            "delete account should sit below the same divider spacing as other sections, gap=$gap",
+            kotlin.math.abs(gap.value - dividerGap.value) < 2f
+        )
+        assertTrue(delete.right <= 360.dp)
+        composeRule.onNodeWithTag(SETTINGS_DELETE_ACCOUNT).performClick()
         assertEquals(1, deletes)
         assertEquals(0, signedOut)
         composeRule.onNodeWithText(testString(R.string.settings_sign_out_title)).assertDoesNotExist()
